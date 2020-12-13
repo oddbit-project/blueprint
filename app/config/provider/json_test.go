@@ -26,70 +26,70 @@ type JsonTestConfig struct {
 }
 
 const (
-	var1Value = 19
-	var2Value = "some_value"
-	var3Value = "other_value"
-	var4Value = "value4"
-	var5Value = true
-	var6Value = 12.99
+	jsonVar1Value = 19
+	jsonVar2Value = "some_value"
+	jsonVar3Value = "other_value"
+	jsonVar4Value = "value4"
+	jsonVar5Value = true
+	jsonVar6Value = 12.99
 )
 
-var expectedKeys = []string{"Var1", "Var2", "Map1", "Var5", "Var6", "Var7"}
+var jsonExpectedKeys = []string{"Var1", "Var2", "Map1", "Var5", "Var6", "Var7"}
 
 func newJsonConfig() *JsonTestConfig {
 	return &JsonTestConfig{
-		Var1: var1Value,
-		Var2: var2Value,
-		Var5: var5Value,
-		Var6: var6Value,
-		Var7: expectedKeys,
+		Var1: jsonVar1Value,
+		Var2: jsonVar2Value,
+		Var5: jsonVar5Value,
+		Var6: jsonVar6Value,
+		Var7: jsonExpectedKeys,
 		Map1: JsonConfigEntry1{
-			Var3: var3Value,
+			Var3: jsonVar3Value,
 			Map2: JsonConfigEntry2{
-				Var4: var4Value,
+				Var4: jsonVar4Value,
 			},
 		},
 	}
 }
 
-func TestJsonProviderFactory(t *testing.T) {
+func TestNewJsonProvider(t *testing.T) {
 	configSource := newJsonConfig()
 
 	cfgBuffer, err := json.Marshal(configSource)
 	if err != nil {
-		t.Fatal("JsonProviderFactory():", err)
+		t.Fatal("NewJsonProvider():", err)
 	}
 
 	/* Test []byte source */
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
-		t.Error("JsonProviderFactory():", err)
+		t.Error("NewJsonProvider():", err)
 	}
 	if cfg == nil {
-		t.Error("JsonProviderFactory(): invalid result object")
+		t.Error("NewJsonProvider(): invalid result object")
 	}
 
 	/* Test io.Reader source */
 	buf := bytes.NewBuffer(cfgBuffer)
-	cfg, err = JsonProviderFactory(buf)
+	cfg, err = NewJsonProvider(buf)
 	if err != nil {
-		t.Error("JsonProviderFactory():", err)
+		t.Error("NewJsonProvider():", err)
 	}
 	if cfg == nil {
-		t.Error("JsonProviderFactory(): invalid result object")
+		t.Error("NewJsonProvider(): invalid result object")
 	}
 
 	/* Test json.RawMessage source */
 	msg := json.RawMessage{}
 	if err := json.Unmarshal(cfgBuffer, &msg); err != nil {
-		t.Fatal("JsonProviderFactory():", err)
+		t.Fatal("NewJsonProvider():", err)
 	}
-	cfg, err = JsonProviderFactory(msg)
+	cfg, err = NewJsonProvider(msg)
 	if err != nil {
-		t.Error("JsonProviderFactory():", err)
+		t.Error("NewJsonProvider():", err)
 	}
 	if cfg == nil {
-		t.Error("JsonProviderFactory(): invalid result object")
+		t.Error("NewJsonProvider(): invalid result object")
 	}
 }
 
@@ -99,7 +99,7 @@ func TestJsonProvider_GetKey(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_GetKey():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetKey():", err)
 	}
@@ -109,7 +109,7 @@ func TestJsonProvider_GetKey(t *testing.T) {
 	if err = cfg.GetKey("Var1", &var1); err != nil {
 		t.Error("JsonProvider_GetKey():", err)
 	} else {
-		if var1 != var1Value {
+		if var1 != jsonVar1Value {
 			t.Error("JsonProvider_GetKey(): Var1 value mismatch")
 		}
 	}
@@ -119,7 +119,7 @@ func TestJsonProvider_GetKey(t *testing.T) {
 	if err = cfg.GetKey("Var2", &var2); err != nil {
 		t.Error("JsonProvider_GetKey():", err)
 	} else {
-		if var2 != var2Value {
+		if var2 != jsonVar2Value {
 			t.Error("JsonProvider_GetKey(): Var2 value mismatch")
 		}
 	}
@@ -129,10 +129,10 @@ func TestJsonProvider_GetKey(t *testing.T) {
 	if err = cfg.GetKey("Map1", &cfgMap1); err != nil {
 		t.Error("JsonProvider_GetKey():", err)
 	} else {
-		if cfgMap1.Var3 != var3Value {
+		if cfgMap1.Var3 != jsonVar3Value {
 			t.Error("JsonProvider_GetKey(): Var3 value mismatch")
 		}
-		if cfgMap1.Map2.Var4 != var4Value {
+		if cfgMap1.Map2.Var4 != jsonVar4Value {
 			t.Error("JsonProvider_GetKey(): Var4 value mismatch")
 		}
 	}
@@ -153,7 +153,7 @@ func TestJsonProvider_GetStringKey(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_GetStringKey():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetStringKey():", err)
 	}
@@ -164,7 +164,7 @@ func TestJsonProvider_GetStringKey(t *testing.T) {
 	if err != nil {
 		t.Error("JsonProvider_GetStringKey():", err)
 	} else {
-		if var2 != var2Value {
+		if var2 != jsonVar2Value {
 			t.Error("JsonProvider_GetStringKey(): Var1 value mismatch")
 		}
 	}
@@ -182,7 +182,7 @@ func TestJsonProvider_GetIntKey(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_GetIntKey():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetIntKey():", err)
 	}
@@ -193,7 +193,7 @@ func TestJsonProvider_GetIntKey(t *testing.T) {
 	if err != nil {
 		t.Error("JsonProvider_GetIntKey():", err)
 	} else {
-		if var1 != var1Value {
+		if var1 != jsonVar1Value {
 			t.Error("JsonProvider_GetIntKey(): Var1 value mismatch")
 		}
 	}
@@ -211,7 +211,7 @@ func TestJsonProvider_GetBoolKey(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_GetBoolKey():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetBoolKey():", err)
 	}
@@ -222,7 +222,7 @@ func TestJsonProvider_GetBoolKey(t *testing.T) {
 	if err != nil {
 		t.Error("JsonProvider_GetBoolKey():", err)
 	} else {
-		if var5 != var5Value {
+		if var5 != jsonVar5Value {
 			t.Error("JsonProvider_GetBoolKey(): Var5 value mismatch")
 		}
 	}
@@ -240,7 +240,7 @@ func TestJsonProvider_GetFloat64Key(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_GetFloat64Key():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetFloat64Key():", err)
 	}
@@ -251,7 +251,7 @@ func TestJsonProvider_GetFloat64Key(t *testing.T) {
 	if err != nil {
 		t.Error("JsonProvider_GetFloat64Key():", err)
 	} else {
-		if var6 != var6Value {
+		if var6 != jsonVar6Value {
 			t.Error("JsonProvider_GetFloat64Key(): Var6 value mismatch")
 		}
 	}
@@ -269,7 +269,7 @@ func TestJsonProvider_GetSliceKey(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_GetSliceKey():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetSliceKey():", err)
 	}
@@ -280,7 +280,7 @@ func TestJsonProvider_GetSliceKey(t *testing.T) {
 	if err != nil {
 		t.Error("JsonProvider_GetSliceKey():", err)
 	} else {
-		if !reflect.DeepEqual(var7, expectedKeys) {
+		if !reflect.DeepEqual(var7, jsonExpectedKeys) {
 			t.Error("JsonProvider_GetSliceKey(): Var7 value mismatch")
 		}
 	}
@@ -291,14 +291,13 @@ func TestJsonProvider_GetSliceKey(t *testing.T) {
 	}
 }
 
-
 func TestJsonProvider_GetConfigNode(t *testing.T) {
 	configSource := newJsonConfig()
 	cfgBuffer, err := json.Marshal(configSource)
 	if err != nil {
 		t.Fatal("JsonProvider_GetConfigNode():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_GetConfigNode():", err)
 	}
@@ -333,11 +332,11 @@ func TestJsonProvider_KeyExists(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_KeyExists():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_KeyExists():", err)
 	}
-	for _, k := range expectedKeys {
+	for _, k := range jsonExpectedKeys {
 		if !cfg.KeyExists(k) {
 			t.Error("JsonProvider_KeyExists(): existing key detection failed")
 		}
@@ -356,16 +355,16 @@ func TestJsonProvider_KeyListExists(t *testing.T) {
 	if err != nil {
 		t.Fatal("JsonProvider_KeyListExists():", err)
 	}
-	cfg, err := JsonProviderFactory(cfgBuffer)
+	cfg, err := NewJsonProvider(cfgBuffer)
 	if err != nil {
 		t.Fatal("JsonProvider_KeyListExists():", err)
 	}
-	if !cfg.KeyListExists(expectedKeys) {
+	if !cfg.KeyListExists(jsonExpectedKeys) {
 		t.Error("JsonProvider_KeyListExists(): existing key detection failed")
 	}
 
 	var nonExistingKeys []string
-	copy(nonExistingKeys, expectedKeys)
+	copy(nonExistingKeys, jsonExpectedKeys)
 	nonExistingKeys = append(nonExistingKeys, "non-existing")
 	if cfg.KeyListExists(nonExistingKeys) {
 		t.Error("JsonProvider_KeyListExists(): non-existing key detection failed")

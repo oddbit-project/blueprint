@@ -13,14 +13,10 @@ type JsonProvider struct {
 	configData map[string]json.RawMessage
 }
 
-func NewJsonProvider() *JsonProvider {
-	return &JsonProvider{
+func NewJsonProvider(src interface{}) (config.ConfigInterface, error) {
+	provider := &JsonProvider{
 		configData: make(map[string]json.RawMessage),
 	}
-}
-
-func JsonProviderFactory(src interface{}) (config.ConfigInterface, error) {
-	provider := NewJsonProvider()
 	switch src.(type) {
 	case json.RawMessage:
 		if err := json.Unmarshal(src.(json.RawMessage), &provider.configData); err != nil {
@@ -42,7 +38,7 @@ func JsonProviderFactory(src interface{}) (config.ConfigInterface, error) {
 		}
 
 	default:
-		return nil, errors.New("JsonProviderFactory: Invalid source type")
+		return nil, errors.New("NewJsonProvider: Invalid source type")
 	}
 	return provider, nil
 }
@@ -130,7 +126,7 @@ func (j *JsonProvider) GetSliceKey(key, separator string) ([]string, error) {
 
 func (j *JsonProvider) GetConfigNode(key string) (config.ConfigInterface, error) {
 	if v, ok := j.configData[key]; ok {
-		return JsonProviderFactory(v)
+		return NewJsonProvider(v)
 	}
 	return nil, config.ErrNoKey
 }

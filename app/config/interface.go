@@ -4,6 +4,7 @@ import "github.com/oddbit-project/blueprint/utils"
 
 const (
 	ErrNoKey = utils.Error("Config key does not exist")
+	ErrNotImplemented = utils.Error("Config method or type not implemented")
 )
 
 type ConfigInterface interface {
