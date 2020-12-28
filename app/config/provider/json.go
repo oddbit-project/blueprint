@@ -10,6 +10,7 @@ import (
 )
 
 type JsonProvider struct {
+	config.ConfigInterface
 	configData map[string]json.RawMessage
 }
 

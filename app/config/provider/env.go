@@ -11,6 +11,7 @@ import (
 const CommaSeparator = ","
 
 type EnvProvider struct {
+	config.ConfigInterface
 	prefix     string
 	configData map[string]string
 }
