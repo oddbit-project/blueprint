@@ -1,0 +1,9 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": 1234,
+    "tlsEnable": true,
+    "tlsCert": "config/server.crt",
+    "tlsKey": "config/server.key"
+  }
+}
