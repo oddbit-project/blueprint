@@ -1,4 +1,8 @@
 # blueprint
+
+<img src="https://img.shields.io/github/go-mod/go-version/oddbit-project/blueprint" />
+<img src="https://img.shields.io/github/actions/workflow/status/oddbit-project/blueprint/run-tests.yml" />
+
 Misc Golang routines
 
 
