@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-// CallStack callable
+// CallableFn CallStack callable function
 type CallableFn func() error
 
 type CallStack struct {
@@ -14,7 +14,7 @@ type CallStack struct {
 	sync.Mutex
 }
 
-// Create new CallStack
+// NewCallStack creates a new CallStack
 func NewCallStack() *CallStack {
 	return &CallStack{
 		calling:  0,
@@ -22,14 +22,20 @@ func NewCallStack() *CallStack {
 	}
 }
 
-// Add a callback
+// Add Adds a callback
 func (c *CallStack) Add(fn CallableFn) {
 	c.Lock()
 	defer c.Unlock()
 	c.handlers = append(c.handlers, fn)
 }
 
-// Run all callbacks in reverse order
+// Run executes the callback functions in the CallStack in reverse order.
+// If abortOnError is true and any of the callback functions return an error, the execution stops and returns that error.
+// If abortOnError is false, all callback functions are executed, regardless of errors.
+// The CallStack is locked while executing the callbacks to ensure thread safety.
+// The calling flag is set to 1 during the execution and reset to 0 after execution.
+// If the CallStack is empty, Run returns nil.
+// Returns an error if abortOnError is true and any callback function returns an error; otherwise, returns nil.
 func (c *CallStack) Run(abortOnError bool) error {
 	c.Lock()
 	atomic.StoreInt32(&c.calling, 1)
@@ -46,7 +52,7 @@ func (c *CallStack) Run(abortOnError bool) error {
 	return nil
 }
 
-// run all callbacks in sequential order
+// RunLinear executes each callback function in the call stack linearly.
 func (c *CallStack) RunLinear(abortOnError bool) error {
 	c.Lock()
 	atomic.StoreInt32(&c.calling, 1)

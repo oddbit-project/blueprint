@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -122,7 +121,7 @@ func TestConsumerChannel(t *testing.T) {
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
 	wg := sync.WaitGroup{}
 	wg.Add(3) // expect 3 message
-	msgChannel := make(chan kafka.Message)
+	msgChannel := make(chan Message)
 	defer close(msgChannel)
 	// consumer thread
 	go func() {
@@ -167,7 +166,7 @@ func TestConsumerSubscribe(t *testing.T) {
 	wg.Add(3) // expect 3 message
 	// consumer thread
 	go func() {
-		consumer.Subscribe(func(ctx context.Context, message kafka.Message) error {
+		consumer.Subscribe(func(ctx context.Context, message Message) error {
 			assert.Equal(t, string(value1), string(message.Value))
 			wg.Done()
 			return nil
@@ -205,7 +204,7 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 	wg.Add(3) // expect 3 message
 	// consumer thread
 	go func() {
-		consumer.SubscribeWithOffsets(func(ctx context.Context, message kafka.Message) error {
+		consumer.SubscribeWithOffsets(func(ctx context.Context, message Message) error {
 			assert.Equal(t, string(value1), string(message.Value))
 			wg.Done()
 			return nil

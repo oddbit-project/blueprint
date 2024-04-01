@@ -20,8 +20,11 @@ type ConsumerConfig struct {
 	tlsProvider.ClientConfig
 }
 
+// Message is a type alias to avoid using kafka-go in application code
+type Message = kafka.Message
+
 // ConsumerFunc Reader handler type
-type ConsumerFunc func(ctx context.Context, message kafka.Message) error
+type ConsumerFunc func(ctx context.Context, message Message) error
 
 type KafkaConsumer struct {
 	ctx     context.Context
@@ -160,7 +163,7 @@ func (c *KafkaConsumer) Subscribe(handler ConsumerFunc) error {
 // It returns the Kafka message and an error
 // If there is no message available, it will block until a message is available
 // If an error occurs, it will be returned
-func (c *KafkaConsumer) ReadMessage() (kafka.Message, error) {
+func (c *KafkaConsumer) ReadMessage() (Message, error) {
 	if !c.IsConnected() {
 		c.Connect()
 	}
@@ -169,7 +172,7 @@ func (c *KafkaConsumer) ReadMessage() (kafka.Message, error) {
 
 // ChannelSubscribe subscribes to a reader handler by channel
 // Note: This function is blocking
-func (c *KafkaConsumer) ChannelSubscribe(ch chan kafka.Message) error {
+func (c *KafkaConsumer) ChannelSubscribe(ch chan Message) error {
 	if !c.IsConnected() {
 		c.Connect()
 	}
