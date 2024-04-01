@@ -65,33 +65,33 @@ func (e *EnvProvider) convertKey(key string) string {
 //   - error: Returns an error if the destination is not a struct or if there is an error setting the field value.
 //
 // Example usage:
-//   type Config struct {
-//       Name     string `env:"APP_NAME"`
-//       Port     int    `env:"APP_PORT"`
-//       Debug    bool   `env:"APP_DEBUG"`
-//       Timeout  string `env:"APP_TIMEOUT"`
-//       Database []string `env:"DB_CONNECTIONS"`
-//   }
 //
-//   var cfg Config
-//   err := readPrefixedStruct("APP", &cfg)
-//   if err != nil {
-//       // handle error
-//   }
+//	type Config struct {
+//	    Name     string `env:"APP_NAME"`
+//	    Port     int    `env:"APP_PORT"`
+//	    Debug    bool   `env:"APP_DEBUG"`
+//	    Timeout  string `env:"APP_TIMEOUT"`
+//	    Database []string `env:"DB_CONNECTIONS"`
+//	}
 //
-//   fmt.Println(cfg.Name)     // Output: MyApp
-//   fmt.Println(cfg.Port)     // Output: 8080
-//   fmt.Println(cfg.Debug)    // Output: true
-//   fmt.Println(cfg.Timeout)  // Output: 10s
-//   fmt.Println(cfg.Database) // Output: [mysql postgres]
+//	var cfg Config
+//	err := readPrefixedStruct("APP", &cfg)
+//	if err != nil {
+//	    // handle error
+//	}
 //
-//   // Assuming the following environment variables are set:
-//   // APP_NAME=MyApp
-//   // APP_PORT=8080
-//   // APP_DEBUG=true
-//   // APP_TIMEOUT=10s
-//   // DB_CONNECTIONS=mysql,postgres
+//	fmt.Println(cfg.Name)     // Output: MyApp
+//	fmt.Println(cfg.Port)     // Output: 8080
+//	fmt.Println(cfg.Debug)    // Output: true
+//	fmt.Println(cfg.Timeout)  // Output: 10s
+//	fmt.Println(cfg.Database) // Output: [mysql postgres]
 //
+//	// Assuming the following environment variables are set:
+//	// APP_NAME=MyApp
+//	// APP_PORT=8080
+//	// APP_DEBUG=true
+//	// APP_TIMEOUT=10s
+//	// DB_CONNECTIONS=mysql,postgres
 func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	// unwrap pointer

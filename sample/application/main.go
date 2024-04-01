@@ -52,7 +52,7 @@ func (a *Application) Build() {
 	// assemble internal dependencies of application
 	// if some error occurs, generate fatal error & abort execution
 
-	// initalize http server
+	// initialize http server
 	log.Info().Msg("Building Sample Application...")
 
 	// initialize http server config

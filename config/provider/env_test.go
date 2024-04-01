@@ -97,7 +97,7 @@ func TestEnvProvider_GetBoolKey(t *testing.T) {
 	}
 
 	// attempt to read invalid value
-	b, err = cfg.GetBoolKey("TEST_STR")
+	_, err = cfg.GetBoolKey("TEST_STR")
 	if err == nil {
 		t.Error("EnvProvider_GetBoolKey(): non-bool should return error")
 	}
@@ -140,14 +140,14 @@ func TestEnvProvider_GetFloat64Key(t *testing.T) {
 	}
 
 	// attempt to read invalid value
-	v, err = cfg.GetFloat64Key("TEST_STR")
+	_, err = cfg.GetFloat64Key("TEST_STR")
 	if err == nil {
 		t.Error("EnvProvider_GetFloat64Key(): non-float64 should return error")
 	}
 
 	// read camelCase key
 	cfg = NewEnvProvider(envPrefix, true)
-	v, err = cfg.GetFloat64Key("testCamelCaseFloat")
+	_, err = cfg.GetFloat64Key("testCamelCaseFloat")
 	if err != nil {
 		t.Error("EnvProvider_GetFloat64Key():", err)
 	}
@@ -169,14 +169,14 @@ func TestEnvProvider_GetIntKey(t *testing.T) {
 	}
 
 	// attempt to read invalid value
-	v, err = cfg.GetIntKey("TEST_STR")
+	_, err = cfg.GetIntKey("TEST_STR")
 	if err == nil {
 		t.Error("EnvProvider_GetIntKey(): non-int should return error")
 	}
 
 	// read camelCase key
 	cfg = NewEnvProvider(envPrefix, true)
-	v, err = cfg.GetIntKey("testCamelCaseInt")
+	_, err = cfg.GetIntKey("testCamelCaseInt")
 	if err != nil {
 		t.Error("EnvProvider_GetIntKey():", err)
 	}
@@ -326,7 +326,7 @@ func TestEnvProvider_GetSliceKey(t *testing.T) {
 	}
 
 	cfg = NewEnvProvider(envPrefix, true)
-	v, err = cfg.GetSliceKey("testCamelCaseList", ",")
+	_, err = cfg.GetSliceKey("testCamelCaseList", ",")
 	if err != nil {
 		t.Error("EnvProvider_GetSliceKey():", err)
 	}
@@ -347,7 +347,7 @@ func TestEnvProvider_GetStringKey(t *testing.T) {
 	}
 
 	cfg = NewEnvProvider(envPrefix, true)
-	v, err = cfg.GetStringKey("testCamelCaseString")
+	_, err = cfg.GetStringKey("testCamelCaseString")
 	if err != nil {
 		t.Error("EnvProvider_GetStringKey():", err)
 	}

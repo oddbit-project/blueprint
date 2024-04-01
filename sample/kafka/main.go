@@ -50,8 +50,13 @@ func main() {
 	defer consumer.Disconnect()
 
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
-	err = producer.Write(value1)
+	if err = producer.Write(value1); err != nil {
+		log.Fatal(err)
+	}
 
-	msg, err := consumer.ReadMessage()
-	fmt.Print(msg)
+	if msg, err := consumer.ReadMessage(); err != nil {
+		log.Fatal(err)
+	} else {
+		fmt.Print(msg)
+	}
 }
