@@ -15,10 +15,7 @@ type ClientConfig struct {
 	DSN string `json:"dsn"`
 }
 
-type Client struct {
-	db.Client
-	dsn string
-}
+type Client db.Client
 
 func (c ClientConfig) Validate() error {
 	if len(c.DSN) == 0 {
@@ -33,12 +30,12 @@ func NewClient(config *ClientConfig) (*Client, error) {
 		return nil, err
 	}
 	return &Client{
-		dsn: config.DSN,
+		Dsn: config.DSN,
 	}, nil
 }
 
 func (db *Client) Connect() error {
-	conn, err := sqlx.Open("clickhouse", db.dsn)
+	conn, err := sqlx.Open("clickhouse", db.Dsn)
 	if err != nil {
 		return err
 	}
@@ -48,4 +45,20 @@ func (db *Client) Connect() error {
 	}
 	db.Conn = conn
 	return nil
+}
+
+func (db *Client) GetClient() *sqlx.DB {
+	return db.Conn
+}
+
+func (db *Client) IsConnected() bool {
+	return db.Conn != nil
+}
+
+func (db *Client) Disconnect() {
+	if db.Conn == nil {
+		return
+	}
+	_ = db.Conn.Close()
+	db.Conn = nil
 }
