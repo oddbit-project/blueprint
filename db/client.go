@@ -15,8 +15,46 @@ type ClientInterface interface {
 	Disconnect()
 }
 
-type Client struct {
+type SqlClient struct {
 	ClientInterface
-	Conn *sqlx.DB
-	Dsn  string
+	Conn       *sqlx.DB
+	Dsn        string
+	DriverName string
+}
+
+func NewSqlClient(dsn string, driverName string) *SqlClient {
+	return &SqlClient{
+		Conn:       nil,
+		Dsn:        dsn,
+		DriverName: driverName,
+	}
+}
+
+func (c *SqlClient) Connect() error {
+	conn, err := sqlx.Open("clickhouse", c.Dsn)
+	if err != nil {
+		return err
+	}
+
+	if err := conn.Ping(); err != nil {
+		return err
+	}
+	c.Conn = conn
+	return nil
+}
+
+func (c *SqlClient) GetClient() *sqlx.DB {
+	return c.Conn
+}
+
+func (c *SqlClient) IsConnected() bool {
+	return c.Conn != nil
+}
+
+func (c *SqlClient) Disconnect() {
+	if c.Conn == nil {
+		return
+	}
+	_ = c.Conn.Close()
+	c.Conn = nil
 }
