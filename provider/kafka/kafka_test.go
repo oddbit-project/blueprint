@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-func getConfig() (ProducerConfig, ConsumerConfig) {
-	producerCfg := ProducerConfig{
+func getConfig() (*ProducerConfig, *ConsumerConfig) {
+	producerCfg := &ProducerConfig{
 		Brokers:  "kafka:9093",
 		Topic:    "test_topic1",
 		AuthType: "scram256",
@@ -21,7 +21,7 @@ func getConfig() (ProducerConfig, ConsumerConfig) {
 			TLSEnable: false,
 		},
 	}
-	consumerCfg := ConsumerConfig{
+	consumerCfg := &ConsumerConfig{
 		Brokers:  "kafka:9093",
 		Topic:    "test_topic1",
 		Group:    "consumer_group_1",
@@ -35,8 +35,8 @@ func getConfig() (ProducerConfig, ConsumerConfig) {
 	return producerCfg, consumerCfg
 }
 
-func purgeTopic(t *testing.T, producerCfg ProducerConfig) {
-	cfg := AdminConfig{
+func purgeTopic(t *testing.T, producerCfg *ProducerConfig) {
+	cfg := &AdminConfig{
 		Brokers:      producerCfg.Brokers,
 		AuthType:     producerCfg.AuthType,
 		Username:     producerCfg.Username,

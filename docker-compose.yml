@@ -1,5 +1,22 @@
 
 services:
+  postgres:
+    image: postgres:latest
+    ports:
+      - 15432:5432
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=blueprint
+      - POSTGRES_DB=blueprint
+
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    container_name: clickhouse
+    hostname: clickhouse
+    ports:
+      - 18123:8123
+      - 19000:9000
+
   mosquitto:
     build:
       context: ./test-deps/mosquitto/
@@ -58,3 +75,5 @@ services:
     depends_on:
       - mosquitto
       - kafka
+      - clickhouse
+      - postgres

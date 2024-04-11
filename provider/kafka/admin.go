@@ -34,7 +34,10 @@ func (c AdminConfig) Validate() error {
 	}
 	return nil
 }
-func NewAdmin(ctx context.Context, cfg AdminConfig) (*KafkaAdmin, error) {
+func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
+	if cfg == nil {
+		return nil, ErrNilConfig
+	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}

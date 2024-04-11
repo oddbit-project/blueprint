@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	ErrEmptyDSN = utils.Error("Empty DSN")
+	ErrEmptyDSN  = utils.Error("Empty DSN")
+	ErrNilConfig = utils.Error("Nil Config")
 )
 
 type ClientConfig struct {
@@ -22,7 +23,9 @@ func (c ClientConfig) Validate() error {
 }
 
 func NewClient(config *ClientConfig) (*db.SqlClient, error) {
-
+	if config == nil {
+		return nil, ErrNilConfig
+	}
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}

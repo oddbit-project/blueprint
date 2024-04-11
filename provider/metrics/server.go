@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+	"github.com/oddbit-project/blueprint/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
@@ -17,6 +18,8 @@ const (
 	DefaultHost         = "localhost"
 	DefaultPort         = 2201
 	DefaultEndpoint     = "/metrics"
+
+	ErrNilConfig = utils.Error("Config is nil")
 )
 
 type Config struct {
@@ -74,7 +77,7 @@ func NewServer(cfg *Config) (*Server, error) {
 //	cfg := &Config{...}
 //	gatherer := prometheus.DefaultGatherer
 //	opts := promhttp.HandlerOpts{...}
-//	server, err := NewCustomServer(cfg, gatherer, opts)
+//	server, err := NewCustomServer(*cfg, gatherer, opts)
 //	if err != nil {
 //	    // handle error
 //	}
@@ -84,6 +87,10 @@ func NewServer(cfg *Config) (*Server, error) {
 //	    // handle error
 //	}
 func NewCustomServer(cfg *Config, gatherer prometheus.Gatherer, opts promhttp.HandlerOpts) (*Server, error) {
+	if cfg == nil {
+		return nil, ErrNilConfig
+	}
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
