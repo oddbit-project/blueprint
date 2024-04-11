@@ -51,7 +51,10 @@ func (c ConsumerConfig) Validate() error {
 	return nil
 }
 
-func NewConsumer(ctx context.Context, cfg ConsumerConfig) (*KafkaConsumer, error) {
+func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*KafkaConsumer, error) {
+	if cfg == nil {
+		return nil, ErrNilConfig
+	}
 	// check if config has errors
 	if err := cfg.Validate(); err != nil {
 		return nil, err

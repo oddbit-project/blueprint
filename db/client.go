@@ -31,7 +31,7 @@ func NewSqlClient(dsn string, driverName string) *SqlClient {
 }
 
 func (c *SqlClient) Connect() error {
-	conn, err := sqlx.Open("clickhouse", c.Dsn)
+	conn, err := sqlx.Open(c.DriverName, c.Dsn)
 	if err != nil {
 		return err
 	}

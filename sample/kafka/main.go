@@ -11,7 +11,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	producerCfg := kafka.ProducerConfig{
+	producerCfg := &kafka.ProducerConfig{
 		Brokers:  "localhost:9093",
 		Topic:    "test_topic",
 		AuthType: "scram256",
@@ -21,7 +21,7 @@ func main() {
 			TLSEnable: false,
 		},
 	}
-	consumerCfg := kafka.ConsumerConfig{
+	consumerCfg := &kafka.ConsumerConfig{
 		Brokers:  "localhost:9093",
 		Topic:    "test_topic",
 		Group:    "consumer_group_1",

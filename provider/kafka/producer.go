@@ -40,7 +40,10 @@ func (c ProducerConfig) Validate() error {
 	return nil
 }
 
-func NewProducer(ctx context.Context, cfg ProducerConfig) (*KafkaProducer, error) {
+func NewProducer(ctx context.Context, cfg *ProducerConfig) (*KafkaProducer, error) {
+	if cfg == nil {
+		return nil, ErrNilConfig
+	}
 	// check if config has errors
 	if err := cfg.Validate(); err != nil {
 		return nil, err

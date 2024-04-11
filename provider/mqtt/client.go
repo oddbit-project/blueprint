@@ -19,6 +19,8 @@ const (
 	ErrInvalidTimeout  = utils.Error("invalid timeout")
 	ErrInvalidQoSLevel = utils.Error("invalid QoS level")
 	ErrPublishTimeout  = utils.Error("timeout when publishing")
+
+	ErrNilConfig = utils.Error("Config is nil")
 )
 
 type MqttHandlers struct {
@@ -119,6 +121,9 @@ func (c *Config) Validate() error {
 func NewClient(cfg *Config) (*Client, error) {
 	var opts *paho.ClientOptions
 	var err error
+	if cfg == nil {
+		return nil, ErrNilConfig
+	}
 	if opts, err = clientOptions(cfg); err != nil {
 		return nil, err
 	}

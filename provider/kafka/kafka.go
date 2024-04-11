@@ -18,6 +18,7 @@ const (
 	ErrInvalidAuthType       = utils.Error("Invalid authentication type")
 
 	ErrMissingAdminBroker = utils.Error("Missing Admin broker address")
+	ErrNilConfig          = utils.Error("Config is nil")
 
 	AuthTypeNone     = "none"
 	AuthTypePlain    = "plain"

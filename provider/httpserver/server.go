@@ -109,6 +109,9 @@ func (c *ServerConfig) NewServer() (*Server, error) {
 //	}
 //	server.Start()
 func NewServer(cfg *ServerConfig) (*Server, error) {
+	if cfg == nil {
+		return nil, ErrNilConfig
+	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
