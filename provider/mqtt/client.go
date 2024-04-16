@@ -217,8 +217,10 @@ func (c *Client) Connect() (bool, error) {
 }
 
 func (c *Client) Close() error {
-	if c.Client.IsConnected() {
-		c.Client.Disconnect(250)
+	if c.Client != nil {
+		if c.Client.IsConnected() {
+			c.Client.Disconnect(250)
+		}
 	}
 	return nil
 }
