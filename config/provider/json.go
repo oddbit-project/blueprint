@@ -5,7 +5,6 @@ import (
 	"github.com/oddbit-project/blueprint/config"
 	"github.com/oddbit-project/blueprint/utils"
 	"io"
-	"io/ioutil"
 	"os"
 )
 
@@ -50,7 +49,7 @@ func NewJsonProvider(src interface{}) (config.ConfigInterface, error) {
 }
 
 func (j *JsonProvider) fromReader(src io.Reader) error {
-	data, err := ioutil.ReadAll(src)
+	data, err := io.ReadAll(src)
 	if err != nil {
 		return err
 	}
