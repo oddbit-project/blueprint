@@ -40,7 +40,7 @@ type ClientConfig struct {
 	TLSKey                string `json:"tlsKey"`
 	TLSKeyPwd             string `json:"tlsKeyPassword"`
 	TLSEnable             bool   `json:"tlsEnable"`
-	TLSInsecureSkipVerify bool   `toml:"tlsInsecureSkipVerify"`
+	TLSInsecureSkipVerify bool   `json:"tlsInsecureSkipVerify"`
 }
 
 // TLSConfig returns a tls.Config{} struct from the ClientConfig
