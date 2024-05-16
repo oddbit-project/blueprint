@@ -16,7 +16,6 @@ type ClientInterface interface {
 }
 
 type SqlClient struct {
-	ClientInterface
 	Conn       *sqlx.DB
 	Dsn        string
 	DriverName string
