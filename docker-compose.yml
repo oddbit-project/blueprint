@@ -72,6 +72,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=blueprint
+      - POSTGRES_DB=blueprint
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=postgres
     depends_on:
       - mosquitto
       - kafka

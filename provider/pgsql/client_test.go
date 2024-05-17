@@ -17,7 +17,7 @@ func TestClientConfigValidate(t *testing.T) {
 		},
 		{
 			name:     "Non-empty DSN",
-			dsn:      "postgresql://blueprint:password@postgres:5432/blueprint",
+			dsn:      getDSN(),
 			expected: nil,
 		},
 	}
