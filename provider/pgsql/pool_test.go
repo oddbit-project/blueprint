@@ -6,8 +6,9 @@ import (
 )
 
 func TestPoolConfigValidate(t *testing.T) {
+
 	defaultCfg := NewPoolConfig()
-	defaultCfg.DSN = "postgresql://blueprint:password@postgres:5432/blueprint"
+	defaultCfg.DSN = getDSN()
 
 	testCases := []struct {
 		name     string
