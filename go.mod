@@ -17,6 +17,7 @@ require (
 	github.com/segmentio/kafka-go v0.4.47
 	github.com/stretchr/testify v1.9.0
 	go.step.sm/crypto v0.43.1
+	golang.org/x/crypto v0.21.0
 )
 
 require (
@@ -70,7 +71,6 @@ require (
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect

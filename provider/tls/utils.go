@@ -1,5 +1,5 @@
 /*
-  Adapted from https://github.com/cloudfabrix/telegraf/tree/master/plugins/common/tls
+  Adapted from https://github.com/influxdata/telegraf/tree/master/plugins/common/tls
   All changes are made available under the original MIT License:
 
 	The MIT License (MIT)
