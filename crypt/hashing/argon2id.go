@@ -67,6 +67,11 @@ func NewArgon2IdConfig() Argon2Config {
 	}
 }
 
+func Argon2IdNeedsRehash(c *Argon2Config) bool {
+	cfg := NewArgon2IdConfig()
+	return c.Memory != cfg.Memory || c.Iterations != cfg.Iterations || c.Parallelism != cfg.Parallelism || c.SaltLength != cfg.SaltLength || c.KeyLength != cfg.KeyLength
+}
+
 func Argon2IdCreateHash(password string, c Argon2Config) (string, error) {
 	salt, err := utils.GenerateRandomBytes(c.SaltLength)
 	if err != nil {
