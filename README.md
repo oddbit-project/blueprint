@@ -145,3 +145,19 @@ func main() {
 	app.Run()
 }
 ```
+
+## License information
+
+All the custom code is licensed under Apache2 license. Some code pieces were copied or imported from different sources,
+and have their own licensing info. All the adapted files contain a full copy of their respective license, and all
+the adaptations are licensed under the original license of the source.
+
+
+The repository includes code adapted from the following sources:
+
+[Argon2Id password hashing](https://github.com/alexedwards/argon2id)
+(c) Alex Edwards, MIT License
+
+
+[Telegraf TLS plugin](https://github.com/influxdata/telegraf/tree/master/plugins/common/tls)
+(c) InfluxData Inc, MIT License
