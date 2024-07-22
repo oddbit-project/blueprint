@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/oddbit-project/blueprint/provider/pgsql"
 	"log"
@@ -8,21 +9,22 @@ import (
 )
 
 func main() {
-	pgConfig := &pgsql.ClientConfig{
-		DSN: "postgres://username:password@localhost:5432/database?sslmode=allow",
-	}
+	pgConfig := pgsql.NewPoolConfig()
+	pgConfig.DSN = "postgres://username:password@localhost:5432/database?sslmode=allow"
 
-	client, err := pgsql.NewClient(pgConfig)
+	pool, err := pgsql.NewPool(context.Background(), pgConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err = client.Connect(); err != nil {
+
+	db, err := pool.Acquire(context.Background())
+	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Disconnect()
+	defer db.Release()
 
 	var greeting string
-	err = client.Conn.QueryRow("select 'Hello, world!'").Scan(&greeting)
+	err = db.QueryRow(context.Background(), "select 'Hello, world!'").Scan(&greeting)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "QueryRow failed: %v\n", err)
 		os.Exit(1)

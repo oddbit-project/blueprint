@@ -1,41 +1,32 @@
 package main
 
 import (
+	"context"
+	"embed"
 	"fmt"
+	"github.com/oddbit-project/blueprint/db/migrations"
 	"github.com/oddbit-project/blueprint/provider/pgsql"
 	"log"
-	"os"
 )
 
+//go:embed migrations/*.sql
+var migFs embed.FS
+
 func main() {
-	pgConfig := &pgsql.ClientConfig{
-		DSN: "postgres://username:password@localhost:5432/database?sslmode=allow",
-	}
+	pgConfig := pgsql.NewPoolConfig()
+	pgConfig.DSN = "postgres://username:password@localhost:5432/database?sslmode=allow"
 
-	client, err := pgsql.NewClient(pgConfig)
+	db, err := pgsql.NewPool(context.Background(), pgConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err = client.Connect(); err != nil {
-		log.Fatal(err)
-	}
-	defer client.Disconnect()
 
-	backend := pgsql.NewMigrationBackend(client.Conn)
-	err = backend.Initialize()
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-	rows, err := backend.List()
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
-	fmt.Println("Listing Migrations:")
-	for _, r := range rows {
-		fmt.Println(r.Created, r.Name, r.SHA2)
-	}
+	source, err := migrations.NewEmbedSource(migFs, "migrations")
 
+	manager := pgsql.NewMigrationManager(db)
+	fmt.Println("Applying migrations...")
+	if err = manager.Run(context.Background(), source, migrations.DefaultProgressFn); err != nil {
+		fmt.Println("Error: ", err)
+	}
 	fmt.Println("Done!")
 }

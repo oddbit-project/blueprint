@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"fmt"
 	"github.com/oddbit-project/blueprint/console"
 	"github.com/oddbit-project/blueprint/utils"
@@ -8,18 +9,17 @@ import (
 )
 
 const (
-	ConsoleSkipMigration   = "Skipping migration (already processed)"
-	ConsoleStartMigration  = "Executing migration"
-	ConsoleFailedMigration = "Failed migration"
-	ConsoleFinishMigration = "Finished migration"
+	MsgSkipMigration = iota + 1
+	MsgRunMigration
+	MsgFinishedMigration
+	MsgError
 
 	ErrMigrationNameHashMismatch = utils.Error("Migration name or hash exists but they mismatch. Migration file was edited or renamed?")
 	ErrMigrationExists           = utils.Error("Migration already executed")
 	ErrRegisterMigration         = utils.Error("Migration executed successfully, but registration failed. Register manually")
 )
 
-type MigrationProgress func(message, name string)
-type ErrorHandler func(err error)
+type ProgressFn func(msgType int, migrationName string, e error)
 
 type MigrationRecord struct {
 	Created  time.Time `db:"created"`
@@ -28,44 +28,43 @@ type MigrationRecord struct {
 	Contents string    `db:"contents"`
 }
 
-type Backend interface {
-	Initialize() error
-	List() ([]*MigrationRecord, error)
-	RunMigration(m *MigrationRecord) error
-	RegisterMigration(m *MigrationRecord) error
+type Source interface {
+	List() ([]string, error)
+	Read(name string) (*MigrationRecord, error)
 }
 
-type Manager struct {
-	backend Backend
-	source  Source
-	console MigrationProgress
-	error   ErrorHandler
+type Manager interface {
+	List(ctx context.Context) ([]*MigrationRecord, error)
+	MigrationExists(ctx context.Context, name string, sha2 string) (bool, error)
+	RunMigration(ctx context.Context, m *MigrationRecord) error
+	RegisterMigration(ctx context.Context, m *MigrationRecord) error
+	Run(ctx context.Context, src Source, consoleFn ProgressFn) error
 }
 
-func NewManager(src Source, b Backend) (*Manager, error) {
-	return &Manager{
-		backend: b,
-		source:  src,
-		console: _consoleHandler,
-		error:   _errorHandler,
-	}, b.Initialize()
-}
-
-func _consoleHandler(message, name string) {
-	msg := fmt.Sprintf("%s;  Migration: %s", message, name)
-	switch message {
-	case ConsoleFinishMigration, ConsoleStartMigration:
-		msg = console.Regular(msg)
+func DefaultProgressFn(msgType int, migrationName string, e error) {
+	var msg string
+	switch msgType {
+	case MsgRunMigration:
+		msg = console.Regular(fmt.Sprintf("Running migration '%s'...", migrationName))
 		break
-	case ConsoleFailedMigration:
-		msg = console.Error(msg)
+	case MsgFinishedMigration:
+		msg = console.Regular(fmt.Sprintf("Migration '%s' finished successfully", migrationName))
 		break
-	case ConsoleSkipMigration:
-		msg = console.Info(msg)
+	case MsgSkipMigration:
+		msg = console.Info(fmt.Sprintf("Migration '%s' already run, skipping", migrationName))
+		break
+
+	case MsgError:
+		msgE := "-"
+		if e != nil {
+			msgE = e.Error()
+		}
+		msg = console.Error(fmt.Sprintf("Error executing migration '%s': %s", migrationName, msgE))
+		break
+
+	default:
+		msg = console.Regular(fmt.Sprintf("Running migration '%s'...", migrationName))
 		break
 	}
 	fmt.Println(msg)
-}
-
-func _errorHandler(err error) {
 }

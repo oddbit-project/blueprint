@@ -21,11 +21,6 @@ const (
 	MigrationFileExtension = ".sql"
 )
 
-type Source interface {
-	List() ([]string, error)
-	Read(name string) (*MigrationRecord, error)
-}
-
 type DiskSource struct {
 	Path string
 }

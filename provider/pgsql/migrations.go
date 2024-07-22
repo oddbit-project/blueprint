@@ -1,11 +1,14 @@
 package pgsql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/jmoiron/sqlx"
+	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oddbit-project/blueprint/db/migrations"
+	"slices"
 )
 
 const (
@@ -13,69 +16,150 @@ const (
 	EngineSchema      = "public"
 	MigrationTable    = "db_migration"
 	EngineSchemaTable = EngineSchema + "." + MigrationTable
+
+	MigrationLockId = 2343452349
 )
 
-type pgBackend struct {
-	db *sqlx.DB
+type pgMigrationManager struct {
+	pool *pgxpool.Pool
+	lock AdvisoryLock
 }
 
-func NewMigrationBackend(db *sqlx.DB) migrations.Backend {
-	return &pgBackend{db: db}
+func NewMigrationManager(pool *pgxpool.Pool) migrations.Manager {
+	return &pgMigrationManager{
+		pool: pool,
+		lock: NewAdvisoryLock(pool, MigrationLockId),
+	}
 }
 
-func (b *pgBackend) Initialize() error {
-	installed, err := b.isInstalled()
+// init checks if migration table exists, and if not, creates
+func (b *pgMigrationManager) init(db *pgxpool.Conn, ctx context.Context) error {
+	exists, err := TableExists(db, ctx, MigrationTable, SchemaDefault)
 	if err != nil {
 		return err
 	}
-	if !installed {
-		return b.install()
+
+	if exists {
+		return nil
 	}
-	return nil
-}
-
-func (b *pgBackend) isInstalled() (bool, error) {
-	return TableExists(b.db, MigrationTable, SchemaDefault)
-}
-
-func (b *pgBackend) install() error {
 	qry := fmt.Sprintf(`CREATE TABLE  %s (
 			created TIMESTAMP WITH TIME ZONE,
 			name TEXT,
 			sha2 TEXT,
 			contents TEXT)`,
 		EngineSchemaTable)
-	_, err := b.db.Exec(qry)
+	_, err = db.Exec(ctx, qry)
 	return err
 }
 
-func (b *pgBackend) List() ([]*migrations.MigrationRecord, error) {
+// registerMigration internal function to register a migration
+func (b *pgMigrationManager) registerMigration(db *pgxpool.Conn, ctx context.Context, m *migrations.MigrationRecord) error {
+	qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES (:created, :name, :sha2, :contents)", EngineSchemaTable)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, qry, m)
+	if err != nil {
+		tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (b *pgMigrationManager) List(ctx context.Context) ([]*migrations.MigrationRecord, error) {
+	db, err := b.pool.Acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Release()
+
+	if err := b.init(db, ctx); err != nil {
+		return nil, err
+	}
+	return b.list(db, ctx)
+}
+
+func (b *pgMigrationManager) list(db *pgxpool.Conn, ctx context.Context) ([]*migrations.MigrationRecord, error) {
 	result := make([]*migrations.MigrationRecord, 0)
 	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", EngineSchemaTable)
-	if err := b.db.Select(result, qry); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return result, nil
-		}
+	if err := pgxscan.Select(ctx, db, &result, qry); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
 
-func (b *pgBackend) migrationExists(name string, sha2 string) (bool, error) {
+func (b *pgMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
+	db, err := b.pool.Acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer db.Release()
+
+	if err := b.init(db, ctx); err != nil {
+		return false, err
+	}
+
+	return b.migrationExists(db, ctx, name, sha2)
+}
+
+func (b *pgMigrationManager) migrationExists(db *pgxpool.Conn, ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
 	qry := fmt.Sprintf("SELECT * FROM %s WHERE name=$1", EngineSchemaTable)
-	if err := b.db.Select(result, qry, name); err != nil {
+
+	if err := pgxscan.Select(ctx, db, qry, name); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
+		return false, err
 	}
+
 	if result.SHA2 != sha2 {
 		return true, migrations.ErrMigrationNameHashMismatch
 	}
+
 	return true, nil
 }
 
-func (b *pgBackend) RunMigration(m *migrations.MigrationRecord) error {
-	exists, err := b.migrationExists(m.Name, m.SHA2)
+// runMigration internal function to execute migrations, called by RunMigration() and Run()
+func (b *pgMigrationManager) runMigration(db *pgxpool.Conn, ctx context.Context, m *migrations.MigrationRecord) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	// execute migration
+	if _, err := tx.Exec(ctx, m.Contents); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	// register migration
+	return b.registerMigration(db, ctx, m)
+}
+
+// RunMigration applies and registers a single migration
+func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.MigrationRecord) error {
+	db, err := b.pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer db.Release()
+
+	if err := b.lock.Lock(ctx); err != nil {
+		return err
+	}
+	defer b.lock.Unlock(ctx)
+
+	if err := b.init(db, ctx); err != nil {
+		return err
+	}
+
+	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
 		return err
 	}
@@ -83,42 +167,92 @@ func (b *pgBackend) RunMigration(m *migrations.MigrationRecord) error {
 		return migrations.ErrMigrationExists
 	}
 
-	tx, err := b.db.Begin()
-	if err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(m.Contents); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-
-	if err := b.RegisterMigration(m); err != nil {
-		// critical error, migration was run successfully, but failed to register
-		// it must be registered manually
-		return migrations.ErrRegisterMigration
-	}
-	return nil
+	return b.runMigration(db, ctx, m)
 }
 
-func (e *pgBackend) RegisterMigration(m *migrations.MigrationRecord) error {
-	exists, err := e.migrationExists(m.Name, m.SHA2)
+// RegisterMigration registers a single migration but does not apply the contents
+func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migrations.MigrationRecord) error {
+	db, err := b.pool.Acquire(ctx)
 	if err != nil {
 		return err
 	}
-	if !exists {
-		qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES (:created, :name, :sha2, :contents)", EngineSchemaTable)
-		tx := e.db.MustBegin()
-		_, err = tx.NamedExec(qry, m)
-		if err != nil {
-			tx.Rollback()
-			return err
+	defer db.Release()
+
+	if err := b.lock.Lock(ctx); err != nil {
+		return err
+	}
+	defer b.lock.Unlock(ctx)
+
+	if err := b.init(db, ctx); err != nil {
+		return err
+	}
+
+	exists, err := b.migrationExists(db, ctx, m.Name, m.SHA2)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return migrations.ErrMigrationExists
+	}
+
+	return b.registerMigration(db, ctx, m)
+}
+
+// Run all migrations from a source, and skip the ones already applied
+// Example:
+//
+//	mm := NewMigrationManager(db)
+//	if err := mm.Run(context.Background(), diskSrc, DefaultProgressFn); err != nil {
+//	   panic(err)
+//	}
+func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, consoleFn migrations.ProgressFn) error {
+	db, err := b.pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer db.Release()
+
+	if err := b.lock.Lock(ctx); err != nil {
+		return err
+	}
+	defer b.lock.Unlock(ctx)
+
+	if err := b.init(db, ctx); err != nil {
+		return err
+	}
+
+	files, err := src.List()
+	if err != nil {
+		return err
+	}
+
+	migList, err := b.list(db, ctx)
+	prevNames := make([]string, len(migList))
+	for i, r := range migList {
+		prevNames[i] = r.Name
+	}
+
+	for _, f := range files {
+		if !slices.Contains(prevNames, f) {
+			// read migration
+			record, err := src.Read(f)
+			if err != nil {
+				consoleFn(migrations.MsgError, f, err)
+				return err
+			}
+			// execute migration
+			consoleFn(migrations.MsgRunMigration, f, nil)
+			err = b.runMigration(db, ctx, record)
+			if err != nil {
+				consoleFn(migrations.MsgError, f, err)
+				return err
+			}
+			consoleFn(migrations.MsgFinishedMigration, f, nil)
+		} else {
+			// already processed, skipping
+			// we're ignoring different contents
+			consoleFn(migrations.MsgSkipMigration, f, nil)
 		}
-		return tx.Commit()
 	}
 	return nil
 }
