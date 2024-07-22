@@ -23,13 +23,11 @@ const (
 
 type pgMigrationManager struct {
 	pool *pgxpool.Pool
-	lock AdvisoryLock
 }
 
 func NewMigrationManager(pool *pgxpool.Pool) migrations.Manager {
 	return &pgMigrationManager{
 		pool: pool,
-		lock: NewAdvisoryLock(pool, MigrationLockId),
 	}
 }
 
@@ -154,10 +152,11 @@ func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.Mig
 	}
 	defer db.Release()
 
-	if err := b.lock.Lock(ctx); err != nil {
+	lock := NewAdvisoryLock(db, MigrationLockId)
+	if err = lock.Lock(context.Background()); err != nil {
 		return err
 	}
-	defer b.lock.Unlock(ctx)
+	defer lock.Unlock(context.Background())
 
 	if err := b.init(db, ctx); err != nil {
 		return err
@@ -182,14 +181,11 @@ func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migration
 	}
 	defer db.Release()
 
-	if err := b.lock.Lock(ctx); err != nil {
+	lock := NewAdvisoryLock(db, MigrationLockId)
+	if err = lock.Lock(context.Background()); err != nil {
 		return err
 	}
-	defer b.lock.Unlock(ctx)
-
-	if err := b.init(db, ctx); err != nil {
-		return err
-	}
+	defer lock.Unlock(context.Background())
 
 	exists, err := b.migrationExists(db, ctx, m.Name, m.SHA2)
 	if err != nil {
@@ -216,10 +212,11 @@ func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, con
 	}
 	defer db.Release()
 
-	if err := b.lock.Lock(ctx); err != nil {
+	lock := NewAdvisoryLock(db, MigrationLockId)
+	if err = lock.Lock(context.Background()); err != nil {
 		return err
 	}
-	defer b.lock.Unlock(ctx)
+	defer lock.Unlock(context.Background())
 
 	if err := b.init(db, ctx); err != nil {
 		return err
