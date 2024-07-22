@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oddbit-project/blueprint/db/migrations"
 	"slices"
@@ -54,12 +55,12 @@ func (b *pgMigrationManager) init(db *pgxpool.Conn, ctx context.Context) error {
 
 // registerMigration internal function to register a migration
 func (b *pgMigrationManager) registerMigration(db *pgxpool.Conn, ctx context.Context, m *migrations.MigrationRecord) error {
-	qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES (:created, :name, :sha2, :contents)", EngineSchemaTable)
+	qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES ($1, $2, $3, $4)", EngineSchemaTable)
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, qry, m)
+	_, err = tx.Exec(ctx, qry, m.Created, m.Name, m.SHA2, m.Contents)
 	if err != nil {
 		tx.Rollback(ctx)
 		return err
@@ -84,6 +85,9 @@ func (b *pgMigrationManager) list(db *pgxpool.Conn, ctx context.Context) ([]*mig
 	result := make([]*migrations.MigrationRecord, 0)
 	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", EngineSchemaTable)
 	if err := pgxscan.Select(ctx, db, &result, qry); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return result, nil
+		}
 		return nil, err
 	}
 	return result, nil

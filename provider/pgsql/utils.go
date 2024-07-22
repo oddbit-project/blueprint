@@ -2,8 +2,8 @@ package pgsql
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -44,7 +44,7 @@ func TableObjectExists(db *pgxpool.Conn, ctx context.Context, tableType string, 
 	var record string
 	qry := "SELECT table_schema FROM information_schema.tables WHERE table_schema=$1 AND table_name=$2 AND table_type=$3"
 	if err := db.QueryRow(ctx, qry, schema, tableName, tableType).Scan(&record); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
