@@ -1,8 +1,8 @@
 module github.com/oddbit-project/blueprint
 
-go 1.21
+go 1.22
 
-toolchain go1.21.1
+toolchain go1.22.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.18.0
@@ -29,6 +29,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/fatih/color v1.17.0 // indirect
+	github.com/georgysavva/scany/v2 v2.1.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect

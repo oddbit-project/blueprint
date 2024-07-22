@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	DefaultMinConns           = 1
+	DefaultMinConns           = 2
 	DefaultMaxConns           = 4
 	DefaultConnLifeTimeSecond = 3600
 	DefaultConnIdleTimeSecond = 1800

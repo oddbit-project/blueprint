@@ -9,18 +9,12 @@ import (
 )
 
 func TestLockMultipleConnections(t *testing.T) {
-	pool := dbClient(t)
+	pool1 := dbClient(t)
+	pool2 := dbClient(t)
 
-	conn1, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn1.Release()
-	conn2, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn2.Release()
-
-	lockId := 12
-	lock1 := NewAdvisoryLock(conn1, lockId)
-	lock2 := NewAdvisoryLock(conn2, lockId)
+	var lockId int64 = 12
+	lock1 := NewAdvisoryLock(pool1, lockId)
+	lock2 := NewAdvisoryLock(pool2, lockId)
 
 	// lock using conn1
 	assert.Nil(t, lock1.Lock(context.Background()))
@@ -48,18 +42,12 @@ func TestLockMultipleConnections(t *testing.T) {
 }
 
 func TestLockConcurrent(t *testing.T) {
-	pool := dbClient(t)
+	pool1 := dbClient(t)
+	pool2 := dbClient(t)
 
-	conn1, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn1.Release()
-	conn2, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn2.Release()
-
-	lockId := 27
-	lock1 := NewAdvisoryLock(conn1, lockId)
-	lock2 := NewAdvisoryLock(conn2, lockId)
+	var lockId int64 = 27
+	lock1 := NewAdvisoryLock(pool1, lockId)
+	lock2 := NewAdvisoryLock(pool2, lockId)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -92,12 +80,9 @@ func TestLockConcurrent(t *testing.T) {
 
 func TestLockUnlock(t *testing.T) {
 	pool := dbClient(t)
-	conn, err := pool.Acquire(context.Background())
-	defer conn.Release()
-	assert.Nil(t, err)
 
-	lockId := 10
-	lock := NewAdvisoryLock(conn, lockId)
+	var lockId int64 = 10
+	lock := NewAdvisoryLock(pool, lockId)
 	// lock
 	assert.Nil(t, lock.Lock(context.Background()))
 

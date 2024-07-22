@@ -18,46 +18,61 @@ package pgsql
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type LockConn interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+type AdvisoryLock interface {
+	Lock(ctx context.Context) error
+	TryLock(ctx context.Context) (bool, error)
+	Unlock(ctx context.Context) error
 }
 
-type AdvisoryLock struct {
-	conn LockConn
-	id   int
+type advisoryLock struct {
+	pool *pgxpool.Pool
+	id   int64
 }
 
-func NewAdvisoryLock(conn LockConn, id int) *AdvisoryLock {
-	return &AdvisoryLock{
-		conn: conn,
+func NewAdvisoryLock(pool *pgxpool.Pool, id int64) AdvisoryLock {
+	return &advisoryLock{
+		pool: pool,
 		id:   id,
 	}
 }
 
 // Lock attempts to perform a lock, and waits until it is available
-func (l *AdvisoryLock) Lock(ctx context.Context) error {
+func (l *advisoryLock) Lock(ctx context.Context) error {
+	db, err := l.pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer db.Release()
 	qry := "SELECT pg_advisory_lock($1)"
-	_, err := l.conn.Exec(ctx, qry, l.id)
+	_, err = db.Exec(ctx, qry, l.id)
 	return err
 }
 
 // TryLock attempts to perform a lock, and returns true if operation was successful
-func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
+func (l *advisoryLock) TryLock(ctx context.Context) (bool, error) {
+	db, err := l.pool.Acquire(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer db.Release()
 	result := false
 	qry := "SELECT pg_try_advisory_lock($1)"
-	err := l.conn.QueryRow(ctx, qry, l.id).Scan(&result)
+	err = db.QueryRow(ctx, qry, l.id).Scan(&result)
 	return result, err
 }
 
 // Unlock unlocks a given lock
 // Unlock of a given lock needs to be done with the same connection
-func (l *AdvisoryLock) Unlock(ctx context.Context) error {
+func (l *advisoryLock) Unlock(ctx context.Context) error {
+	db, err := l.pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer db.Release()
 	qry := "SELECT pg_advisory_unlock($1)"
-	_, err := l.conn.Exec(ctx, qry, l.id)
+	_, err = db.Exec(ctx, qry, l.id)
 	return err
 }
