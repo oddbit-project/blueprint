@@ -21,97 +21,46 @@ package pgsql
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"sync"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type AdvisoryLock interface {
-	Lock(ctx context.Context) error
-	TryLock(ctx context.Context) (bool, error)
-	Unlock(ctx context.Context) error
+type LockConn interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
-type advisoryLock struct {
-	pool    *pgxpool.Pool
-	id      int64
-	counter int
-	db      *pgxpool.Conn // we must use the same connection for locking/unlocking
-	l       sync.Mutex
+type AdvisoryLock struct {
+	conn LockConn
+	id   int
 }
 
-func NewAdvisoryLock(pool *pgxpool.Pool, id int64) AdvisoryLock {
-	return &advisoryLock{
-		pool:    pool,
-		id:      id,
-		db:      nil,
-		counter: 0,
-		l:       sync.Mutex{},
+func NewAdvisoryLock(conn LockConn, id int) *AdvisoryLock {
+	return &AdvisoryLock{
+		conn: conn,
+		id:   id,
 	}
 }
 
 // Lock attempts to perform a lock, and waits until it is available
-func (l *advisoryLock) Lock(ctx context.Context) error {
-	l.l.Lock()
-	defer l.l.Unlock()
-
-	var err error
-	if l.db == nil {
-		l.db, err = l.pool.Acquire(ctx)
-		if err != nil {
-			return err
-		}
-	}
+func (l *AdvisoryLock) Lock(ctx context.Context) error {
 	qry := "SELECT pg_advisory_lock($1)"
-	_, err = l.db.Exec(ctx, qry, l.id)
-	if err == nil {
-		// lock acquired
-		l.counter++
-	}
+	_, err := l.conn.Exec(ctx, qry, l.id)
 	return err
 }
 
 // TryLock attempts to perform a lock, and returns true if operation was successful
-func (l *advisoryLock) TryLock(ctx context.Context) (bool, error) {
-	l.l.Lock()
-	defer l.l.Unlock()
-
-	var err error
-	if l.db == nil {
-		l.db, err = l.pool.Acquire(ctx)
-		if err != nil {
-			return false, err
-		}
-	}
+func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
 	result := false
 	qry := "SELECT pg_try_advisory_lock($1)"
-	err = l.db.QueryRow(ctx, qry, l.id).Scan(&result)
-	if err == nil && result {
-		// lock acquired
-		l.counter++
-	}
+	err := l.conn.QueryRow(ctx, qry, l.id).Scan(&result)
 	return result, err
 }
 
 // Unlock unlocks a given lock
 // Unlock of a given lock needs to be done with the same connection
-func (l *advisoryLock) Unlock(ctx context.Context) error {
-	l.l.Lock()
-	defer l.l.Unlock()
-
-	var err error
-	if l.db == nil {
-		l.db, err = l.pool.Acquire(ctx)
-		if err != nil {
-			return err
-		}
-	}
+func (l *AdvisoryLock) Unlock(ctx context.Context) error {
 	qry := "SELECT pg_advisory_unlock($1)"
-	_, err = l.db.Exec(ctx, qry, l.id)
-	if l.counter > 0 && err == nil {
-		l.counter--
-		if l.counter == 0 {
-			l.db = nil
-		}
-	}
+	_, err := l.conn.Exec(ctx, qry, l.id)
 	return err
 }
