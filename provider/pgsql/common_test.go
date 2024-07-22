@@ -25,5 +25,6 @@ func dbClient(t *testing.T) *pgxpool.Pool {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return pool
 }
