@@ -10,7 +10,7 @@ const (
 	ErrInvalidParameters = utils.Error("invalid parameter count or parameter is nil")
 )
 
-type ClientInterface interface {
+type Client interface {
 	GetClient() *sqlx.DB
 	IsConnected() bool
 	Connect() error

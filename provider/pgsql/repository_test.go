@@ -120,6 +120,22 @@ func testFunctions(t *testing.T, repo testRepository) {
 	assert.Nil(t, repo.FetchWhere(map[string]any{"label": "record 4"}, &records))
 	assert.Equal(t, "record 4", records[0].Label)
 
+	// use exists
+	exists := false
+	// non-existing record
+	exists, err = repo.Exists("label", "record 999")
+	assert.Nil(t, err)
+	assert.False(t, exists)
+	// existing record
+	exists, err = repo.Exists("label", "record 8")
+	assert.Nil(t, err)
+	assert.True(t, exists)
+
+	// existing record with skip value
+	exists, err = repo.Exists("label", "record 4", "id_sample_table", records[0].Id)
+	assert.Nil(t, err)
+	assert.False(t, exists)
+
 	// delete record number 4
 	assert.Nil(t, repo.Delete(repo.SqlDelete().Where(goqu.C("id_sample_table").Eq(4))))
 	// try to read deleted item, should fail

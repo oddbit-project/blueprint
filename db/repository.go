@@ -23,6 +23,7 @@ type Reader interface {
 	Fetch(qry *goqu.SelectDataset, target any) error
 	FetchWhere(fieldValues map[string]any, target any) error
 	FetchByKey(keyField string, value any, target any) error
+	Exists(fieldName string, fieldValue any, skip ...any) (bool, error)
 }
 
 type Executor interface {
@@ -50,6 +51,10 @@ type Deleter interface {
 type Identifier interface {
 	Db() *sqlx.DB
 	Name() string
+}
+
+type SqlxReaderCtx interface {
+	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 }
 
 type Repository interface {
@@ -126,143 +131,95 @@ func (r *repository) Sql() goqu.DialectWrapper {
 	return r.dialect
 }
 
+// SqlSelect returns a Select query builder
 func (r *repository) SqlSelect() *goqu.SelectDataset {
 	return r.dialect.From(r.tableName)
 }
 
+// SqlInsert returns an Insert query builder
 func (r *repository) SqlInsert() *goqu.InsertDataset {
 	return r.dialect.Insert(r.tableName)
 }
 
+// SqlUpdate returns an Update query builder
 func (r *repository) SqlUpdate() *goqu.UpdateDataset {
 	return r.dialect.Update(r.tableName)
 }
 
+// SqlDelete returns a Delete query builder
 func (r *repository) SqlDelete() *goqu.DeleteDataset {
 	return r.dialect.Delete(r.tableName)
 }
 
 // FetchOne fetch a record; target must be a struct
+// Example:
+//
+//	row:= &MyRecord{}
+//	err := repo.FetchOne(repo.SqlSelect(), row)
 func (r *repository) FetchOne(qry *goqu.SelectDataset, target any) error {
-	if target == nil || qry == nil {
-		return ErrInvalidParameters
-	}
 	return fetchOne(r.ctx, r.conn, qry, target)
 }
 
-func fetchOne(ctx context.Context, conn *sqlx.DB, qry *goqu.SelectDataset, target any) error {
-	qry.Limit(1)
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	return conn.QueryRowxContext(ctx, sqlQry, args...).StructScan(target)
-}
-
+// Fetch records; target must be a slice
+// Example:
+//
+//	rows:= make([]*MyRecord,0)
+//	err := repo.Fetch(repo.SqlSelect(), rows)
 func (r *repository) Fetch(qry *goqu.SelectDataset, target any) error {
-	if target == nil {
-		return ErrInvalidParameters
-	}
 	return fetch(r.ctx, r.conn, qry, target)
 }
 
-// FetchRecord fetch a single record with WHERE clause
+// FetchRecord fetch a single record with WHERE clause; all clauses are AND
+// Example:
+//
+//	row:= &MyRecord{}
+//	err:= repo.FetchRecord(map[string]any{"name":"foo","email":"foo@bar"}, row)
 func (r *repository) FetchRecord(fieldValues map[string]any, target any) error {
-	if fieldValues == nil {
-		return ErrInvalidParameters
-	}
-	qry := r.SqlSelect()
-	for field, value := range fieldValues {
-		qry = qry.Where(goqu.C(field).Eq(value))
-	}
-	return fetchOne(r.ctx, r.conn, qry, target)
+	return fetchRecord(r.ctx, r.conn, r.SqlSelect(), fieldValues, target)
 }
 
 // FetchByKey fetch a single record with WHERE keyField=value
 func (r *repository) FetchByKey(keyField string, value any, target any) error {
-	if target == nil {
-		return ErrInvalidParameters
-	}
-	qry := r.SqlSelect().Where(goqu.C(keyField).Eq(value))
-	return fetchOne(r.ctx, r.conn, qry, target)
+	return fetchByKey(r.ctx, r.conn, r.SqlSelect(), keyField, value, target)
 }
 
 // FetchWhere fetch multiple records with WHERE clause
 func (r *repository) FetchWhere(fieldValues map[string]any, target any) error {
-	if fieldValues == nil {
-		return ErrInvalidParameters
-	}
-	qry := r.SqlSelect()
-	for field, value := range fieldValues {
-		qry = qry.Where(goqu.C(field).Eq(value))
-	}
-	return fetch(r.ctx, r.conn, qry, target)
+	return fetchWhere(r.ctx, r.conn, r.SqlSelect(), fieldValues, target)
 }
 
-func fetch(ctx context.Context, conn *sqlx.DB, qry *goqu.SelectDataset, target any) error {
-	if qry == nil {
-		return ErrInvalidParameters
-	}
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	return conn.SelectContext(ctx, target, sqlQry, args...)
-}
-
+// Exec execute a query
 func (r *repository) Exec(qry *goqu.SelectDataset) error {
-	if qry == nil {
-		return ErrInvalidParameters
-	}
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = r.conn.ExecContext(r.ctx, sqlQry, args...)
-	return err
+	return exec(r.ctx, r.conn, qry)
 }
 
+// RawExec executes a raw sql query
 func (r *repository) RawExec(sql string, args ...any) error {
-	_, err := r.conn.ExecContext(r.ctx, sql, args...)
-	return err
+	return rawExec(r.ctx, r.conn, sql, args...)
+}
+
+// Exists returns true if one or more records exist WHERE fieldName=fieldValue
+// the optional skip parameter can be used to specify an extra clause WHERE skip[0]<>skip[1]
+// Example:
+//
+//	// check if a record with label == "record 4"
+//	exists, err := repo.Exists("label", "record 4")
+//	// check if a record with label == "record 4" and id_sample_table<>4 exists
+//	exists, err := repo.Exists("label", "record 4", "id_sample_table", 4)
+func (r *repository) Exists(fieldName string, fieldValue any, skip ...any) (bool, error) {
+	return exists(r.ctx, r.conn, r.SqlSelect(), fieldName, fieldValue, skip...)
 }
 
 func (r *repository) Delete(qry *goqu.DeleteDataset) error {
-	if qry == nil {
-		return ErrInvalidParameters
-	}
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = r.conn.ExecContext(r.ctx, sqlQry, args...)
-	return err
+	return del(r.ctx, r.conn, qry)
 }
 
 func (r *repository) DeleteWhere(fieldNameValue map[string]any) error {
-	if fieldNameValue == nil {
-		return ErrInvalidParameters
-	}
-	ds := r.SqlDelete()
-	for field, value := range fieldNameValue {
-		ds = ds.Where(goqu.C(field).Eq(value))
-	}
-	sqlQry, args, err := ds.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = r.conn.ExecContext(r.ctx, sqlQry, args...)
-	return err
+	return deleteWhere(r.ctx, r.conn, r.SqlDelete(), fieldNameValue)
 }
 
 func (r *repository) DeleteByKey(keyField string, value any) error {
-	ds := r.SqlDelete().Where(goqu.C(keyField).Eq(value))
-	sqlQry, args, err := ds.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = r.conn.ExecContext(r.ctx, sqlQry, args...)
-	return err
+	return deleteByKey(r.ctx, r.conn, r.SqlDelete(), keyField, value)
 }
 
 func (r *repository) Select(sql string, target any, args ...any) error {
@@ -270,15 +227,7 @@ func (r *repository) Select(sql string, target any, args ...any) error {
 }
 
 func (r *repository) Insert(rows ...any) error {
-	if len(rows) == 0 {
-		return ErrInvalidParameters
-	}
-	sqlQry, args, err := r.SqlInsert().Rows(rows...).Prepared(true).ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = r.conn.ExecContext(r.ctx, sqlQry, args...)
-	return err
+	return insert(r.ctx, r.conn, r.SqlInsert(), rows...)
 }
 
 // InsertReturning inserts a record, and returns the specified return fields into target
@@ -288,51 +237,23 @@ func (r *repository) Insert(rows ...any) error {
 //	record := &SomeRecord{}
 //	err := InsertReturning(record, []any{"id_table"}, &record.Id)
 func (r *repository) InsertReturning(record any, returnFields []interface{}, target ...any) error {
-	if record == nil || returnFields == nil || len(target) == 0 {
-		return ErrInvalidParameters
-	}
-	qry, values, err := r.SqlInsert().Rows(record).Prepared(true).Returning(returnFields...).ToSQL()
-	if err != nil {
-		return err
-	}
-	return r.conn.QueryRowxContext(r.ctx, qry, values...).Scan(target...)
+	return insertReturning(r.ctx, r.conn, r.SqlInsert(), record, returnFields, target...)
 }
 
 // Update execute an update query
 func (r *repository) Update(qry *goqu.UpdateDataset) error {
-	if qry == nil {
-		return ErrInvalidParameters
-	}
-	qrySql, values, err := qry.Prepared(true).ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = r.conn.ExecContext(r.ctx, qrySql, values...)
-	return err
+	return update(r.ctx, r.conn, qry)
 }
 
-// UpdateRecord updates a record using a WHERE condition
+// UpdateRecord updates a record using a WHERE condition with AND
 // record can be a map[string]any specifying fields & values
 func (r *repository) UpdateRecord(record any, whereFieldsValues map[string]any) error {
-	if record == nil {
-		return ErrInvalidParameters
-	}
-	qry := r.SqlUpdate().Set(record)
-	if whereFieldsValues != nil {
-		for field, value := range whereFieldsValues {
-			qry = qry.Where(goqu.C(field).Eq(value))
-		}
-	}
-	return r.Update(qry)
+	return updateRecord(r.ctx, r.conn, r.SqlUpdate(), record, whereFieldsValues)
 }
 
 // UpdateByKey updates a record using WHERE keyField=value
 func (r *repository) UpdateByKey(record any, keyField string, value any) error {
-	if record == nil {
-		return ErrInvalidParameters
-	}
-	qry := r.SqlUpdate().Set(record).Where(goqu.C(keyField).Eq(value))
-	return r.Update(qry)
+	return updateByKey(r.ctx, r.conn, r.SqlUpdate(), record, keyField, value)
 }
 
 func (t *tx) Commit() error {
@@ -373,13 +294,130 @@ func (t *tx) SqlDelete() *goqu.DeleteDataset {
 
 // FetchOne fetch a record; target must be a struct
 func (t *tx) FetchOne(qry *goqu.SelectDataset, target any) error {
+	return fetchOne(t.ctx, t.conn, qry, target)
+}
+
+func (t *tx) Fetch(qry *goqu.SelectDataset, target any) error {
+	return fetch(t.ctx, t.conn, qry, target)
+}
+
+// FetchRecord fetch a single record with WHERE clause
+func (t *tx) FetchRecord(fieldValues map[string]any, target any) error {
+	return fetchRecord(t.ctx, t.conn, t.SqlSelect(), fieldValues, target)
+}
+
+// FetchByKey fetch a single record with WHERE keyField=value
+func (t *tx) FetchByKey(keyField string, value any, target any) error {
+	return fetchByKey(t.ctx, t.conn, t.SqlSelect(), keyField, value, target)
+}
+
+// FetchWhere fetch multiple records with WHERE clause
+func (t *tx) FetchWhere(fieldValues map[string]any, target any) error {
+	return fetchWhere(t.ctx, t.conn, t.SqlSelect(), fieldValues, target)
+}
+
+// Exists returns true if one or more records exist WHERE fieldName=fieldValue
+// the optional skip parameter can be used to specify an extra clause WHERE skip[0]<>skip[1]
+func (t *tx) Exists(fieldName string, fieldValue any, skip ...any) (bool, error) {
+	return exists(t.ctx, t.conn, t.SqlSelect(), fieldName, fieldValue, skip...)
+}
+
+func (t *tx) Exec(qry *goqu.SelectDataset) error {
+	return exec(t.ctx, t.conn, qry)
+}
+
+func (t *tx) RawExec(sql string, args ...any) error {
+	return rawExec(t.ctx, t.conn, sql, args...)
+}
+
+func (t *tx) Delete(qry *goqu.DeleteDataset) error {
+	return del(t.ctx, t.conn, qry)
+}
+
+func (t *tx) DeleteWhere(fieldNameValue map[string]any) error {
+	return deleteWhere(t.ctx, t.conn, t.SqlDelete(), fieldNameValue)
+}
+
+func (t *tx) DeleteByKey(keyField string, value any) error {
+	return deleteByKey(t.ctx, t.conn, t.SqlDelete(), keyField, value)
+}
+
+func (t *tx) Select(sql string, target any, args ...any) error {
+	return t.conn.SelectContext(t.ctx, target, sql, args...)
+}
+
+func (t *tx) Insert(rows ...any) error {
+	return insert(t.ctx, t.conn, t.SqlInsert(), rows...)
+}
+
+// InsertReturning inserts a record, and returns the specified return fields into target
+func (t *tx) InsertReturning(record any, returnFields []interface{}, target ...any) error {
+	return insertReturning(t.ctx, t.conn, t.SqlInsert(), record, returnFields, target...)
+}
+
+// Update execute an update query
+func (t *tx) Update(qry *goqu.UpdateDataset) error {
+	return update(t.ctx, t.conn, qry)
+}
+
+// UpdateRecord updates a record using a WHERE condition
+// record can be a map[string]any specifying fields & values
+func (t *tx) UpdateRecord(record any, whereFieldsValues map[string]any) error {
+	return updateRecord(t.ctx, t.conn, t.SqlUpdate(), record, whereFieldsValues)
+}
+
+// UpdateByKey updates a record using WHERE keyField=value
+func (t *tx) UpdateByKey(record any, keyField string, value any) error {
+	return updateByKey(t.ctx, t.conn, t.SqlUpdate(), record, keyField, value)
+}
+
+// EmptyResult returns true if error is empty result
+func EmptyResult(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows)
+}
+
+// Exists returns true if one or more records exist WHERE fieldName=fieldValue
+// the optional skip parameter can be used to specify an extra clause WHERE skip[0]<>skip[1]
+func (t *tx) exists(ctx context.Context, conn sqlx.QueryerContext, fieldName string, fieldValue any, skip ...any) (bool, error) {
+	result := 0
+	qry := t.SqlSelect().Select(goqu.L("COUNT(*)")).Where(goqu.C(fieldName).Eq(fieldValue))
+	if len(skip) > 0 {
+		if len(skip) != 2 {
+			return false, ErrInvalidParameters
+		}
+		qry = qry.Where(goqu.C(skip[0].(string)).Neq(skip[1]))
+	}
+	qrySql, args, err := qry.ToSQL()
+	if err != nil {
+		return false, err
+	}
+
+	if err = conn.QueryRowxContext(ctx, qrySql, args...).Scan(&result); err != nil {
+		return false, err
+	}
+	return result > 0, err
+}
+
+func rawExec(ctx context.Context, conn sqlx.ExecerContext, sql string, args ...any) error {
+	_, err := conn.ExecContext(ctx, sql, args...)
+	return err
+}
+
+func exec(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.SelectDataset) error {
+	if qry == nil {
+		return ErrInvalidParameters
+	}
+	sqlQry, args, err := qry.ToSQL()
+	if err != nil {
+		return err
+	}
+	return rawExec(ctx, conn, sqlQry, args...)
+}
+
+func fetchOne(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset, target any) error {
 	if target == nil || qry == nil {
 		return ErrInvalidParameters
 	}
-	return txFetchOne(t.ctx, t.conn, qry, target)
-}
-
-func txFetchOne(ctx context.Context, conn *sqlx.Tx, qry *goqu.SelectDataset, target any) error {
 	qry.Limit(1)
 	sqlQry, args, err := qry.ToSQL()
 	if err != nil {
@@ -388,8 +426,8 @@ func txFetchOne(ctx context.Context, conn *sqlx.Tx, qry *goqu.SelectDataset, tar
 	return conn.QueryRowxContext(ctx, sqlQry, args...).StructScan(target)
 }
 
-func txFetch(ctx context.Context, conn *sqlx.Tx, qry *goqu.SelectDataset, target any) error {
-	if qry == nil {
+func fetch(ctx context.Context, conn SqlxReaderCtx, qry *goqu.SelectDataset, target any) error {
+	if target == nil || qry == nil {
 		return ErrInvalidParameters
 	}
 	sqlQry, args, err := qry.ToSQL()
@@ -399,47 +437,54 @@ func txFetch(ctx context.Context, conn *sqlx.Tx, qry *goqu.SelectDataset, target
 	return conn.SelectContext(ctx, target, sqlQry, args...)
 }
 
-func (t *tx) Fetch(qry *goqu.SelectDataset, target any) error {
-	if target == nil {
-		return ErrInvalidParameters
-	}
-	return txFetch(t.ctx, t.conn, qry, target)
-}
-
-// FetchRecord fetch a single record with WHERE clause
-func (t *tx) FetchRecord(fieldValues map[string]any, target any) error {
+func fetchRecord(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset, fieldValues map[string]any, target any) error {
 	if fieldValues == nil {
 		return ErrInvalidParameters
 	}
-	qry := t.SqlSelect()
 	for field, value := range fieldValues {
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
-	return txFetchOne(t.ctx, t.conn, qry, target)
+	return fetchOne(ctx, conn, qry, target)
 }
 
-// FetchByKey fetch a single record with WHERE keyField=value
-func (t *tx) FetchByKey(keyField string, value any, target any) error {
+func fetchByKey(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset, keyField string, value any, target any) error {
 	if target == nil {
 		return ErrInvalidParameters
 	}
-	qry := t.SqlSelect().Where(goqu.C(keyField).Eq(value))
-	return txFetchOne(t.ctx, t.conn, qry, target)
+	return fetchOne(ctx, conn, qry.Where(goqu.C(keyField).Eq(value)), target)
 }
 
-// FetchWhere fetch multiple records with WHERE clause
-func (t *tx) FetchWhere(fieldValues map[string]any, target any) error {
+func fetchWhere(ctx context.Context, conn SqlxReaderCtx, qry *goqu.SelectDataset, fieldValues map[string]any, target any) error {
 	if fieldValues == nil {
 		return ErrInvalidParameters
 	}
-	qry := t.SqlSelect()
 	for field, value := range fieldValues {
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
-	return txFetch(t.ctx, t.conn, qry, target)
+	return fetch(ctx, conn, qry, target)
 }
 
-func (t *tx) Exec(qry *goqu.SelectDataset) error {
+func exists(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset, fieldName string, fieldValue any, skip ...any) (bool, error) {
+	result := 0
+	qry = qry.Select(goqu.L("COUNT(*)")).Where(goqu.C(fieldName).Eq(fieldValue))
+	if len(skip) > 0 {
+		if len(skip) != 2 {
+			return false, ErrInvalidParameters
+		}
+		qry = qry.Where(goqu.C(skip[0].(string)).Neq(skip[1]))
+	}
+	qrySql, args, err := qry.ToSQL()
+	if err != nil {
+		return false, err
+	}
+
+	if err = conn.QueryRowxContext(ctx, qrySql, args...).Scan(&result); err != nil {
+		return false, err
+	}
+	return result > 0, err
+}
+
+func del(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) error {
 	if qry == nil {
 		return ErrInvalidParameters
 	}
@@ -447,83 +492,59 @@ func (t *tx) Exec(qry *goqu.SelectDataset) error {
 	if err != nil {
 		return err
 	}
-	_, err = t.conn.ExecContext(t.ctx, sqlQry, args...)
+	_, err = conn.ExecContext(ctx, sqlQry, args...)
 	return err
 }
 
-func (t *tx) RawExec(sql string, args ...any) error {
-	_, err := t.conn.ExecContext(t.ctx, sql, args...)
-	return err
-}
-
-func (t *tx) Delete(qry *goqu.DeleteDataset) error {
-	if qry == nil {
-		return ErrInvalidParameters
-	}
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = t.conn.ExecContext(t.ctx, sqlQry, args...)
-	return err
-}
-
-func (t *tx) DeleteWhere(fieldNameValue map[string]any) error {
+func deleteWhere(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, fieldNameValue map[string]any) error {
 	if fieldNameValue == nil {
 		return ErrInvalidParameters
 	}
-	ds := t.SqlDelete()
 	for field, value := range fieldNameValue {
-		ds = ds.Where(goqu.C(field).Eq(value))
+		qry = qry.Where(goqu.C(field).Eq(value))
 	}
-	sqlQry, args, err := ds.ToSQL()
+	sqlQry, args, err := qry.ToSQL()
 	if err != nil {
 		return err
 	}
-	_, err = t.conn.ExecContext(t.ctx, sqlQry, args...)
+	_, err = conn.ExecContext(ctx, sqlQry, args...)
 	return err
 }
 
-func (t *tx) DeleteByKey(keyField string, value any) error {
-	ds := t.SqlDelete().Where(goqu.C(keyField).Eq(value))
-	sqlQry, args, err := ds.ToSQL()
+func deleteByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, keyField string, value any) error {
+	qry = qry.Where(goqu.C(keyField).Eq(value))
+	sqlQry, args, err := qry.ToSQL()
 	if err != nil {
 		return err
 	}
-	_, err = t.conn.ExecContext(t.ctx, sqlQry, args...)
+	_, err = conn.ExecContext(ctx, sqlQry, args...)
 	return err
 }
 
-func (t *tx) Select(sql string, target any, args ...any) error {
-	return t.conn.SelectContext(t.ctx, target, sql, args...)
-}
-
-func (t *tx) Insert(rows ...any) error {
+func insert(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.InsertDataset, rows ...any) error {
 	if len(rows) == 0 {
 		return ErrInvalidParameters
 	}
-	sqlQry, args, err := t.SqlInsert().Rows(rows...).Prepared(true).ToSQL()
+	sqlQry, args, err := qry.Rows(rows...).Prepared(true).ToSQL()
 	if err != nil {
 		return err
 	}
-	_, err = t.conn.ExecContext(t.ctx, sqlQry, args...)
+	_, err = conn.ExecContext(ctx, sqlQry, args...)
 	return err
 }
 
-// InsertReturning inserts a record, and returns the specified return fields into target
-func (t *tx) InsertReturning(record any, returnFields []interface{}, target ...any) error {
+func insertReturning(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.InsertDataset, record any, returnFields []interface{}, target ...any) error {
 	if record == nil || returnFields == nil || len(target) == 0 {
 		return ErrInvalidParameters
 	}
-	qry, values, err := t.SqlInsert().Rows(record).Prepared(true).Returning(returnFields...).ToSQL()
+	sqlQry, values, err := qry.Rows(record).Prepared(true).Returning(returnFields...).ToSQL()
 	if err != nil {
 		return err
 	}
-	return t.conn.QueryRowxContext(t.ctx, qry, values...).Scan(target...)
+	return conn.QueryRowxContext(ctx, sqlQry, values...).Scan(target...)
 }
 
-// Update execute an update query
-func (t *tx) Update(qry *goqu.UpdateDataset) error {
+func update(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDataset) error {
 	if qry == nil {
 		return ErrInvalidParameters
 	}
@@ -531,35 +552,26 @@ func (t *tx) Update(qry *goqu.UpdateDataset) error {
 	if err != nil {
 		return err
 	}
-	_, err = t.conn.ExecContext(t.ctx, qrySql, values...)
+	_, err = conn.ExecContext(ctx, qrySql, values...)
 	return err
 }
 
-// UpdateRecord updates a record using a WHERE condition
-// record can be a map[string]any specifying fields & values
-func (t *tx) UpdateRecord(record any, whereFieldsValues map[string]any) error {
+func updateRecord(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDataset, record any, whereFieldsValues map[string]any) error {
 	if record == nil {
 		return ErrInvalidParameters
 	}
-	qry := t.SqlUpdate().Set(record)
+	qry = qry.Set(record)
 	if whereFieldsValues != nil {
 		for field, value := range whereFieldsValues {
 			qry = qry.Where(goqu.C(field).Eq(value))
 		}
 	}
-	return t.Update(qry)
+	return update(ctx, conn, qry)
 }
 
-// UpdateByKey updates a record using WHERE keyField=value
-func (t *tx) UpdateByKey(record any, keyField string, value any) error {
+func updateByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDataset, record any, keyField string, value any) error {
 	if record == nil {
 		return ErrInvalidParameters
 	}
-	qry := t.SqlUpdate().Set(record).Where(goqu.C(keyField).Eq(value))
-	return t.Update(qry)
-}
-
-// EmptyResult returns true if error is empty result
-func EmptyResult(err error) bool {
-	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows)
+	return update(ctx, conn, qry.Set(record).Where(goqu.C(keyField).Eq(value)))
 }
