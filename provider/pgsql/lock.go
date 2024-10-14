@@ -21,8 +21,10 @@ package pgsql
 
 import (
 	"context"
+	"database/sql"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jmoiron/sqlx"
 )
 
 type LockConn interface {
@@ -31,21 +33,33 @@ type LockConn interface {
 }
 
 type AdvisoryLock struct {
-	conn LockConn
+	db   *sqlx.DB
+	conn *sql.Conn
 	id   int
 }
 
-func NewAdvisoryLock(conn LockConn, id int) *AdvisoryLock {
+func NewAdvisoryLock(ctx context.Context, db *sqlx.DB, id int) (*AdvisoryLock, error) {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return &AdvisoryLock{
 		conn: conn,
 		id:   id,
+	}, nil
+}
+
+func (l *AdvisoryLock) Close() {
+	if l.conn != nil {
+		l.conn.Close()
+		l.conn = nil
 	}
 }
 
 // Lock attempts to perform a lock, and waits until it is available
 func (l *AdvisoryLock) Lock(ctx context.Context) error {
 	qry := "SELECT pg_advisory_lock($1)"
-	_, err := l.conn.Exec(ctx, qry, l.id)
+	_, err := l.conn.ExecContext(ctx, qry, l.id)
 	return err
 }
 
@@ -53,7 +67,7 @@ func (l *AdvisoryLock) Lock(ctx context.Context) error {
 func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
 	result := false
 	qry := "SELECT pg_try_advisory_lock($1)"
-	err := l.conn.QueryRow(ctx, qry, l.id).Scan(&result)
+	err := l.conn.QueryRowContext(ctx, qry, l.id).Scan(&result)
 	return result, err
 }
 
@@ -61,6 +75,6 @@ func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
 // Unlock of a given lock needs to be done with the same connection
 func (l *AdvisoryLock) Unlock(ctx context.Context) error {
 	qry := "SELECT pg_advisory_unlock($1)"
-	_, err := l.conn.Exec(ctx, qry, l.id)
+	_, err := l.conn.ExecContext(ctx, qry, l.id)
 	return err
 }

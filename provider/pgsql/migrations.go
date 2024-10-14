@@ -5,35 +5,39 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
+	"github.com/oddbit-project/blueprint/db"
 	"github.com/oddbit-project/blueprint/db/migrations"
 	"slices"
 )
 
 const (
 	// engine constants
-	EngineSchema      = "public"
-	MigrationTable    = "db_migration"
-	EngineSchemaTable = EngineSchema + "." + MigrationTable
+	EngineSchema         = "public"
+	MigrationTable       = "db_migration"
+	EngineMigrationTable = EngineSchema + "." + MigrationTable
 
 	MigrationLockId = 2343452349
 )
 
 type pgMigrationManager struct {
-	pool *pgxpool.Pool
+	db *sqlx.DB
 }
 
-func NewMigrationManager(pool *pgxpool.Pool) migrations.Manager {
-	return &pgMigrationManager{
-		pool: pool,
+func NewMigrationManager(ctx context.Context, client *db.SqlClient) (migrations.Manager, error) {
+	result := &pgMigrationManager{
+		db: client.Db(),
 	}
+	if err := result.init(ctx); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // init checks if migration table exists, and if not, creates
-func (b *pgMigrationManager) init(db *pgxpool.Conn, ctx context.Context) error {
-	exists, err := TableExists(db, ctx, MigrationTable, SchemaDefault)
+func (b *pgMigrationManager) init(ctx context.Context) error {
+	exists, err := TableExists(ctx, b.db, MigrationTable, SchemaDefault)
 	if err != nil {
 		return err
 	}
@@ -46,70 +50,44 @@ func (b *pgMigrationManager) init(db *pgxpool.Conn, ctx context.Context) error {
 			name TEXT,
 			sha2 TEXT,
 			contents TEXT)`,
-		EngineSchemaTable)
-	_, err = db.Exec(ctx, qry)
+		EngineMigrationTable)
+	_, err = b.db.ExecContext(ctx, qry)
 	return err
 }
 
 // registerMigration internal function to register a migration
-func (b *pgMigrationManager) registerMigration(db *pgxpool.Conn, ctx context.Context, m *migrations.MigrationRecord) error {
-	qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES ($1, $2, $3, $4)", EngineSchemaTable)
-	tx, err := db.Begin(ctx)
+func (b *pgMigrationManager) registerMigration(ctx context.Context, m *migrations.MigrationRecord) error {
+	qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES ($1, $2, $3, $4)", EngineMigrationTable)
+	tx, err := b.db.Begin()
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, qry, m.Created, m.Name, m.SHA2, m.Contents)
+	_, err = tx.ExecContext(ctx, qry, m.Created, m.Name, m.SHA2, m.Contents)
 	if err != nil {
-		tx.Rollback(ctx)
+		_ = tx.Rollback()
 		return err
 	}
-	return tx.Commit(ctx)
+	return tx.Commit()
 }
 
 func (b *pgMigrationManager) List(ctx context.Context) ([]*migrations.MigrationRecord, error) {
-	db, err := b.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Release()
-
-	if err := b.init(db, ctx); err != nil {
-		return nil, err
-	}
-	return b.list(db, ctx)
-}
-
-func (b *pgMigrationManager) list(db *pgxpool.Conn, ctx context.Context) ([]*migrations.MigrationRecord, error) {
 	result := make([]*migrations.MigrationRecord, 0)
-	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", EngineSchemaTable)
-	if err := pgxscan.Select(ctx, db, &result, qry); err != nil {
+	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", EngineMigrationTable)
+	if err := b.db.SelectContext(ctx, &result, qry); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return result, nil
 		}
 		return nil, err
 	}
 	return result, nil
+
 }
 
 func (b *pgMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
-	db, err := b.pool.Acquire(ctx)
-	if err != nil {
-		return false, err
-	}
-	defer db.Release()
-
-	if err := b.init(db, ctx); err != nil {
-		return false, err
-	}
-
-	return b.migrationExists(db, ctx, name, sha2)
-}
-
-func (b *pgMigrationManager) migrationExists(db *pgxpool.Conn, ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
-	qry := fmt.Sprintf("SELECT * FROM %s WHERE name=$1", EngineSchemaTable)
+	qry := fmt.Sprintf("SELECT * FROM %s WHERE name=$1 LIMIT 1", EngineMigrationTable)
 
-	if err := pgxscan.Select(ctx, db, qry, name); err != nil {
+	if err := b.db.SelectContext(ctx, qry, name); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
@@ -119,48 +97,41 @@ func (b *pgMigrationManager) migrationExists(db *pgxpool.Conn, ctx context.Conte
 	if result.SHA2 != sha2 {
 		return true, migrations.ErrMigrationNameHashMismatch
 	}
-
 	return true, nil
 }
 
 // runMigration internal function to execute migrations, called by RunMigration() and Run()
-func (b *pgMigrationManager) runMigration(db *pgxpool.Conn, ctx context.Context, m *migrations.MigrationRecord) error {
-	tx, err := db.Begin(ctx)
+func (b *pgMigrationManager) runMigration(ctx context.Context, m *migrations.MigrationRecord) error {
+	tx, err := b.db.Begin()
 	if err != nil {
 		return err
 	}
 
 	// execute migration
-	if _, err := tx.Exec(ctx, m.Contents); err != nil {
-		_ = tx.Rollback(ctx)
+	if _, err := tx.ExecContext(ctx, m.Contents); err != nil {
+		_ = tx.Rollback()
 		return err
 	}
 
-	if err = tx.Commit(ctx); err != nil {
+	if err = tx.Commit(); err != nil {
 		return err
 	}
 
 	// register migration
-	return b.registerMigration(db, ctx, m)
+	return b.registerMigration(ctx, m)
 }
 
 // RunMigration applies and registers a single migration
 func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	db, err := b.pool.Acquire(ctx)
+	lock, err := NewAdvisoryLock(ctx, b.db, MigrationLockId)
 	if err != nil {
 		return err
 	}
-	defer db.Release()
-
-	lock := NewAdvisoryLock(db, MigrationLockId)
-	if err = lock.Lock(context.Background()); err != nil {
+	defer lock.Close()
+	if err := lock.Lock(ctx); err != nil {
 		return err
 	}
-	defer lock.Unlock(context.Background())
-
-	if err := b.init(db, ctx); err != nil {
-		return err
-	}
+	defer lock.Unlock(ctx)
 
 	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
@@ -170,24 +141,22 @@ func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.Mig
 		return migrations.ErrMigrationExists
 	}
 
-	return b.runMigration(db, ctx, m)
+	return b.runMigration(ctx, m)
 }
 
 // RegisterMigration registers a single migration but does not apply the contents
 func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	db, err := b.pool.Acquire(ctx)
+	lock, err := NewAdvisoryLock(ctx, b.db, MigrationLockId)
 	if err != nil {
 		return err
 	}
-	defer db.Release()
-
-	lock := NewAdvisoryLock(db, MigrationLockId)
-	if err = lock.Lock(context.Background()); err != nil {
+	defer lock.Close()
+	if err := lock.Lock(context.Background()); err != nil {
 		return err
 	}
 	defer lock.Unlock(context.Background())
 
-	exists, err := b.migrationExists(db, ctx, m.Name, m.SHA2)
+	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
 		return err
 	}
@@ -195,7 +164,7 @@ func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migration
 		return migrations.ErrMigrationExists
 	}
 
-	return b.registerMigration(db, ctx, m)
+	return b.registerMigration(ctx, m)
 }
 
 // Run all migrations from a source, and skip the ones already applied
@@ -206,28 +175,26 @@ func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migration
 //	   panic(err)
 //	}
 func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, consoleFn migrations.ProgressFn) error {
-	db, err := b.pool.Acquire(ctx)
+	if consoleFn == nil {
+		consoleFn = migrations.DefaultProgressFn
+	}
+
+	lock, err := NewAdvisoryLock(ctx, b.db, MigrationLockId)
 	if err != nil {
 		return err
 	}
-	defer db.Release()
-
-	lock := NewAdvisoryLock(db, MigrationLockId)
-	if err = lock.Lock(context.Background()); err != nil {
+	defer lock.Close()
+	if err := lock.Lock(context.Background()); err != nil {
 		return err
 	}
 	defer lock.Unlock(context.Background())
-
-	if err := b.init(db, ctx); err != nil {
-		return err
-	}
 
 	files, err := src.List()
 	if err != nil {
 		return err
 	}
 
-	migList, err := b.list(db, ctx)
+	migList, err := b.List(ctx)
 	prevNames := make([]string, len(migList))
 	for i, r := range migList {
 		prevNames[i] = r.Name
@@ -243,7 +210,7 @@ func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, con
 			}
 			// execute migration
 			consoleFn(migrations.MsgRunMigration, f, nil)
-			err = b.runMigration(db, ctx, record)
+			err = b.runMigration(ctx, record)
 			if err != nil {
 				consoleFn(migrations.MsgError, f, err)
 				return err

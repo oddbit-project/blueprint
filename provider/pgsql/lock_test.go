@@ -9,18 +9,18 @@ import (
 )
 
 func TestLockMultipleConnections(t *testing.T) {
-	pool := dbClient(t)
+	client := dbClient(t)
+	assert.Nil(t, client.Connect())
+	defer client.Disconnect()
 
-	conn1, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn1.Release()
-	conn2, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn2.Release()
+	conn1 := client.Db()
+	conn2 := client.Db()
 
 	lockId := 12
-	lock1 := NewAdvisoryLock(conn1, lockId)
-	lock2 := NewAdvisoryLock(conn2, lockId)
+	lock1, err := NewAdvisoryLock(context.Background(), conn1, lockId)
+	assert.Nil(t, err)
+	lock2, err := NewAdvisoryLock(context.Background(), conn2, lockId)
+	assert.Nil(t, err)
 
 	// lock using conn1
 	assert.Nil(t, lock1.Lock(context.Background()))
@@ -48,18 +48,18 @@ func TestLockMultipleConnections(t *testing.T) {
 }
 
 func TestLockConcurrent(t *testing.T) {
-	pool := dbClient(t)
+	client := dbClient(t)
+	assert.Nil(t, client.Connect())
+	defer client.Disconnect()
 
-	conn1, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn1.Release()
-	conn2, err := pool.Acquire(context.Background())
-	assert.Nil(t, err)
-	defer conn2.Release()
+	conn1 := client.Db()
+	conn2 := client.Db()
 
 	lockId := 27
-	lock1 := NewAdvisoryLock(conn1, lockId)
-	lock2 := NewAdvisoryLock(conn2, lockId)
+	lock1, err := NewAdvisoryLock(context.Background(), conn1, lockId)
+	assert.Nil(t, err)
+	lock2, err := NewAdvisoryLock(context.Background(), conn2, lockId)
+	assert.Nil(t, err)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -91,13 +91,13 @@ func TestLockConcurrent(t *testing.T) {
 }
 
 func TestLockUnlock(t *testing.T) {
-	pool := dbClient(t)
-	conn, err := pool.Acquire(context.Background())
-	defer conn.Release()
-	assert.Nil(t, err)
+	client := dbClient(t)
+	assert.Nil(t, client.Connect())
+	defer client.Disconnect()
 
 	lockId := 10
-	lock := NewAdvisoryLock(conn, lockId)
+	lock, err := NewAdvisoryLock(context.Background(), client.Db(), lockId)
+	assert.Nil(t, err)
 	// lock
 	assert.Nil(t, lock.Lock(context.Background()))
 
