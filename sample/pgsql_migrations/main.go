@@ -13,17 +13,21 @@ import (
 var migFs embed.FS
 
 func main() {
-	pgConfig := pgsql.NewPoolConfig()
+	pgConfig := pgsql.NewClientConfig()
 	pgConfig.DSN = "postgres://username:password@localhost:5432/database?sslmode=allow"
 
-	db, err := pgsql.NewPool(context.Background(), pgConfig)
+	client, err := pgsql.NewClient(pgConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer client.Disconnect()
 
 	source, err := migrations.NewEmbedSource(migFs, "migrations")
 
-	manager := pgsql.NewMigrationManager(db)
+	manager, err := pgsql.NewMigrationManager(context.Background(), client)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("Applying migrations...")
 	if err = manager.Run(context.Background(), source, migrations.DefaultProgressFn); err != nil {
 		fmt.Println("Error: ", err)

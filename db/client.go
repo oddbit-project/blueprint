@@ -6,7 +6,9 @@ import (
 	"github.com/oddbit-project/blueprint/utils"
 )
 
-const ErrAbstractMethod = utils.Error("Abstract method")
+const (
+	ErrInvalidParameters = utils.Error("invalid parameter count or parameter is nil")
+)
 
 type ClientInterface interface {
 	GetClient() *sqlx.DB
@@ -15,17 +17,23 @@ type ClientInterface interface {
 	Disconnect()
 }
 
-type SqlClient struct {
-	Conn       *sqlx.DB
-	Dsn        string
-	DriverName string
+type ConnectionOptions interface {
+	Apply(db *sqlx.DB) error
 }
 
-func NewSqlClient(dsn string, driverName string) *SqlClient {
+type SqlClient struct {
+	Conn        *sqlx.DB
+	Dsn         string
+	DriverName  string
+	connOptions ConnectionOptions
+}
+
+func NewSqlClient(dsn string, driverName string, connOptions ConnectionOptions) *SqlClient {
 	return &SqlClient{
-		Conn:       nil,
-		Dsn:        dsn,
-		DriverName: driverName,
+		Conn:        nil,
+		Dsn:         dsn,
+		DriverName:  driverName,
+		connOptions: connOptions,
 	}
 }
 
@@ -35,6 +43,11 @@ func (c *SqlClient) Connect() error {
 		return err
 	}
 
+	if c.connOptions != nil {
+		if err = c.connOptions.Apply(conn); err != nil {
+			return err
+		}
+	}
 	if err := conn.Ping(); err != nil {
 		return err
 	}
@@ -42,7 +55,12 @@ func (c *SqlClient) Connect() error {
 	return nil
 }
 
-func (c *SqlClient) GetClient() *sqlx.DB {
+func (c *SqlClient) Db() *sqlx.DB {
+	if c.Conn == nil {
+		if err := c.Connect(); err != nil {
+			panic(err)
+		}
+	}
 	return c.Conn
 }
 

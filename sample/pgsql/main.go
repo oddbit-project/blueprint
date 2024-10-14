@@ -9,22 +9,18 @@ import (
 )
 
 func main() {
-	pgConfig := pgsql.NewPoolConfig()
+	pgConfig := pgsql.NewClientConfig()
 	pgConfig.DSN = "postgres://username:password@localhost:5432/database?sslmode=allow"
 
-	pool, err := pgsql.NewPool(context.Background(), pgConfig)
+	client, err := pgsql.NewClient(pgConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	db, err := pool.Acquire(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Release()
+	db := client.Db()
+	defer client.Disconnect()
 
 	var greeting string
-	err = db.QueryRow(context.Background(), "select 'Hello, world!'").Scan(&greeting)
+	err = db.QueryRowxContext(context.Background(), "select 'Hello, world!'").Scan(&greeting)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "QueryRow failed: %v\n", err)
 		os.Exit(1)

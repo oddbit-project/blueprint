@@ -1,9 +1,8 @@
 package pgsql
 
 import (
-	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/oddbit-project/blueprint/db"
 	"os"
 	"testing"
 )
@@ -11,20 +10,19 @@ import (
 func getDSN() string {
 	user := os.Getenv("POSTGRES_USER")
 	pwd := os.Getenv("POSTGRES_PASSWORD")
-	db := os.Getenv("POSTGRES_DB")
+	database := os.Getenv("POSTGRES_DB")
 	port := os.Getenv("POSTGRES_PORT")
 	host := os.Getenv("POSTGRES_HOST")
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, pwd, host, port, db)
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, pwd, host, port, database)
 }
 
-func dbClient(t *testing.T) *pgxpool.Pool {
+func dbClient(t *testing.T) *db.SqlClient {
 
-	cfg := NewPoolConfig()
+	cfg := NewClientConfig()
 	cfg.DSN = getDSN()
-	pool, err := NewPool(context.Background(), cfg)
+	client, err := NewClient(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	return pool
+	return client
 }
