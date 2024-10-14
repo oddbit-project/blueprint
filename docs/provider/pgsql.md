@@ -29,9 +29,8 @@ import (
 )
 
 func main() {
-	pgConfig := &pgsql.ClientConfig{
-		DSN: "postgres://username:password@localhost:5432/database?sslmode=allow",
-	}
+	pgConfig := pgsql.NewClientConfig()
+	pgConfig.DSN = "postgres://username:password@localhost:5432/database?sslmode=allow"
 
 	client, err := pgsql.NewClient(pgConfig)
 	if err != nil {
@@ -41,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer client.Disconnect()
-
+	
 	// do stuff
 }
 
