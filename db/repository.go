@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/doug-martin/goqu/v9"
-	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -82,6 +81,8 @@ type Transaction interface {
 	Commit() error
 	Rollback() error
 }
+
+type FV map[string]any // alias for fieldValues maps
 
 type repository struct {
 	conn      *sqlx.DB
