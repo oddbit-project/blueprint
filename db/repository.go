@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/doug-martin/goqu/v9"
+	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
 )
 
