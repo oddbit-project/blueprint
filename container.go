@@ -61,6 +61,7 @@ func (c *Container) Run(mainFn ...RuntimeFn) {
 		select {
 		case <-monitor:
 			log.Info().Msg("Shutting down application...")
+			Shutdown(nil)
 			c.CancelCtx()
 
 		case <-c.Context.Done():
@@ -73,6 +74,7 @@ func (c *Container) Run(mainFn ...RuntimeFn) {
 // AbortFatal aborts execution in case of fatal error
 func (c *Container) AbortFatal(err error) {
 	if err != nil {
+		Shutdown(err)
 		c.Terminate(err)
 	}
 }
@@ -83,11 +85,7 @@ func (c *Container) Terminate(err error) {
 	if err != nil {
 		retCode = -1
 	}
-
-	// call shutdown handlers first
-	// some shutdown handlers may depend on the to-be cancelled context
-	Shutdown(err)
-
+	
 	// cancel application context
 	if c.Context != nil {
 		// cancel context if not canceled yet
