@@ -85,7 +85,7 @@ func (c *Container) Terminate(err error) {
 	if err != nil {
 		retCode = -1
 	}
-	
+
 	// cancel application context
 	if c.Context != nil {
 		// cancel context if not canceled yet
