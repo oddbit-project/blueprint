@@ -83,15 +83,18 @@ func (c *Container) Terminate(err error) {
 	if err != nil {
 		retCode = -1
 	}
-	// attempts to cancel application context
+
+	// call shutdown handlers first
+	// some shutdown handlers may depend on the to-be cancelled context
+	Shutdown(err)
+
+	// cancel application context
 	if c.Context != nil {
 		// cancel context if not canceled yet
 		if c.CancelCtx != nil && !errors.Is(c.Context.Err(), context.Canceled) {
 			c.CancelCtx()
 		}
 	}
-	// call shutdown handlers
-	Shutdown(err)
 
 	// exit to os
 	os.Exit(retCode)
