@@ -7,9 +7,9 @@ import (
 )
 
 var appDestructors *callstack.CallStack = nil
-var shutdownMx *sync.Mutex = &sync.Mutex{}
+var shutdownMx = &sync.Mutex{}
 
-// Retrieve callback manager
+// GetDestructorManager Retrieve callback manager
 func GetDestructorManager() *callstack.CallStack {
 	return appDestructors
 }

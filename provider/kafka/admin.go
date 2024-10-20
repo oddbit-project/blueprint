@@ -110,7 +110,7 @@ func (c *KafkaAdmin) GetTopics(topics ...string) ([]kafka.Partition, error) {
 	return c.Conn.ReadPartitions(topics...)
 }
 
-// GetTopics list existing kafka topics
+// ListTopics list existing kafka topics
 func (c *KafkaAdmin) ListTopics() ([]string, error) {
 	if c.Conn == nil {
 		if err := c.Connect(); err != nil {

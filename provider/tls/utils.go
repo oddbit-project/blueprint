@@ -84,7 +84,7 @@ var defaultCipherSuites = []uint16{
 
 // ParseCiphers returns a `[]uint16` by received `[]string` key that represents ciphers from crypto/tls.
 func ParseCiphers(ciphers []string) ([]uint16, error) {
-	suites := []uint16{}
+	var suites []uint16
 
 	for _, cipher := range ciphers {
 		v, ok := tlsCipherMap[cipher]

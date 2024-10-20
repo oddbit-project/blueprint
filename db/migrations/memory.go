@@ -28,7 +28,7 @@ func (d *MemorySource) Add(name string, content string) {
 // List  sql files (migrations)
 func (d *MemorySource) List() ([]string, error) {
 	var files []string
-	for k, _ := range d.files {
+	for k := range d.files {
 		if filepath.Ext(k) == MigrationFileExtension {
 			files = append(files, k)
 		}

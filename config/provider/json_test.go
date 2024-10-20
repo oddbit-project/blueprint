@@ -3,6 +3,7 @@ package provider
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/oddbit-project/blueprint/config"
 	"reflect"
 	"testing"
@@ -321,7 +322,7 @@ func TestJsonProvider_GetConfigNode(t *testing.T) {
 	if err == nil {
 		t.Fatal("JsonProvider_GetConfigNode(): non-existing key is returning data")
 	}
-	if err != config.ErrNoKey || cfgNode != nil {
+	if !errors.Is(err, config.ErrNoKey) || cfgNode != nil {
 		t.Fatal("JsonProvider_GetConfigNode(): error mismatch on non-existing key")
 	}
 }

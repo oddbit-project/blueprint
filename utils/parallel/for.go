@@ -2,7 +2,7 @@ package parallel
 
 type ForIntFn func(i int) error
 
-// Iterate a function in parallel using goroutines
+// ForInt iterate a function in parallel using goroutines
 // Adapted from https://github.com/tsenart/nap scatter() function
 func ForInt(to int, fn ForIntFn) error {
 	errChan := make(chan error, to)
