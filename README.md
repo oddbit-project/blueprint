@@ -161,3 +161,7 @@ The repository includes code adapted from the following sources:
 
 [Telegraf TLS plugin](https://github.com/influxdata/telegraf/tree/master/plugins/common/tls)
 (c) InfluxData Inc, MIT License
+
+
+[Threadsafe package](https://github.com/hayageek/threadsafe)
+ (c) Ravishanker Kusuma, MIT License
