@@ -64,7 +64,7 @@ func TestCallStack(t *testing.T) {
 
 	if err = cs.RunLinear(true); err == nil {
 		t.Error("RunLinear(): failed to return expected error")
-	} else if errors.Is(err, myError) {
+	} else if !errors.Is(err, myError) {
 		t.Error("RunLinear(): unexpected error returned")
 	}
 	if returnValue != testString {
