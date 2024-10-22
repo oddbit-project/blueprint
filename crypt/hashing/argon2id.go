@@ -132,7 +132,7 @@ func Argon2IdDecodeHash(hash string) (*Argon2Config, []byte, []byte, error) {
 	return cfg, salt, key, nil
 }
 
-// Argon2ComparePassword
+// Argon2IdComparePassword
 // Compares password and hash, and returns the hash configto enable re-hashing if necessary
 func Argon2IdComparePassword(password, hash string) (bool, *Argon2Config, error) {
 	cfg, salt, key, err := Argon2IdDecodeHash(hash)

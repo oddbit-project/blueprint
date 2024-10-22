@@ -1,6 +1,7 @@
 package pgsql
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -40,7 +41,7 @@ func TestClientConfigValidate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.cfg.Validate()
-			if err != tc.expected {
+			if !errors.Is(err, tc.expected) {
 				t.Errorf("expected %v, got %v", tc.expected, err)
 			}
 			if err == nil {

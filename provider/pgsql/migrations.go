@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	// engine constants
 	EngineSchema         = "public"
 	MigrationTable       = "db_migration"
 	EngineMigrationTable = EngineSchema + "." + MigrationTable

@@ -17,7 +17,6 @@ const (
 	ErrInvalidFile   = utils.Error("Specified migration path is not a file")
 	ErrReadMigration = utils.Error("Error reading migration")
 
-	// migration file extension
 	MigrationFileExtension = ".sql"
 )
 

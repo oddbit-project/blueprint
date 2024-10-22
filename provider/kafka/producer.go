@@ -95,10 +95,10 @@ func NewProducer(ctx context.Context, cfg *ProducerConfig) (*KafkaProducer, erro
 }
 
 // Disconnect disconnects from the Writer
-func (c *KafkaProducer) Disconnect() {
-	if c.Writer != nil {
-		c.Writer.Close()
-		c.Writer = nil
+func (p *KafkaProducer) Disconnect() {
+	if p.Writer != nil {
+		p.Writer.Close()
+		p.Writer = nil
 	}
 }
 

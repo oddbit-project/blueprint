@@ -66,7 +66,7 @@ func (c *CallStack) RunLinear(abortOnError bool) error {
 	return nil
 }
 
-// returns true if in call loop
+// IsCalling returns true if in call loop
 func (c *CallStack) IsCalling() bool {
 	return atomic.LoadInt32(&c.calling) == 1
 }

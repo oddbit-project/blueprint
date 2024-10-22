@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
@@ -91,7 +92,7 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*KafkaConsumer, erro
 		dialer.TLS = tls
 	}
 
-	cfg_reader := &kafka.ReaderConfig{
+	cfgReader := &kafka.ReaderConfig{
 		Brokers: strings.Split(cfg.Brokers, ","),
 		GroupID: cfg.Group,
 		Topic:   cfg.Topic,
@@ -100,7 +101,7 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*KafkaConsumer, erro
 
 	return &KafkaConsumer{
 		ctx:     ctx,
-		config:  cfg_reader,
+		config:  cfgReader,
 		Brokers: cfg.Brokers,
 		Topic:   cfg.Topic,
 		Group:   cfg.Group,
@@ -151,7 +152,7 @@ func (c *KafkaConsumer) Subscribe(handler ConsumerFunc) error {
 	for {
 		msg, err := c.Reader.ReadMessage(c.ctx)
 		if err != nil {
-			if err != context.Canceled {
+			if !errors.Is(err, context.Canceled) {
 				return err
 			}
 			return nil
@@ -184,7 +185,7 @@ func (c *KafkaConsumer) ChannelSubscribe(ch chan Message) error {
 	for {
 		msg, err := c.Reader.ReadMessage(c.ctx)
 		if err != nil {
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				// clean exit
 				return nil
 			}
@@ -204,7 +205,7 @@ func (c *KafkaConsumer) SubscribeWithOffsets(handler ConsumerFunc) error {
 	for {
 		msg, err := c.Reader.FetchMessage(c.ctx)
 		if err != nil {
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				// clean exit
 				return nil
 			}

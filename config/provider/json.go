@@ -119,7 +119,7 @@ func (j *JsonProvider) GetFloat64Key(key string) (float64, error) {
 	return result, err
 }
 
-// note: separator is ignored
+// GetSliceKey note: separator is ignored
 func (j *JsonProvider) GetSliceKey(key, separator string) ([]string, error) {
 	buf := make([]string, 0)
 	if v, ok := j.configData[key]; ok {

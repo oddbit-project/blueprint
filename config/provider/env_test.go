@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"errors"
 	"github.com/oddbit-project/blueprint/config"
 	"os"
 	"reflect"
@@ -64,7 +65,7 @@ func setEnvVars(t *testing.T) {
 }
 
 func resetEnvVars() {
-	for k, _ := range envVars {
+	for k := range envVars {
 		os.Unsetenv(k)
 	}
 }
@@ -75,7 +76,7 @@ func TestNewEnvProvider(t *testing.T) {
 
 	cfg := NewEnvProvider(envPrefix, false)
 	keys := make([]string, 0)
-	for k, _ := range envVars {
+	for k := range envVars {
 		keys = append(keys, k)
 	}
 	if !cfg.KeyListExists(keys) {
@@ -119,7 +120,7 @@ func TestEnvProvider_GetConfigNode(t *testing.T) {
 
 	cfg := NewEnvProvider(envPrefix, false)
 	node, err := cfg.GetConfigNode("TEST_STR")
-	if err != config.ErrNotImplemented || node != nil {
+	if !errors.Is(err, config.ErrNotImplemented) || node != nil {
 		t.Error("EnvProvider_GetConfigNode(): invalid result")
 	}
 }
@@ -358,7 +359,7 @@ func TestEnvProvider_KeyExists(t *testing.T) {
 	defer resetEnvVars()
 
 	cfg := NewEnvProvider(envPrefix, false)
-	for k, _ := range envVars {
+	for k := range envVars {
 		if !cfg.KeyExists(k) {
 			t.Error("EnvProvider_KeyExists(): existing key not found")
 		}
@@ -368,7 +369,7 @@ func TestEnvProvider_KeyExists(t *testing.T) {
 	}
 	// camelCase
 	cfg = NewEnvProvider(envPrefix, true)
-	for k, _ := range envVars {
+	for k := range envVars {
 		if !cfg.KeyExists(k) {
 			t.Error("EnvProvider_KeyExists(): existing key not found")
 		}
@@ -384,7 +385,7 @@ func TestEnvProvider_KeyListExists(t *testing.T) {
 
 	cfg := NewEnvProvider(envPrefix, false)
 	keys := make([]string, 0)
-	for k, _ := range envVars {
+	for k := range envVars {
 		keys = append(keys, k)
 	}
 	if !cfg.KeyListExists(keys) {
@@ -397,7 +398,7 @@ func TestEnvProvider_KeyListExists(t *testing.T) {
 
 	cfg = NewEnvProvider(envPrefix, true)
 	keys = make([]string, 0)
-	for k, _ := range envVars {
+	for k := range envVars {
 		keys = append(keys, k)
 	}
 	if !cfg.KeyListExists(keys) {
