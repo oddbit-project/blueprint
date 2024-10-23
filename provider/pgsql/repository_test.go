@@ -173,4 +173,7 @@ func testFunctions(t *testing.T, repo testRepository) {
 	// select via exec
 	assert.Nil(t, repo.Exec(repo.SqlSelect().Where(goqu.C("label").Eq("bar"))))
 
+	// delete cascade
+	assert.Nil(t, repo.DeleteCascade(repo.SqlDelete()))
+
 }

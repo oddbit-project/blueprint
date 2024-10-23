@@ -44,6 +44,7 @@ type Updater interface {
 
 type Deleter interface {
 	Delete(qry *goqu.DeleteDataset) error
+	DeleteCascade(qry *goqu.DeleteDataset) error
 	DeleteWhere(fieldNameValue map[string]any) error
 	DeleteByKey(keyField string, value any) error
 }
@@ -216,6 +217,10 @@ func (r *repository) Delete(qry *goqu.DeleteDataset) error {
 	return del(r.ctx, r.conn, qry)
 }
 
+func (r *repository) DeleteCascade(qry *goqu.DeleteDataset) error {
+	return delCascade(r.ctx, r.conn, qry)
+}
+
 func (r *repository) DeleteWhere(fieldNameValue map[string]any) error {
 	return deleteWhere(r.ctx, r.conn, r.SqlDelete(), fieldNameValue)
 }
@@ -334,6 +339,10 @@ func (t *tx) RawExec(sql string, args ...any) error {
 
 func (t *tx) Delete(qry *goqu.DeleteDataset) error {
 	return del(t.ctx, t.conn, qry)
+}
+
+func (t *tx) DeleteCascade(qry *goqu.DeleteDataset) error {
+	return delCascade(t.ctx, t.conn, qry)
 }
 
 func (t *tx) DeleteWhere(fieldNameValue map[string]any) error {
@@ -498,6 +507,19 @@ func del(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) 
 	return err
 }
 
+func delCascade(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) error {
+	if qry == nil {
+		return ErrInvalidParameters
+	}
+	sqlQry, args, err := qry.ToSQL()
+	if err != nil {
+		return err
+	}
+	sqlQry = sqlQry + " CASCADE"
+	_, err = conn.ExecContext(ctx, sqlQry, args...)
+	return err
+}
+
 func deleteWhere(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, fieldNameValue map[string]any) error {
 	if fieldNameValue == nil {
 		return ErrInvalidParameters
@@ -505,22 +527,12 @@ func deleteWhere(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteD
 	for field, value := range fieldNameValue {
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = conn.ExecContext(ctx, sqlQry, args...)
-	return err
+	return del(ctx, conn, qry)
 }
 
 func deleteByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, keyField string, value any) error {
 	qry = qry.Where(goqu.C(keyField).Eq(value))
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = conn.ExecContext(ctx, sqlQry, args...)
-	return err
+	return del(ctx, conn, qry)
 }
 
 func insert(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.InsertDataset, rows ...any) error {
