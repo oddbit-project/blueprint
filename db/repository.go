@@ -26,6 +26,11 @@ type Reader interface {
 	Exists(fieldName string, fieldValue any, skip ...any) (bool, error)
 }
 
+type Counter interface {
+	Count() (int64, error)
+	CountWhere(fieldValues map[string]any) (int64, error)
+}
+
 type Executor interface {
 	Exec(qry *goqu.SelectDataset) error
 	RawExec(sql string, args ...any) error
@@ -44,7 +49,6 @@ type Updater interface {
 
 type Deleter interface {
 	Delete(qry *goqu.DeleteDataset) error
-	DeleteCascade(qry *goqu.DeleteDataset) error
 	DeleteWhere(fieldNameValue map[string]any) error
 	DeleteByKey(keyField string, value any) error
 }
@@ -66,6 +70,7 @@ type Repository interface {
 	Writer
 	Deleter
 	Updater
+	Counter
 	NewTransaction(opts *sql.TxOptions) (Transaction, error)
 }
 
@@ -76,6 +81,7 @@ type Transaction interface {
 	Writer
 	Deleter
 	Updater
+	Counter
 
 	Db() *sqlx.Tx
 	Name() string
@@ -217,10 +223,6 @@ func (r *repository) Delete(qry *goqu.DeleteDataset) error {
 	return del(r.ctx, r.conn, qry)
 }
 
-func (r *repository) DeleteCascade(qry *goqu.DeleteDataset) error {
-	return delCascade(r.ctx, r.conn, qry)
-}
-
 func (r *repository) DeleteWhere(fieldNameValue map[string]any) error {
 	return deleteWhere(r.ctx, r.conn, r.SqlDelete(), fieldNameValue)
 }
@@ -235,6 +237,20 @@ func (r *repository) Select(sql string, target any, args ...any) error {
 
 func (r *repository) Insert(rows ...any) error {
 	return insert(r.ctx, r.conn, r.SqlInsert(), rows...)
+}
+
+// Count returns the total number of rows in the database table
+func (r *repository) Count() (int64, error) {
+	return count(r.ctx, r.conn, r.SqlSelect().Select(goqu.L("COUNT(*)")))
+}
+
+// CountWhere returns the number of rows matching the fieldValues map
+func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
+	qry := r.SqlSelect().Select(goqu.L("COUNT(*)"))
+	for field, value := range fieldValues {
+		qry = qry.Where(goqu.C(field).Eq(value))
+	}
+	return count(r.ctx, r.conn, qry)
 }
 
 // InsertReturning inserts a record, and returns the specified return fields into target
@@ -341,10 +357,6 @@ func (t *tx) Delete(qry *goqu.DeleteDataset) error {
 	return del(t.ctx, t.conn, qry)
 }
 
-func (t *tx) DeleteCascade(qry *goqu.DeleteDataset) error {
-	return delCascade(t.ctx, t.conn, qry)
-}
-
 func (t *tx) DeleteWhere(fieldNameValue map[string]any) error {
 	return deleteWhere(t.ctx, t.conn, t.SqlDelete(), fieldNameValue)
 }
@@ -380,6 +392,20 @@ func (t *tx) UpdateRecord(record any, whereFieldsValues map[string]any) error {
 // UpdateByKey updates a record using WHERE keyField=value
 func (t *tx) UpdateByKey(record any, keyField string, value any) error {
 	return updateByKey(t.ctx, t.conn, t.SqlUpdate(), record, keyField, value)
+}
+
+// Count returns the total number of rows in the database table
+func (t *tx) Count() (int64, error) {
+	return count(t.ctx, t.conn, t.SqlSelect().Select(goqu.L("COUNT(*)")))
+}
+
+// CountWhere returns the number of rows matching the fieldValues map
+func (t *tx) CountWhere(fieldValues map[string]any) (int64, error) {
+	qry := t.SqlSelect().Select(goqu.L("COUNT(*)"))
+	for field, value := range fieldValues {
+		qry = qry.Where(goqu.C(field).Eq(value))
+	}
+	return count(t.ctx, t.conn, qry)
 }
 
 // EmptyResult returns true if error is empty result
@@ -507,19 +533,6 @@ func del(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) 
 	return err
 }
 
-func delCascade(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) error {
-	if qry == nil {
-		return ErrInvalidParameters
-	}
-	sqlQry, args, err := qry.ToSQL()
-	if err != nil {
-		return err
-	}
-	sqlQry = sqlQry + " CASCADE"
-	_, err = conn.ExecContext(ctx, sqlQry, args...)
-	return err
-}
-
 func deleteWhere(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, fieldNameValue map[string]any) error {
 	if fieldNameValue == nil {
 		return ErrInvalidParameters
@@ -588,4 +601,16 @@ func updateByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateD
 		return ErrInvalidParameters
 	}
 	return update(ctx, conn, qry.Set(record).Where(goqu.C(keyField).Eq(value)))
+}
+
+func count(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset) (int64, error) {
+	sqlQry, values, err := qry.ToSQL()
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	if err = conn.QueryRowxContext(ctx, sqlQry, values...).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
