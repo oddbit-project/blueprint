@@ -29,6 +29,7 @@ type testRepository interface {
 	db.Writer
 	db.Deleter
 	db.Updater
+	db.Counter
 }
 
 func dbCleanup(t *testing.T, client *db.SqlClient) {
@@ -173,7 +174,13 @@ func testFunctions(t *testing.T, repo testRepository) {
 	// select via exec
 	assert.Nil(t, repo.Exec(repo.SqlSelect().Where(goqu.C("label").Eq("bar"))))
 
-	// delete cascade
-	assert.Nil(t, repo.DeleteCascade(repo.SqlDelete()))
+	// count records
+	count, err := repo.Count()
+	assert.Nil(t, err)
+	assert.Equal(t, int64(8), count)
 
+	// count records with where
+	count, err = repo.CountWhere(map[string]any{"label": "bar"})
+	assert.Nil(t, err)
+	assert.Equal(t, int64(1), count)
 }
