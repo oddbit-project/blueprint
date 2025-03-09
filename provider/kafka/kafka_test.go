@@ -20,6 +20,7 @@ func getConfig() (*ProducerConfig, *ConsumerConfig) {
 		ClientConfig: tlsProvider.ClientConfig{
 			TLSEnable: false,
 		},
+		ProducerOptions: ProducerOptions{},
 	}
 	consumerCfg := &ConsumerConfig{
 		Brokers:  "kafka:9093",
@@ -31,6 +32,7 @@ func getConfig() (*ProducerConfig, *ConsumerConfig) {
 		ClientConfig: tlsProvider.ClientConfig{
 			TLSEnable: false,
 		},
+		ConsumerOptions: ConsumerOptions{},
 	}
 	return producerCfg, consumerCfg
 }

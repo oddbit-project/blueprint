@@ -9,16 +9,42 @@ import (
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
 	"strings"
+	"time"
 )
+
+// ConsumerOptions additional consumer options
+type ConsumerOptions struct {
+	GroupTopics            []string `json:"groupTopics"`            // GroupTopics if specified, topics to consume as a group instead of Topic
+	Partition              uint     `json:"partition"`              // Partition id, used if no Group specified, defaults to 0
+	QueueCapacity          uint     `json:"queueCapacity"`          // QueueCapacity, defaults to 100
+	MinBytes               uint     `json:"minBytes"`               // MinBytes, defaults to 0
+	MaxBytes               uint     `json:"maxBytes"`               // MaxBytes, defaults to 1048576
+	MaxWait                uint     `json:"maxWait"`                // MaxWait in milliseconds, default 10.000 (10s)
+	ReadBatchTimeout       uint     `json:"readBatchTimeout"`       // ReadBatchTimeout in milliseconds, default 10.000 (10s)
+	HeartbeatInterval      uint     `json:"heartbeatInterval"`      // HeartbeatInterval in milliseconds, default 3000 (3s)
+	CommitInterval         uint     `json:"commitInterval"`         // CommitInterval in milliseconds, default 0
+	PartitionWatchInterval uint     `json:"partitionWatchInterval"` // PartitionWatchInterval in milliseconds, default 5000 (5s)
+	WatchPartitionChanges  bool     `json:"watchPartitionChanges"`  // WatchPartitionChanges, default true
+	SessionTimeout         uint     `json:"sessionTimeout"`         // SessionTimeout in milliseconds, default 30.000 (30s)
+	RebalanceTimeout       uint     `json:"rebalanceTimeout"`       // RebalanceTimeout in milliseconds, default 30.000 (30s)
+	JoinGroupBackoff       uint     `json:"joinGroupBackoff"`       // JoinGroupBackoff in milliseconds, default 5000 (5s)
+	RetentionTime          uint     `json:"retentionTime"`          // RetentionTime, in milliseconds, default 86.400.000ms (24h)
+	StartOffset            string   `json:"startOffset"`            // StartOffset either "first", "last", default "last"
+	ReadBackoffMin         uint     `json:"readBackoffMin"`         // ReadBackoffMin in milliseconds, default 100
+	ReadBackoffMax         uint     `json:"readBackoffMax"`         // ReadBackoffMax in milliseconds, default 1000 (1s)
+	MaxAttempts            uint     `json:"maxAttempts"`            // MaxAttempts default 3
+	IsolationLevel         string   `json:"isolationLevel"`         // IsolationLevel "uncommitted" or "committed", default "committed"
+}
 
 type ConsumerConfig struct {
 	Brokers  string `json:"brokers"`
-	Topic    string `json:"topic"`
-	Group    string `json:"group"`
-	AuthType string `json:"authType"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Topic    string `json:"topic"`    // Topic to consume from, if not specified will use GroupTopics
+	Group    string `json:"group"`    // Group consumer group, if not specified will use specified partition
+	AuthType string `json:"authType"` // AuthType to use, one of "none", "plain", "scram256", "scram512"
+	Username string `json:"username"` // Username optional username
+	Password string `json:"password"` // Password optional password
 	tlsProvider.ClientConfig
+	ConsumerOptions
 }
 
 // Message is a type alias to avoid using kafka-go in application code
@@ -27,7 +53,7 @@ type Message = kafka.Message
 // ConsumerFunc Reader handler type
 type ConsumerFunc func(ctx context.Context, message Message) error
 
-type KafkaConsumer struct {
+type Consumer struct {
 	ctx     context.Context
 	Brokers string
 	Group   string
@@ -36,23 +62,127 @@ type KafkaConsumer struct {
 	Reader  *kafka.Reader
 }
 
+// ApplyOptions set ReaderConfig additional parameters
+func (c ConsumerConfig) ApplyOptions(r *kafka.ReaderConfig) {
+	if c.Group != "" {
+		if c.SessionTimeout > 0 {
+			r.SessionTimeout = time.Duration(c.SessionTimeout) * time.Millisecond
+		}
+		if c.RebalanceTimeout > 0 {
+			r.RebalanceTimeout = time.Duration(c.RebalanceTimeout) * time.Millisecond
+		}
+		if c.RetentionTime > 0 {
+			r.RetentionTime = time.Duration(c.RetentionTime) * time.Millisecond
+		}
+
+		if len(c.StartOffset) > 0 {
+			switch c.StartOffset {
+			case "first":
+				r.StartOffset = kafka.FirstOffset
+			default:
+				r.StartOffset = kafka.LastOffset
+			}
+		}
+	} else {
+		r.Partition = int(c.Partition)
+	}
+
+	if c.GroupTopics != nil && len(c.GroupTopics) > 0 {
+		r.GroupTopics = c.GroupTopics
+	}
+
+	if c.QueueCapacity > 0 {
+		r.QueueCapacity = int(c.QueueCapacity)
+	}
+
+	if c.MinBytes != 0 {
+		r.MinBytes = int(c.MinBytes)
+	}
+
+	if c.MaxBytes > 0 {
+		r.MaxBytes = int(c.MaxBytes)
+	}
+
+	if c.MaxWait > 0 {
+		r.MaxWait = time.Duration(c.MaxWait) * time.Millisecond
+	}
+
+	if c.ReadBatchTimeout > 0 {
+		r.ReadBatchTimeout = time.Duration(c.ReadBatchTimeout) * time.Millisecond
+	}
+
+	if c.HeartbeatInterval > 0 {
+		r.HeartbeatInterval = time.Duration(c.HeartbeatInterval) * time.Millisecond
+	}
+
+	if c.CommitInterval > 0 {
+		r.CommitInterval = time.Duration(c.CommitInterval) * time.Millisecond
+	}
+
+	if c.PartitionWatchInterval > 0 {
+		r.PartitionWatchInterval = time.Duration(c.PartitionWatchInterval) * time.Millisecond
+	}
+
+	if !c.WatchPartitionChanges {
+		r.WatchPartitionChanges = false
+	}
+
+	if c.JoinGroupBackoff > 0 {
+		r.JoinGroupBackoff = time.Duration(c.JoinGroupBackoff) * time.Millisecond
+	}
+
+	if c.ReadBackoffMin > 0 {
+		r.ReadBackoffMin = time.Duration(c.ReadBackoffMin) * time.Millisecond
+	}
+
+	if c.ReadBackoffMax > 0 {
+		r.ReadBackoffMax = time.Duration(c.ReadBackoffMax) * time.Millisecond
+	}
+
+	if c.MaxAttempts > 0 {
+		r.MaxAttempts = int(c.MaxAttempts)
+	}
+
+	if len(c.IsolationLevel) > 0 {
+		switch c.IsolationLevel {
+		case "uncommitted":
+			r.IsolationLevel = kafka.ReadUncommitted
+		}
+	}
+}
+
+// Validate validates ConsumerConfig fields
 func (c ConsumerConfig) Validate() error {
 	if len(c.Brokers) == 0 {
 		return ErrMissingConsumerBroker
 	}
 	if len(c.Topic) == 0 {
-		return ErrMissingConsumerTopic
-	}
-	if len(c.Group) == 0 {
-		return ErrMissingConsumerGroup
+		if len(c.GroupTopics) == 0 {
+			return ErrMissingConsumerTopic
+		}
 	}
 	if str.Contains(c.AuthType, validAuthTypes) == -1 {
 		return ErrInvalidAuthType
 	}
+
+	if len(c.Topic) > 0 {
+		if len(c.StartOffset) > 0 {
+			if str.Contains(c.StartOffset, []string{"first", "last"}) < 0 {
+				return ErrInvalidStartOffset
+			}
+		}
+	}
+
+	if len(c.IsolationLevel) > 0 {
+		if str.Contains(c.StartOffset, []string{"uncommitted", "committed"}) < 0 {
+			return ErrInvalidIsolationLevel
+		}
+	}
+
 	return nil
 }
 
-func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*KafkaConsumer, error) {
+func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*Consumer, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -99,7 +229,10 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*KafkaConsumer, erro
 		Dialer:  dialer,
 	}
 
-	return &KafkaConsumer{
+	// apply extra config options
+	cfg.ApplyOptions(cfgReader)
+
+	return &Consumer{
 		ctx:     ctx,
 		config:  cfgReader,
 		Brokers: cfg.Brokers,
@@ -111,12 +244,12 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*KafkaConsumer, erro
 
 // GetConfig Get initial config object
 // Useful to set other options before connect
-func (c *KafkaConsumer) GetConfig() *kafka.ReaderConfig {
+func (c *Consumer) GetConfig() *kafka.ReaderConfig {
 	return c.config
 }
 
 // Rewind Read messages from the beginning
-func (c *KafkaConsumer) Rewind() error {
+func (c *Consumer) Rewind() error {
 	if c.Reader == nil {
 		c.config.StartOffset = kafka.FirstOffset
 		return nil
@@ -125,12 +258,12 @@ func (c *KafkaConsumer) Rewind() error {
 }
 
 // Connect to Kafka broker
-func (c *KafkaConsumer) Connect() {
+func (c *Consumer) Connect() {
 	c.Reader = kafka.NewReader(*c.config)
 }
 
 // Disconnect Diconnect from kafka
-func (c *KafkaConsumer) Disconnect() {
+func (c *Consumer) Disconnect() {
 	if c.Reader != nil {
 		c.Reader.Close()
 		c.Reader = nil
@@ -138,13 +271,13 @@ func (c *KafkaConsumer) Disconnect() {
 }
 
 // IsConnected Returns true if Reader was initialized
-func (c *KafkaConsumer) IsConnected() bool {
+func (c *Consumer) IsConnected() bool {
 	return c.Reader != nil
 }
 
 // Subscribe consumes a message from a topic using a handler
 // Note: this function is blocking
-func (c *KafkaConsumer) Subscribe(handler ConsumerFunc) error {
+func (c *Consumer) Subscribe(handler ConsumerFunc) error {
 	if !c.IsConnected() {
 		c.Connect()
 	}
@@ -167,7 +300,7 @@ func (c *KafkaConsumer) Subscribe(handler ConsumerFunc) error {
 // It returns the Kafka message and an error
 // If there is no message available, it will block until a message is available
 // If an error occurs, it will be returned
-func (c *KafkaConsumer) ReadMessage() (Message, error) {
+func (c *Consumer) ReadMessage() (Message, error) {
 	if !c.IsConnected() {
 		c.Connect()
 	}
@@ -176,7 +309,7 @@ func (c *KafkaConsumer) ReadMessage() (Message, error) {
 
 // ChannelSubscribe subscribes to a reader handler by channel
 // Note: This function is blocking
-func (c *KafkaConsumer) ChannelSubscribe(ch chan Message) error {
+func (c *Consumer) ChannelSubscribe(ch chan Message) error {
 	if !c.IsConnected() {
 		c.Connect()
 	}
@@ -197,7 +330,7 @@ func (c *KafkaConsumer) ChannelSubscribe(ch chan Message) error {
 
 // SubscribeWithOffsets manages a reader handler that explicitly commits offsets
 // Note: this function is blocking
-func (c *KafkaConsumer) SubscribeWithOffsets(handler ConsumerFunc) error {
+func (c *Consumer) SubscribeWithOffsets(handler ConsumerFunc) error {
 	if !c.IsConnected() {
 		c.Connect()
 	}

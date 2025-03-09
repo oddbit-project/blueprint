@@ -17,7 +17,7 @@ type AdminConfig struct {
 	tlsProvider.ClientConfig
 }
 
-type KafkaAdmin struct {
+type Admin struct {
 	broker string
 	ctx    context.Context
 	dialer *kafka.Dialer
@@ -34,7 +34,7 @@ func (c AdminConfig) Validate() error {
 	}
 	return nil
 }
-func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
+func NewAdmin(ctx context.Context, cfg *AdminConfig) (*Admin, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -72,7 +72,7 @@ func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
 		dialer.TLS = tls
 	}
 
-	return &KafkaAdmin{
+	return &Admin{
 		broker: cfg.Brokers,
 		ctx:    ctx,
 		dialer: dialer,
@@ -80,7 +80,7 @@ func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
 	}, nil
 }
 
-func (c *KafkaAdmin) Connect() error {
+func (c *Admin) Connect() error {
 	var err error
 	if c.Conn, err = c.dialer.DialContext(c.ctx, "tcp", c.broker); err != nil {
 		c.Conn = nil
@@ -89,18 +89,18 @@ func (c *KafkaAdmin) Connect() error {
 	return nil
 }
 
-func (c *KafkaAdmin) Disconnect() {
+func (c *Admin) Disconnect() {
 	if c.Conn != nil {
 		c.Conn.Close()
 		c.Conn = nil
 	}
 }
 
-func (c *KafkaAdmin) IsConnected() bool {
+func (c *Admin) IsConnected() bool {
 	return c.Conn != nil
 }
 
-func (c *KafkaAdmin) GetTopics(topics ...string) ([]kafka.Partition, error) {
+func (c *Admin) GetTopics(topics ...string) ([]kafka.Partition, error) {
 	if c.Conn == nil {
 		if err := c.Connect(); err != nil {
 			return nil, err
@@ -111,7 +111,7 @@ func (c *KafkaAdmin) GetTopics(topics ...string) ([]kafka.Partition, error) {
 }
 
 // ListTopics list existing kafka topics
-func (c *KafkaAdmin) ListTopics() ([]string, error) {
+func (c *Admin) ListTopics() ([]string, error) {
 	if c.Conn == nil {
 		if err := c.Connect(); err != nil {
 			return nil, err
@@ -130,7 +130,7 @@ func (c *KafkaAdmin) ListTopics() ([]string, error) {
 }
 
 // TopicExists returns true if Topic exists
-func (c *KafkaAdmin) TopicExists(topic string) (bool, error) {
+func (c *Admin) TopicExists(topic string) (bool, error) {
 	if topics, err := c.ListTopics(); err != nil {
 		return false, err
 	} else {
@@ -144,7 +144,7 @@ func (c *KafkaAdmin) TopicExists(topic string) (bool, error) {
 }
 
 // CreateTopic create a new Topic
-func (c *KafkaAdmin) CreateTopic(topic string, numPartitions int, replicationFactor int) error {
+func (c *Admin) CreateTopic(topic string, numPartitions int, replicationFactor int) error {
 	if c.Conn == nil {
 		if err := c.Connect(); err != nil {
 			return err
@@ -159,7 +159,7 @@ func (c *KafkaAdmin) CreateTopic(topic string, numPartitions int, replicationFac
 }
 
 // DeleteTopic removes a Topic
-func (c *KafkaAdmin) DeleteTopic(topic string) error {
+func (c *Admin) DeleteTopic(topic string) error {
 	if c.Conn == nil {
 		if err := c.Connect(); err != nil {
 			return err

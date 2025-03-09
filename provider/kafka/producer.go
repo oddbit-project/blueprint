@@ -9,7 +9,22 @@ import (
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
 	"strings"
+	"time"
 )
+
+// ProducerOptions additional producer options
+type ProducerOptions struct {
+	MaxAttempts     uint   `json:"maxAttempts"`
+	WriteBackoffMin uint   `json:"writeBackoffMin"` // WriteBackoffMin value in milliseconds, defaults to 100
+	WriteBackoffMax uint   `json:"writeBackoffMax"` // WriteBackoffMax value in milliseconds, defaults to 1000
+	BatchSize       uint   `json:"batchSize"`       // BatchSize, defaults to 100
+	BatchBytes      uint64 `json:"batchBytes"`      // BatchBytes, defaults to 1048576
+	BatchTimeout    uint   `json:"batchTimeout"`    // BatchTimeout value in milliseconds, defaults to 1000
+	ReadTimeout     uint   `json:"readTimeout"`     // ReadTimeout value in milliseconds, defaults to 10.000
+	WriteTimeout    uint   `json:"writeTimeout"`    // WriteTimeout value in milliseconds, defaults to 10.000
+	RequiredAcks    string `json:"requiredAcks"`    // RequiredAcks one of "none", "one", "all", default "none"
+	Async           bool   `json:"async"`           // Async, default false
+}
 
 type ProducerConfig struct {
 	Brokers  string `json:"brokers"`
@@ -18,13 +33,53 @@ type ProducerConfig struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	tlsProvider.ClientConfig
+	ProducerOptions
 }
 
-type KafkaProducer struct {
+type Producer struct {
 	ctx     context.Context
 	Brokers string
 	Topic   string
 	Writer  *kafka.Writer
+}
+
+// ApplyOptions sets additional Writer parameters
+func (p ProducerOptions) ApplyOptions(w *kafka.Writer) {
+	if p.MaxAttempts > 0 {
+		w.MaxAttempts = int(p.MaxAttempts)
+	}
+	if p.WriteBackoffMin > 0 {
+		w.WriteBackoffMin = time.Duration(p.WriteBackoffMin) * time.Millisecond
+	}
+	if p.WriteBackoffMax > 0 {
+		w.WriteBackoffMax = time.Duration(p.WriteBackoffMax) * time.Millisecond
+	}
+	if p.BatchSize > 0 {
+		w.BatchSize = int(p.BatchSize)
+	}
+	if p.BatchBytes > 0 {
+		w.BatchBytes = int64(p.BatchBytes)
+	}
+	if p.BatchTimeout > 0 {
+		w.BatchTimeout = time.Duration(p.BatchTimeout) * time.Millisecond
+	}
+	if p.ReadTimeout > 0 {
+		w.ReadTimeout = time.Duration(p.ReadTimeout) * time.Millisecond
+	}
+	if p.WriteTimeout > 0 {
+		w.WriteTimeout = time.Duration(p.WriteTimeout) * time.Millisecond
+	}
+
+	switch p.RequiredAcks {
+	case "all":
+		w.RequiredAcks = kafka.RequireAll
+	case "one":
+		w.RequiredAcks = kafka.RequireOne
+	default:
+		w.RequiredAcks = kafka.RequireNone
+	}
+
+	w.Async = p.Async
 }
 
 func (c ProducerConfig) Validate() error {
@@ -37,10 +92,11 @@ func (c ProducerConfig) Validate() error {
 	if str.Contains(c.AuthType, validAuthTypes) == -1 {
 		return ErrInvalidAuthType
 	}
+
 	return nil
 }
 
-func NewProducer(ctx context.Context, cfg *ProducerConfig) (*KafkaProducer, error) {
+func NewProducer(ctx context.Context, cfg *ProducerConfig) (*Producer, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -86,7 +142,10 @@ func NewProducer(ctx context.Context, cfg *ProducerConfig) (*KafkaProducer, erro
 		Transport:              transport,
 	}
 
-	return &KafkaProducer{
+	// apply writer options, if defined
+	cfg.ApplyOptions(producer)
+
+	return &Producer{
 		ctx:     ctx,
 		Brokers: cfg.Brokers,
 		Topic:   cfg.Topic,
@@ -95,7 +154,7 @@ func NewProducer(ctx context.Context, cfg *ProducerConfig) (*KafkaProducer, erro
 }
 
 // Disconnect disconnects from the Writer
-func (p *KafkaProducer) Disconnect() {
+func (p *Producer) Disconnect() {
 	if p.Writer != nil {
 		p.Writer.Close()
 		p.Writer = nil
@@ -103,12 +162,12 @@ func (p *KafkaProducer) Disconnect() {
 }
 
 // IsConnected returns ture if Writer is connected
-func (p *KafkaProducer) IsConnected() bool {
+func (p *Producer) IsConnected() bool {
 	return p.Writer != nil
 }
 
 // Write writes a single message to topic
-func (p *KafkaProducer) Write(value []byte, key ...[]byte) error {
+func (p *Producer) Write(value []byte, key ...[]byte) error {
 	if p.Writer == nil {
 		return ErrProducerClosed
 	}
@@ -123,7 +182,7 @@ func (p *KafkaProducer) Write(value []byte, key ...[]byte) error {
 }
 
 // WriteMulti Write multiple messages to Topic
-func (p *KafkaProducer) WriteMulti(values ...[]byte) error {
+func (p *Producer) WriteMulti(values ...[]byte) error {
 	if p.Writer == nil {
 		return ErrProducerClosed
 	}
@@ -136,7 +195,7 @@ func (p *KafkaProducer) WriteMulti(values ...[]byte) error {
 }
 
 // WriteJson Write a struct to a Topic as a json message
-func (p *KafkaProducer) WriteJson(data interface{}, key ...[]byte) error {
+func (p *Producer) WriteJson(data interface{}, key ...[]byte) error {
 	var k []byte = nil
 	if len(key) > 0 {
 		k = key[0]
@@ -153,7 +212,7 @@ func (p *KafkaProducer) WriteJson(data interface{}, key ...[]byte) error {
 }
 
 // WriteMultiJson Write a slice of structs to a Topic as a json message
-func (p *KafkaProducer) WriteMultiJson(values ...interface{}) error {
+func (p *Producer) WriteMultiJson(values ...interface{}) error {
 	ml := make([]kafka.Message, len(values))
 	for i, v := range values {
 		value, err := json.Marshal(v)

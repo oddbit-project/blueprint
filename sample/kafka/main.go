@@ -20,6 +20,7 @@ func main() {
 		ClientConfig: tlsProvider.ClientConfig{
 			TLSEnable: false,
 		},
+		ProducerOptions: kafka.ProducerOptions{},
 	}
 	consumerCfg := &kafka.ConsumerConfig{
 		Brokers:  "localhost:9093",
@@ -31,6 +32,7 @@ func main() {
 		ClientConfig: tlsProvider.ClientConfig{
 			TLSEnable: false,
 		},
+		ConsumerOptions: kafka.ConsumerOptions{},
 	}
 
 	producer, err := kafka.NewProducer(ctx, producerCfg)
