@@ -80,6 +80,8 @@ func LoadTLSCertPool(certFiles []string) (*x509.CertPool, error) {
 // - certFile: Path to the certificate file.
 // - keyFile: Path to the private key file.
 // - password: Password to decrypt the private key file (if encrypted).
+//   NOTE: For improved security, consider using environment variables or a secure
+//   key management system instead of passing plaintext passwords.
 //
 // The function reads the certificate file and private key file using os.ReadFile.
 // If there is an error reading any of the files, an error is returned.
@@ -95,7 +97,9 @@ func LoadTLSCertPool(certFiles []string) (*x509.CertPool, error) {
 // Example:
 //
 // config := &tls.Config{}
-// err := LoadTLSCertificate(config, "path/to/cert.pem", "path/to/key.pem", "password")
+// // Use environment variable or secrets manager for passwords
+// keyPassword := os.Getenv("TLS_KEY_PASSWORD")
+// err := LoadTLSCertificate(config, "path/to/cert.pem", "path/to/key.pem", keyPassword)
 //
 //	if err != nil {
 //	    log.Fatal(err)
@@ -103,7 +107,6 @@ func LoadTLSCertPool(certFiles []string) (*x509.CertPool, error) {
 //
 // // TLS configuration with loaded certificate is ready to use.
 func LoadTLSCertificate(config *tls.Config, certFile, keyFile, password string) error {
-
 	certBytes, err := os.ReadFile(certFile)
 	if err != nil {
 		log.Error().Msgf("LoadTLSCertificates(): failed to read certFile '%s'; %v", certFile, err)
@@ -128,22 +131,45 @@ func LoadTLSCertificate(config *tls.Config, certFile, keyFile, password string) 
 			log.Error().Msgf("LoadTLSCertificates(): encrypted private key '%s', but no password supplied", keyFile)
 			return ErrMissingPassword
 		}
-		rawDecryptedKey, err := pemutil.DecryptPKCS8PrivateKey(keyPEMBlock.Bytes, []byte(password))
+		
+		// Convert password to byte array only when needed
+		passwordBytes := []byte(password)
+		defer func() {
+			// Clear the password from memory after use
+			for i := range passwordBytes {
+				passwordBytes[i] = 0
+			}
+		}()
+		
+		rawDecryptedKey, err := pemutil.DecryptPKCS8PrivateKey(keyPEMBlock.Bytes, passwordBytes)
 		if err != nil {
 			log.Error().Msgf("LoadTLSCertificates(): failed to decrypt PKCS#8 private key: %v", err)
 			return ErrDecryptError
 		}
+		
 		decryptedKey, err := x509.ParsePKCS8PrivateKey(rawDecryptedKey)
 		if err != nil {
 			log.Error().Msgf("LoadTLSCertificates(): failed to parse decrypted PKCS#8 private key: %v", err)
 			return ErrDecryptError
 		}
+		
 		privateKey, ok := decryptedKey.(*rsa.PrivateKey)
 		if !ok {
 			log.Error().Msg("LoadTLSCertificates(): decrypted key is not a RSA private key")
 			return ErrDecryptError
 		}
-		cert, err = tls.X509KeyPair(certBytes, pem.EncodeToMemory(&pem.Block{Type: keyPEMBlock.Type, Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}))
+		
+		keyPEM := pem.EncodeToMemory(&pem.Block{
+			Type:  keyPEMBlock.Type, 
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		})
+		
+		cert, err = tls.X509KeyPair(certBytes, keyPEM)
+		// Clear sensitive data
+		for i := range keyPEM {
+			keyPEM[i] = 0
+		}
+		
 		if err != nil {
 			log.Error().Msgf("LoadTLSCertificates(): failed to load cert/key pair: %v", err)
 			return ErrInvalidCert
@@ -155,6 +181,7 @@ func LoadTLSCertificate(config *tls.Config, certFile, keyFile, password string) 
 			return ErrInvalidCert
 		}
 	}
+	
 	config.Certificates = []tls.Certificate{cert}
 	return nil
 }

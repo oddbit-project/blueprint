@@ -6,6 +6,7 @@ import (
 	"fmt"
 	ginzerolog "github.com/dn365/gin-zerolog"
 	"github.com/gin-gonic/gin"
+	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"net/http"
 	"time"
@@ -80,14 +81,19 @@ func (c *ServerConfig) Validate() error {
 	return nil
 }
 
-// NewRouter creates a new gin router
+// NewRouter creates a new gin router with standardized logging
 func NewRouter(serverName string, debug bool) *gin.Engine {
 	if !debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.New()
-	router.Use(ginzerolog.Logger(serverName))
+	
+	// Use our structured logging middleware instead of the default zerolog one
+	router.Use(log.HTTPLogMiddleware(serverName))
+	
+	// Still include recovery middleware
 	router.Use(gin.Recovery())
+	
 	return router
 }
 

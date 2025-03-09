@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"errors"
+	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
@@ -278,19 +279,41 @@ func (c *Consumer) IsConnected() bool {
 // Subscribe consumes a message from a topic using a handler
 // Note: this function is blocking
 func (c *Consumer) Subscribe(handler ConsumerFunc) error {
+	logger := log.NewKafkaConsumerLogger(c.ctx, c.Topic, c.Group)
+	
 	if !c.IsConnected() {
-		c.Connect()
+		logger.Info("Connecting to Kafka consumer before subscription", nil)
+		if err := c.Connect(); err != nil {
+			logger.Error(err, "Failed to connect before subscription", nil)
+			return err
+		}
 	}
+	
+	logger.Info("Starting Kafka message subscription", nil)
 	defer c.Reader.Close()
+	
 	for {
 		msg, err := c.Reader.ReadMessage(c.ctx)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				return err
+			if errors.Is(err, context.Canceled) {
+				logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
+				return nil
 			}
-			return nil
+			
+			logger.Error(err, "Error reading Kafka message", nil)
+			return err
 		}
+		
+		// Log received message
+		log.LogKafkaMessageReceived(c.ctx, msg, c.Group)
+		
+		// Process message with handler
 		if err := handler(c.ctx, msg); err != nil {
+			logger.Error(err, "Handler error processing Kafka message", map[string]interface{}{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+			})
 			return err
 		}
 	}

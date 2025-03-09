@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
@@ -168,17 +169,44 @@ func (p *Producer) IsConnected() bool {
 
 // Write writes a single message to topic
 func (p *Producer) Write(value []byte, key ...[]byte) error {
+	logger := log.NewKafkaProducerLogger(p.ctx, p.Topic)
+	
 	if p.Writer == nil {
+		logger.Error(ErrProducerClosed, "Failed to write message - producer closed", nil)
 		return ErrProducerClosed
 	}
+	
 	var k []byte = nil
 	if len(key) > 0 {
 		k = key[0]
 	}
-	return p.Writer.WriteMessages(p.ctx, kafka.Message{
+	
+	msg := kafka.Message{
+		Topic: p.Topic,
 		Key:   k,
 		Value: value,
+		// Add trace information as headers
+		Headers: log.AddKafkaHeadersFromContext(p.ctx, nil),
+	}
+	
+	// Log at debug level before sending
+	logger.Debug("Sending message to Kafka", map[string]interface{}{
+		"message_size": len(value),
+		"has_key":      k != nil,
 	})
+	
+	err := p.Writer.WriteMessages(p.ctx, msg)
+	if err != nil {
+		logger.Error(err, "Failed to write message to Kafka", map[string]interface{}{
+			"message_size": len(value),
+		})
+		return err
+	}
+	
+	// Log message sent at debug level
+	log.LogKafkaMessageSent(p.ctx, msg)
+	
+	return nil
 }
 
 // WriteMulti Write multiple messages to Topic
@@ -196,19 +224,53 @@ func (p *Producer) WriteMulti(values ...[]byte) error {
 
 // WriteJson Write a struct to a Topic as a json message
 func (p *Producer) WriteJson(data interface{}, key ...[]byte) error {
+	logger := log.NewKafkaProducerLogger(p.ctx, p.Topic)
+	
+	if p.Writer == nil {
+		logger.Error(ErrProducerClosed, "Failed to write JSON message - producer closed", nil)
+		return ErrProducerClosed
+	}
+	
 	var k []byte = nil
 	if len(key) > 0 {
 		k = key[0]
 	}
+	
+	// Log serialization attempt
+	logger.Debug("Serializing object to JSON for Kafka", nil)
+	
 	value, err := json.Marshal(data)
 	if err != nil {
+		logger.Error(err, "Failed to serialize object to JSON", nil)
 		return err
 	}
-
-	return p.Writer.WriteMessages(p.ctx, kafka.Message{
+	
+	msg := kafka.Message{
+		Topic: p.Topic,
 		Key:   k,
 		Value: value,
+		// Add trace information as headers
+		Headers: log.AddKafkaHeadersFromContext(p.ctx, nil),
+	}
+	
+	// Log at debug level before sending
+	logger.Debug("Sending JSON message to Kafka", map[string]interface{}{
+		"message_size": len(value),
+		"has_key":      k != nil,
 	})
+	
+	err = p.Writer.WriteMessages(p.ctx, msg)
+	if err != nil {
+		logger.Error(err, "Failed to write JSON message to Kafka", map[string]interface{}{
+			"message_size": len(value),
+		})
+		return err
+	}
+	
+	// Log message sent
+	log.LogKafkaMessageSent(p.ctx, msg)
+	
+	return nil
 }
 
 // WriteMultiJson Write a slice of structs to a Topic as a json message
