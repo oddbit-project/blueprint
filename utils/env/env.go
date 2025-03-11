@@ -1,4 +1,4 @@
-package secure
+package env
 
 import (
 	"os"
@@ -39,12 +39,12 @@ func GetEnvVar(name string) string {
 
 	// If not in cache, get from OS
 	val := os.Getenv(name)
-	
+
 	// Update cache
 	envCacheMu.Lock()
 	envCache[name] = val
 	envCacheMu.Unlock()
-	
+
 	return val
 }
 
@@ -54,11 +54,11 @@ func SetEnvVar(name, value string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Update cache
 	envCacheMu.Lock()
 	envCache[name] = value
 	envCacheMu.Unlock()
-	
+
 	return nil
 }

@@ -49,7 +49,7 @@ const (
 type ServerConfig struct {
 	TLSCert            string   `json:"tlsCert"`
 	TLSKey             string   `json:"tlsKey"`
-	TLSKeyPwd          string   `json:"tlsKeyPassword"`
+	TlsKeyCredential            // TLS key password
 	TLSAllowedCACerts  []string `json:"tlsAllowedCACerts"`
 	TLSCipherSuites    []string `json:"tlsCipherSuites"`
 	TLSMinVersion      string   `json:"tlsMinVersion"`
@@ -80,7 +80,7 @@ func (c *ServerConfig) TLSConfig() (*tls.Config, error) {
 	}
 
 	if c.TLSCert != "" && c.TLSKey != "" {
-		err := LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TLSKeyPwd)
+		err := LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TlsKeyCredential)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +139,7 @@ func (c *ServerConfig) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Cert
 		log.Error().Msgf("could not validate peer certificate: %v", err)
 		return ErrInvalidPeerCert
 	}
-	
+
 	// Check certificate expiration
 	now := time.Now()
 	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
@@ -150,10 +150,7 @@ func (c *ServerConfig) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Cert
 			Msg("peer certificate has expired or is not yet valid")
 		return ErrExpiredCert
 	}
-	
-	// Check for revocation (basic implementation)
-	// In a production system, this should use OCSP or CRL checking
-	
+
 	// Check DNS names
 	if len(c.TLSAllowedDNSNames) > 0 {
 		for _, name := range cert.DNSNames {
@@ -164,6 +161,6 @@ func (c *ServerConfig) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Cert
 		log.Error().Msgf("peer certificate not in allowed DNS Name list: %v", cert.DNSNames)
 		return ErrForbiddenDNS
 	}
-	
+
 	return nil
 }

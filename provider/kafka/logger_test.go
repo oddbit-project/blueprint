@@ -1,11 +1,12 @@
-package log
+package kafka
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/rs/zerolog"
+	"github.com/oddbit-project/blueprint/log"
+	log2 "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -14,12 +15,8 @@ import (
 func TestLogKafkaMessageReceived(t *testing.T) {
 	// Create a test logger with a buffer
 	buf := &bytes.Buffer{}
-	logger := &Logger{
-		logger:     zerolog.New(buf),
-		moduleInfo: "kafka-test",
-	}
-	ctx := logger.WithContext(context.Background())
-	
+	logger := NewConsumerLogger("sample-topic", "sample-group")
+
 	// Create a test Kafka message
 	msg := kafka.Message{
 		Topic:     "test-topic",
@@ -32,15 +29,15 @@ func TestLogKafkaMessageReceived(t *testing.T) {
 			{Key: "header2", Value: []byte("value2")},
 		},
 	}
-	
+
 	// Log the message
-	LogKafkaMessageReceived(ctx, msg, "test-group")
-	
+	LogMessageReceived(logger, msg, "test-group")
+
 	// Parse the log
 	logMap := map[string]interface{}{}
 	err := json.Unmarshal(buf.Bytes(), &logMap)
 	assert.NoError(t, err)
-	
+
 	// Check log properties
 	assert.Equal(t, "info", logMap["level"])
 	assert.Equal(t, "Received message from topic test-topic", logMap["message"])
@@ -56,12 +53,8 @@ func TestLogKafkaMessageReceived(t *testing.T) {
 func TestLogKafkaMessageSent(t *testing.T) {
 	// Create a test logger with a buffer
 	buf := &bytes.Buffer{}
-	logger := &Logger{
-		logger:     zerolog.New(buf),
-		moduleInfo: "kafka-test",
-	}
-	ctx := logger.WithContext(context.Background())
-	
+	logger := NewProducerLogger("sample-topic")
+
 	// Create a test Kafka message
 	msg := kafka.Message{
 		Topic: "test-topic",
@@ -71,15 +64,15 @@ func TestLogKafkaMessageSent(t *testing.T) {
 			{Key: "header1", Value: []byte("value1")},
 		},
 	}
-	
+
 	// Log the message
-	LogKafkaMessageSent(ctx, msg)
-	
+	LogMessageSent(logger, msg)
+
 	// Parse the log
 	logMap := map[string]interface{}{}
 	err := json.Unmarshal(buf.Bytes(), &logMap)
 	assert.NoError(t, err)
-	
+
 	// Check log properties
 	assert.Equal(t, "info", logMap["level"])
 	assert.Equal(t, "Sent message to topic test-topic", logMap["message"])
@@ -90,59 +83,47 @@ func TestLogKafkaMessageSent(t *testing.T) {
 
 func TestNewKafkaConsumerLogger(t *testing.T) {
 	// Simpler test that only tests the module info
-	ctx := context.Background()
-	logger := NewKafkaConsumerLogger(ctx, "test-topic", "test-group")
-	
+	logger := NewConsumerLogger("test-topic", "test-group")
+
 	assert.NotNil(t, logger)
-	assert.Equal(t, "default", logger.moduleInfo) // Default when no logger in context
-	
+	assert.Equal(t, "kafka", logger.ModuleInfo()) // Default when no logger in context
+
 	// Test with another logger in context
-	origLogger := New("test-module")
-	ctx = origLogger.WithContext(ctx)
-	
-	logger = NewKafkaConsumerLogger(ctx, "test-topic", "test-group")
-	assert.Equal(t, "test-module", logger.moduleInfo)
+	logger = log.New("test-module")
+	assert.Equal(t, "test-module", logger.ModuleInfo())
 }
 
 func TestNewKafkaProducerLogger(t *testing.T) {
 	// Simpler test that only tests the module info
-	ctx := context.Background()
-	logger := NewKafkaProducerLogger(ctx, "test-topic")
-	
+	logger := NewProducerLogger("test-topic")
+
 	assert.NotNil(t, logger)
-	assert.Equal(t, "default", logger.moduleInfo) // Default when no logger in context
-	
+	assert.Equal(t, "default", logger.ModuleInfo()) // Default when no logger in context
+
 	// Test with another logger in context
-	origLogger := New("test-module")
-	ctx = origLogger.WithContext(ctx)
-	
-	logger = NewKafkaProducerLogger(ctx, "test-topic")
-	assert.Equal(t, "test-module", logger.moduleInfo)
+	logger = log.New("test-module")
+	assert.Equal(t, "test-module", logger.ModuleInfo())
 }
 
 func TestLogKafkaError(t *testing.T) {
 	// Create a test logger with a buffer
 	buf := &bytes.Buffer{}
-	logger := &Logger{
-		logger:     zerolog.New(buf),
-		moduleInfo: "kafka-test",
-	}
-	ctx := logger.WithContext(context.Background())
-	
+	logger := log.New("kafka-test")
+
 	// Test error logging
 	testErr := errors.New("kafka connection error")
 	fields := map[string]interface{}{
 		"broker": "localhost:9092",
 		"topic":  "test-topic",
 	}
-	
-	LogKafkaError(ctx, testErr, "Failed to connect to Kafka", fields)
-	
+
+	LogError(logger, testErr, "Failed to connect to Kafka", fields)
+
 	// Parse the log
 	logMap := map[string]interface{}{}
 	err := json.Unmarshal(buf.Bytes(), &logMap)
 	assert.NoError(t, err)
-	
+
 	// Check log properties
 	assert.Equal(t, "error", logMap["level"])
 	assert.Equal(t, "Failed to connect to Kafka", logMap["message"])
@@ -155,35 +136,35 @@ func TestLogKafkaError(t *testing.T) {
 func TestAddKafkaHeadersFromContext(t *testing.T) {
 	// Create a logger with trace ID
 	traceID := "test-trace-id"
-	logger := New("test-module").WithTraceID(traceID)
-	
+	logger := log.New("test-module").WithTraceID(traceID)
+
 	// Add logger to context
 	ctx := logger.WithContext(context.Background())
-	
+
 	// Add request ID to context
 	requestID := "test-request-id"
 	ctx = context.WithValue(ctx, "request_id", requestID)
-	
+
 	// Create existing headers
 	existingHeaders := []kafka.Header{
 		{Key: "existing", Value: []byte("value")},
 	}
-	
+
 	// Add headers from context
-	headers := AddKafkaHeadersFromContext(ctx, existingHeaders)
-	
+	headers := LoggerAddHeadersFromContext(ctx, logger, existingHeaders)
+
 	// Check that the headers were added
 	assert.Equal(t, 3, len(headers))
-	
+
 	// Check existing header is preserved
 	assert.Equal(t, "existing", headers[0].Key)
 	assert.Equal(t, []byte("value"), headers[0].Value)
-	
+
 	// Check trace ID was added
-	assert.Equal(t, HeaderTraceID, headers[1].Key)
+	assert.Equal(t, log2.HeaderTraceID, headers[1].Key)
 	assert.Equal(t, []byte(traceID), headers[1].Value)
-	
+
 	// Check request ID was added
-	assert.Equal(t, HeaderRequestID, headers[2].Key)
+	assert.Equal(t, log2.HeaderRequestID, headers[2].Key)
 	assert.Equal(t, []byte(requestID), headers[2].Value)
 }

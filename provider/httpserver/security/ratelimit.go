@@ -1,4 +1,4 @@
-package httpserver
+package security
 
 import (
 	"github.com/gin-gonic/gin"
@@ -29,10 +29,10 @@ func NewClientRateLimiter(r rate.Limit, b int) *ClientRateLimiter {
 		burst:        b,
 		clientExpiry: 1 * time.Hour,
 	}
-	
+
 	// Start cleanup routine
 	rl.cleanupTimer = time.AfterFunc(rl.clientExpiry, rl.cleanup)
-	
+
 	return rl
 }
 
@@ -41,7 +41,7 @@ func (rl *ClientRateLimiter) GetLimiter(ip string) *rate.Limiter {
 	rl.mu.RLock()
 	limiter, exists := rl.limiters[ip]
 	rl.mu.RUnlock()
-	
+
 	if !exists {
 		rl.mu.Lock()
 		// Double check after obtaining write lock
@@ -52,7 +52,7 @@ func (rl *ClientRateLimiter) GetLimiter(ip string) *rate.Limiter {
 		}
 		rl.mu.Unlock()
 	}
-	
+
 	return limiter
 }
 
@@ -60,12 +60,12 @@ func (rl *ClientRateLimiter) GetLimiter(ip string) *rate.Limiter {
 func (rl *ClientRateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	// In a more sophisticated implementation, we would track last access time
 	// for each limiter and remove those that haven't been used recently
 	// For now, we just reset the map periodically
 	rl.limiters = make(map[string]*rate.Limiter)
-	
+
 	// Reschedule cleanup
 	rl.cleanupTimer.Reset(rl.clientExpiry)
 }
@@ -73,24 +73,24 @@ func (rl *ClientRateLimiter) cleanup() {
 // RateLimitMiddleware creates a Gin middleware for rate limiting
 func RateLimitMiddleware(r rate.Limit, b int) gin.HandlerFunc {
 	limiter := NewClientRateLimiter(r, b)
-	
+
 	return func(c *gin.Context) {
 		// Get client IP
 		ip, _, err := net.SplitHostPort(c.Request.RemoteAddr)
 		if err != nil {
 			ip = c.Request.RemoteAddr
 		}
-		
+
 		// Use X-Forwarded-For if behind proxy
 		if c.GetHeader("X-Forwarded-For") != "" {
 			ips := c.GetHeader("X-Forwarded-For")
 			ipList := strings.Split(ips, ",")
 			ip = strings.TrimSpace(ipList[0])
 		}
-		
+
 		// Get the rate limiter for this IP
 		clientLimiter := limiter.GetLimiter(ip)
-		
+
 		// Check if rate limit exceeded
 		if !clientLimiter.Allow() {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
@@ -99,19 +99,7 @@ func RateLimitMiddleware(r rate.Limit, b int) gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		c.Next()
 	}
-}
-
-// AddRateLimiting adds rate limiting middleware to the server
-// ratePerMinute specifies the allowed requests per minute
-func (s *Server) AddRateLimiting(ratePerMinute int) {
-	// Convert rate per minute to rate per second
-	r := rate.Limit(float64(ratePerMinute) / 60.0)
-	
-	// Allow bursts of up to 5 requests
-	b := 5
-	
-	s.AddMiddleware(RateLimitMiddleware(r, b))
 }

@@ -1,14 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint"
 	"github.com/oddbit-project/blueprint/config/provider"
-	"github.com/oddbit-project/blueprint/log/zerolog/writer"
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
-	"github.com/rs/zerolog/log"
 	"os"
 )
 
@@ -53,7 +53,7 @@ func (a *Application) Build() {
 	// if some error occurs, generate fatal error & abort execution
 
 	// initialize http server
-	log.Info().Msg("Building Sample Application...")
+	log.Info(a.container.Context, "Building Sample Application...")
 
 	// initialize http server config
 	httpConfig := httpserver.NewServerConfig()
@@ -85,7 +85,7 @@ func (a *Application) Run() {
 	// Start  application - http server
 	a.container.Run(func(app interface{}) error {
 		go func() {
-			log.Info().Msg(fmt.Sprintf("Running Sample Application API at https://%s:%d/v1/hello", a.httpServer.Config.Host, a.httpServer.Config.Port))
+			log.Infof(a.container.Context, "Running Sample Application API at https://%s:%d/v1/hello", a.httpServer.Config.Host, a.httpServer.Config.Port)
 			a.container.AbortFatal(a.httpServer.Start())
 		}()
 		return nil
@@ -93,19 +93,22 @@ func (a *Application) Run() {
 }
 
 func main() {
-	// use zerolog as logger with console writer
-	writer.UseDefaultWriter()
+	// config logger
+	log.Configure(log.NewDefaultConfig())
+
+	// base context
+	ctx := context.Background()
 
 	flag.Parse()
 
 	if *cliArgs.ShowVersion {
-		log.Printf("Version: %s\n", VERSION)
+		fmt.Printf("Version: %s\n", VERSION)
 		os.Exit(0)
 	}
 
 	app, err := NewApplication(cliArgs)
 	if err != nil {
-		log.Err(err).Msg("Initialization failed")
+		log.Error(ctx, err, "Initialization failed")
 		os.Exit(-1)
 	}
 

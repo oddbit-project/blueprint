@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"errors"
+	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils/str"
@@ -38,12 +39,12 @@ type ConsumerOptions struct {
 }
 
 type ConsumerConfig struct {
-	Brokers  string `json:"brokers"`
-	Topic    string `json:"topic"`    // Topic to consume from, if not specified will use GroupTopics
-	Group    string `json:"group"`    // Group consumer group, if not specified will use specified partition
-	AuthType string `json:"authType"` // AuthType to use, one of "none", "plain", "scram256", "scram512"
-	Username string `json:"username"` // Username optional username
-	Password string `json:"password"` // Password optional password
+	Brokers                        string `json:"brokers"`
+	Topic                          string `json:"topic"`    // Topic to consume from, if not specified will use GroupTopics
+	Group                          string `json:"group"`    // Group consumer group, if not specified will use specified partition
+	AuthType                       string `json:"authType"` // AuthType to use, one of "none", "plain", "scram256", "scram512"
+	Username                       string `json:"username"` // Username optional username
+	secure.DefaultCredentialConfig        // optional password
 	tlsProvider.ClientConfig
 	ConsumerOptions
 }
@@ -52,15 +53,15 @@ type ConsumerConfig struct {
 type Message = kafka.Message
 
 // ConsumerFunc Reader handler type
-type ConsumerFunc func(ctx context.Context, message Message) error
+type ConsumerFunc func(ctx context.Context, message Message, l *log.Logger) error
 
 type Consumer struct {
-	ctx     context.Context
 	Brokers string
 	Group   string
 	Topic   string
 	config  *kafka.ReaderConfig
 	Reader  *kafka.Reader
+	Logger  *log.Logger
 }
 
 // ApplyOptions set ReaderConfig additional parameters
@@ -183,7 +184,7 @@ func (c ConsumerConfig) Validate() error {
 	return nil
 }
 
-func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*Consumer, error) {
+func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -192,25 +193,42 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*Consumer, error) {
 		return nil, err
 	}
 
+	var key []byte
+	var credential *secure.Credential
+	var password string
+	var err error
+
+	key, err = secure.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
+		return nil, err
+	}
+
 	dialer := &kafka.Dialer{
 		DualStack: true,
 		Timeout:   DefaultTimeout,
 	}
 
+	password, err = credential.Get()
+	if err != nil {
+		return nil, err
+	}
 	switch cfg.AuthType {
 	case AuthTypePlain:
 		dialer.SASLMechanism = plain.Mechanism{
 			Username: cfg.Username,
-			Password: cfg.Password,
+			Password: password,
 		}
 	case AuthTypeScram256:
-		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, cfg.Password); err != nil {
+		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, password); err != nil {
 			return nil, err
 		} else {
 			dialer.SASLMechanism = sasl
 		}
 	case AuthTypeScram512:
-		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, cfg.Password); err != nil {
+		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, password); err != nil {
 			return nil, err
 		} else {
 			dialer.SASLMechanism = sasl
@@ -233,13 +251,24 @@ func NewConsumer(ctx context.Context, cfg *ConsumerConfig) (*Consumer, error) {
 	// apply extra config options
 	cfg.ApplyOptions(cfgReader)
 
+	// remove credential from memory
+	// it still exists in the dialer configuration
+	credential.Clear()
+
+	if logger == nil {
+		logger = NewConsumerLogger(cfg.Topic, cfg.Group)
+	} else {
+		// add kafka context
+		ConsumerLogger(logger, cfg.Topic, cfg.Group)
+	}
+
 	return &Consumer{
-		ctx:     ctx,
 		config:  cfgReader,
 		Brokers: cfg.Brokers,
 		Topic:   cfg.Topic,
 		Group:   cfg.Group,
 		Reader:  nil,
+		Logger:  logger,
 	}, nil
 }
 
@@ -266,6 +295,7 @@ func (c *Consumer) Connect() {
 // Disconnect Diconnect from kafka
 func (c *Consumer) Disconnect() {
 	if c.Reader != nil {
+		c.Logger.Info("Closing reader")
 		c.Reader.Close()
 		c.Reader = nil
 	}
@@ -278,38 +308,32 @@ func (c *Consumer) IsConnected() bool {
 
 // Subscribe consumes a message from a topic using a handler
 // Note: this function is blocking
-func (c *Consumer) Subscribe(handler ConsumerFunc) error {
-	logger := log.NewKafkaConsumerLogger(c.ctx, c.Topic, c.Group)
-	
+func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
+
 	if !c.IsConnected() {
-		logger.Info("Connecting to Kafka consumer before subscription", nil)
-		if err := c.Connect(); err != nil {
-			logger.Error(err, "Failed to connect before subscription", nil)
-			return err
-		}
+		c.Logger.Info("Connecting to Kafka consumer before subscription", nil)
+		c.Connect()
 	}
-	
-	logger.Info("Starting Kafka message subscription", nil)
+
+	c.Logger.Info("Starting Kafka message subscription", nil)
 	defer c.Reader.Close()
-	
+
 	for {
-		msg, err := c.Reader.ReadMessage(c.ctx)
+		msg, err := c.Reader.ReadMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
+				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			
-			logger.Error(err, "Error reading Kafka message", nil)
+
+			c.Logger.Error(err, "Error reading Kafka message", nil)
 			return err
 		}
-		
-		// Log received message
-		log.LogKafkaMessageReceived(c.ctx, msg, c.Group)
-		
+
 		// Process message with handler
-		if err := handler(c.ctx, msg); err != nil {
-			logger.Error(err, "Handler error processing Kafka message", map[string]interface{}{
+		// Note: if logging of messages is required, it should be implemented inside the handler
+		if err := handler(ctx, msg, c.Logger); err != nil {
+			c.Logger.Error(err, "Handler error processing Kafka message", map[string]interface{}{
 				"topic":     msg.Topic,
 				"partition": msg.Partition,
 				"offset":    msg.Offset,
@@ -323,25 +347,26 @@ func (c *Consumer) Subscribe(handler ConsumerFunc) error {
 // It returns the Kafka message and an error
 // If there is no message available, it will block until a message is available
 // If an error occurs, it will be returned
-func (c *Consumer) ReadMessage() (Message, error) {
+func (c *Consumer) ReadMessage(ctx context.Context) (Message, error) {
 	if !c.IsConnected() {
 		c.Connect()
 	}
-	return c.Reader.ReadMessage(c.ctx)
+	return c.Reader.ReadMessage(ctx)
 }
 
 // ChannelSubscribe subscribes to a reader handler by channel
 // Note: This function is blocking
-func (c *Consumer) ChannelSubscribe(ch chan Message) error {
+func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error {
 	if !c.IsConnected() {
 		c.Connect()
 	}
 	defer c.Reader.Close()
 
 	for {
-		msg, err := c.Reader.ReadMessage(c.ctx)
+		msg, err := c.Reader.ReadMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
+				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				// clean exit
 				return nil
 			}
@@ -353,21 +378,22 @@ func (c *Consumer) ChannelSubscribe(ch chan Message) error {
 
 // SubscribeWithOffsets manages a reader handler that explicitly commits offsets
 // Note: this function is blocking
-func (c *Consumer) SubscribeWithOffsets(handler ConsumerFunc) error {
+func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFunc) error {
 	if !c.IsConnected() {
 		c.Connect()
 	}
 	defer c.Reader.Close()
 	for {
-		msg, err := c.Reader.FetchMessage(c.ctx)
+		msg, err := c.Reader.FetchMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
+				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				// clean exit
 				return nil
 			}
 			return err
 		}
-		if err := handler(c.ctx, msg); err != nil {
+		if err := handler(ctx, msg, c.Logger); err != nil {
 			return err
 		}
 	}

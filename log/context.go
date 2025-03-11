@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
 )
 
@@ -11,13 +12,13 @@ type ContextFields map[string]interface{}
 // MergeContextFields merges multiple context fields maps into a single map
 func MergeContextFields(fieldSets ...ContextFields) ContextFields {
 	result := make(ContextFields)
-	
+
 	for _, fields := range fieldSets {
 		for k, v := range fields {
 			result[k] = v
 		}
 	}
-	
+
 	return result
 }
 
@@ -41,12 +42,12 @@ func ExtractLoggerFromContext(ctx context.Context) *Logger {
 	if ctx == nil {
 		return New("default")
 	}
-	
+
 	logger, ok := ctx.Value(LogContextKey).(*Logger)
 	if !ok {
 		return New("default")
 	}
-	
+
 	return logger
 }
 
@@ -60,11 +61,11 @@ func WithField(ctx context.Context, key string, value interface{}) context.Conte
 // WithFields adds multiple fields to the logger in the context and returns the updated context
 func WithFields(ctx context.Context, fields ContextFields) context.Context {
 	logger := ExtractLoggerFromContext(ctx)
-	
+
 	for k, v := range fields {
 		logger = logger.WithField(k, v)
 	}
-	
+
 	return logger.WithContext(ctx)
 }
 
@@ -73,6 +74,16 @@ func Debug(ctx context.Context, msg string, fields ...ContextFields) {
 	logger := ExtractLoggerFromContext(ctx)
 	if len(fields) > 0 {
 		logger.Debug(msg, fields[0])
+	} else {
+		logger.Debug(msg)
+	}
+}
+
+// Debugf logs a debug message with the logger from the context
+func Debugf(ctx context.Context, msg string, args ...any) {
+	logger := ExtractLoggerFromContext(ctx)
+	if len(args) > 0 {
+		logger.Debug(fmt.Sprintf(msg, args...))
 	} else {
 		logger.Debug(msg)
 	}
@@ -88,11 +99,31 @@ func Info(ctx context.Context, msg string, fields ...ContextFields) {
 	}
 }
 
+// Infof logs an info message with the logger from the context
+func Infof(ctx context.Context, msg string, args ...any) {
+	logger := ExtractLoggerFromContext(ctx)
+	if len(args) > 0 {
+		logger.Info(fmt.Sprintf(msg, args...), nil)
+	} else {
+		logger.Info(msg)
+	}
+}
+
 // Warn logs a warning message with the logger from the context
 func Warn(ctx context.Context, msg string, fields ...ContextFields) {
 	logger := ExtractLoggerFromContext(ctx)
 	if len(fields) > 0 {
 		logger.Warn(msg, fields[0])
+	} else {
+		logger.Warn(msg)
+	}
+}
+
+// Warnf logs a warning message with the logger from the context
+func Warnf(ctx context.Context, msg string, args ...any) {
+	logger := ExtractLoggerFromContext(ctx)
+	if len(args) > 0 {
+		logger.Warn(fmt.Sprintf(msg, args...), nil)
 	} else {
 		logger.Warn(msg)
 	}
@@ -108,11 +139,31 @@ func Error(ctx context.Context, err error, msg string, fields ...ContextFields) 
 	}
 }
 
+// Errorf logs an error message with the logger from the context
+func Errorf(ctx context.Context, err error, msg string, args ...any) {
+	logger := ExtractLoggerFromContext(ctx)
+	if len(args) > 0 {
+		logger.Error(err, fmt.Sprintf(msg, args...), nil)
+	} else {
+		logger.Error(err, msg)
+	}
+}
+
 // Fatal logs a fatal message with the logger from the context
 func Fatal(ctx context.Context, err error, msg string, fields ...ContextFields) {
 	logger := ExtractLoggerFromContext(ctx)
 	if len(fields) > 0 {
 		logger.Fatal(err, msg, fields[0])
+	} else {
+		logger.Fatal(err, msg)
+	}
+}
+
+// Fatalf logs a fatal message with the logger from the context
+func Fatalf(ctx context.Context, err error, msg string, args ...any) {
+	logger := ExtractLoggerFromContext(ctx)
+	if len(args) > 0 {
+		logger.Fatal(err, fmt.Sprintf(msg, args...), nil)
 	} else {
 		logger.Fatal(err, msg)
 	}

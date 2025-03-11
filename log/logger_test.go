@@ -48,9 +48,9 @@ func TestLogger_NewWithComponent(t *testing.T) {
 func TestLogger_WithTraceID(t *testing.T) {
 	logger := New("testmodule")
 	traceID := "trace123"
-	
+
 	tracedLogger := logger.WithTraceID(traceID)
-	
+
 	assert.Equal(t, traceID, tracedLogger.GetTraceID())
 	assert.Equal(t, logger.moduleInfo, tracedLogger.moduleInfo)
 	assert.Equal(t, logger.hostname, tracedLogger.hostname)
@@ -58,10 +58,10 @@ func TestLogger_WithTraceID(t *testing.T) {
 
 func TestLogger_WithField(t *testing.T) {
 	logger, buf := setupTestLogger(t)
-	
+
 	fieldLogger := logger.WithField("test_key", "test_value")
 	fieldLogger.Info("test message")
-	
+
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "test_value", logMap["test_key"])
 	assert.Equal(t, "test message", logMap["message"])
@@ -69,12 +69,12 @@ func TestLogger_WithField(t *testing.T) {
 
 func TestLogger_Info(t *testing.T) {
 	logger, buf := setupTestLogger(t)
-	
+
 	logger.Info("info message", map[string]interface{}{
 		"key1": "value1",
 		"key2": 123,
 	})
-	
+
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "info message", logMap["message"])
 	assert.Equal(t, "info", logMap["level"])
@@ -84,9 +84,9 @@ func TestLogger_Info(t *testing.T) {
 
 func TestLogger_Debug(t *testing.T) {
 	logger, buf := setupTestLogger(t)
-	
+
 	logger.Debug("debug message")
-	
+
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "debug message", logMap["message"])
 	assert.Equal(t, "debug", logMap["level"])
@@ -94,9 +94,9 @@ func TestLogger_Debug(t *testing.T) {
 
 func TestLogger_Warn(t *testing.T) {
 	logger, buf := setupTestLogger(t)
-	
+
 	logger.Warn("warn message")
-	
+
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "warn message", logMap["message"])
 	assert.Equal(t, "warn", logMap["level"])
@@ -104,18 +104,18 @@ func TestLogger_Warn(t *testing.T) {
 
 func TestLogger_Error(t *testing.T) {
 	logger, buf := setupTestLogger(t)
-	
+
 	testErr := errors.New("test error")
 	logger.Error(testErr, "error message", map[string]interface{}{
 		"context": "test context",
 	})
-	
+
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "error message", logMap["message"])
 	assert.Equal(t, "error", logMap["level"])
 	assert.Equal(t, "test error", logMap["error"])
 	assert.Equal(t, "test context", logMap["context"])
-	
+
 	// Stack should be included
 	if stack, ok := logMap["stack"]; ok {
 		assert.NotEmpty(t, stack)
@@ -124,17 +124,17 @@ func TestLogger_Error(t *testing.T) {
 
 func TestLogger_WithContext(t *testing.T) {
 	logger := New("testmodule")
-	
+
 	ctx := context.Background()
 	ctxWithLogger := logger.WithContext(ctx)
-	
+
 	extractedLogger := FromContext(ctxWithLogger)
 	assert.Equal(t, logger.moduleInfo, extractedLogger.moduleInfo)
 }
 
 func TestFromContext_NoLogger(t *testing.T) {
 	ctx := context.Background()
-	
+
 	logger := FromContext(ctx)
 	assert.Equal(t, "default", logger.moduleInfo)
 }
@@ -142,7 +142,7 @@ func TestFromContext_NoLogger(t *testing.T) {
 func TestFromContext_WithLogger(t *testing.T) {
 	logger := New("testmodule")
 	ctx := logger.WithContext(context.Background())
-	
+
 	extractedLogger := FromContext(ctx)
 	assert.Equal(t, "testmodule", extractedLogger.moduleInfo)
 }
@@ -150,10 +150,10 @@ func TestFromContext_WithLogger(t *testing.T) {
 func TestConfigure(t *testing.T) {
 	cfg := NewDefaultConfig()
 	cfg.Level = "debug"
-	
+
 	err := Configure(cfg)
 	assert.NoError(t, err)
-	
+
 	// Test with invalid level
 	cfg.Level = "invalid"
 	err = Configure(cfg)
@@ -162,7 +162,7 @@ func TestConfigure(t *testing.T) {
 
 func TestNewDefaultConfig(t *testing.T) {
 	cfg := NewDefaultConfig()
-	
+
 	assert.Equal(t, "info", cfg.Level)
 	assert.Equal(t, "console", cfg.Format)
 	assert.True(t, cfg.IncludeTimestamp)

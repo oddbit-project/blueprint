@@ -1,10 +1,16 @@
 package httpserver
 
 import (
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"net/http"
-	"strings"
+	cv "github.com/oddbit-project/blueprint/provider/httpserver/request/validator"
+	"github.com/oddbit-project/blueprint/provider/httpserver/response"
+)
+
+const (
+	fieldErrMsg = "Error: Field validation failed on the '%s' validator"
 )
 
 var (
@@ -18,81 +24,59 @@ type ValidationError struct {
 	Message string `json:"message"`
 }
 
-// ValidationResponse is the standard format for validation errors
-type ValidationResponse struct {
-	Success bool              `json:"success"`
-	Errors  []ValidationError `json:"errors"`
-}
-
 // ValidateJSON validates an incoming JSON request against a struct with validation tags
 // Example usage:
 //
-//  type LoginRequest struct {
-//      Username string `json:"username" binding:"required" validate:"email"`
-//      Password string `json:"password" binding:"required" validate:"min=8,max=32"`
-//  }
+//	type LoginRequest struct {
+//	    Username string `json:"username" binding:"required" validate:"email"`
+//	    Password string `json:"password" binding:"required" validate:"min=8,max=32"`
+//	}
 //
-//  func LoginHandler(c *gin.Context) {
-//      var req LoginRequest
-//      if !ValidateJSON(c, &req) {
-//          return // Validation failed and error response already sent
-//      }
-//      // Continue with valid request
-//  }
+//	func LoginHandler(c *gin.Context) {
+//	    var req LoginRequest
+//	    if !ValidateJSON(c, &req) {
+//	        return // Validation failed and error response already sent
+//	    }
+//	    // Continue with valid request
+//	}
 func ValidateJSON(c *gin.Context, obj interface{}) bool {
 	// First use Gin's binding to check basic requirements
 	if err := c.ShouldBindJSON(obj); err != nil {
 		validationErrors := []ValidationError{}
-		
+
 		// Extract field error details from Gin's binding errors
-		if verr, ok := err.(validator.ValidationErrors); ok {
+		var verr validator.ValidationErrors
+		if errors.As(err, &verr) {
 			for _, f := range verr {
-				// Format the field name and error message
-				field := strings.ToLower(f.Field())
-				message := formatValidationMessage(f)
 				validationErrors = append(validationErrors, ValidationError{
-					Field:   field,
-					Message: message,
+					Field:   f.Field(),
+					Message: fmt.Sprintf(fieldErrMsg, f.Tag()),
 				})
 			}
-		} else {
-			// If not a validation error, it's likely a malformed JSON
-			validationErrors = append(validationErrors, ValidationError{
-				Field:   "request",
-				Message: "Invalid JSON format",
-			})
 		}
-		
-		// Return validation errors in standard format
-		c.AbortWithStatusJSON(http.StatusBadRequest, ValidationResponse{
-			Success: false,
-			Errors:  validationErrors,
-		})
+
+		response.ValidationError(c, validationErrors)
 		return false
 	}
-	
+
 	// Run additional validations with the full validator
 	if err := validate.Struct(obj); err != nil {
 		validationErrors := []ValidationError{}
-		
-		if verr, ok := err.(validator.ValidationErrors); ok {
+
+		var verr validator.ValidationErrors
+		if errors.As(err, &verr) {
 			for _, f := range verr {
-				field := strings.ToLower(f.Field())
-				message := formatValidationMessage(f)
 				validationErrors = append(validationErrors, ValidationError{
-					Field:   field,
-					Message: message,
+					Field:   f.Field(),
+					Message: fmt.Sprintf(fieldErrMsg, f.Tag()),
 				})
 			}
 		}
-		
-		c.AbortWithStatusJSON(http.StatusBadRequest, ValidationResponse{
-			Success: false,
-			Errors:  validationErrors,
-		})
+
+		response.ValidationError(c, validationErrors)
 		return false
 	}
-	
+
 	return true
 }
 
@@ -100,104 +84,32 @@ func ValidateJSON(c *gin.Context, obj interface{}) bool {
 func ValidateQuery(c *gin.Context, obj interface{}) bool {
 	if err := c.ShouldBindQuery(obj); err != nil {
 		validationErrors := []ValidationError{}
-		
+
 		if verr, ok := err.(validator.ValidationErrors); ok {
 			for _, f := range verr {
-				field := strings.ToLower(f.Field())
-				message := formatValidationMessage(f)
 				validationErrors = append(validationErrors, ValidationError{
-					Field:   field,
-					Message: message,
+					Field:   f.Field(),
+					Message: fmt.Sprintf(fieldErrMsg, f.Tag()),
 				})
 			}
 		} else {
 			validationErrors = append(validationErrors, ValidationError{
-				Field:   "query",
+				Field:   "-",
 				Message: "Invalid query parameters",
 			})
 		}
-		
-		c.AbortWithStatusJSON(http.StatusBadRequest, ValidationResponse{
-			Success: false,
-			Errors:  validationErrors,
-		})
+
+		response.ValidationError(c, validationErrors)
 		return false
 	}
-	
+
 	return true
 }
 
-// Helper function to format validation error messages
-func formatValidationMessage(fe validator.FieldError) string {
-	switch fe.Tag() {
-	case "required":
-		return "This field is required"
-	case "email":
-		return "Invalid email format"
-	case "min":
-		return "Value is too short"
-	case "max":
-		return "Value is too long"
-	case "alphanum":
-		return "Only alphanumeric characters are allowed"
-	default:
-		return "Invalid value"
-	}
-}
-
-// CustomValidationRules registers custom validation rules
-func CustomValidationRules() {
-	// Register custom validation rules
-	validate.RegisterValidation("securepassword", validateSecurePassword)
-	// Add more custom validations as needed
-}
-
-// Sample custom validation rule for secure passwords
-func validateSecurePassword(fl validator.FieldLevel) bool {
-	password := fl.Field().String()
-	
-	// Password complexity requirements
-	hasUpperCase := false
-	hasLowerCase := false
-	hasNumber := false
-	hasSpecial := false
-	
-	if len(password) < 8 {
-		return false
-	}
-	
-	for _, char := range password {
-		switch {
-		case 'A' <= char && char <= 'Z':
-			hasUpperCase = true
-		case 'a' <= char && char <= 'z':
-			hasLowerCase = true
-		case '0' <= char && char <= '9':
-			hasNumber = true
-		case strings.ContainsRune(`!@#$%^&*()-_=+[]{}|;:'",.<>/?`, char):
-			hasSpecial = true
-		}
-	}
-	
-	// Require at least 3 of the 4 character types
-	count := 0
-	if hasUpperCase {
-		count++
-	}
-	if hasLowerCase {
-		count++
-	}
-	if hasNumber {
-		count++
-	}
-	if hasSpecial {
-		count++
-	}
-	
-	return count >= 3
-}
-
-// Initialize validators
 func init() {
-	CustomValidationRules()
+	// register custom validators
+	if err := validate.RegisterValidation("securepassword", cv.ValidateSecurePassword); err != nil {
+		panic(err)
+	}
+
 }

@@ -2,15 +2,14 @@ package main
 
 import (
 	paho "github.com/eclipse/paho.mqtt.golang"
-	"github.com/oddbit-project/blueprint/log/zerolog/writer"
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/mqtt"
-	"github.com/rs/zerolog/log"
+	"os"
 	"time"
 )
 
 func main() {
-	// use zerolog as logger with console writer
-	writer.UseDefaultWriter()
+	_ = log.Configure(log.NewDefaultConfig())
 
 	cfg := mqtt.NewConfig()
 	cfg.Username = "testUser"
@@ -26,13 +25,16 @@ func main() {
 	cfg.PersistentSession = false
 	cfg.Brokers = []string{"localhost:18883"}
 
+	logger := log.New("mqtt-sample")
 	client, err := mqtt.NewClient(cfg)
 	if err != nil {
-		log.Fatal().Msgf("cannot initialize mqtt: %v", err)
+		logger.Fatal(err, "cannot initialize mqtt")
+		os.Exit(1)
 	}
 	_, err = client.Connect()
 	if err != nil {
-		log.Fatal().Msgf("cannot connect to mqtt: %v", err)
+		logger.Fatal(err, "cannot connect to mqtt")
+		os.Exit(1)
 	}
 	defer client.Close()
 
@@ -41,14 +43,21 @@ func main() {
 
 	var received []byte = nil
 	// subscribe topic
-	client.Subscribe(topicName, 2, func(c paho.Client, msg paho.Message) {
-		log.Info().Msgf("Received message: %s", msg.Payload())
+	err = client.Subscribe(topicName, 2, func(c paho.Client, msg paho.Message) {
+		logger.Infof("Received message: %s", msg.Payload())
 		received = msg.Payload()
 	})
+	if err != nil {
+		logger.Fatal(err, "cannot subscribe")
+		os.Exit(1)
+	}
 
 	// write to topic
-	log.Info().Msgf("Writing message: %v", string(message))
-	client.Write(topicName, message)
+	logger.Infof("Writing message: %v", string(message))
+	if err = client.Write(topicName, message); err != nil {
+		logger.Fatal(err, "cannot publish message")
+		os.Exit(1)
+	}
 
 	for received == nil {
 		// sleep 10ms each time

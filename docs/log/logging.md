@@ -7,7 +7,7 @@ Blueprint provides a structured logging system built on top of zerolog that offe
 - **Structured logging** with standardized field names
 - **Context-aware logging** for tracking requests across multiple services
 - **Distributed tracing** with trace and request IDs
-- **Component-specific logging** for HTTP, Kafka, and database operations
+- **Component-specific logging** for HTTP and Kafka operations
 - **Log levels** for different severity of messages
 - **Performance-oriented** with minimal allocations
 
@@ -70,24 +70,25 @@ func processRequest(ctx context.Context, req Request) {
 import (
     "github.com/gin-gonic/gin"
     "github.com/oddbit-project/blueprint/log"
+    "github.com/oddbit-project/provider/httpserver"
 )
 
 // Use the HTTP logging middleware
-router.Use(log.HTTPLogMiddleware("api"))
+router.Use(httpserver.HTTPLogMiddleware("api"))
 
 // Log within handlers
 func handler(c *gin.Context) {
     // Get the request logger
-    logger := log.GetRequestLogger(c)
+    logger := httpserver.GetRequestLogger(c)
     
     // Or use helper functions
-    log.RequestInfo(c, "Processing API request", map[string]interface{}{
+    httpserver.RequestInfo(c, "Processing API request", map[string]interface{}{
         "request_data": someData,
     })
     
     // Error handling
     if err := someOperation(); err != nil {
-        log.RequestError(c, err, "Operation failed")
+        httpserver.RequestError(c, err, "Operation failed")
         return
     }
 }
@@ -97,17 +98,20 @@ func handler(c *gin.Context) {
 
 ```go
 import (
+	"context"
     "github.com/oddbit-project/blueprint/log"
     "github.com/oddbit-project/blueprint/provider/kafka"
 )
 
+ctx := context.Background()
+
 // Producer logging
-producer, _ := kafka.NewProducer(cfg)
-err := producer.WriteJson(data)
+producer, _ := kafka.NewProducer(cfg, nil)
+err := producer.WriteJson(ctx, data)
 
 // Consumer with logging
-consumer, _ := kafka.NewConsumer(cfg)
-consumer.Subscribe(func(ctx context.Context, msg kafka.Message) error {
+consumer, _ := kafka.NewConsumer(cfg, nil)
+consumer.Subscribe(ctx, func(ctx context.Context, msg kafka.Message, l *log.Logger) error {
     // Message is automatically logged by the updated consumer
     
     // Add your processing logic
@@ -117,37 +121,8 @@ consumer.Subscribe(func(ctx context.Context, msg kafka.Message) error {
 })
 
 // Manual Kafka logging
-log.LogKafkaMessageReceived(ctx, msg, "mygroup")
-log.LogKafkaMessageSent(ctx, msg)
-```
-
-## Database Query Logging
-
-```go
-import (
-    "github.com/oddbit-project/blueprint/log"
-    "database/sql"
-)
-
-// Log database operations
-startTime := time.Now()
-rows, err := db.QueryContext(ctx, query, args...)
-duration := time.Since(startTime)
-
-log.LogDBQuery(ctx, query, args, duration, err)
-
-// Log database results
-result, err := db.ExecContext(ctx, query, args...)
-log.LogDBResult(ctx, result, err, "INSERT")
-
-// Transaction logging
-tx, err := db.BeginTx(ctx, nil)
-log.LogDBTransaction(ctx, "begin", err)
-
-// ... perform operations ...
-
-err = tx.Commit()
-log.LogDBTransaction(ctx, "commit", err)
+kafka.LogMessageReceived(consumer.Logger, msg, "mygroup")
+kafka.LogMessageSent(producer.Logger, msg)
 ```
 
 ## Configuration

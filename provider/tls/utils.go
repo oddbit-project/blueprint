@@ -38,6 +38,12 @@ const (
 	ErrInvalidTlsVersion = utils.Error("invalid TLS version")
 )
 
+type TlsKeyCredential struct {
+	Password       string `json:"tlsKeyPassword"`
+	PasswordEnvVar string `json:"tlsKeyPasswordEnvVar"`
+	PasswordFile   string `json:"tlsKeyPasswordFile"`
+}
+
 var tlsVersionMap = map[string]uint16{
 	// Removed TLS 1.0 and 1.1 as they are insecure and deprecated
 	"TLS12": tls.VersionTLS12,
@@ -45,22 +51,22 @@ var tlsVersionMap = map[string]uint16{
 }
 
 // Only include secure cipher suites that are recommended for modern TLS security
-// Removed all RC4, 3DES, and non-AEAD ciphers as they are vulnerable
+// RC4, 3DES, and non-AEAD ciphers are vulnerable
 var tlsCipherMap = map[string]uint16{
 	// ChaCha20-Poly1305 ciphers (preferred for performance on systems without AES-NI)
-	"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":    tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-	
+	"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":   tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305": tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+
 	// AES-GCM ciphers (AEAD authenticated encryption)
 	"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":   tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 	"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256": tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 	"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":   tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 	"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384": tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-	
+
 	// TLS 1.3 cipher suites
-	"TLS_AES_128_GCM_SHA256":                  tls.TLS_AES_128_GCM_SHA256,
-	"TLS_AES_256_GCM_SHA384":                  tls.TLS_AES_256_GCM_SHA384,
-	"TLS_CHACHA20_POLY1305_SHA256":            tls.TLS_CHACHA20_POLY1305_SHA256,
+	"TLS_AES_128_GCM_SHA256":       tls.TLS_AES_128_GCM_SHA256,
+	"TLS_AES_256_GCM_SHA384":       tls.TLS_AES_256_GCM_SHA384,
+	"TLS_CHACHA20_POLY1305_SHA256": tls.TLS_CHACHA20_POLY1305_SHA256,
 }
 
 // default server cipher suites to be used, if none specified
@@ -70,7 +76,7 @@ var defaultCipherSuites = []uint16{
 	tls.TLS_AES_128_GCM_SHA256,
 	tls.TLS_AES_256_GCM_SHA384,
 	tls.TLS_CHACHA20_POLY1305_SHA256,
-	
+
 	// TLS 1.2 ECDHE cipher suites (for backward compatibility)
 	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
@@ -103,4 +109,19 @@ func ParseTLSVersion(version string) (uint16, error) {
 	}
 	log.Error().Msgf("ParseTLSVersion(): invalid tls version %q", version)
 	return 0, ErrInvalidTlsVersion
+}
+
+// GetPassword get tls key password
+func (c TlsKeyCredential) GetPassword() string {
+	return c.Password
+}
+
+// GetEnvVar get tls key password env var
+func (c TlsKeyCredential) GetEnvVar() string {
+	return c.PasswordEnvVar
+}
+
+// GetFileName get tls key password file
+func (c TlsKeyCredential) GetFileName() string {
+	return c.PasswordFile
 }

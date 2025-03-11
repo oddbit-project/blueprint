@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils/str"
@@ -32,16 +33,16 @@ type ProducerConfig struct {
 	Topic    string `json:"topic"`
 	AuthType string `json:"authType"`
 	Username string `json:"username"`
-	Password string `json:"password"`
+	secure.DefaultCredentialConfig
 	tlsProvider.ClientConfig
 	ProducerOptions
 }
 
 type Producer struct {
-	ctx     context.Context
 	Brokers string
 	Topic   string
 	Writer  *kafka.Writer
+	Logger  *log.Logger
 }
 
 // ApplyOptions sets additional Writer parameters
@@ -97,7 +98,7 @@ func (c ProducerConfig) Validate() error {
 	return nil
 }
 
-func NewProducer(ctx context.Context, cfg *ProducerConfig) (*Producer, error) {
+func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -106,24 +107,41 @@ func NewProducer(ctx context.Context, cfg *ProducerConfig) (*Producer, error) {
 		return nil, err
 	}
 
+	var key []byte
+	var credential *secure.Credential
+	var password string
+	var err error
+
+	key, err = secure.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
+		return nil, err
+	}
+
 	transport := &kafka.Transport{
 		DialTimeout: DefaultTimeout,
 	}
 
+	password, err = credential.Get()
+	if err != nil {
+		return nil, err
+	}
 	switch cfg.AuthType {
 	case AuthTypePlain:
 		transport.SASL = plain.Mechanism{
 			Username: cfg.Username,
-			Password: cfg.Password,
+			Password: password,
 		}
 	case AuthTypeScram256:
-		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, cfg.Password); err != nil {
+		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, password); err != nil {
 			return nil, err
 		} else {
 			transport.SASL = sasl
 		}
 	case AuthTypeScram512:
-		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, cfg.Password); err != nil {
+		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, password); err != nil {
 			return nil, err
 		} else {
 			transport.SASL = sasl
@@ -146,17 +164,29 @@ func NewProducer(ctx context.Context, cfg *ProducerConfig) (*Producer, error) {
 	// apply writer options, if defined
 	cfg.ApplyOptions(producer)
 
+	// remove credential from memory
+	// it still exists in the dialer configuration
+	credential.Clear()
+
+	if logger == nil {
+		logger = NewProducerLogger(cfg.Topic)
+	} else {
+		// add kafka context
+		ProducerLogger(logger, cfg.Topic)
+	}
+
 	return &Producer{
-		ctx:     ctx,
 		Brokers: cfg.Brokers,
 		Topic:   cfg.Topic,
 		Writer:  producer,
+		Logger:  logger,
 	}, nil
 }
 
 // Disconnect disconnects from the Writer
 func (p *Producer) Disconnect() {
 	if p.Writer != nil {
+		p.Logger.Info("Closing producer")
 		p.Writer.Close()
 		p.Writer = nil
 	}
@@ -168,49 +198,39 @@ func (p *Producer) IsConnected() bool {
 }
 
 // Write writes a single message to topic
-func (p *Producer) Write(value []byte, key ...[]byte) error {
-	logger := log.NewKafkaProducerLogger(p.ctx, p.Topic)
-	
+func (p *Producer) Write(ctx context.Context, value []byte, key ...[]byte) error {
+
 	if p.Writer == nil {
-		logger.Error(ErrProducerClosed, "Failed to write message - producer closed", nil)
+		p.Logger.Error(ErrProducerClosed, "Failed to write message - producer closed", nil)
 		return ErrProducerClosed
 	}
-	
+
 	var k []byte = nil
 	if len(key) > 0 {
 		k = key[0]
 	}
-	
+
 	msg := kafka.Message{
 		Topic: p.Topic,
 		Key:   k,
 		Value: value,
 		// Add trace information as headers
-		Headers: log.AddKafkaHeadersFromContext(p.ctx, nil),
+		Headers: LoggerAddHeadersFromContext(ctx, p.Logger, nil),
 	}
-	
-	// Log at debug level before sending
-	logger.Debug("Sending message to Kafka", map[string]interface{}{
-		"message_size": len(value),
-		"has_key":      k != nil,
-	})
-	
-	err := p.Writer.WriteMessages(p.ctx, msg)
+
+	err := p.Writer.WriteMessages(ctx, msg)
 	if err != nil {
-		logger.Error(err, "Failed to write message to Kafka", map[string]interface{}{
+		p.Logger.Error(err, "Failed to write message to Kafka", map[string]interface{}{
 			"message_size": len(value),
 		})
 		return err
 	}
-	
-	// Log message sent at debug level
-	log.LogKafkaMessageSent(p.ctx, msg)
-	
+
 	return nil
 }
 
 // WriteMulti Write multiple messages to Topic
-func (p *Producer) WriteMulti(values ...[]byte) error {
+func (p *Producer) WriteMulti(ctx context.Context, values ...[]byte) error {
 	if p.Writer == nil {
 		return ErrProducerClosed
 	}
@@ -219,62 +239,55 @@ func (p *Producer) WriteMulti(values ...[]byte) error {
 		ml[idx].Key = nil
 		ml[idx].Value = value
 	}
-	return p.Writer.WriteMessages(p.ctx, ml...)
+	return p.Writer.WriteMessages(ctx, ml...)
 }
 
 // WriteJson Write a struct to a Topic as a json message
-func (p *Producer) WriteJson(data interface{}, key ...[]byte) error {
-	logger := log.NewKafkaProducerLogger(p.ctx, p.Topic)
-	
+func (p *Producer) WriteJson(ctx context.Context, data interface{}, key ...[]byte) error {
+
 	if p.Writer == nil {
-		logger.Error(ErrProducerClosed, "Failed to write JSON message - producer closed", nil)
+		p.Logger.Error(ErrProducerClosed, "Failed to write JSON message - producer closed", nil)
 		return ErrProducerClosed
 	}
-	
+
 	var k []byte = nil
 	if len(key) > 0 {
 		k = key[0]
 	}
-	
-	// Log serialization attempt
-	logger.Debug("Serializing object to JSON for Kafka", nil)
-	
+
 	value, err := json.Marshal(data)
 	if err != nil {
-		logger.Error(err, "Failed to serialize object to JSON", nil)
+		p.Logger.Error(err, "Failed to serialize object to JSON", nil)
 		return err
 	}
-	
+
 	msg := kafka.Message{
 		Topic: p.Topic,
 		Key:   k,
 		Value: value,
 		// Add trace information as headers
-		Headers: log.AddKafkaHeadersFromContext(p.ctx, nil),
+		Headers: LoggerAddHeadersFromContext(ctx, p.Logger, nil),
 	}
-	
+
 	// Log at debug level before sending
-	logger.Debug("Sending JSON message to Kafka", map[string]interface{}{
+	p.Logger.Debug("Sending JSON message to Kafka", map[string]interface{}{
 		"message_size": len(value),
 		"has_key":      k != nil,
 	})
-	
-	err = p.Writer.WriteMessages(p.ctx, msg)
+
+	err = p.Writer.WriteMessages(ctx, msg)
 	if err != nil {
-		logger.Error(err, "Failed to write JSON message to Kafka", map[string]interface{}{
+		p.Logger.Error(err, "Failed to write JSON message to Kafka", map[string]interface{}{
 			"message_size": len(value),
 		})
 		return err
 	}
-	
-	// Log message sent
-	log.LogKafkaMessageSent(p.ctx, msg)
-	
+
 	return nil
 }
 
 // WriteMultiJson Write a slice of structs to a Topic as a json message
-func (p *Producer) WriteMultiJson(values ...interface{}) error {
+func (p *Producer) WriteMultiJson(ctx context.Context, values ...interface{}) error {
 	ml := make([]kafka.Message, len(values))
 	for i, v := range values {
 		value, err := json.Marshal(v)
@@ -285,5 +298,5 @@ func (p *Producer) WriteMultiJson(values ...interface{}) error {
 			Value: value,
 		}
 	}
-	return p.Writer.WriteMessages(p.ctx, ml...)
+	return p.Writer.WriteMessages(ctx, ml...)
 }

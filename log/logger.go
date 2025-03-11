@@ -3,9 +3,10 @@ package log
 import (
 	"context"
 	"fmt"
-	"github.com/oddbit-project/blueprint/types/callstack"
+	"github.com/oddbit-project/blueprint/utils/debug"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"io"
 	"os"
 	"time"
 )
@@ -17,7 +18,6 @@ const (
 	LogTraceIDKey       = "trace_id"
 	LogModuleKey        = "module"
 	LogComponentKey     = "component"
-	LogHostnameKey      = "hostname"
 	LogTimestampFormat  = time.RFC3339Nano
 	LogCallerSkipFrames = 2
 )
@@ -30,8 +30,8 @@ type Logger struct {
 	traceID    string
 }
 
-// LogConfig contains configuration for the logger
-type LogConfig struct {
+// Config contains configuration for the logger
+type Config struct {
 	Level            string `json:"level"`
 	Format           string `json:"format"` // "console" or "json"
 	IncludeTimestamp bool   `json:"includeTimestamp"`
@@ -41,8 +41,8 @@ type LogConfig struct {
 }
 
 // NewDefaultConfig returns a default logging configuration
-func NewDefaultConfig() *LogConfig {
-	return &LogConfig{
+func NewDefaultConfig() *Config {
+	return &Config{
 		Level:            "info",
 		Format:           "console",
 		IncludeTimestamp: true,
@@ -53,17 +53,17 @@ func NewDefaultConfig() *LogConfig {
 }
 
 // Configure configures the global logger based on the provided configuration
-func Configure(cfg *LogConfig) error {
+func Configure(cfg *Config) error {
 	// Set global log level
 	level, err := zerolog.ParseLevel(cfg.Level)
 	if err != nil {
 		return fmt.Errorf("invalid log level: %s", cfg.Level)
 	}
 	zerolog.SetGlobalLevel(level)
-	
+
 	// Configure timestamp format
 	zerolog.TimeFieldFormat = LogTimestampFormat
-	
+
 	// Determine output writer
 	var output zerolog.ConsoleWriter
 	if cfg.Format == "console" {
@@ -71,30 +71,30 @@ func Configure(cfg *LogConfig) error {
 			w.TimeFormat = LogTimestampFormat
 		})
 	}
-	
+
 	// Configure base logger
 	baseLogger := zerolog.New(output).Level(level)
-	
+
 	// Add standard fields
 	if cfg.IncludeTimestamp {
 		baseLogger = baseLogger.With().Timestamp().Logger()
 	}
-	
+
 	if cfg.IncludeCaller {
 		baseLogger = baseLogger.With().Caller().Logger()
 		zerolog.CallerSkipFrameCount = cfg.CallerSkipFrames
 	}
-	
+
 	// Set as global logger
 	log.Logger = baseLogger
-	
+
 	return nil
 }
 
 // New creates a new logger with module information
 func New(module string) *Logger {
 	hostname, _ := os.Hostname()
-	
+
 	return &Logger{
 		logger:     log.With().Str(LogModuleKey, module).Logger(),
 		moduleInfo: module,
@@ -102,10 +102,20 @@ func New(module string) *Logger {
 	}
 }
 
+// ModuleInfo get module name
+func (l *Logger) ModuleInfo() string {
+	return l.moduleInfo
+}
+
+// Hostname get configured hostname
+func (l *Logger) Hostname() string {
+	return l.hostname
+}
+
 // NewWithComponent creates a new logger with module and component information
 func NewWithComponent(module, component string) *Logger {
 	hostname, _ := os.Hostname()
-	
+
 	return &Logger{
 		logger: log.With().
 			Str(LogModuleKey, module).
@@ -114,6 +124,17 @@ func NewWithComponent(module, component string) *Logger {
 		moduleInfo: fmt.Sprintf("%s.%s", module, component),
 		hostname:   hostname,
 	}
+}
+
+// WithOutput use a custom output
+func (l *Logger) WithOutput(output io.Writer) *Logger {
+	newLogger := &Logger{
+		logger:     l.logger.Output(output),
+		moduleInfo: l.moduleInfo,
+		hostname:   l.hostname,
+		traceID:    l.traceID,
+	}
+	return newLogger
 }
 
 // WithTraceID creates a new logger with the specified trace ID
@@ -144,17 +165,17 @@ func FromContext(ctx context.Context) *Logger {
 	if ctx == nil {
 		return New("default")
 	}
-	
+
 	value := ctx.Value(LogContextKey)
 	if value == nil {
 		return New("default")
 	}
-	
+
 	logger, ok := value.(*Logger)
 	if !ok {
 		return New("default")
 	}
-	
+
 	return logger
 }
 
@@ -176,6 +197,15 @@ func (l *Logger) Debug(msg string, fields ...map[string]interface{}) {
 	event.Msg(msg)
 }
 
+// Debugf logs a debug message with the given fields
+func (l *Logger) Debugf(msg string, fields ...interface{}) {
+	event := l.logger.Debug()
+	if len(fields) > 0 {
+		msg = fmt.Sprintf(msg, fields...)
+	}
+	event.Msg(msg)
+}
+
 // Info logs an info message with the given fields
 func (l *Logger) Info(msg string, fields ...map[string]interface{}) {
 	event := l.logger.Info()
@@ -183,6 +213,15 @@ func (l *Logger) Info(msg string, fields ...map[string]interface{}) {
 		for k, v := range fields[0] {
 			event = event.Interface(k, v)
 		}
+	}
+	event.Msg(msg)
+}
+
+// Infof logs an info message with the given fields
+func (l *Logger) Infof(msg string, fields ...interface{}) {
+	event := l.logger.Info()
+	if len(fields) > 0 {
+		msg = fmt.Sprintf(msg, fields...)
 	}
 	event.Msg(msg)
 }
@@ -198,54 +237,110 @@ func (l *Logger) Warn(msg string, fields ...map[string]interface{}) {
 	event.Msg(msg)
 }
 
+// Warnf logs a warning message with the given fields
+func (l *Logger) Warnf(msg string, fields ...interface{}) {
+	event := l.logger.Warn()
+	if len(fields) > 0 {
+		msg = fmt.Sprintf(msg, fields...)
+	}
+	event.Msg(msg)
+}
+
 // Error logs an error message with the given fields
 // It automatically adds stack information
 func (l *Logger) Error(err error, msg string, fields ...map[string]interface{}) {
 	event := l.logger.Error()
-	
+
 	// Add error information
 	if err != nil {
 		event = event.Err(err)
-		
+
 		// Add stack trace if available
-		callStack := callstack.Get(1)
+		callStack := debug.GetStackTrace(1)
 		if len(callStack) > 0 {
 			event = event.Strs("stack", callStack)
 		}
 	}
-	
+
 	// Add additional fields
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
 			event = event.Interface(k, v)
 		}
 	}
-	
+
+	event.Msg(msg)
+}
+
+// Errorf logs an error message with the given fields
+// It automatically adds stack information
+func (l *Logger) Errorf(err error, msg string, fields ...interface{}) {
+	event := l.logger.Error()
+
+	// Add error information
+	if err != nil {
+		event = event.Err(err)
+
+		// Add stack trace if available
+		callStack := debug.GetStackTrace(1)
+		if len(callStack) > 0 {
+			event = event.Strs("stack", callStack)
+		}
+	}
+
+	// Add additional fields
+	if len(fields) > 0 {
+		msg = fmt.Sprintf(msg, fields...)
+	}
+
 	event.Msg(msg)
 }
 
 // Fatal logs a fatal message with the given fields and exits the application
 func (l *Logger) Fatal(err error, msg string, fields ...map[string]interface{}) {
 	event := l.logger.Fatal()
-	
+
 	// Add error information
 	if err != nil {
 		event = event.Err(err)
-		
+
 		// Add stack trace if available
-		callStack := callstack.Get(1)
+		callStack := debug.GetStackTrace(1)
 		if len(callStack) > 0 {
 			event = event.Strs("stack", callStack)
 		}
 	}
-	
+
 	// Add additional fields
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
 			event = event.Interface(k, v)
 		}
 	}
-	
+
+	event.Msg(msg)
+}
+
+// Fatalf logs a fatal message with the given fields and exits the application
+func (l *Logger) Fatalf(err error, msg string, fields ...interface{}) {
+	event := l.logger.Fatal()
+
+	// Add error information
+	if err != nil {
+		event = event.Err(err)
+
+		// Add stack trace if available
+		callStack := debug.GetStackTrace(1)
+		if len(callStack) > 0 {
+			event = event.Strs("stack", callStack)
+		}
+	}
+
+	// Add additional fields
+	if len(fields) > 0 {
+		msg = fmt.Sprintf(msg, fields...)
+	}
+
 	event.Msg(msg)
 }
 
