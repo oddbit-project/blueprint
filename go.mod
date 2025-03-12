@@ -6,7 +6,7 @@ toolchain go1.22.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.18.0
-	github.com/dn365/gin-zerolog v0.0.0-20171227063204-b43714b00db1
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/gin-gonic/gin v1.9.0
@@ -65,7 +65,6 @@ require (
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.9 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect

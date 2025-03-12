@@ -211,7 +211,6 @@ func (p *Producer) Write(ctx context.Context, value []byte, key ...[]byte) error
 	}
 
 	msg := kafka.Message{
-		Topic: p.Topic,
 		Key:   k,
 		Value: value,
 		// Add trace information as headers
@@ -262,7 +261,6 @@ func (p *Producer) WriteJson(ctx context.Context, data interface{}, key ...[]byt
 	}
 
 	msg := kafka.Message{
-		Topic: p.Topic,
 		Key:   k,
 		Value: value,
 		// Add trace information as headers
