@@ -16,9 +16,6 @@ The Blueprint logging system builds on zerolog to provide:
 
 - **Logger**: The main logging interface with methods for each log level
 - **Context**: Functions for context-aware logging and propagation
-- **HTTP**: Middleware and utilities for HTTP request logging
-- **Kafka**: Logging functions for Kafka producers and consumers
-- **DB**: Database query and transaction logging
 
 ## Quick Start
 
@@ -27,13 +24,13 @@ The Blueprint logging system builds on zerolog to provide:
 logger := log.New("myapp")
 
 // Log at different levels
-logger.Info("Application started", map[string]interface{}{
+logger.Info("Application started", FV{
     "version": "1.0.0",
 })
 
 // Log errors with stack traces
 if err := operation(); err != nil {
-    logger.Error(err, "Operation failed", map[string]interface{}{
+    logger.Error(err, "Operation failed", log.FV{
         "operation_id": 123,
     })
 }
@@ -54,7 +51,7 @@ processItem(ctx, item)
 // Extract logger from context
 func processItem(ctx context.Context, item Item) {
     logger := log.FromContext(ctx)
-    logger.Info("Processing item", map[string]interface{}{
+    logger.Info("Processing item", log.FV{
         "item_id": item.ID,
     })
 }

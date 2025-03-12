@@ -197,35 +197,40 @@ func (p *Producer) IsConnected() bool {
 	return p.Writer != nil
 }
 
-// Write writes a single message to topic
-func (p *Producer) Write(ctx context.Context, value []byte, key ...[]byte) error {
+// WriteWithHeaders writes a single message to topic, with headers
+func (p *Producer) WriteWithHeaders(ctx context.Context, value []byte, key []byte, headers []kafka.Header) error {
 
 	if p.Writer == nil {
 		p.Logger.Error(ErrProducerClosed, "Failed to write message - producer closed", nil)
 		return ErrProducerClosed
 	}
 
-	var k []byte = nil
-	if len(key) > 0 {
-		k = key[0]
-	}
-
 	msg := kafka.Message{
-		Key:   k,
+		Key:   key,
 		Value: value,
 		// Add trace information as headers
-		Headers: LoggerAddHeadersFromContext(ctx, p.Logger, nil),
+		Headers: headers,
 	}
 
 	err := p.Writer.WriteMessages(ctx, msg)
 	if err != nil {
-		p.Logger.Error(err, "Failed to write message to Kafka", map[string]interface{}{
+		p.Logger.Error(err, "Failed to write message to Kafka", log.KV{
 			"message_size": len(value),
 		})
 		return err
 	}
 
 	return nil
+}
+
+// WriteWithKey writes a message with key
+func (p *Producer) WriteWithKey(ctx context.Context, value []byte, key []byte) error {
+	return p.WriteWithHeaders(ctx, value, key, nil)
+}
+
+// Write writes a single message to topic
+func (p *Producer) Write(ctx context.Context, value []byte) error {
+	return p.WriteWithHeaders(ctx, value, nil, nil)
 }
 
 // WriteMulti Write multiple messages to Topic
@@ -243,12 +248,6 @@ func (p *Producer) WriteMulti(ctx context.Context, values ...[]byte) error {
 
 // WriteJson Write a struct to a Topic as a json message
 func (p *Producer) WriteJson(ctx context.Context, data interface{}, key ...[]byte) error {
-
-	if p.Writer == nil {
-		p.Logger.Error(ErrProducerClosed, "Failed to write JSON message - producer closed", nil)
-		return ErrProducerClosed
-	}
-
 	var k []byte = nil
 	if len(key) > 0 {
 		k = key[0]
@@ -260,28 +259,7 @@ func (p *Producer) WriteJson(ctx context.Context, data interface{}, key ...[]byt
 		return err
 	}
 
-	msg := kafka.Message{
-		Key:   k,
-		Value: value,
-		// Add trace information as headers
-		Headers: LoggerAddHeadersFromContext(ctx, p.Logger, nil),
-	}
-
-	// Log at debug level before sending
-	p.Logger.Debug("Sending JSON message to Kafka", map[string]interface{}{
-		"message_size": len(value),
-		"has_key":      k != nil,
-	})
-
-	err = p.Writer.WriteMessages(ctx, msg)
-	if err != nil {
-		p.Logger.Error(err, "Failed to write JSON message to Kafka", map[string]interface{}{
-			"message_size": len(value),
-		})
-		return err
-	}
-
-	return nil
+	return p.WriteWithHeaders(ctx, value, k, nil)
 }
 
 // WriteMultiJson Write a slice of structs to a Topic as a json message

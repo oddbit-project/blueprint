@@ -166,7 +166,7 @@ func main() {
     if err != nil {
         logger.Error(err, "Failed to read message", nil)
     } else {
-        logger.Info("Received message", map[string]interface{}{
+        logger.Info("Received message", log.KV{
             "value": string(msg.Value),
             "key": string(msg.Key),
             "topic": msg.Topic,
@@ -189,7 +189,7 @@ func main() {
             }
             
             // Process the message
-            logger.Info("Processing message", map[string]interface{}{
+            logger.Info("Processing message", log.KV{
                 "value_len": len(msg.Value),
             })
             

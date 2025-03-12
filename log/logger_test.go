@@ -24,8 +24,8 @@ func setupTestLogger(t *testing.T) (*Logger, *bytes.Buffer) {
 }
 
 // parseLogOutput parses the log output into a map
-func parseLogOutput(t *testing.T, buf *bytes.Buffer) map[string]interface{} {
-	result := map[string]interface{}{}
+func parseLogOutput(t *testing.T, buf *bytes.Buffer) KV {
+	result := KV{}
 	err := json.Unmarshal(buf.Bytes(), &result)
 	assert.NoError(t, err, "Log output should be valid JSON")
 	return result
@@ -70,7 +70,7 @@ func TestLogger_WithField(t *testing.T) {
 func TestLogger_Info(t *testing.T) {
 	logger, buf := setupTestLogger(t)
 
-	logger.Info("info message", map[string]interface{}{
+	logger.Info("info message", KV{
 		"key1": "value1",
 		"key2": 123,
 	})
@@ -106,7 +106,7 @@ func TestLogger_Error(t *testing.T) {
 	logger, buf := setupTestLogger(t)
 
 	testErr := errors.New("test error")
-	logger.Error(testErr, "error message", map[string]interface{}{
+	logger.Error(testErr, "error message", KV{
 		"context": "test context",
 	})
 

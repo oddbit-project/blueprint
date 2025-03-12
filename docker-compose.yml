@@ -13,6 +13,11 @@ services:
     image: clickhouse/clickhouse-server
     container_name: clickhouse
     hostname: clickhouse
+    environment:
+      - CLICKHOUSE_PASSWORD=somePassword
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     ports:
       - 18123:8123
       - 19000:9000

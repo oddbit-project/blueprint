@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/oddbit-project/blueprint/crypt/secure"
-	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/stretchr/testify/assert"
 	"sync"
@@ -60,7 +59,7 @@ func purgeTopic(t *testing.T, producerCfg *ProducerConfig) {
 	timeout := 20 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	
+
 	admin, err := NewAdmin(cfg, nil)
 	if err != nil {
 		t.Skipf("Cannot connect to Kafka admin: %v", err)
@@ -74,17 +73,17 @@ func purgeTopic(t *testing.T, producerCfg *ProducerConfig) {
 		t.Skipf("Cannot check if topic exists: %v", err)
 		return
 	}
-	
+
 	if exists {
 		if err := admin.DeleteTopic(ctx, producerCfg.Topic); err != nil {
 			t.Skipf("Cannot delete existing topic: %v", err)
 			return
 		}
 	}
-	
+
 	// Give Kafka some time to fully delete the topic
 	time.Sleep(3 * time.Second)
-	
+
 	// Create the topic
 	if err := admin.CreateTopic(ctx, producerCfg.Topic, 1, 1); err != nil {
 		t.Skipf("Cannot create topic: %v", err)
@@ -169,7 +168,7 @@ func TestConsumerChannel(t *testing.T) {
 		return
 	}
 	defer producer.Disconnect()
-	
+
 	timeout := 30 * time.Second
 	consumerCtx, cancel := context.WithCancel(context.Background())
 	defer cancel() // This will signal all goroutines to stop
@@ -185,11 +184,11 @@ func TestConsumerChannel(t *testing.T) {
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
 	wg := sync.WaitGroup{}
 	wg.Add(3) // expect 3 message
-	
+
 	// Create a done channel to signal when we're finished processing
 	done := make(chan struct{})
 	msgChannel := make(chan Message)
-	
+
 	// consumer thread - make sure it stops when test ends
 	consumerWg := sync.WaitGroup{}
 	consumerWg.Add(1)
@@ -200,7 +199,7 @@ func TestConsumerChannel(t *testing.T) {
 			t.Logf("ChannelSubscribe error: %v", err)
 		}
 	}()
-	
+
 	// channel process thread
 	processorWg := sync.WaitGroup{}
 	processorWg.Add(1)
@@ -219,7 +218,7 @@ func TestConsumerChannel(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// now write 3 messages
 	err = producer.WriteMulti(ctx, value1, value1, value1)
 	if err != nil {
@@ -238,19 +237,19 @@ func TestConsumerChannel(t *testing.T) {
 		wg.Wait()
 		close(waitCh)
 	}()
-	
+
 	select {
 	case <-waitCh:
 		// Success! All messages processed
 	case <-time.After(timeout):
 		t.Log("Timeout waiting for messages")
 	}
-	
+
 	// Clean shutdown
-	cancel()        // Signal to stop consumer
-	close(done)     // Signal to stop processor
+	cancel()          // Signal to stop consumer
+	close(done)       // Signal to stop processor
 	close(msgChannel) // Close channel
-	
+
 	// Wait for goroutines to finish
 	consumerWg.Wait()
 	processorWg.Wait()
@@ -287,14 +286,14 @@ func TestConsumerSubscribe(t *testing.T) {
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
 	wg := sync.WaitGroup{}
 	wg.Add(3) // expect 3 message
-	
+
 	// consumer thread with proper cleanup
 	consumerWg := sync.WaitGroup{}
 	consumerWg.Add(1)
 	go func() {
 		defer consumerWg.Done()
 		err := consumer.Subscribe(consumerCtx,
-			func(ctx context.Context, message Message, l *log.Logger) error {
+			func(ctx context.Context, message Message) error {
 				assert.Equal(t, string(value1), string(message.Value))
 				wg.Done()
 				return nil
@@ -303,7 +302,7 @@ func TestConsumerSubscribe(t *testing.T) {
 			t.Logf("Subscribe error: %v", err)
 		}
 	}()
-	
+
 	// now write 3 messages
 	err = producer.WriteMulti(ctx, value1, value1, value1)
 	if err != nil {
@@ -319,17 +318,17 @@ func TestConsumerSubscribe(t *testing.T) {
 		wg.Wait()
 		close(waitCh)
 	}()
-	
+
 	select {
 	case <-waitCh:
 		// Success! All messages processed
 	case <-time.After(timeout):
 		t.Log("Timeout waiting for messages")
 	}
-	
+
 	// Clean shutdown
 	cancel() // Signal to stop consumer
-	
+
 	// Wait for consumer goroutine to finish
 	consumerWg.Wait()
 }
@@ -365,7 +364,7 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
 	wg := sync.WaitGroup{}
 	wg.Add(3) // expect 3 message
-	
+
 	// consumer thread with proper cleanup
 	consumerWg := sync.WaitGroup{}
 	consumerWg.Add(1)
@@ -373,7 +372,7 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 		defer consumerWg.Done()
 		err := consumer.SubscribeWithOffsets(
 			consumerCtx,
-			func(ctx context.Context, message Message, logger *log.Logger) error {
+			func(ctx context.Context, message Message) error {
 				assert.Equal(t, string(value1), string(message.Value))
 				wg.Done()
 				return nil
@@ -382,7 +381,7 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 			t.Logf("SubscribeWithOffsets error: %v", err)
 		}
 	}()
-	
+
 	// now write 3 messages
 	err = producer.WriteMulti(ctx, value1, value1, value1)
 	if err != nil {
@@ -398,17 +397,17 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 		wg.Wait()
 		close(waitCh)
 	}()
-	
+
 	select {
 	case <-waitCh:
 		// Success! All messages processed
 	case <-time.After(timeout):
 		t.Log("Timeout waiting for messages")
 	}
-	
+
 	// Clean shutdown
 	cancel() // Signal to stop consumer
-	
+
 	// Wait for consumer goroutine to finish
 	consumerWg.Wait()
 }
@@ -482,7 +481,7 @@ func TestProducer(t *testing.T) {
 		t.Skipf("Failed to write multiple JSON messages: %v", err)
 		return
 	}
-	
+
 	for i := 0; i < 3; i++ {
 		msg, err := consumer.ReadMessage(consumerCtx)
 		if err != nil {

@@ -20,18 +20,18 @@ import "github.com/oddbit-project/blueprint/log"
 logger := log.New("mymodule")
 
 // Log messages at different levels
-logger.Info("Application started", map[string]interface{}{
+logger.Info("Application started", log.KV{
     "version": "1.0.0",
 })
 
-logger.Debug("Processing item", map[string]interface{}{
+logger.Debug("Processing item", log.KV{
     "item_id": 123,
 })
 
 // Log errors with stack traces
 err := someOperation()
 if err != nil {
-    logger.Error(err, "Failed to process item", map[string]interface{}{
+    logger.Error(err, "Failed to process item", log.KV{
         "item_id": 123,
     })
 }
@@ -82,7 +82,7 @@ func handler(c *gin.Context) {
     logger := httpserver.GetRequestLogger(c)
     
     // Or use helper functions
-    httpserver.RequestInfo(c, "Processing API request", map[string]interface{}{
+    httpserver.RequestInfo(c, "Processing API request", log.KV{
         "request_data": someData,
     })
     
@@ -96,6 +96,7 @@ func handler(c *gin.Context) {
 
 ## Kafka Message Logging
 
+Kafka consumer example:
 ```go
 import (
 	"context"
@@ -111,18 +112,19 @@ err := producer.WriteJson(ctx, data)
 
 // Consumer with logging
 consumer, _ := kafka.NewConsumer(cfg, nil)
-consumer.Subscribe(ctx, func(ctx context.Context, msg kafka.Message, l *log.Logger) error {
-    // Message is automatically logged by the updated consumer
+consumer.Subscribe(ctx, func(ctx context.Context, msg kafka.Message) error {
+    // use consumer logger
+	consumer.Logger.Info("processing message...")
+	
+	// log kafka message
+	kafka.LogMessageReceived(consumer.Logger, msg, consumer.GetConfig().Group)    
     
-    // Add your processing logic
+	// Add your processing logic
     // ...
     
     return nil
 })
 
-// Manual Kafka logging
-kafka.LogMessageReceived(consumer.Logger, msg, "mygroup")
-kafka.LogMessageSent(producer.Logger, msg)
 ```
 
 ## Configuration
@@ -147,13 +149,12 @@ if err != nil {
 
 ## Best Practices
 
-1. **Use context propagation**: Always pass the context with logger between functions and services
-2. **Include relevant fields**: Add meaningful fields to help with debugging and analysis
-3. **Be consistent with log levels**:
+1. **Include relevant fields**: Add meaningful fields to help with debugging and analysis
+2. **Be consistent with log levels**:
    - DEBUG: Detailed information for debugging
    - INFO: General operational information
    - WARN: Situations that might cause issues
    - ERROR: Errors that prevent normal operation
    - FATAL: Critical errors that require shutdown
-4. **Sanitize sensitive data**: Don't log passwords, tokens, or other sensitive information
-5. **Use structured logging**: Avoid string concatenation or formatting in log messages
+3. **Sanitize sensitive data**: Don't log passwords, tokens, or other sensitive information
+4. **Use structured logging**: Avoid string concatenation or formatting in log messages

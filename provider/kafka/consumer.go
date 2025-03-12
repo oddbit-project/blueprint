@@ -53,7 +53,7 @@ type ConsumerConfig struct {
 type Message = kafka.Message
 
 // ConsumerFunc Reader handler type
-type ConsumerFunc func(ctx context.Context, message Message, l *log.Logger) error
+type ConsumerFunc func(ctx context.Context, message Message) error
 
 type Consumer struct {
 	Brokers string
@@ -332,8 +332,8 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 		// Process message with handler
 		// Note: if logging of messages is required, it should be implemented inside the handler
-		if err := handler(ctx, msg, c.Logger); err != nil {
-			c.Logger.Error(err, "Handler error processing Kafka message", map[string]interface{}{
+		if err := handler(ctx, msg); err != nil {
+			c.Logger.Error(err, "Handler error processing Kafka message", log.KV{
 				"topic":     msg.Topic,
 				"partition": msg.Partition,
 				"offset":    msg.Offset,
@@ -393,7 +393,7 @@ func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFun
 			}
 			return err
 		}
-		if err := handler(ctx, msg, c.Logger); err != nil {
+		if err := handler(ctx, msg); err != nil {
 			return err
 		}
 	}

@@ -30,6 +30,9 @@ type Logger struct {
 	traceID    string
 }
 
+// KV is a helper to field map
+type KV map[string]interface{}
+
 // Config contains configuration for the logger
 type Config struct {
 	Level            string `json:"level"`
