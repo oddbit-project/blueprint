@@ -67,5 +67,33 @@ func main() {
 		}
 			
 	}
+	
+	// Count all users
+	count, err := repo.Count()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Total users: %d\n", count)
+	
+	// Count users with specific criteria
+	activeCount, err := repo.CountWhere(map[string]any{"active": true})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Active users: %d\n", activeCount)
 }
 ```
+
+## Counter Interface
+
+The Repository implements a Counter interface that provides methods for counting records:
+
+```go
+type Counter interface {
+	Count() (int64, error)
+	CountWhere(fieldValues map[string]any) (int64, error)
+}
+```
+
+- `Count()` - Returns the total number of rows in the table
+- `CountWhere(fieldValues map[string]any)` - Returns the number of rows matching the specified field values

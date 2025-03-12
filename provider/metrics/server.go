@@ -43,9 +43,13 @@ func NewConfig() *Config {
 		WriteTimeout: DefaultWriteTimeout,
 		Endpoint:     DefaultEndpoint,
 		ServerConfig: tlsProvider.ServerConfig{
-			TLSCert:            "",
-			TLSKey:             "",
-			TLSKeyPwd:          "",
+			TLSCert: "",
+			TLSKey:  "",
+			TlsKeyCredential: tlsProvider.TlsKeyCredential{
+				Password:       "",
+				PasswordEnvVar: "",
+				PasswordFile:   "",
+			},
 			TLSAllowedCACerts:  nil,
 			TLSCipherSuites:    nil,
 			TLSMinVersion:      "",

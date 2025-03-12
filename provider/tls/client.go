@@ -38,7 +38,7 @@ type ClientConfig struct {
 	TLSCA                 string `json:"tlsCa"`
 	TLSCert               string `json:"tlsCert"`
 	TLSKey                string `json:"tlsKey"`
-	TLSKeyPwd             string `json:"tlsKeyPassword"`
+	TlsKeyCredential             // tls key password
 	TLSEnable             bool   `json:"tlsEnable"`
 	TLSInsecureSkipVerify bool   `json:"tlsInsecureSkipVerify"`
 }
@@ -67,7 +67,7 @@ func (c *ClientConfig) TLSConfig() (*tls.Config, error) {
 	}
 
 	if c.TLSCert != "" && c.TLSKey != "" {
-		err = LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TLSKeyPwd)
+		err = LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TlsKeyCredential)
 		if err != nil {
 			return nil, err
 		}

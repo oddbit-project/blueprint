@@ -35,19 +35,21 @@ import (
 	"github.com/oddbit-project/blueprint/utils"
 	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/rs/zerolog/log"
+	"time"
 )
 
 const (
-	TLSMinVersionDefault = tls.VersionTLS12
+	TLSMinVersionDefault = tls.VersionTLS13 // Use TLS 1.3 by default for better security
 	ErrInvalidPeerCert   = utils.Error("invalid peer certificate")
 	ErrForbiddenDNS      = utils.Error("peer certificate not allowed in DNS name list")
+	ErrExpiredCert       = utils.Error("peer certificate has expired")
 )
 
 // ServerConfig represents the standard server TLS config.
 type ServerConfig struct {
 	TLSCert            string   `json:"tlsCert"`
 	TLSKey             string   `json:"tlsKey"`
-	TLSKeyPwd          string   `json:"tlsKeyPassword"`
+	TlsKeyCredential            // TLS key password
 	TLSAllowedCACerts  []string `json:"tlsAllowedCACerts"`
 	TLSCipherSuites    []string `json:"tlsCipherSuites"`
 	TLSMinVersion      string   `json:"tlsMinVersion"`
@@ -78,7 +80,7 @@ func (c *ServerConfig) TLSConfig() (*tls.Config, error) {
 	}
 
 	if c.TLSCert != "" && c.TLSKey != "" {
-		err := LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TLSKeyPwd)
+		err := LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TlsKeyCredential)
 		if err != nil {
 			return nil, err
 		}
@@ -138,11 +140,27 @@ func (c *ServerConfig) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Cert
 		return ErrInvalidPeerCert
 	}
 
-	for _, name := range cert.DNSNames {
-		if str.Contains(name, c.TLSAllowedDNSNames) > -1 {
-			return nil
-		}
+	// Check certificate expiration
+	now := time.Now()
+	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
+		log.Error().
+			Time("notBefore", cert.NotBefore).
+			Time("notAfter", cert.NotAfter).
+			Time("now", now).
+			Msg("peer certificate has expired or is not yet valid")
+		return ErrExpiredCert
 	}
-	log.Error().Msgf("peer certificate not in allowed DNS Name list: %v", cert.DNSNames)
-	return ErrForbiddenDNS
+
+	// Check DNS names
+	if len(c.TLSAllowedDNSNames) > 0 {
+		for _, name := range cert.DNSNames {
+			if str.Contains(name, c.TLSAllowedDNSNames) > -1 {
+				return nil
+			}
+		}
+		log.Error().Msgf("peer certificate not in allowed DNS Name list: %v", cert.DNSNames)
+		return ErrForbiddenDNS
+	}
+
+	return nil
 }

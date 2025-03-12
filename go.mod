@@ -6,11 +6,13 @@ toolchain go1.22.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.18.0
-	github.com/dn365/gin-zerolog v0.0.0-20171227063204-b43714b00db1
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/gin-gonic/gin v1.9.0
+	github.com/go-playground/validator/v10 v10.11.2
 	github.com/gobeam/stringy v0.0.6
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.3
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/prometheus/client_golang v1.19.0
@@ -19,6 +21,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.step.sm/crypto v0.43.1
 	golang.org/x/crypto v0.21.0
+	golang.org/x/time v0.5.0
 )
 
 require (
@@ -35,10 +38,8 @@ require (
 	github.com/go-faster/errors v0.6.1 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.11.2 // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect

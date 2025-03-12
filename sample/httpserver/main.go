@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
-	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
+
+	log.Configure(log.NewDefaultConfig())
 
 	srvConfig := httpserver.NewServerConfig()
 	srvConfig.Host = "localhost"
@@ -17,7 +21,8 @@ func main() {
 
 	server, err := httpserver.NewServer(srvConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(context.Background(), err, "could not start http server")
+		os.Exit(1)
 	}
 
 	server.Route().GET("/hello", func(c *gin.Context) {
