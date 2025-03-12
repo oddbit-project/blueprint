@@ -17,7 +17,7 @@ func TestNewClient(t *testing.T) {
 	}{
 		{
 			name:          "ValidClientConfig",
-			clientConfig:  &ClientConfig{DSN: "clickhouse://clickhouse:9000/default"},
+			clientConfig:  &ClientConfig{DSN: "clickhouse://default@clickhouse:9000/default"},
 			expectedError: nil,
 			expectClient:  true,
 		},
