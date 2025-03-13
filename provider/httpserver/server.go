@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/oddbit-project/blueprint/provider/httpserver/log"
+	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/log/writer"
+	httplog "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"net/http"
 	"time"
@@ -81,14 +83,16 @@ func (c *ServerConfig) Validate() error {
 }
 
 // NewRouter creates a new gin router with standardized logging
-func NewRouter(serverName string, debug bool) *gin.Engine {
+func NewRouter(serverName string, debug bool, logger *log.Logger) *gin.Engine {
 	if !debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.New()
 
-	// Use our structured logging middleware
-	router.Use(log.HTTPLogMiddleware(serverName))
+	if logger != nil {
+		// Use our structured logging middleware
+		router.Use(httplog.HTTPLogMiddleware(logger))
+	}
 
 	// Still include recovery middleware
 	router.Use(gin.Recovery())
@@ -96,11 +100,11 @@ func NewRouter(serverName string, debug bool) *gin.Engine {
 	return router
 }
 
-func (c *ServerConfig) NewServer() (*Server, error) {
+func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	return NewServer(c)
+	return NewServer(c, logger)
 }
 
 // NewServer creates a new http server.
@@ -113,7 +117,7 @@ func (c *ServerConfig) NewServer() (*Server, error) {
 //	  log.Fatal(err)
 //	}
 //	server.Start()
-func NewServer(cfg *ServerConfig) (*Server, error) {
+func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -121,11 +125,16 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		return nil, err
 	}
 
+	serverName := cfg.GetOption("serverName", ServerDefaultName)
+	if logger == nil {
+		logger = httplog.NewHTTPLogger(serverName)
+	}
+
 	tlsConfig, err := cfg.TLSConfig()
 	if err != nil {
 		return nil, err
 	}
-	router := NewRouter(cfg.GetOption("serverName", ServerDefaultName), cfg.Debug)
+	router := NewRouter(serverName, cfg.Debug, logger)
 	result := &Server{
 		Config: cfg,
 		Router: router,
@@ -135,6 +144,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 			ReadTimeout:  time.Duration(cfg.ReadTimeout) * time.Second,
 			WriteTimeout: time.Duration(cfg.WriteTimeout) * time.Second,
 			TLSConfig:    tlsConfig,
+			ErrorLog:     writer.NewErrorLog(logger), // error log wrapper
 		},
 	}
 	return result, nil

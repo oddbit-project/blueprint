@@ -37,7 +37,7 @@ import (
 	"github.com/oddbit-project/blueprint/config/provider"
 	"github.com/oddbit-project/blueprint/log/zerolog/writer"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
-	"github.com/rs/zerolog/log"
+    "github.com/oddbit-project/blueprint/log"
 	"os"
 )
 
@@ -82,7 +82,7 @@ func (a *Application) Build() {
 	// if some error occurs, generate fatal error & abort execution
 
 	// initalize http server
-	log.Info().Msg("Building Sample Application...")
+	log.Info("Building Sample Application...")
 
 	// initialize http server config
 	httpConfig := httpserver.NewServerConfig()

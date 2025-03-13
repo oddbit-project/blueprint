@@ -49,7 +49,7 @@ func NewDefaultConfig() *Config {
 		Level:            "info",
 		Format:           "console",
 		IncludeTimestamp: true,
-		IncludeCaller:    true,
+		IncludeCaller:    false,
 		IncludeHostname:  true,
 		CallerSkipFrames: LogCallerSkipFrames,
 	}

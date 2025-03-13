@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/log"
@@ -11,17 +10,18 @@ import (
 )
 
 func main() {
-
+	// config logger
 	log.Configure(log.NewDefaultConfig())
+	logger := log.New("http-server")
 
 	srvConfig := httpserver.NewServerConfig()
 	srvConfig.Host = "localhost"
 	srvConfig.Port = 8089
 	srvConfig.Debug = true
 
-	server, err := httpserver.NewServer(srvConfig)
+	server, err := httpserver.NewServer(srvConfig, logger)
 	if err != nil {
-		log.Fatal(context.Background(), err, "could not start http server")
+		logger.Fatal(err, "could not start http server")
 		os.Exit(1)
 	}
 

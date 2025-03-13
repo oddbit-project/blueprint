@@ -13,8 +13,12 @@ const (
 	HeaderTraceID   = "X-Trace-ID"
 )
 
+func NewHTTPLogger(moduleName string) *log.Logger {
+	return log.New(moduleName)
+}
+
 // HTTPLogMiddleware is a middleware for logging HTTP requests
-func HTTPLogMiddleware(moduleName string) gin.HandlerFunc {
+func HTTPLogMiddleware(logger *log.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get or generate request ID
 		requestID := c.GetHeader(HeaderRequestID)
@@ -30,8 +34,12 @@ func HTTPLogMiddleware(moduleName string) gin.HandlerFunc {
 			c.Header(HeaderTraceID, traceID)
 		}
 
-		// Create logger with request context
-		logger := log.New(moduleName).WithTraceID(traceID).
+		// only create logger if not available
+		if logger == nil {
+			logger = NewHTTPLogger("server")
+		}
+
+		logger.WithTraceID(traceID).
 			WithField("request_id", requestID).
 			WithField("method", c.Request.Method).
 			WithField("path", c.Request.URL.Path).
