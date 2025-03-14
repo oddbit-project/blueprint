@@ -25,6 +25,8 @@ const (
 	LogCallerSkipFrames = 2
 
 	DefaultLogFile = "application.log"
+	LogFmtPretty   = "pretty"
+	LogFmtJson     = "json"
 )
 
 // Logger wraps zerolog.Logger to provide consistent logging patterns
@@ -46,15 +48,18 @@ type Config struct {
 	IncludeCaller    bool   `json:"includeCaller"`
 	IncludeHostname  bool   `json:"includeHostname"`
 	CallerSkipFrames int    `json:"callerSkipFrames"`
-	TimeFormat       string `json:"timeFormat"`   // Time format string
-	NoColor          bool   `json:"noColor"`      // if true, disable color
-	OutputToFile     bool   `json:"outputToFile"` // Enable file output
-	FilePath         string `json:"filePath"`     // Path to log file
-	FileRotation     bool   `json:"fileRotation"` // Enable log rotation
-	MaxSizeMb        int    `json:"maxSizeMb"`    // Max size in MB before rotation
-	MaxBackups       int    `json:"maxBackups"`   // Max number of rotated files to keep
-	MaxAgeDays       int    `json:"maxAgeDays"`   // Max age in days to keep rotated files
-	Compress         bool   `json:"compress"`     // Compress rotated files
+	TimeFormat       string `json:"timeFormat"`      // Time format string
+	NoColor          bool   `json:"noColor"`         // if true, disable color
+	OutputToFile     bool   `json:"outputToFile"`    // Enable file output
+	FilePath         string `json:"filePath"`        // Path to log file
+	FileAppend       bool   `json:"fileAppend"`      // Append to existing file
+	FilePermissions  int    `json:"filePermissions"` // File permissions (e.g., 0644)
+	FileFormat       string `json:"fileFormat"`      // file format, "pretty" or json
+	FileRotation     bool   `json:"fileRotation"`    // Enable log rotation
+	MaxSizeMb        int    `json:"maxSizeMb"`       // Max size in MB before rotation
+	MaxBackups       int    `json:"maxBackups"`      // Max number of rotated files to keep
+	MaxAgeDays       int    `json:"maxAgeDays"`      // Max age in days to keep rotated files
+	Compress         bool   `json:"compress"`        // Compress rotated files
 }
 
 // track open log files
@@ -65,7 +70,7 @@ var ljack *lumberjack.Logger
 func NewDefaultConfig() *Config {
 	return &Config{
 		Level:            "info",
-		Format:           "pretty",
+		Format:           LogFmtPretty,
 		IncludeTimestamp: true,
 		IncludeCaller:    false,
 		IncludeHostname:  true,
@@ -73,8 +78,11 @@ func NewDefaultConfig() *Config {
 		TimeFormat:       LogTimestampFormat,
 		NoColor:          false,
 		OutputToFile:     false,
+		FileAppend:       true,
+		FilePermissions:  0644,
 		FilePath:         DefaultLogFile,
-		FileRotation:     true,
+		FileRotation:     false,
+		FileFormat:       LogFmtJson,
 		MaxSizeMb:        100, // 100 MB
 		MaxBackups:       5,   // 5 backup files
 		MaxAgeDays:       30,  // 30 days
@@ -82,8 +90,27 @@ func NewDefaultConfig() *Config {
 	}
 }
 
+// EnableFileOutput enables file logging with the given file path
+func EnableFileOutput(cfg *Config, filePath string) *Config {
+	cfg.OutputToFile = true
+	cfg.FilePath = filePath
+	return cfg
+}
+
+// SetFileFormat sets the output format for file logging
+func SetFileFormat(cfg *Config, format string) *Config {
+	cfg.FileFormat = format
+	return cfg
+}
+
+// DisableFileAppend disables appending to existing log files (will overwrite)
+func DisableFileAppend(cfg *Config) *Config {
+	cfg.FileAppend = false
+	return cfg
+}
+
 // buildLogWriter configures the logger output based on config
-func buildLogWriter(cfg *Config) io.Writer {
+func buildLogWriter(cfg *Config) (io.Writer, error) {
 	var consoleWriter io.Writer
 
 	// Set up console writer
@@ -100,7 +127,7 @@ func buildLogWriter(cfg *Config) io.Writer {
 
 	// If file output is not enabled, just return console writer
 	if !cfg.OutputToFile {
-		return consoleWriter
+		return consoleWriter, nil
 	}
 
 	// Set up file writer with rotation if enabled
@@ -116,20 +143,32 @@ func buildLogWriter(cfg *Config) io.Writer {
 		fileWriter = ljack
 	} else {
 		// Simple file without rotation
-		file, err := os.OpenFile(cfg.FilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			// Fall back to console if file can't be opened
-			log.Err(err).Msg("Failed to open log file, falling back to console only")
-			return consoleWriter
+		fileFlags := os.O_CREATE | os.O_WRONLY
+		if cfg.FileAppend {
+			fileFlags |= os.O_APPEND
+		} else {
+			fileFlags |= os.O_TRUNC
 		}
-		fileWriter = file
+		file, err := os.OpenFile(cfg.FilePath, fileFlags, os.FileMode(cfg.FilePermissions))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open log file %s: %w", cfg.FilePath, err)
+		}
+
+		if cfg.FileFormat == LogFmtPretty {
+			fileWriter = zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
+				w.TimeFormat = cfg.TimeFormat
+				w.Out = file
+			})
+		} else {
+			fileWriter = file
+		}
 
 		// Track the file for closing on shutdown
 		openLogFiles = append(openLogFiles, file)
 	}
 
 	// Combine console and file writers
-	return zerolog.MultiLevelWriter(consoleWriter, fileWriter)
+	return zerolog.MultiLevelWriter(consoleWriter, fileWriter), nil
 }
 
 // Validate validate log configuration
@@ -140,7 +179,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid log level: %s", c.Level)
 	}
 
-	validFormats := []string{"pretty", "json"}
+	validFormats := []string{LogFmtPretty, LogFmtJson}
 	if !slices.Contains(validFormats, c.Format) {
 		return fmt.Errorf("invalid log format: %s", c.Format)
 	}
@@ -152,6 +191,13 @@ func (c *Config) Validate() error {
 	if len(c.TimeFormat) == 0 {
 		return fmt.Errorf("missing time format string")
 	}
+
+	if c.OutputToFile {
+		if !slices.Contains(validFormats, c.FileFormat) {
+			return fmt.Errorf("invalid file log format: %s", c.FileFormat)
+		}
+	}
+
 	return nil
 }
 
@@ -168,7 +214,10 @@ func Configure(cfg *Config) error {
 	zerolog.TimeFieldFormat = cfg.TimeFormat
 
 	// build output writer
-	output := buildLogWriter(cfg)
+	var output io.Writer
+	if output, err = buildLogWriter(cfg); err != nil {
+		return err
+	}
 
 	// Configure base logger
 	baseLogger := zerolog.New(output).Level(level)
@@ -296,7 +345,7 @@ func (l *Logger) Debug(msg string, fields ...map[string]interface{}) {
 }
 
 // Debugf logs a debug message with the given fields
-func (l *Logger) Debugf(msg string, fields ...interface{}) {
+func (l *Logger) Debugf(msg string, fields ...any) {
 	event := l.logger.Debug()
 	if len(fields) > 0 {
 		msg = fmt.Sprintf(msg, fields...)
@@ -316,7 +365,7 @@ func (l *Logger) Info(msg string, fields ...map[string]interface{}) {
 }
 
 // Infof logs an info message with the given fields
-func (l *Logger) Infof(msg string, fields ...interface{}) {
+func (l *Logger) Infof(msg string, fields ...any) {
 	event := l.logger.Info()
 	if len(fields) > 0 {
 		msg = fmt.Sprintf(msg, fields...)
@@ -336,7 +385,7 @@ func (l *Logger) Warn(msg string, fields ...map[string]interface{}) {
 }
 
 // Warnf logs a warning message with the given fields
-func (l *Logger) Warnf(msg string, fields ...interface{}) {
+func (l *Logger) Warnf(msg string, fields ...any) {
 	event := l.logger.Warn()
 	if len(fields) > 0 {
 		msg = fmt.Sprintf(msg, fields...)
@@ -372,7 +421,7 @@ func (l *Logger) Error(err error, msg string, fields ...map[string]interface{}) 
 
 // Errorf logs an error message with the given fields
 // It automatically adds stack information
-func (l *Logger) Errorf(err error, msg string, fields ...interface{}) {
+func (l *Logger) Errorf(err error, msg string, fields ...any) {
 	event := l.logger.Error()
 
 	// Add error information
@@ -420,7 +469,7 @@ func (l *Logger) Fatal(err error, msg string, fields ...map[string]interface{}) 
 }
 
 // Fatalf logs a fatal message with the given fields and exits the application
-func (l *Logger) Fatalf(err error, msg string, fields ...interface{}) {
+func (l *Logger) Fatalf(err error, msg string, fields ...any) {
 	event := l.logger.Fatal()
 
 	// Add error information

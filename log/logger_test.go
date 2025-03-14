@@ -14,7 +14,9 @@ import (
 func setupTestLogger(t *testing.T) (*Logger, *bytes.Buffer) {
 	buf := &bytes.Buffer{}
 	zerolog.TimeFieldFormat = ""
-	zl := zerolog.New(buf)
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zl := zerolog.New(buf).Level(zerolog.DebugLevel)
+
 	logger := &Logger{
 		logger:     zl,
 		moduleInfo: "test",
@@ -86,7 +88,7 @@ func TestLogger_Debug(t *testing.T) {
 	logger, buf := setupTestLogger(t)
 
 	logger.Debug("debug message")
-
+	
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "debug message", logMap["message"])
 	assert.Equal(t, "debug", logMap["level"])
