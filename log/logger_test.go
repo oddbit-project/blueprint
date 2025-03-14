@@ -164,9 +164,12 @@ func TestNewDefaultConfig(t *testing.T) {
 	cfg := NewDefaultConfig()
 
 	assert.Equal(t, "info", cfg.Level)
-	assert.Equal(t, "console", cfg.Format)
+	assert.Equal(t, "pretty", cfg.Format)
 	assert.True(t, cfg.IncludeTimestamp)
-	assert.True(t, cfg.IncludeCaller)
+	assert.False(t, cfg.IncludeCaller)
 	assert.True(t, cfg.IncludeHostname)
 	assert.Equal(t, LogCallerSkipFrames, cfg.CallerSkipFrames)
+	assert.Equal(t, LogTimestampFormat, cfg.TimeFormat)
+	assert.False(t, cfg.OutputToFile)
+	assert.False(t, cfg.NoColor)
 }

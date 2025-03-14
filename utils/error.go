@@ -11,3 +11,9 @@ func NotNil(v any, e Error) {
 		panic(e)
 	}
 }
+
+func PanicOnError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}

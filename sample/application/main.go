@@ -8,6 +8,7 @@ import (
 	"github.com/oddbit-project/blueprint/config/provider"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
+	"github.com/oddbit-project/blueprint/utils"
 	"os"
 )
 
@@ -98,7 +99,8 @@ func (a *Application) Run() {
 
 func main() {
 	// config logger
-	log.Configure(log.NewDefaultConfig())
+	utils.PanicOnError(log.Configure(log.NewDefaultConfig()))
+	
 	logger := log.New("sample-application")
 
 	flag.Parse()

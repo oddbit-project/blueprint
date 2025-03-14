@@ -43,7 +43,8 @@ func TestHTTPLogMiddleware(t *testing.T) {
 	// Set up a test router with the middleware
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(HTTPLogMiddleware("test-api"))
+	logger := log.New("test-http")
+	router.Use(HTTPLogMiddleware(logger))
 
 	// Add a test handler
 	router.GET("/test", func(c *gin.Context) {
