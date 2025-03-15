@@ -5,7 +5,15 @@
 ![go-reportcard](https://goreportcard.com/badge/github.com/oddbit-project/blueprint)
 
 
-Misc Golang routines
+Go application framework for building web applications and microservices with built-in support for:
+
+- Container-based application lifecycle management
+- Configuration management
+- Structured logging with file rotation
+- HTTP server with security features (TLS, CSRF protection, security headers, session management)
+- Database connectivity (PostgreSQL, ClickHouse)
+- Message queue integration (Kafka, MQTT)
+- Metrics endpoint for Prometheus monitoring
 
 
 ## Application example
