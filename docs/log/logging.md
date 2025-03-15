@@ -135,7 +135,7 @@ import "github.com/oddbit-project/blueprint/log"
 // Create a configuration
 cfg := log.NewDefaultConfig()
 cfg.Level = "debug"           // log level: debug, info, warn, error
-cfg.Format = "console"        // output format: console or json
+cfg.Format = "pretty"        // output format: pretty or json
 cfg.IncludeTimestamp = true   // include timestamp in logs
 cfg.IncludeCaller = true      // include caller information
 cfg.IncludeHostname = true    // include hostname

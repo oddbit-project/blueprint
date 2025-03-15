@@ -57,25 +57,6 @@ func processItem(ctx context.Context, item Item) {
 }
 ```
 
-## HTTP Integration
-
-```go
-// Add logging middleware to Gin router
-router.Use(log.HTTPLogMiddleware("api"))
-
-// Log in HTTP handlers
-func handler(c *gin.Context) {
-    log.RequestInfo(c, "Processing API request")
-    
-    // Log errors
-    if err := operation(); err != nil {
-        log.RequestError(c, err, "Failed to process request")
-        c.AbortWithStatus(500)
-        return
-    }
-}
-```
-
 ## Configuration
 
 Configure the logging system using:

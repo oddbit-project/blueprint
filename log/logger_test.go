@@ -88,7 +88,7 @@ func TestLogger_Debug(t *testing.T) {
 	logger, buf := setupTestLogger(t)
 
 	logger.Debug("debug message")
-	
+
 	logMap := parseLogOutput(t, buf)
 	assert.Equal(t, "debug message", logMap["message"])
 	assert.Equal(t, "debug", logMap["level"])
