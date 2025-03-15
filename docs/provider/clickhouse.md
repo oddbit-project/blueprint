@@ -1,6 +1,10 @@
 # blueprint.provider.clickhouse
 
-Blueprint ClickHouse client
+Blueprint ClickHouse client and configuration management
+
+## Configuration Management
+
+Blueprint includes a comprehensive configuration management library for ClickHouse. See the [Configuration Management](clickhouse/config.md) documentation for details.
 
 ## Using the client
 
@@ -42,3 +46,10 @@ func main() {
     // do stuff
 }
 ```
+
+## Examples
+
+For working examples, see:
+
+- [ClickHouse Client Example](../../sample/clickhouse/main.go)
+- [ClickHouse Configuration Management Example](../../sample/clickhouse_config/main.go)
