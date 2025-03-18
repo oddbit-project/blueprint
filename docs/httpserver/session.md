@@ -1,11 +1,13 @@
 # Session Management
 
-Blueprint provides built-in session management for HTTP applications. The session management system is designed to be flexible and secure, with support for multiple storage backends:
+Blueprint provides built-in session management for HTTP applications. The session management system is designed to be 
+flexible and secure, with support for multiple storage backends:
 
 1. **Cookie-based Sessions**: Using in-memory or Redis storage
 2. **JWT-based Sessions**: Using stateless JSON Web Tokens
 
-> **Note**: The cookie-based session management integrates well with Blueprint's built-in CSRF protection. For enhanced security when using cookies, it's recommended to use both features together.
+> **Note**: The cookie-based session management integrates well with Blueprint's built-in CSRF protection.
+> For enhanced security when using cookies, it's recommended to use both features together.
 
 ## Features
 
@@ -34,12 +36,17 @@ Blueprint provides several session management options, all with a consistent API
 For simple applications or development environments:
 
 ```go
+// configure logger
+logger := log.New("session-sample")
+
 // Configure session
-sessionConfig := session.DefaultSessionConfig()
-sessionConfig.Logger = logger
+sessionConfig := session.NewConfig()
+
+// session backend
+backend := kv.NewMemoryKV()
 
 // Use session middleware with memory store
-sessionManager := server.UseSessionWithMemoryStore(sessionConfig)
+sessionManager := server.UseSession(sessionConfig, backend, logger)
 ```
 
 ### Option 2: Redis-based Cookie Sessions
@@ -47,16 +54,22 @@ sessionManager := server.UseSessionWithMemoryStore(sessionConfig)
 For distributed applications with multiple server instances:
 
 ```go
+// configure logger
+logger := log.New("session-sample")
+
 // Configure session
-sessionConfig := session.DefaultSessionConfig()
-sessionConfig.Logger = logger
+sessionConfig := session.NewConfig()
 
 // Configure Redis
-redisConfig := session.DefaultRedisConfig()
+redisConfig := redis.NewConfig()
 redisConfig.Address = "localhost:6379"
 
+// redis client
+backend, err := redis.NewClient(redisConfig)
+utils.PanicOnError(err)
+
 // Use session middleware with Redis store
-sessionManager, err := server.UseSessionWithRedisStore(sessionConfig, redisConfig)
+sessionManager, err := server.UseSession(sessionConfig, backend, logger)
 if err != nil {
     logger.Fatal(err, "could not connect to Redis")
     os.Exit(1)
@@ -68,17 +81,15 @@ if err != nil {
 For stateless, API-focused applications:
 
 ```go
-// Configure session
-sessionConfig := session.DefaultSessionConfig()
-sessionConfig.Logger = logger
+// configure logger
+logger := log.New("session-sample")
 
 // Configure JWT
-jwtConfig := session.DefaultJWTConfig()
+jwtConfig := session.NewJWTConfig()
 jwtConfig.SigningKey = []byte("your-secure-signing-key")
-jwtConfig.Logger = logger
 
 // Use session middleware with JWT
-jwtManager, err := server.UseSessionWithJWT(sessionConfig, jwtConfig)
+jwtManager, err := server.UseJWTSession(jwtConfig, logger)
 if err != nil {
     logger.Fatal(err, "could not create JWT session manager")
     os.Exit(1)
@@ -87,62 +98,38 @@ if err != nil {
 
 ## Session Configuration
 
-The `SessionConfig` struct contains all the configuration options for sessions:
+The `Config` struct contains all the configuration options for sessions. The struct can be used internally or updated from
+a config provider, such as a JSON file:
 
 ```go
-type SessionConfig struct {
-    // CookieName is the name of the cookie used to store the session ID
-    CookieName string
-
-    // Expiration is the maximum lifetime of a session
-    Expiration time.Duration
-
-    // IdleTimeout is the maximum time a session can be inactive
-    IdleTimeout time.Duration
-
-    // MaxSessions is the maximum number of sessions to store in memory
-    MaxSessions int
-
-    // Secure sets the Secure flag on cookies (should be true in production)
-    Secure bool
-
-    // HttpOnly sets the HttpOnly flag on cookies (should be true)
-    HttpOnly bool
-
-    // SameSite sets the SameSite policy for cookies
-    SameSite http.SameSite
-
-    // Domain sets the domain for the cookie
-    Domain string
-
-    // Path sets the path for the cookie
-    Path string
-
-    // CleanupInterval sets how often the session cleanup runs
-    CleanupInterval time.Duration
-
-    // Logger for the session store
-    Logger *log.Logger
+type Config struct {
+  CookieName             string `json:"cookieName"`             // CookieName is the name of the cookie used to store the session ID
+  ExpirationSeconds      int    `json:"expirationSeconds"`      // Expiration is the maximum lifetime of a session
+  IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // IdleTimeoutSeconds is the maximum time a session can be inactive
+  Secure                 bool   `json:"secure"`                 // Secure sets the Secure flag on cookies (should be true in production)
+  HttpOnly               bool   `json:"httpOnly"`               // HttpOnly sets the HttpOnly flag on cookies (should be true)
+  SameSite               int    `json:"sameSite"`               // SameSite sets the SameSite policy for cookies
+  Domain                 string `json:"domain"`                 // Domain sets the domain for the cookie
+  Path                   string `json:"path"`                   // Path sets the path for the cookie
+  CleanupIntervalSeconds int    `json:"cleanupIntervalSeconds"` // CleanupIntervalSeconds sets how often the session cleanup runs
 }
 ```
 
-Default sensible options are provided by `DefaultSessionConfig()`:
+Default sensible options are provided by `NewConfig()`:
 
 ```go
-func DefaultSessionConfig() *SessionConfig {
-    return &SessionConfig{
-        CookieName:      "blueprint_session",
-        Expiration:      30 * time.Minute,
-        IdleTimeout:     15 * time.Minute,
-        MaxSessions:     10000,
-        Secure:          true,
-        HttpOnly:        true,
-        SameSite:        http.SameSiteStrictMode,
-        Path:            "/",
-        Domain:          "",
-        CleanupInterval: 5 * time.Minute,
-        Logger:          nil,
-    }
+func NewConfig() *Config {
+    return &Config{
+    CookieName:             DefaultSessionCookieName,
+    ExpirationSeconds:      DefaultSessionExpiration,
+    IdleTimeoutSeconds:     DefaultSessionIdleTimeout,
+    Secure:                 DefaultSecure,
+    HttpOnly:               DefaultHttpOnly,
+    SameSite:               DefaultSameSite,
+    Path:                   "/",
+    Domain:                 "",
+    CleanupIntervalSeconds: DefaultCleanupInterval,
+  }
 }
 ```
 
@@ -151,7 +138,7 @@ func DefaultSessionConfig() *SessionConfig {
 ### Reading and Writing Session Data
 
 ```go
-// Get the session
+// Get the session from the gin context
 session := session.Get(c)
 
 // Store a value
@@ -224,29 +211,6 @@ To completely clear a session (e.g., at logout):
 sessionManager.Clear(c)
 ```
 
-## Session Stores
-
-Blueprint provides two session store implementations:
-
-### MemoryStore
-
-The `MemoryStore` keeps sessions in memory. It's easy to set up but not suitable for distributed applications.
-
-```go
-store := session.NewMemoryStore(config)
-```
-
-### RedisStore
-
-The `RedisStore` stores sessions in Redis, making it suitable for distributed applications.
-
-```go
-store, err := session.NewRedisStore(sessionConfig, redisConfig)
-if err != nil {
-    // Handle error
-}
-```
-
 ## Full Examples
 
 - **Cookie-based Sessions**: See `/sample/session/main.go` for a complete example of cookie-based session usage
@@ -254,42 +218,41 @@ if err != nil {
 
 ## JWT Configuration
 
-When using JWT-based sessions, you can configure the token behavior using the `JWTConfig`:
+When using JWT-based sessions, you can configure the token behavior using the `JWTConfig`; the struct can be updated from
+a config provider. The SigningMethod and Expiration fields are updated on `Validate()`, from the respective configuration
+values:
 
 ```go
 type JWTConfig struct {
-    // SigningKey is the key used to sign JWT tokens
-    SigningKey []byte
-
-    // SigningMethod is the method used to sign the token
-    SigningMethod jwt.SigningMethod
-
-    // Expiration is the expiration time for tokens
-    Expiration time.Duration
-
-    // Issuer is the issuer of the token
-    Issuer string
-
-    // Audience is the audience of the token
-    Audience string
-
-    // Logger for operations
-    Logger *log.Logger
+  SigningKey        []byte            `json:"signingKey"`        // SigningKey is the key used to sign JWT tokens; if json, base64-encoded key
+  SigningAlgorithm  string            `json:"signingAlgorithm"`  // SigningAlgorithm, one of HS256, HS384, HS512
+  ExpirationSeconds int               `json:"expirationSeconds"` // ExpirationSeconds
+  Issuer            string            `json:"issuer"`            // Issuer is the issuer of the token
+  Audience          string            `json:"audience"`          // Audience is the audience of the token
+  SigningMethod     jwt.SigningMethod `json:"-"`                 // SigningMethod is the method used to sign the token; filled on Validate()
+  Expiration        time.Duration     `json:"-"`                 // Expiration is the expiration time for tokens; filled on Validate()
 }
 ```
 
-Default values are provided by `DefaultJWTConfig()`:
+Default values are provided by `NewJWTConfig()`:
 
 ```go
-func DefaultJWTConfig() *JWTConfig {
-    return &JWTConfig{
-        SigningKey:    nil, // Must be set by the user
-        SigningMethod: jwt.SigningMethodHS256,
-        Expiration:    time.Hour * 24, // 24 hours
-        Issuer:        "blueprint",
-        Audience:      "api",
-        Logger:        nil,
-    }
+func NewJWTConfig() *JWTConfig {
+  // random signing key, should be overriden by user
+  buf := make([]byte, 128)
+  _, err := rand.Read(buf)
+  if err != nil {
+      panic(err)
+  }
+  return &JWTConfig{
+    SigningKey:        buf, // Must be set by the user
+    SigningAlgorithm:  "HS256",
+    SigningMethod:     jwt.SigningMethodHS256,
+    ExpirationSeconds: 86400,
+    Expiration:        time.Second * 86400, // 24 hours
+    Issuer:            "blueprint",
+    Audience:          "api",
+  }
 }
 ```
 
@@ -321,8 +284,10 @@ Blueprint's session management works well with the built-in CSRF protection. Her
 
 ```go
 // 1. Set up session management
-sessionConfig := session.DefaultSessionConfig()
-sessionManager := server.UseSessionWithMemoryStore(sessionConfig)
+logger := log.New("sample-logger")
+backend := kv.NewMemoryKV()
+sessionConfig := session.NewConfig()
+sessionManager := server.UseSession(sessionConfig, backend, logger)
 
 // 2. Enable CSRF protection
 server.UseCSRFProtection()

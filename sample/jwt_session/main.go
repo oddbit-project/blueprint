@@ -28,17 +28,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Configure JWT session
-	sessionConfig := session.DefaultSessionConfig()
-	sessionConfig.Logger = logger
-	
 	// JWT configuration
-	jwtConfig := session.DefaultJWTConfig()
+	jwtConfig := session.NewJWTConfig()
 	jwtConfig.SigningKey = []byte("your-secret-key-should-be-at-least-32-bytes")
-	jwtConfig.Logger = logger
-	
+
 	// Use JWT session middleware
-	sessionManager, err := server.UseSessionWithJWT(sessionConfig, jwtConfig)
+	sessionManager, err := server.UseJWTSession(jwtConfig, logger)
 	if err != nil {
 		logger.Fatal(err, "could not create JWT session manager")
 		os.Exit(1)
@@ -52,14 +47,14 @@ func main() {
 			Username string `json:"username" binding:"required"`
 			Password string `json:"password" binding:"required"`
 		}
-		
+
 		if err := c.ShouldBindJSON(&credentials); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Invalid request",
 			})
 			return
 		}
-		
+
 		// Check credentials (dummy validation for demo)
 		if credentials.Username != "user" || credentials.Password != "password" {
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -67,18 +62,18 @@ func main() {
 			})
 			return
 		}
-		
+
 		// Get the session
 		sess := session.Get(c)
-		
+
 		// Store user data in session
 		session.Set(c, "user_id", 123)
 		session.Set(c, "username", credentials.Username)
 		session.Set(c, "authenticated", true)
-		
+
 		// Session set in middleware will automatically add the JWT token to
 		// the Authorization header in the response
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"success":  true,
 			"message":  "Authentication successful",
@@ -86,15 +81,15 @@ func main() {
 			"username": credentials.Username,
 			// Note: In a real application, you'd get the token from the header
 			// For convenience in this demo, we'll include it in the response
-			"token":    sess.Values["_jwt_token"],
+			"token": sess.Values["_jwt_token"],
 		})
 	})
-	
+
 	// Protected endpoint - requires authentication
 	server.Route().GET("/profile", func(c *gin.Context) {
 		// Get the session
 		sess := session.Get(c)
-		
+
 		// Check if user is authenticated
 		authenticated, ok := session.GetBool(c, "authenticated")
 		if !ok || !authenticated {
@@ -103,11 +98,11 @@ func main() {
 			})
 			return
 		}
-		
+
 		// Get user data
 		userID, _ := session.GetInt(c, "user_id")
 		username, _ := session.GetString(c, "username")
-		
+
 		// Return user profile
 		c.JSON(http.StatusOK, gin.H{
 			"user_id":  userID,
@@ -115,7 +110,7 @@ func main() {
 			"visits":   sess.Values["visits"],
 		})
 	})
-	
+
 	// Endpoint to demonstrate session data persistence
 	server.Route().GET("/visit", func(c *gin.Context) {
 		// Check if user is authenticated
@@ -126,40 +121,40 @@ func main() {
 			})
 			return
 		}
-		
+
 		// Update visit count
 		visits := 1
 		if v, ok := session.GetInt(c, "visits"); ok {
 			visits = v + 1
 		}
 		session.Set(c, "visits", visits)
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": fmt.Sprintf("Visit count: %d", visits),
 			"visits":  visits,
 		})
 	})
-	
+
 	// Endpoint to refresh the token
 	server.Route().POST("/refresh", func(c *gin.Context) {
 		// This will force a token refresh
 		sessionManager.Regenerate(c)
-		
+
 		// Get the refreshed session
 		sess := session.Get(c)
-		
+
 		// Return token
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Token refreshed",
 			"token":   sess.Values["_jwt_token"],
 		})
 	})
-	
+
 	// Logout endpoint
 	server.Route().POST("/logout", func(c *gin.Context) {
 		// Clear the session
 		sessionManager.Clear(c)
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Logged out successfully",
 		})

@@ -120,7 +120,7 @@ func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error) {
 //	server.Start()
 func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 	if cfg == nil {
-		return nil, ErrNilConfig
+		cfg = NewServerConfig()
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err

@@ -1,9 +1,11 @@
 package httpserver
 
 import (
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	"github.com/oddbit-project/blueprint/provider/httpserver/security"
 	"github.com/oddbit-project/blueprint/provider/httpserver/session"
+	"github.com/oddbit-project/blueprint/provider/kv"
 	"golang.org/x/time/rate"
 )
 
@@ -40,92 +42,38 @@ func (s *Server) UseRateLimiting(ratePerMinute int) {
 }
 
 // UseSessionWithMemoryStore adds session middleware with in-memory storage
-func (s *Server) UseSessionWithMemoryStore(config *session.SessionConfig) *session.Manager {
+func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.Logger) *session.SessionManager {
 	if config == nil {
-		config = session.DefaultSessionConfig()
+		config = session.NewConfig()
 	}
-	
-	// Set logger if not provided
-	if config.Logger == nil && s.Logger != nil {
-		config.Logger = s.Logger
-	}
-	
 	// Create store
-	store := session.NewMemoryStore(config)
-	
+	store := session.NewStore(config, backend, logger)
+
 	// Create manager
-	manager := session.NewManager(store, config)
-	
+	manager := session.NewManager(store, config, logger)
+
 	// Add middleware
 	s.AddMiddleware(manager.Middleware())
-	
+
 	return manager
 }
 
-// UseSessionWithRedisStore adds session middleware with Redis storage
-func (s *Server) UseSessionWithRedisStore(sessionConfig *session.SessionConfig, redisConfig *session.RedisConfig) (*session.Manager, error) {
-	if sessionConfig == nil {
-		sessionConfig = session.DefaultSessionConfig()
-	}
-	
-	if redisConfig == nil {
-		redisConfig = session.DefaultRedisConfig()
-	}
-	
-	// Set logger if not provided
-	if sessionConfig.Logger == nil && s.Logger != nil {
-		sessionConfig.Logger = s.Logger
-	}
-	
-	if redisConfig.Logger == nil && s.Logger != nil {
-		redisConfig.Logger = s.Logger
-	}
-	
-	// Create store
-	store, err := session.NewRedisStore(sessionConfig, redisConfig)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Create manager
-	manager := session.NewManager(store, sessionConfig)
-	
-	// Add middleware
-	s.AddMiddleware(manager.Middleware())
-	
-	return manager, nil
-}
-
-// UseSessionWithJWT adds session middleware with JWT token support
-func (s *Server) UseSessionWithJWT(sessionConfig *session.SessionConfig, jwtConfig *session.JWTConfig) (*session.JWTSessionManager, error) {
-	if sessionConfig == nil {
-		sessionConfig = session.DefaultSessionConfig()
-	}
-	
+// UseJWTSession adds session middleware with JWT token support
+func (s *Server) UseJWTSession(jwtConfig *session.JWTConfig, logger *log.Logger) (*session.JWTSessionManager, error) {
 	if jwtConfig == nil {
-		jwtConfig = session.DefaultJWTConfig()
+		jwtConfig = session.NewJWTConfig()
 	}
-	
-	// Set logger if not provided
-	if sessionConfig.Logger == nil && s.Logger != nil {
-		sessionConfig.Logger = s.Logger
-	}
-	
-	if jwtConfig.Logger == nil && s.Logger != nil {
-		jwtConfig.Logger = s.Logger
-	}
-	
 	// Create JWT manager
-	jwtManager, err := session.NewJWTManager(jwtConfig)
+	jwtManager, err := session.NewJWTManager(jwtConfig, logger)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create session manager
-	manager := session.NewJWTSessionManager(jwtManager, sessionConfig)
-	
+	manager := session.NewJWTSessionManager(jwtManager)
+
 	// Add middleware
 	s.AddMiddleware(manager.Middleware())
-	
+
 	return manager, nil
 }

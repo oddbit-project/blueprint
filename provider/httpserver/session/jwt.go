@@ -1,79 +1,102 @@
 package session
 
 import (
-	"encoding/json"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/utils"
 	"time"
+)
+
+const (
+	ErrJWTSigningKey           = utils.Error("JWT signing key is required")
+	ErrInvalidSigningAlgorithm = utils.Error("JWT signing algorithm is invalid")
 )
 
 // JWT-related errors
 var (
-	ErrJWTInvalid    = errors.New("invalid JWT token")
-	ErrJWTExpired    = errors.New("JWT token expired")
-	ErrJWTNotFound   = errors.New("JWT token not found")
-	ErrJWTSigningKey = errors.New("JWT signing key is required")
+	ErrJWTInvalid  = errors.New("invalid JWT token")
+	ErrJWTExpired  = errors.New("JWT token expired")
+	ErrJWTNotFound = errors.New("JWT token not found")
 )
 
 // JWTConfig holds configuration for JWT tokens
 type JWTConfig struct {
-	// SigningKey is the key used to sign JWT tokens
-	SigningKey []byte
-
-	// SigningMethod is the method used to sign the token
-	SigningMethod jwt.SigningMethod
-
-	// Expiration is the expiration time for tokens
-	Expiration time.Duration
-
-	// Issuer is the issuer of the token
-	Issuer string
-
-	// Audience is the audience of the token
-	Audience string
-
-	// Logger for operations
-	Logger *log.Logger
-}
-
-// DefaultJWTConfig returns a default JWT configuration
-func DefaultJWTConfig() *JWTConfig {
-	return &JWTConfig{
-		SigningKey:    nil, // Must be set by the user
-		SigningMethod: jwt.SigningMethodHS256,
-		Expiration:    time.Hour * 24, // 24 hours
-		Issuer:        "blueprint",
-		Audience:      "api",
-		Logger:        nil,
-	}
+	SigningKey        []byte            `json:"signingKey"`        // SigningKey is the key used to sign JWT tokens; if json, base64-encoded key
+	SigningAlgorithm  string            `json:"signingAlgorithm"`  // SigningAlgorithm, one of HS256, HS384, HS512
+	ExpirationSeconds int               `json:"expirationSeconds"` // ExpirationSeconds
+	Issuer            string            `json:"issuer"`            // Issuer is the issuer of the token
+	Audience          string            `json:"audience"`          // Audience is the audience of the token
+	SigningMethod     jwt.SigningMethod `json:"-"`                 // SigningMethod is the method used to sign the token; filled on Validate()
+	Expiration        time.Duration     `json:"-"`                 // Expiration is the expiration time for tokens; filled on Validate()
 }
 
 // JWTManager manages JWT tokens
 type JWTManager struct {
 	config *JWTConfig
-}
-
-// NewJWTManager creates a new JWT manager
-func NewJWTManager(config *JWTConfig) (*JWTManager, error) {
-	if config == nil {
-		config = DefaultJWTConfig()
-	}
-
-	if len(config.SigningKey) == 0 {
-		return nil, ErrJWTSigningKey
-	}
-
-	return &JWTManager{
-		config: config,
-	}, nil
+	logger *log.Logger
 }
 
 // Claims is a custom JWT claims type
 type Claims struct {
 	jwt.RegisteredClaims
 	Data map[string]interface{} `json:"data,omitempty"`
+}
+
+// NewJWTConfig returns a default JWT configuration
+func NewJWTConfig() *JWTConfig {
+	// random signing key, should be overriden by user
+	buf := make([]byte, 128)
+	_, err := rand.Read(buf)
+	if err != nil {
+		panic(err)
+	}
+	return &JWTConfig{
+		SigningKey:        buf, // Must be set by the user
+		SigningAlgorithm:  "HS256",
+		SigningMethod:     jwt.SigningMethodHS256,
+		ExpirationSeconds: 86400,
+		Expiration:        time.Second * 86400, // 24 hours
+		Issuer:            "blueprint",
+		Audience:          "api",
+	}
+}
+
+// Validate the JWT configuration
+func (c *JWTConfig) Validate() error {
+	if len(c.SigningKey) == 0 {
+
+		return ErrJWTSigningKey
+	}
+
+	c.SigningMethod = jwt.GetSigningMethod(c.SigningAlgorithm)
+	if c.SigningMethod == nil {
+		return ErrInvalidSigningAlgorithm
+	}
+	if c.ExpirationSeconds <= 0 {
+		return ErrInvalidExpirationSeconds
+	}
+	c.Expiration = time.Second * time.Duration(c.ExpirationSeconds)
+
+	return nil
+}
+
+// NewJWTManager creates a new JWT manager
+func NewJWTManager(config *JWTConfig, logger *log.Logger) (*JWTManager, error) {
+	if config == nil {
+		config = NewJWTConfig()
+	}
+
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
+	return &JWTManager{
+		config: config,
+		logger: logger,
+	}, nil
 }
 
 // Generate creates a new JWT token with the given claims
@@ -106,8 +129,8 @@ func (m *JWTManager) Generate(sessionID string, sessionData *SessionData) (strin
 	// Sign and get the complete encoded token
 	tokenString, err := token.SignedString(m.config.SigningKey)
 	if err != nil {
-		if m.config.Logger != nil {
-			m.config.Logger.Error(err, "Failed to sign JWT token")
+		if m.logger != nil {
+			m.logger.Error(err, "Failed to sign JWT token")
 		}
 		return "", err
 	}
@@ -164,44 +187,14 @@ func (m *JWTManager) Refresh(tokenString string) (string, error) {
 	return m.Generate(claims.ID, sessionData)
 }
 
-// SessionDataFromClaims converts JWT claims to a SessionData object
-func SessionDataFromClaims(claims *Claims) *SessionData {
-	return &SessionData{
-		Values:       claims.Data,
-		LastAccessed: time.Now(),
-		Created:      claims.IssuedAt.Time,
-		ID:           claims.ID,
-	}
-}
-
-// JWTStore is a JWT token-based store implementation
-type JWTStore struct {
-	manager *JWTManager
-	config  *SessionConfig
-	logger  *log.Logger
-}
-
-// NewJWTStore creates a new JWT-based store
-func NewJWTStore(jwtManager *JWTManager, sessionConfig *SessionConfig) *JWTStore {
-	if sessionConfig == nil {
-		sessionConfig = DefaultSessionConfig()
-	}
-
-	return &JWTStore{
-		manager: jwtManager,
-		config:  sessionConfig,
-		logger:  sessionConfig.Logger,
-	}
-}
-
 // Get retrieves a session from a JWT token
-func (s *JWTStore) Get(tokenString string) (*SessionData, error) {
+func (m *JWTManager) Get(tokenString string) (*SessionData, error) {
 	if tokenString == "" {
 		return nil, ErrJWTNotFound
 	}
 
 	// Validate token
-	claims, err := s.manager.Validate(tokenString)
+	claims, err := m.Validate(tokenString)
 	if err != nil {
 		return nil, err
 	}
@@ -214,8 +207,8 @@ func (s *JWTStore) Get(tokenString string) (*SessionData, error) {
 // Set generates a new JWT token for the session data
 // Note: The returned error contains the token string
 // This is necessary because there's no persistent storage with JWT
-func (s *JWTStore) Set(id string, session *SessionData) error {
-	tokenString, err := s.manager.Generate(id, session)
+func (m *JWTManager) Set(id string, session *SessionData) error {
+	tokenString, err := m.Generate(id, session)
 	if err != nil {
 		return err
 	}
@@ -226,17 +219,10 @@ func (s *JWTStore) Set(id string, session *SessionData) error {
 	return nil
 }
 
-// Delete is a no-op for JWT store since tokens are stateless
-func (s *JWTStore) Delete(id string) error {
-	// No-op: JWT tokens are stateless and can't be deleted
-	// They will expire based on their expiration time
-	return nil
-}
-
 // Generate creates a new session and ID
-func (s *JWTStore) Generate() (*SessionData, string) {
+func (m *JWTManager) NewSession() (*SessionData, string) {
 	id := generateSessionID()
-	
+
 	session := &SessionData{
 		Values:       make(map[string]interface{}),
 		LastAccessed: time.Now(),
@@ -247,31 +233,12 @@ func (s *JWTStore) Generate() (*SessionData, string) {
 	return session, id
 }
 
-// StartCleanup is a no-op for JWT store
-func (s *JWTStore) StartCleanup() {
-	// No-op: JWT tokens are stateless and don't need cleanup
-}
-
-// StopCleanup is a no-op for JWT store
-func (s *JWTStore) StopCleanup() {
-	// No-op: JWT tokens are stateless and don't need cleanup
-}
-
-// MarshallSessionData converts a session data object to JSON
-func MarshallSessionData(session *SessionData) (string, error) {
-	data, err := json.Marshal(session)
-	if err != nil {
-		return "", err
+// SessionDataFromClaims converts JWT claims to a SessionData object
+func SessionDataFromClaims(claims *Claims) *SessionData {
+	return &SessionData{
+		Values:       claims.Data,
+		LastAccessed: time.Now(),
+		Created:      claims.IssuedAt.Time,
+		ID:           claims.ID,
 	}
-	return string(data), nil
-}
-
-// UnmarshallSessionData converts JSON to a session data object
-func UnmarshallSessionData(data string) (*SessionData, error) {
-	var session SessionData
-	err := json.Unmarshal([]byte(data), &session)
-	if err != nil {
-		return nil, err
-	}
-	return &session, nil
 }
