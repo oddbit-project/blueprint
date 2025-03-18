@@ -28,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	// Initialize logger
-	logger := &log.Logger{}
+	logger := log.New("clickhouse-config")
 
 	// Create ClickHouse client
 	clickhouseConfig := &clickhouse.ClientConfig{

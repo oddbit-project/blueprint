@@ -44,7 +44,7 @@ if err != nil {
 }
 
 // Create a logger
-logger := log.NewLogger()
+logger := log.New("clickhouse-sample")
 
 // Create the configuration manager
 manager := config.NewManager(client, logger)
