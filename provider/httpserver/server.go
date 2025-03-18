@@ -27,6 +27,7 @@ type Server struct {
 	Config *ServerConfig
 	Router *gin.Engine
 	Server *http.Server
+	Logger *log.Logger
 }
 
 func NewServerConfig() *ServerConfig {
@@ -119,7 +120,7 @@ func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error) {
 //	server.Start()
 func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 	if cfg == nil {
-		return nil, ErrNilConfig
+		cfg = NewServerConfig()
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -138,6 +139,7 @@ func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 	result := &Server{
 		Config: cfg,
 		Router: router,
+		Logger: logger,
 		Server: &http.Server{
 			Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			Handler:      router,
