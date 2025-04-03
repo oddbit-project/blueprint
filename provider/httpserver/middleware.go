@@ -41,7 +41,7 @@ func (s *Server) UseRateLimiting(ratePerMinute int) {
 	s.AddMiddleware(security.RateLimitMiddleware(r, b))
 }
 
-// UseSessionWithMemoryStore adds session middleware with in-memory storage
+// UseSessionWithMemoryStore adds session middleware with provided storage
 func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.Logger) *session.SessionManager {
 	if config == nil {
 		config = session.NewConfig()
