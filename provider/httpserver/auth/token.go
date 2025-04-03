@@ -3,7 +3,7 @@ package auth
 import "github.com/gin-gonic/gin"
 
 const (
-	DefaultTokenAuthHeader = "X-Auth-Key"
+	DefaultTokenAuthHeader = "X-API-Key"
 )
 
 type authToken struct {
