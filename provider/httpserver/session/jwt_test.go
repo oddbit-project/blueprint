@@ -48,7 +48,7 @@ func TestJWTExpiration(t *testing.T) {
 	// Create JWT config with short expiration
 	config := NewJWTConfig()
 	config.SigningKey = []byte("test-signing-key-for-jwt-tests-only")
-	config.Expiration = time.Millisecond * 100 // Very short for testing
+	config.Expiration = time.Second * 1 // Very short for testing
 
 	// Create manager
 	manager, err := NewJWTManager(config, nil)
@@ -69,7 +69,7 @@ func TestJWTExpiration(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Wait for token to expire
-	time.Sleep(time.Millisecond * 200)
+	time.Sleep(time.Second * 2)
 
 	// Validate token (should fail)
 	_, err = manager.Validate(token)
