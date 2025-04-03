@@ -16,11 +16,11 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 	logger := log.New("test")
 
 	tests := []struct {
-		name            string
-		options         map[string]string
-		requestHeaders  map[string]string
-		expectedStatus  int
-		testEndpoint    string
+		name           string
+		options        map[string]string
+		requestHeaders map[string]string
+		expectedStatus int
+		testEndpoint   string
 	}{
 		{
 			name: "Valid auth token",
@@ -52,9 +52,9 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 				OptAuthTokenHeader: "X-Test-Auth",
 				OptAuthTokenSecret: "test-secret",
 			},
-			requestHeaders:  map[string]string{},
-			expectedStatus:  http.StatusUnauthorized,
-			testEndpoint:    "/test",
+			requestHeaders: map[string]string{},
+			expectedStatus: http.StatusUnauthorized,
+			testEndpoint:   "/test",
 		},
 		{
 			name: "Default header name",
@@ -62,7 +62,7 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 				OptAuthTokenSecret: "test-secret",
 			},
 			requestHeaders: map[string]string{
-				"X-Auth-Key": "test-secret",
+				"X-API-Key": "test-secret",
 			},
 			expectedStatus: http.StatusOK,
 			testEndpoint:   "/test",
