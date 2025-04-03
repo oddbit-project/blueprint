@@ -7,10 +7,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/log/writer"
+	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	httplog "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"net/http"
+	"strings"
 	"time"
+)
+
+const (
+	// misc server options
+	OptAuthTokenHeader        = "authTokenHeader"
+	OptAuthTokenSecret        = "authTokenSecret"
+	OptDefaultSecurityHeaders = "defaultSecurityHeaders"
 )
 
 type ServerConfig struct {
@@ -29,6 +38,8 @@ type Server struct {
 	Server *http.Server
 	Logger *log.Logger
 }
+
+type OptionsFunc func(*Server) error
 
 func NewServerConfig() *ServerConfig {
 	return &ServerConfig{
@@ -136,6 +147,7 @@ func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 		return nil, err
 	}
 	router := NewRouter(serverName, cfg.Debug, logger)
+
 	result := &Server{
 		Config: cfg,
 		Router: router,
@@ -149,7 +161,36 @@ func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 			ErrorLog:     writer.NewErrorLog(logger), // error log wrapper
 		},
 	}
+
 	return result, nil
+}
+
+// ProcessOptions process default options for server
+func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
+
+	// security headers
+	if v, ok := s.Config.Options[OptDefaultSecurityHeaders]; ok {
+		if strings.ToLower(v) == "true" || v == "1" {
+			s.UseDefaultSecurityHeaders()
+		}
+	}
+
+	// auth token
+	if secret, ok := s.Config.Options[OptAuthTokenSecret]; ok {
+		var headerName string
+		if headerName, ok = s.Config.Options[OptAuthTokenHeader]; !ok {
+			headerName = auth.DefaultTokenAuthHeader
+		}
+		authToken := auth.NewAuthToken(headerName, secret)
+		s.UseAuth(authToken)
+	}
+
+	for _, withOption := range withOptions {
+		if err := withOption(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AddMiddleware adds the specified middleware function to the server's router.
