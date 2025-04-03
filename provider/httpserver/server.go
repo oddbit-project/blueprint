@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	ginzerolog "github.com/dn365/gin-zerolog"
 	"github.com/gin-gonic/gin"
+	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/log/writer"
+	httplog "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"net/http"
 	"time"
@@ -21,14 +23,11 @@ type ServerConfig struct {
 	tlsProvider.ServerConfig
 }
 
-type AuthMiddlewareInterface interface {
-	CanAccess(c *gin.Context) bool
-}
-
 type Server struct {
 	Config *ServerConfig
 	Router *gin.Engine
 	Server *http.Server
+	Logger *log.Logger
 }
 
 func NewServerConfig() *ServerConfig {
@@ -40,9 +39,13 @@ func NewServerConfig() *ServerConfig {
 		Debug:        false,
 		Options:      make(map[string]string),
 		ServerConfig: tlsProvider.ServerConfig{
-			TLSCert:            "",
-			TLSKey:             "",
-			TLSKeyPwd:          "",
+			TLSCert: "",
+			TLSKey:  "",
+			TlsKeyCredential: tlsProvider.TlsKeyCredential{
+				Password:       "",
+				PasswordEnvVar: "",
+				PasswordFile:   "",
+			},
 			TLSAllowedCACerts:  nil,
 			TLSCipherSuites:    nil,
 			TLSMinVersion:      "",
@@ -80,22 +83,29 @@ func (c *ServerConfig) Validate() error {
 	return nil
 }
 
-// NewRouter creates a new gin router
-func NewRouter(serverName string, debug bool) *gin.Engine {
+// NewRouter creates a new gin router with standardized logging
+func NewRouter(serverName string, debug bool, logger *log.Logger) *gin.Engine {
 	if !debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.New()
-	router.Use(ginzerolog.Logger(serverName))
+
+	if logger != nil {
+		// Use our structured logging middleware
+		router.Use(httplog.HTTPLogMiddleware(logger))
+	}
+
+	// Still include recovery middleware
 	router.Use(gin.Recovery())
+
 	return router
 }
 
-func (c *ServerConfig) NewServer() (*Server, error) {
+func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	return NewServer(c)
+	return NewServer(c, logger)
 }
 
 // NewServer creates a new http server.
@@ -108,28 +118,35 @@ func (c *ServerConfig) NewServer() (*Server, error) {
 //	  log.Fatal(err)
 //	}
 //	server.Start()
-func NewServer(cfg *ServerConfig) (*Server, error) {
+func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 	if cfg == nil {
-		return nil, ErrNilConfig
+		cfg = NewServerConfig()
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+
+	serverName := cfg.GetOption("serverName", ServerDefaultName)
+	if logger == nil {
+		logger = httplog.NewHTTPLogger(serverName)
 	}
 
 	tlsConfig, err := cfg.TLSConfig()
 	if err != nil {
 		return nil, err
 	}
-	router := NewRouter(cfg.GetOption("serverName", ServerDefaultName), cfg.Debug)
+	router := NewRouter(serverName, cfg.Debug, logger)
 	result := &Server{
 		Config: cfg,
 		Router: router,
+		Logger: logger,
 		Server: &http.Server{
 			Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			Handler:      router,
 			ReadTimeout:  time.Duration(cfg.ReadTimeout) * time.Second,
 			WriteTimeout: time.Duration(cfg.WriteTimeout) * time.Second,
 			TLSConfig:    tlsConfig,
+			ErrorLog:     writer.NewErrorLog(logger), // error log wrapper
 		},
 	}
 	return result, nil
@@ -150,21 +167,8 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 //	}
 //
 // Note: The AddMiddleware method is defined on the Server struct which contains a Router field of type gin.Engine.
-func (c *Server) AddMiddleware(middlewareFunc gin.HandlerFunc) {
-	c.Router.Use(middlewareFunc)
-}
-
-// UseAuth registers an auth middleware
-func (c *Server) UseAuth(authMiddleware AuthMiddlewareInterface) {
-	mw := func(ctx *gin.Context) {
-		if authMiddleware.CanAccess(ctx) {
-			ctx.Next()
-		} else {
-			HttpError401(ctx)
-		}
-		return
-	}
-	c.Router.Use(mw)
+func (s *Server) AddMiddleware(middlewareFunc gin.HandlerFunc) {
+	s.Router.Use(middlewareFunc)
 }
 
 // Group creates a new RouterGroup with the specified relativePath.
@@ -184,8 +188,8 @@ func (c *Server) UseAuth(authMiddleware AuthMiddlewareInterface) {
 //
 // This will create a group with the base path "/api" and add a route for GET "/users".
 // All routes added to the group will have the "/api" prefix.
-func (c *Server) Group(relativePath string) *gin.RouterGroup {
-	return c.Router.Group(relativePath)
+func (s *Server) Group(relativePath string) *gin.RouterGroup {
+	return s.Router.Group(relativePath)
 }
 
 // Route returns the gin.Engine instance associated with the Server.
@@ -203,8 +207,8 @@ func (c *Server) Group(relativePath string) *gin.RouterGroup {
 //	})
 //
 // Note: The gin.Engine instance is stored in the Router field of the Server struct.
-func (c *Server) Route() *gin.Engine {
-	return c.Router
+func (s *Server) Route() *gin.Engine {
+	return s.Router
 }
 
 // Start starts the HTTP server of the Server instance.
@@ -230,12 +234,12 @@ func (c *Server) Route() *gin.Engine {
 //	        return nil
 //	    })
 //	}
-func (c *Server) Start() error {
+func (s *Server) Start() error {
 	var err error
-	if c.Server.TLSConfig == nil {
-		err = c.Server.ListenAndServe()
+	if s.Server.TLSConfig == nil {
+		err = s.Server.ListenAndServe()
 	} else {
-		err = c.Server.ListenAndServeTLS("", "")
+		err = s.Server.ListenAndServeTLS("", "")
 	}
 	// when Shutdown() is called, the return error is http.ErrServerClosed
 	if !errors.Is(err, http.ErrServerClosed) {
@@ -247,6 +251,6 @@ func (c *Server) Start() error {
 // Shutdown gracefully shuts down the server by calling the Shutdown method of the underlying httpserver.Server.
 // It takes a context.Context object as a parameter, which can be used to control the shutdown process.
 // The method returns an error if the shutdown process fails.
-func (c *Server) Shutdown(ctx context.Context) error {
-	return c.Server.Shutdown(ctx)
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.Server.Shutdown(ctx)
 }

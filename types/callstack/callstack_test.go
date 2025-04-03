@@ -2,6 +2,7 @@ package callstack
 
 import (
 	"errors"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -70,4 +71,9 @@ func TestCallStack(t *testing.T) {
 	if returnValue != testString {
 		t.Error("RunLinear(): failed callback not executed in order")
 	}
+}
+
+func TestCallStack_IsCalling(t *testing.T) {
+	c := NewCallStack()
+	assert.False(t, c.IsCalling())
 }

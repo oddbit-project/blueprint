@@ -6,9 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint"
 	"github.com/oddbit-project/blueprint/config/provider"
-	"github.com/oddbit-project/blueprint/log/zerolog/writer"
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
-	"github.com/rs/zerolog/log"
+	"github.com/oddbit-project/blueprint/utils"
 	"os"
 )
 
@@ -27,6 +27,7 @@ type Application struct {
 	container  *blueprint.Container // runnable application container
 	args       *CliArgs             // cli args
 	httpServer *httpserver.Server   // our api server
+	logger     *log.Logger
 }
 
 // command-line args
@@ -36,15 +37,19 @@ var cliArgs = &CliArgs{
 }
 
 // NewApplication Sample application factory
-func NewApplication(args *CliArgs) (*Application, error) {
+func NewApplication(args *CliArgs, logger *log.Logger) (*Application, error) {
 	cfg, err := provider.NewJsonProvider(*args.ConfigFile)
 	if err != nil {
 		return nil, err
+	}
+	if logger == nil {
+		logger = log.New("application")
 	}
 	return &Application{
 		container:  blueprint.NewContainer(cfg),
 		args:       args,
 		httpServer: nil,
+		logger:     logger,
 	}, nil
 }
 
@@ -53,7 +58,7 @@ func (a *Application) Build() {
 	// if some error occurs, generate fatal error & abort execution
 
 	// initialize http server
-	log.Info().Msg("Building Sample Application...")
+	a.logger.Info("Building Sample Application...")
 
 	// initialize http server config
 	httpConfig := httpserver.NewServerConfig()
@@ -63,7 +68,7 @@ func (a *Application) Build() {
 	}
 	// Create http server from config
 	var err error
-	a.httpServer, err = httpConfig.NewServer()
+	a.httpServer, err = httpConfig.NewServer(a.logger)
 	a.container.AbortFatal(err)
 
 	// add http handler
@@ -85,7 +90,7 @@ func (a *Application) Run() {
 	// Start  application - http server
 	a.container.Run(func(app interface{}) error {
 		go func() {
-			log.Info().Msg(fmt.Sprintf("Running Sample Application API at https://%s:%d/v1/hello", a.httpServer.Config.Host, a.httpServer.Config.Port))
+			a.logger.Infof("Running Sample Application API at https://%s:%d/v1/hello", a.httpServer.Config.Host, a.httpServer.Config.Port)
 			a.container.AbortFatal(a.httpServer.Start())
 		}()
 		return nil
@@ -93,25 +98,26 @@ func (a *Application) Run() {
 }
 
 func main() {
-	// use zerolog as logger with console writer
-	writer.UseDefaultWriter()
+	// config logger
+	utils.PanicOnError(log.Configure(log.NewDefaultConfig()))
+	
+	logger := log.New("sample-application")
 
 	flag.Parse()
 
 	if *cliArgs.ShowVersion {
-		log.Printf("Version: %s\n", VERSION)
+		fmt.Printf("Version: %s\n", VERSION)
 		os.Exit(0)
 	}
 
-	app, err := NewApplication(cliArgs)
+	app, err := NewApplication(cliArgs, logger)
 	if err != nil {
-		log.Err(err).Msg("Initialization failed")
+		logger.Error(err, "Initialization failed")
 		os.Exit(-1)
 	}
 
 	// build application
 	app.Build()
-
 	// execute application
 	app.Run()
 }

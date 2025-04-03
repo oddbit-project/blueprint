@@ -7,8 +7,7 @@ import (
 
 const (
 	ErrMissingConsumerBroker    = utils.Error("Missing Consumer broker address")
-	ErrMissingConsumerTopic     = utils.Error("Missing Consumer Topic name")
-	ErrMissingConsumerGroup     = utils.Error("Missing Consumer Group")
+	ErrMissingConsumerTopic     = utils.Error("Missing Consumer Topic or Topic Group")
 	ErrConsumerAlreadyConnected = utils.Error("Cannot change connection properties; already connected")
 	DefaultTimeout              = time.Second * 30
 
@@ -16,6 +15,8 @@ const (
 	ErrMissingProducerTopic  = utils.Error("Missing Producer Topic name")
 	ErrProducerClosed        = utils.Error("Producer is already closed")
 	ErrInvalidAuthType       = utils.Error("Invalid authentication type")
+	ErrInvalidStartOffset    = utils.Error("Invalid start offset")
+	ErrInvalidIsolationLevel = utils.Error("Invalid isolation level")
 
 	ErrMissingAdminBroker = utils.Error("Missing Admin broker address")
 	ErrNilConfig          = utils.Error("Config is nil")

@@ -2,6 +2,8 @@ package kafka
 
 import (
 	"context"
+	"github.com/oddbit-project/blueprint/crypt/secure"
+	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
@@ -13,15 +15,15 @@ type AdminConfig struct {
 	Brokers  string `json:"brokers"`
 	AuthType string `json:"authType"`
 	Username string `json:"username"`
-	Password string `json:"password"`
+	secure.DefaultCredentialConfig
 	tlsProvider.ClientConfig
 }
 
-type KafkaAdmin struct {
+type Admin struct {
 	broker string
-	ctx    context.Context
 	dialer *kafka.Dialer
 	Conn   *kafka.Conn
+	Logger *log.Logger
 }
 
 func (c AdminConfig) Validate() error {
@@ -34,7 +36,7 @@ func (c AdminConfig) Validate() error {
 	}
 	return nil
 }
-func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
+func NewAdmin(cfg *AdminConfig, logger *log.Logger) (*Admin, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -42,25 +44,43 @@ func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
 		return nil, err
 	}
 
+	var key []byte
+	var credential *secure.Credential
+	var password string
+	var err error
+
+	key, err = secure.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
+		return nil, err
+	}
+
 	dialer := &kafka.Dialer{
-		Timeout:   DefaultTimeout,
 		DualStack: true,
+		Timeout:   DefaultTimeout,
+	}
+
+	password, err = credential.Get()
+	if err != nil {
+		return nil, err
 	}
 
 	switch cfg.AuthType {
 	case AuthTypePlain:
 		dialer.SASLMechanism = plain.Mechanism{
 			Username: cfg.Username,
-			Password: cfg.Password,
+			Password: password,
 		}
 	case AuthTypeScram256:
-		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, cfg.Password); err != nil {
+		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, password); err != nil {
 			return nil, err
 		} else {
 			dialer.SASLMechanism = sasl
 		}
 	case AuthTypeScram512:
-		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, cfg.Password); err != nil {
+		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, password); err != nil {
 			return nil, err
 		} else {
 			dialer.SASLMechanism = sasl
@@ -72,37 +92,47 @@ func NewAdmin(ctx context.Context, cfg *AdminConfig) (*KafkaAdmin, error) {
 		dialer.TLS = tls
 	}
 
-	return &KafkaAdmin{
+	if logger == nil {
+		logger = NewAdminLogger(cfg.Brokers)
+	} else {
+		// add kafka context
+		AdminLogger(logger, cfg.Brokers)
+	}
+
+	return &Admin{
 		broker: cfg.Brokers,
-		ctx:    ctx,
 		dialer: dialer,
 		Conn:   nil,
+		Logger: logger,
 	}, nil
 }
 
-func (c *KafkaAdmin) Connect() error {
+func (c *Admin) Connect(ctx context.Context) error {
 	var err error
-	if c.Conn, err = c.dialer.DialContext(c.ctx, "tcp", c.broker); err != nil {
+	c.Logger.Info("connecting to kafka...")
+	if c.Conn, err = c.dialer.DialContext(ctx, "tcp", c.broker); err != nil {
 		c.Conn = nil
+		c.Logger.Error(err, "failed to connect to kafka")
 		return err
 	}
 	return nil
 }
 
-func (c *KafkaAdmin) Disconnect() {
+func (c *Admin) Disconnect() {
 	if c.Conn != nil {
+		c.Logger.Info("disconnecting from kafka...")
 		c.Conn.Close()
 		c.Conn = nil
 	}
 }
 
-func (c *KafkaAdmin) IsConnected() bool {
+func (c *Admin) IsConnected() bool {
 	return c.Conn != nil
 }
 
-func (c *KafkaAdmin) GetTopics(topics ...string) ([]kafka.Partition, error) {
+func (c *Admin) GetTopics(ctx context.Context, topics ...string) ([]kafka.Partition, error) {
 	if c.Conn == nil {
-		if err := c.Connect(); err != nil {
+		if err := c.Connect(ctx); err != nil {
 			return nil, err
 		}
 		defer c.Disconnect()
@@ -111,14 +141,15 @@ func (c *KafkaAdmin) GetTopics(topics ...string) ([]kafka.Partition, error) {
 }
 
 // ListTopics list existing kafka topics
-func (c *KafkaAdmin) ListTopics() ([]string, error) {
+func (c *Admin) ListTopics(ctx context.Context) ([]string, error) {
 	if c.Conn == nil {
-		if err := c.Connect(); err != nil {
+		if err := c.Connect(ctx); err != nil {
 			return nil, err
 		}
 		defer c.Disconnect()
 	}
 	if partitions, err := c.Conn.ReadPartitions(); err != nil {
+		c.Logger.Error(err, "failed to read partitions")
 		return nil, err
 	} else {
 		topics := make([]string, len(partitions))
@@ -130,8 +161,8 @@ func (c *KafkaAdmin) ListTopics() ([]string, error) {
 }
 
 // TopicExists returns true if Topic exists
-func (c *KafkaAdmin) TopicExists(topic string) (bool, error) {
-	if topics, err := c.ListTopics(); err != nil {
+func (c *Admin) TopicExists(ctx context.Context, topic string) (bool, error) {
+	if topics, err := c.ListTopics(ctx); err != nil {
 		return false, err
 	} else {
 		for _, t := range topics {
@@ -144,13 +175,18 @@ func (c *KafkaAdmin) TopicExists(topic string) (bool, error) {
 }
 
 // CreateTopic create a new Topic
-func (c *KafkaAdmin) CreateTopic(topic string, numPartitions int, replicationFactor int) error {
+func (c *Admin) CreateTopic(ctx context.Context, topic string, numPartitions int, replicationFactor int) error {
 	if c.Conn == nil {
-		if err := c.Connect(); err != nil {
+		if err := c.Connect(ctx); err != nil {
 			return err
 		}
 		defer c.Disconnect()
 	}
+	c.Logger.
+		WithField("topicName", topic).
+		WithField("numPartitions", numPartitions).
+		WithField("replicationFactor", replicationFactor).
+		Info("attempting to create a topic...")
 	return c.Conn.CreateTopics(kafka.TopicConfig{
 		Topic:             topic,
 		NumPartitions:     numPartitions,
@@ -159,12 +195,15 @@ func (c *KafkaAdmin) CreateTopic(topic string, numPartitions int, replicationFac
 }
 
 // DeleteTopic removes a Topic
-func (c *KafkaAdmin) DeleteTopic(topic string) error {
+func (c *Admin) DeleteTopic(ctx context.Context, topic string) error {
 	if c.Conn == nil {
-		if err := c.Connect(); err != nil {
+		if err := c.Connect(ctx); err != nil {
 			return err
 		}
 		defer c.Disconnect()
 	}
+	c.Logger.
+		WithField("topicName", topic).
+		Info("attempting to delete a topic...")
 	return c.Conn.DeleteTopics(topic)
 }
