@@ -1,6 +1,7 @@
 package session
 
 import (
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -45,34 +46,39 @@ func TestJWTManager(t *testing.T) {
 }
 
 func TestJWTExpiration(t *testing.T) {
-	// Create JWT config with short expiration
+	// Create a fake expired token for testing
+	// This approach skips waiting for actual expiration, which can be timing sensitive in tests
+
+	// Create manager with standard config
 	config := NewJWTConfig()
 	config.SigningKey = []byte("test-signing-key-for-jwt-tests-only")
-	config.Expiration = time.Second * 1 // Very short for testing
-
-	// Create manager
+	
 	manager, err := NewJWTManager(config, nil)
 	assert.NoError(t, err)
 
-	// Create session
-	session := &SessionData{
-		Values: map[string]interface{}{
-			"test": "value",
+	// Create a token with expiry time in the past
+	now := time.Now()
+	pastTime := now.Add(-time.Hour) // Time in the past
+	
+	claims := &Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    config.Issuer,
+			Subject:   "test-expired",
+			Audience:  jwt.ClaimStrings{config.Audience},
+			ExpiresAt: jwt.NewNumericDate(pastTime), // Expired time!
+			NotBefore: jwt.NewNumericDate(pastTime),
+			IssuedAt:  jwt.NewNumericDate(pastTime),
+			ID:        "test-expired-id",
 		},
-		LastAccessed: time.Now(),
-		Created:      time.Now(),
-		ID:           "test-session-id",
+		Data: map[string]interface{}{"test": "value"},
 	}
-
-	// Generate token
-	token, err := manager.Generate(session.ID, session)
+	
+	token := jwt.NewWithClaims(config.SigningMethod, claims)
+	tokenString, err := token.SignedString(config.SigningKey)
 	assert.NoError(t, err)
-
-	// Wait for token to expire
-	time.Sleep(time.Second * 2)
-
-	// Validate token (should fail)
-	_, err = manager.Validate(token)
+	
+	// Validate token (should fail with expiration error)
+	_, err = manager.Validate(tokenString)
 	assert.Error(t, err)
 	assert.Equal(t, ErrJWTExpired, err)
 }
