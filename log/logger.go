@@ -201,44 +201,73 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Configure configures the global logger based on the provided configuration
-func Configure(cfg *Config) error {
-	// Set global log level
-	level, err := zerolog.ParseLevel(cfg.Level)
+// Logger returns a new logger instance based on the configuration
+func (c *Config) Logger() (*Logger, error) {
+	hostname, _ := os.Hostname()
+
+	level, err := zerolog.ParseLevel(c.Level)
 	if err != nil {
-		return fmt.Errorf("invalid log level: %s", cfg.Level)
+		return nil, fmt.Errorf("invalid log level: %s", c.Level)
 	}
 	zerolog.SetGlobalLevel(level)
 
 	// Configure timestamp format
-	zerolog.TimeFieldFormat = cfg.TimeFormat
+	zerolog.TimeFieldFormat = c.TimeFormat
 
 	// build output writer
 	var output io.Writer
-	if output, err = buildLogWriter(cfg); err != nil {
-		return err
+	if output, err = buildLogWriter(c); err != nil {
+		return nil, err
 	}
 
 	// Configure base logger
-	baseLogger := zerolog.New(output).Level(level)
+	logger := zerolog.New(output).Level(level)
 
 	// Add standard fields
-	if cfg.IncludeTimestamp {
-		baseLogger = baseLogger.With().Timestamp().Logger()
+	if c.IncludeTimestamp {
+		logger = logger.With().Timestamp().Logger()
 	}
 
-	if cfg.IncludeCaller {
-		baseLogger = baseLogger.With().Caller().Logger()
-		zerolog.CallerSkipFrameCount = cfg.CallerSkipFrames
+	if c.IncludeCaller {
+		logger = logger.With().Caller().Logger()
+		zerolog.CallerSkipFrameCount = c.CallerSkipFrames
+	}
+
+	return &Logger{
+		logger:     logger,
+		moduleInfo: "",
+		hostname:   hostname,
+	}, nil
+}
+
+// ModuleLogger returns a new module logger based on the configuration
+func (c *Config) ModuleLogger(module string) (*Logger, error) {
+	l, err := c.Logger()
+	if err != nil {
+		return nil, err
+	}
+	hostname, _ := os.Hostname()
+	return &Logger{
+		logger:     l.logger.With().Str(LogModuleKey, module).Logger(),
+		moduleInfo: module,
+		hostname:   hostname,
+	}, nil
+}
+
+// Configure configures the global logger based on the provided configuration
+func Configure(cfg *Config) error {
+	logger, err := cfg.Logger()
+	if err != nil {
+		return err
 	}
 
 	// Set as global logger
-	log.Logger = baseLogger
+	log.Logger = logger.logger
 
 	return nil
 }
 
-// New creates a new logger with module information
+// New creates a new logger from global logger with module information
 func New(module string) *Logger {
 	hostname, _ := os.Hostname()
 
