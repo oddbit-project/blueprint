@@ -215,11 +215,11 @@ func (c *Client) NewRepository(ctx context.Context, tableName string) Repository
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	return c.Ping(ctx)
+	return c.Conn.Ping(ctx)
 }
 
 func (c *Client) Stats() driver.Stats {
-	return c.Stats()
+	return c.Conn.Stats()
 }
 
 func (c *Client) Close() error {
