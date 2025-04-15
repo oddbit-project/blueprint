@@ -106,15 +106,6 @@ type tx struct {
 	dialect   goqu.DialectWrapper
 }
 
-func NewRepository(ctx context.Context, conn *SqlClient, tableName string) Repository {
-	return &repository{
-		conn:      conn.Db(),
-		ctx:       ctx,
-		tableName: tableName,
-		dialect:   goqu.Dialect(conn.DriverName),
-	}
-}
-
 func (r *repository) NewTransaction(opts *sql.TxOptions) (Transaction, error) {
 	t, err := r.Db().BeginTxx(r.ctx, opts)
 	if err != nil {
