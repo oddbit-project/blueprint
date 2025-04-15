@@ -1,6 +1,6 @@
 # db.Grid
 
-Data grid component for building dynamic SQL queries with filtering, sorting, searching, and pagination capabilities.
+Data grid component for building dynamic SQL queries with filtering, sorting, searching, and pagination capabilities. The Grid component is integrated with the Repository through the GridOps interface.
 
 ## Overview
 
@@ -448,6 +448,43 @@ statement, _ := grid.Build(customSelect, query)
 sql, _, _ := statement.ToSQL()
 // SQL: SELECT COUNT(*) FROM "users" WHERE ("active" IS TRUE)
 ```
+
+## Repository Integration
+
+The Grid component is integrated with the Repository through the GridOps interface:
+
+```go
+type GridOps interface {
+	Grid(record any) (*Grid, error)
+	QueryGrid(record any, args GridQuery, dest any) error
+}
+```
+
+This integration provides a more convenient way to use Grid functionality:
+
+```go
+// Create a repository
+repo := db.NewRepository(context.Background(), client, "users")
+
+// Simple way to query with Grid functionality
+query, _ := db.NewGridQuery(db.SearchAny, 10, 0)
+query.SearchText = "smith"
+query.FilterFields = map[string]any{"active": true}
+query.SortFields = map[string]string{"username": db.SortAscending}
+
+// Execute the query directly
+var users []*UserRecord
+err := repo.QueryGrid(&UserRecord{}, query, &users)
+```
+
+Benefits of using the Repository's GridOps methods:
+
+1. **Field Spec Caching** - The Repository caches the FieldSpec created from your record type, improving performance for repeated grid operations
+2. **Simplified API** - The QueryGrid method combines Grid creation, query building, and execution in a single call
+3. **Consistent Context** - Uses the repository's context for query execution
+4. **Integration with Transactions** - Works seamlessly with the repository's transaction management
+
+For more detailed information on using Grid with Repository, see the [Repository Documentation](repository.md#gridops-interface).
 
 ## See Also
 

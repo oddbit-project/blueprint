@@ -2,9 +2,8 @@ package db
 
 import (
 	"database/sql"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 // TestEmptyResult checks the EmptyResult helper function
@@ -46,6 +45,8 @@ func TestRepositoryInterfaces(t *testing.T) {
 
 	var _ Updater = (*repository)(nil)
 	var _ Updater = (*tx)(nil)
+	
+	var _ GridOps = (*repository)(nil)
 }
 
 // TestFVAlias ensures that the FV alias works as expected
@@ -68,4 +69,61 @@ func TestRepositoryTypes(t *testing.T) {
 	
 	var transaction *tx
 	assert.Nil(t, transaction)
+}
+
+// TestGridStruct is a test struct for GridOps tests
+type TestGridStruct struct {
+	ID      int    `db:"id" json:"id" grid:"sort,filter"`
+	Name    string `db:"name" json:"name" grid:"sort,search,filter"`
+	Email   string `db:"email" json:"email" grid:"sort,search,filter"`
+	Active  bool   `db:"active" json:"active" grid:"filter"`
+	Created string `db:"created" json:"created" grid:"sort"`
+}
+
+// TestRepositoryGrid tests the Grid method of the repository
+func TestRepositoryGrid(t *testing.T) {
+	// Create a repository with a nil database connection 
+	// (we're only testing the Grid method which doesn't use the database)
+	repo := &repository{
+		tableName: "test_table",
+		spec:      nil, // Start with nil spec
+	}
+	
+	// Test creating a grid with a new record type
+	grid, err := repo.Grid(&TestGridStruct{})
+	assert.NoError(t, err)
+	assert.NotNil(t, grid)
+	assert.Equal(t, "test_table", grid.tableName)
+	
+	// The spec should now be cached
+	assert.NotNil(t, repo.spec)
+	
+	// Test creating another grid with the same record type
+	// This should use the cached spec
+	cachedSpec := repo.spec
+	grid2, err := repo.Grid(&TestGridStruct{})
+	assert.NoError(t, err)
+	assert.NotNil(t, grid2)
+	assert.Equal(t, cachedSpec, repo.spec) // Should use the same spec
+}
+
+// TestRepositoryQueryGrid_InvalidRecord tests the QueryGrid method with an invalid record
+func TestRepositoryQueryGrid_InvalidRecord(t *testing.T) {
+	// Create a repository without a database connection
+	// (we'll only test the error case that doesn't use the connection)
+	repo := &repository{
+		tableName: "test_users",
+		spec:      nil,
+	}
+	
+	// Create a grid query
+	query, err := NewGridQuery(SearchAny, 10, 0)
+	assert.NoError(t, err)
+	
+	// Create a destination slice
+	var users []*TestGridStruct
+	
+	// Test with an invalid record
+	err = repo.QueryGrid(nil, query, &users)
+	assert.Error(t, err)
 }

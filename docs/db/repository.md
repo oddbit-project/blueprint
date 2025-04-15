@@ -97,3 +97,99 @@ type Counter interface {
 
 - `Count()` - Returns the total number of rows in the table
 - `CountWhere(fieldValues map[string]any)` - Returns the number of rows matching the specified field values
+
+## GridOps Interface
+
+The Repository also implements a GridOps interface that provides methods for working with data grids:
+
+```go
+type GridOps interface {
+	Grid(record any) (*Grid, error)
+	QueryGrid(record any, args GridQuery, dest any) error
+}
+```
+
+- `Grid(record any) (*Grid, error)` - Creates a Grid object based on the provided record type, using field tags to determine which fields can be sorted, filtered, or searched
+- `QueryGrid(record any, args GridQuery, dest any) error` - Creates a Grid object and executes a query using the provided GridQuery parameters
+
+### Example Usage
+
+```go
+type UserRecord struct {
+	ID       int    `db:"id" json:"id" grid:"sort,filter"`
+	Username string `db:"username" json:"username" grid:"sort,search,filter"`
+	Email    string `db:"email" json:"email" grid:"sort,search,filter"`
+	Active   bool   `db:"active" json:"active" grid:"filter"`
+}
+
+func main() {
+	// ... setup connection and repository as shown earlier ...
+	repo := db.NewRepository(context.Background(), client, "users")
+
+	// Create a GridQuery for searching and filtering
+	query, err := db.NewGridQuery(db.SearchAny, 10, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Set search parameters
+	query.SearchText = "john"
+	query.FilterFields = map[string]any{
+		"active": true,
+	}
+	query.SortFields = map[string]string{
+		"username": db.SortAscending,
+	}
+
+	// Execute the query
+	var users []*UserRecord
+	if err := repo.QueryGrid(&UserRecord{}, query, &users); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Found %d active users matching 'john'\n", len(users))
+
+	// Alternatively, create and configure a Grid manually
+	grid, err := repo.Grid(&UserRecord{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add custom filter function
+	grid.AddFilterFunc("active", func(value any) (any, error) {
+		switch v := value.(type) {
+		case string:
+			switch v {
+			case "yes", "true", "1":
+				return true, nil
+			case "no", "false", "0":
+				return false, nil
+			default:
+				return nil, fmt.Errorf("invalid boolean value: %v", v)
+			}
+		case bool:
+			return v, nil
+		default:
+			return nil, fmt.Errorf("unsupported type: %T", value)
+		}
+	})
+
+	// Validate and build the query
+	if err := grid.ValidQuery(query); err != nil {
+		log.Fatal(err)
+	}
+
+	statement, err := grid.Build(repo.SqlSelect(), query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Execute the query
+	var filteredUsers []*UserRecord
+	if err := repo.Fetch(statement, &filteredUsers); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+For more detailed information about grid functionality, see the [Data Grid documentation](dbgrid.md).

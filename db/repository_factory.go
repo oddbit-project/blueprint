@@ -27,6 +27,7 @@ func NewRepository(ctx context.Context, conn *SqlClient, tableName string) Repos
 		ctx:       ctx,
 		tableName: tableName,
 		dialect:   goqu.Dialect(conn.DriverName),
+		spec:      nil,
 	}
 }
 
