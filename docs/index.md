@@ -7,6 +7,8 @@
 ## Database
 
 - [Repository](db/repository.md)
+- [Field Specifications](db/fields.md)
+- [Data Grid](db/dbgrid.md)
 
 ## Security
 
@@ -19,6 +21,8 @@
 - [Kafka](provider/kafka.md)
 - [PostgreSQL](provider/pgsql.md)
 - [MQTT](provider/mqtt.md)
+- [NATS](provider/nats.md)
+- [TLS](provider/tls.md)
 
 ## Logging
 
