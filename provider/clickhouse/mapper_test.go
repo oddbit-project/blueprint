@@ -37,12 +37,26 @@ func TestStructMap(t *testing.T) {
 			Age:  30,
 		}
 
-		values, err := m.Map("Test", s, false)
+		columns, values, err := m.Map("Test", s, false)
 		assert.NoError(t, err)
+		assert.Len(t, columns, 3)
 		assert.Len(t, values, 3)
-		assert.Equal(t, 1, values[0])
-		assert.Equal(t, "test", values[1])
-		assert.Equal(t, 30, values[2])
+		
+		// Verify all expected columns are present
+		assert.Contains(t, columns, "id")
+		assert.Contains(t, columns, "name")
+		assert.Contains(t, columns, "age")
+		
+		// Create a map to associate columns with values
+		valueMap := make(map[string]interface{})
+		for i, col := range columns {
+			valueMap[col] = values[i]
+		}
+		
+		// Verify each column has the expected value
+		assert.Equal(t, 1, valueMap["id"])
+		assert.Equal(t, "test", valueMap["name"])
+		assert.Equal(t, 30, valueMap["age"])
 	})
 
 	t.Run("Valid struct pointer with addr", func(t *testing.T) {
@@ -52,17 +66,33 @@ func TestStructMap(t *testing.T) {
 			Age:  30,
 		}
 
-		values, err := m.Map("Test", s, true)
+		columns, values, err := m.Map("Test", s, true)
 		assert.NoError(t, err)
+		assert.Len(t, columns, 3)
 		assert.Len(t, values, 3)
 		
-		// With pointer=true we get addresses of the values
-		idPtr := values[0].(*int)
-		namePtr := values[1].(*string)
-		agePtr := values[2].(*int)
+		// Verify all expected columns are present
+		assert.Contains(t, columns, "id")
+		assert.Contains(t, columns, "name")
+		assert.Contains(t, columns, "age")
 		
+		// Create a map to associate columns with values (which are pointers in this case)
+		valueMap := make(map[string]interface{})
+		for i, col := range columns {
+			valueMap[col] = values[i]
+		}
+		
+		// Verify each pointer contains the expected value
+		idPtr, ok := valueMap["id"].(*int)
+		assert.True(t, ok, "ID should be an *int")
 		assert.Equal(t, 1, *idPtr)
+		
+		namePtr, ok := valueMap["name"].(*string)
+		assert.True(t, ok, "Name should be a *string")
 		assert.Equal(t, "test", *namePtr)
+		
+		agePtr, ok := valueMap["age"].(*int)
+		assert.True(t, ok, "Age should be an *int")
 		assert.Equal(t, 30, *agePtr)
 	})
 
@@ -75,12 +105,19 @@ func TestStructMap(t *testing.T) {
 			internal: 42,
 		}
 
-		values, err := m.Map("Test", s, false)
+		columns, values, err := m.Map("Test", s, false)
 		assert.NoError(t, err)
-		assert.Len(t, values, 3) // Should only include the exported fields with CH tags
 		
-		// Note: values may not be in the same order as the fields in the struct
-		// So we skip the exact order checks
+		// Should only include the exported fields with CH tags
+		assert.Len(t, columns, 3)
+		assert.Len(t, values, 3)
+		
+		// Verify the expected columns and no unexpected ones
+		assert.Contains(t, columns, "id")
+		assert.Contains(t, columns, "name")
+		assert.Contains(t, columns, "age")
+		assert.NotContains(t, columns, "private")
+		assert.NotContains(t, columns, "internal")
 	})
 
 	t.Run("Nested struct", func(t *testing.T) {
@@ -94,11 +131,18 @@ func TestStructMap(t *testing.T) {
 			internal: 42,
 		}
 
-		values, err := m.Map("Test", s, false)
+		columns, values, err := m.Map("Test", s, false)
 		assert.NoError(t, err)
-		// Fields from nested struct will be included, but number may vary
-		// Just check that we have values
+		
+		// Verify we got columns and values
+		assert.NotEmpty(t, columns)
 		assert.NotEmpty(t, values)
+		assert.Equal(t, len(columns), len(values))
+		
+		// Check for expected fields - the current implementation doesn't expand nested structs
+		assert.Contains(t, columns, "base")
+		assert.Contains(t, columns, "extra")
+		assert.NotContains(t, columns, "internal")
 	})
 
 	t.Run("Not a pointer", func(t *testing.T) {
@@ -108,8 +152,9 @@ func TestStructMap(t *testing.T) {
 			Age:  30,
 		}
 
-		values, err := m.Map("Test", s, false)
+		columns, values, err := m.Map("Test", s, false)
 		assert.Error(t, err)
+		assert.Nil(t, columns)
 		assert.Nil(t, values)
 		assert.Contains(t, err.Error(), "must pass a pointer")
 	})
@@ -117,8 +162,9 @@ func TestStructMap(t *testing.T) {
 	t.Run("Nil pointer", func(t *testing.T) {
 		var s *testStruct = nil
 
-		values, err := m.Map("Test", s, false)
+		columns, values, err := m.Map("Test", s, false)
 		assert.Error(t, err)
+		assert.Nil(t, columns)
 		assert.Nil(t, values)
 		assert.Contains(t, err.Error(), "nil pointer")
 	})
@@ -126,8 +172,9 @@ func TestStructMap(t *testing.T) {
 	t.Run("Not a struct", func(t *testing.T) {
 		s := "not a struct"
 
-		values, err := m.Map("Test", &s, false)
+		columns, values, err := m.Map("Test", &s, false)
 		assert.Error(t, err)
+		assert.Nil(t, columns)
 		assert.Nil(t, values)
 		assert.Contains(t, err.Error(), "expects a struct")
 	})
@@ -155,6 +202,16 @@ func TestStructIdx(t *testing.T) {
 		assert.NotContains(t, idx, "private")
 		assert.NotContains(t, idx, "internal")
 	})
+	
+	t.Run("Nested struct", func(t *testing.T) {
+		typ := (testNestedStruct{}).Type()
+		idx := structIdx(typ)
+		
+		// Current implementation puts nested structs as fields themselves, not expanded
+		assert.Contains(t, idx, "base")
+		assert.Contains(t, idx, "extra")
+		assert.NotContains(t, idx, "internal")
+	})
 }
 
 // Helper method to get type safely
@@ -164,4 +221,8 @@ func (testStruct) Type() reflect.Type {
 
 func (testStructWithPrivate) Type() reflect.Type {
 	return reflect.TypeOf(testStructWithPrivate{})
+}
+
+func (testNestedStruct) Type() reflect.Type {
+	return reflect.TypeOf(testNestedStruct{})
 }

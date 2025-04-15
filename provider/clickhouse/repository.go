@@ -269,7 +269,7 @@ func (r *repository) Insert(rows ...any) error {
 
 // InsertAsync inserts a single record async
 func (r *repository) InsertAsync(record any) error {
-	values, err := r.mapper.Map("AppendStruct", record, false)
+	cols, values, err := r.mapper.Map("InsertAsync", record, false)
 	if err != nil {
 		return err
 	}
@@ -278,11 +278,7 @@ func (r *repository) InsertAsync(record any) error {
 	qry.WriteString("INSERT INTO ")
 	qry.WriteString(r.tableName)
 	qry.WriteString(" VALUES(")
-	tmp := make([]string, len(values))
-	for i := range tmp {
-		tmp[i] = "?"
-	}
-	qry.WriteString(strings.Join(tmp, ","))
+	qry.WriteString(strings.Join(cols, ","))
 	qry.WriteString(")")
 
 	return r.conn.AsyncInsert(r.ctx, qry.String(), false, values...)

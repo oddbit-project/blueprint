@@ -31,16 +31,16 @@ type structMap struct {
 	cache sync.Map
 }
 
-func (m *structMap) Map(op string, s any, ptr bool) ([]any, error) {
+func (m *structMap) Map(op string, s any, ptr bool) ([]string, []any, error) {
 	v := reflect.ValueOf(s)
 	if v.Kind() != reflect.Ptr {
-		return nil, &clickhouse.OpError{
+		return nil, nil, &clickhouse.OpError{
 			Op:  op,
 			Err: fmt.Errorf("must pass a pointer, not a value, to %s destination", op),
 		}
 	}
 	if v.IsNil() {
-		return nil, &clickhouse.OpError{
+		return nil, nil, &clickhouse.OpError{
 			Op:  op,
 			Err: fmt.Errorf("nil pointer passed to %s destination", op),
 		}
@@ -50,7 +50,7 @@ func (m *structMap) Map(op string, s any, ptr bool) ([]any, error) {
 		t = t.Elem()
 	}
 	if v.Kind() != reflect.Struct {
-		return nil, &clickhouse.OpError{
+		return nil, nil, &clickhouse.OpError{
 			Op:  op,
 			Err: fmt.Errorf("%s expects a struct dest", op),
 		}
@@ -65,8 +65,10 @@ func (m *structMap) Map(op string, s any, ptr bool) ([]any, error) {
 		m.cache.Store(t, index)
 	}
 
+	cols := make([]string, 0, len(index))
 	values := make([]any, 0, len(index))
-	for _, idx := range index {
+	for c, idx := range index {
+		cols = append(cols, c)
 		switch field := v.FieldByIndex(idx); {
 		case ptr:
 			values = append(values, field.Addr().Interface())
@@ -74,7 +76,7 @@ func (m *structMap) Map(op string, s any, ptr bool) ([]any, error) {
 			values = append(values, field.Interface())
 		}
 	}
-	return values, nil
+	return cols, values, nil
 }
 
 func structIdx(t reflect.Type) map[string][]int {

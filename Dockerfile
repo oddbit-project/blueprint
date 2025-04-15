@@ -6,6 +6,6 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=1
 
-CMD ["go", "test", "-v", "./..."]
+CMD ["go", "test", "-v", "-race","-tags=integration", "./..."]
