@@ -9,6 +9,7 @@ type Worker struct {
 	jobQueue       chan Job
 	ctx            context.Context
 	requestCounter uint64
+	counterMutex   sync.Mutex
 }
 
 type WorkerGroup struct {
@@ -34,7 +35,9 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 			select {
 			case job := <-w.jobQueue:
 				job.Run(w.ctx)
+				w.counterMutex.Lock()
 				w.requestCounter++
+				w.counterMutex.Unlock()
 
 			case <-w.ctx.Done():
 				return
@@ -45,6 +48,8 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 }
 
 func (w *Worker) RequestCounter() uint64 {
+	w.counterMutex.Lock()
+	defer w.counterMutex.Unlock()
 	return w.requestCounter
 }
 

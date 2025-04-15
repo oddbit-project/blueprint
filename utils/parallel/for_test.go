@@ -80,7 +80,11 @@ func TestForInt(t *testing.T) {
 		assert.Equal(t, expectedError, err)
 		
 		// Some items should have been processed, but not necessarily all
-		assert.NotEmpty(t, processed)
+		// Use a mutex to safely check if the map is not empty
+		mu.Lock()
+		isEmpty := len(processed) == 0
+		mu.Unlock()
+		assert.False(t, isEmpty, "Processed map should not be empty")
 	})
 	
 	// Test case: nil function would panic, so we're not testing it
