@@ -27,6 +27,7 @@ type Repository interface {
 	db.Writer
 	db.Deleter
 	db.Counter
+	db.GridOps
 	Conn() clickhouse.Conn
 }
 
@@ -36,6 +37,7 @@ type repository struct {
 	tableName string
 	mapper    *structMap
 	dialect   goqu.DialectWrapper
+	spec      *db.FieldSpec
 }
 
 func NewRepository(ctx context.Context, conn clickhouse.Conn, tableName string) Repository {
@@ -45,6 +47,7 @@ func NewRepository(ctx context.Context, conn clickhouse.Conn, tableName string) 
 		tableName: tableName,
 		mapper:    &structMap{},
 		dialect:   goqu.Dialect("clickhouse"),
+		spec:      nil,
 	}
 }
 
@@ -318,4 +321,41 @@ func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 // InsertReturning is not supported
 func (r *repository) InsertReturning(record any, returnFields []interface{}, target ...any) error {
 	return ErrNotSupported
+}
+
+// Grid creates a new Grid object for the record, and caches the field spec for more efficient usage
+func (r *repository) Grid(record any) (*db.Grid, error) {
+	if r.spec == nil {
+		var err error
+		if r.spec, err = db.NewFieldSpec(record); err != nil {
+			return nil, err
+		}
+	}
+	return db.NewGridWithSpec(r.tableName, r.spec), nil
+}
+
+// QueryGrid creates a new Grid object and performs a query using GridQuery
+func (r *repository) QueryGrid(record any, args db.GridQuery, dest any) error {
+	var (
+		err    error
+		qry    *goqu.SelectDataset
+		grid   *db.Grid
+		sql    string
+		values []interface{}
+	)
+
+	grid, err = r.Grid(record)
+	if err != nil {
+		return err
+	}
+
+	qry, err = grid.Build(r.SqlSelect(), args)
+	if err != nil {
+		return err
+	}
+	sql, values, err = qry.ToSQL()
+	if err != nil {
+		return err
+	}
+	return r.conn.Select(r.ctx, dest, sql, values...)
 }

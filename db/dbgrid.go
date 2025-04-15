@@ -14,6 +14,8 @@ const (
 	SearchStart = 1
 	SearchEnd   = 2
 	SearchAny   = 3
+
+	DefaultPageSize = 100
 )
 
 type GridFilterFunc func(lookupValue any) (any, error)
@@ -69,6 +71,19 @@ func NewGridQuery(searchType uint, limit uint, offset uint) (GridQuery, error) {
 		Offset:       offset,
 		Limit:        limit,
 	}, nil
+}
+
+// Page calculates offset and limit from page information
+func (g GridQuery) Page(page, itemsPerPage int) {
+	if page < 1 {
+		page = 1
+	}
+	if itemsPerPage < 1 {
+		itemsPerPage = DefaultPageSize
+	}
+
+	g.Offset = uint((page - 1) * itemsPerPage)
+	g.Limit = uint(itemsPerPage)
 }
 
 // NewGrid create a new grid

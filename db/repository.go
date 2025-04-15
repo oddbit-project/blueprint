@@ -62,6 +62,11 @@ type SqlxReaderCtx interface {
 	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 }
 
+type GridOps interface {
+	Grid(record any) (*Grid, error)
+	QueryGrid(record any, args GridQuery, dest any) error
+}
+
 type Repository interface {
 	Identifier
 	Builder
@@ -71,6 +76,7 @@ type Repository interface {
 	Deleter
 	Updater
 	Counter
+	GridOps
 	NewTransaction(opts *sql.TxOptions) (Transaction, error)
 }
 
@@ -97,6 +103,7 @@ type repository struct {
 	ctx       context.Context
 	tableName string
 	dialect   goqu.DialectWrapper
+	spec      *FieldSpec
 }
 
 type tx struct {
@@ -243,6 +250,38 @@ func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return Count(r.ctx, r.conn, qry)
+}
+
+// Grid creates a new Grid object for the record, and caches the field spec for more efficient usage
+func (r *repository) Grid(record any) (*Grid, error) {
+	if r.spec == nil {
+		var err error
+		if r.spec, err = NewFieldSpec(record); err != nil {
+			return nil, err
+		}
+	}
+	return NewGridWithSpec(r.tableName, r.spec), nil
+}
+
+// QueryGrid creates a new Grid object and performs a query using GridQuery
+func (r *repository) QueryGrid(record any, args GridQuery, dest any) error {
+	var (
+		err  error
+		qry  *goqu.SelectDataset
+		grid *Grid
+	)
+
+	grid, err = r.Grid(record)
+	if err != nil {
+		return err
+	}
+
+	qry, err = grid.Build(r.SqlSelect(), args)
+	if err != nil {
+		return err
+	}
+
+	return Fetch(r.ctx, r.conn, qry, dest)
 }
 
 // InsertReturning inserts a record, and returns the specified return fields into target
