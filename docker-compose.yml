@@ -36,6 +36,17 @@ services:
     ports:
       - 1883:1883
       - 8883:8883
+      
+  nats:
+    image: nats:latest
+    container_name: nats
+    ports:
+      - 4222:4222
+      - 8222:8222
+      - 6222:6222
+    command: ["-js", "-m", "8222", "--user", "testuser", "--pass", "testpassword"]
+    volumes:
+      - ./test-deps/nats:/etc/nats
 
   zookeeper:
     container_name: zookeeper
@@ -88,3 +99,4 @@ services:
       - kafka
       - clickhouse
       - postgres
+      - nats

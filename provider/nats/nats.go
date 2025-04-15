@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/utils"
 	"time"
 )
@@ -26,3 +27,10 @@ const (
 )
 
 var validAuthTypes = []string{AuthTypeNone, AuthTypeBasic, AuthTypeToken}
+
+// StringPasswordConfig creates a simple string password credential config for testing
+func StringPasswordConfig(password string) secure.DefaultCredentialConfig {
+	return secure.DefaultCredentialConfig{
+		Password: password,
+	}
+}
