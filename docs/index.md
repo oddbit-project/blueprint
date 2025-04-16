@@ -31,3 +31,8 @@
 ## HTTP Server
 
 - [Request Utilities](provider/httpserver/request.md)
+
+## Utilities
+
+- [BatchWriter](batchwriter/batchwriter.md)
+- [ThreadPool](threadpool/threadpool.md)

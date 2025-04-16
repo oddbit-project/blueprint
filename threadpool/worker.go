@@ -2,6 +2,7 @@ package threadpool
 
 import (
 	"context"
+	"github.com/oddbit-project/blueprint/log"
 	"sync"
 )
 
@@ -10,6 +11,8 @@ type Worker struct {
 	ctx            context.Context
 	requestCounter uint64
 	counterMutex   sync.Mutex
+	// Could add a logger field for panic logging
+	// logger         *log.Logger
 }
 
 type WorkerGroup struct {
@@ -28,20 +31,33 @@ func NewWorker(jobQueue chan Job, ctx context.Context) *Worker {
 	}
 }
 
-func (w *Worker) Start(wg *sync.WaitGroup) {
+func (w *Worker) Start(wg *sync.WaitGroup, logger *log.Logger) {
 	go func() {
 		defer wg.Done()
 		for {
 			select {
 			case job := <-w.jobQueue:
-				job.Run(w.ctx)
+				// Recover from any panics in job execution to prevent worker crash
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							// Only log if logger is provided
+							if logger != nil {
+								logger.Warnf("ThreadPool Worker panic: %v", r)
+							}
+							// Otherwise silently recover
+						}
+					}()
+					job.Run(w.ctx)
+				}()
+
+				// Update counter after job completion
 				w.counterMutex.Lock()
 				w.requestCounter++
 				w.counterMutex.Unlock()
 
 			case <-w.ctx.Done():
 				return
-
 			}
 		}
 	}()
@@ -53,7 +69,9 @@ func (w *Worker) RequestCounter() uint64 {
 	return w.requestCounter
 }
 
-func NewWorkerGroup(workerCount int, jobQueue chan Job, parentCtx context.Context) (*WorkerGroup, error) {
+// NewWorkerGroup creates a new group of workers
+// If logger is nil, panics will be recovered silently 
+func NewWorkerGroup(workerCount int, jobQueue chan Job, parentCtx context.Context, logger *log.Logger) (*WorkerGroup, error) {
 	if workerCount < 1 {
 		return nil, ErrInvalidWorkerCount
 	}
@@ -70,18 +88,31 @@ func NewWorkerGroup(workerCount int, jobQueue chan Job, parentCtx context.Contex
 	}
 	// Start workers
 	for i := 0; i < workerCount; i++ {
+		// First create and add to WaitGroup before starting the worker goroutine
 		group.workers[i] = NewWorker(jobQueue, group.ctx)
-		group.workers[i].Start(group.wg)
 		group.wg.Add(1)
+		group.workers[i].Start(group.wg, logger)
 	}
 	return group, nil
 }
 
 func (w *WorkerGroup) RequestCount() uint64 {
 	var totalRequests uint64
+	// Use a lock to ensure consistent reading of values across all workers
+	var mutex sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(len(w.workers))
 	for _, worker := range w.workers {
-		totalRequests += worker.RequestCounter()
+		go func(worker *Worker) {
+			defer wg.Done()
+			count := worker.RequestCounter()
+			mutex.Lock()
+			totalRequests += count
+			mutex.Unlock()
+		}(worker)
 	}
+	wg.Wait()
 	return totalRequests
 }
 
