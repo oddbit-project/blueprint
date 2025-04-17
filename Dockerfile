@@ -8,4 +8,4 @@ COPY . .
 
 ENV CGO_ENABLED=1
 
-CMD ["go", "test", "-v", "-race","-tags=integration", "./..."]
+CMD ["go", "test", "-v", "-race","-tags=integration,race", "./..."]

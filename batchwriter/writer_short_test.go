@@ -67,27 +67,46 @@ func TestSimple_Add(t *testing.T) {
 func TestSimple_TryAdd(t *testing.T) {
 	ctx := context.Background()
 	
-	// Create BatchWriter with a capacity of 3 but a channel of capacity 2
-	bw, _ := NewBatchWriter(ctx, 3, time.Hour, func(records ...any) {
-		// Do nothing
+	// Create an extremely slow flush function that sleeps
+	bw, _ := NewBatchWriter(ctx, 2, time.Hour, func(records ...any) {
+		// Simulate slow processing (this causes channel to fill up)
+		time.Sleep(500 * time.Millisecond)
 	})
 	defer bw.Stop()
 	
-	// These should succeed (channel capacity is 3)
-	success1 := bw.TryAdd(1)
-	success2 := bw.TryAdd(2)
-	success3 := bw.TryAdd(3)
-	
-	// This might fail depending on timing
-	success4 := bw.TryAdd(4)
-	
-	if !success1 || !success2 || !success3 {
-		t.Error("First three TryAdd calls should succeed")
+	// These should succeed
+	if !bw.TryAdd(1) {
+		t.Error("First TryAdd should succeed")
+	}
+	if !bw.TryAdd(2) {
+		t.Error("Second TryAdd should succeed")
 	}
 	
-	// Check metrics for drops
+	// Trigger a flush (will run in background)
+	bw.FlushNow()
+	
+	// Add more items to the channel until we hit capacity
+	// The channel capacity is 2, so we keep adding until we get a failure
+	var failedCount int
+	for i := 0; i < 20; i++ {
+		if !bw.TryAdd(i) {
+			failedCount++
+			break
+		}
+		// Small delay between tries
+		time.Sleep(time.Millisecond)
+	}
+	
+	if failedCount == 0 {
+		t.Error("Expected at least one TryAdd to fail due to full channel")
+	}
+	
+	// Allow time for processing to complete
+	time.Sleep(600 * time.Millisecond)
+	
+	// Verify metrics
 	metrics := bw.GetMetrics()
-	if !success4 && metrics.RecordsDropped != 1 {
-		t.Errorf("Expected 1 record dropped, got %d", metrics.RecordsDropped)
+	if metrics.RecordsDropped == 0 {
+		t.Errorf("Expected at least one record to be dropped")
 	}
 }
