@@ -18,7 +18,7 @@ import (
 
 // getNatsHost returns the NATS server hostname from environment or default
 func getNatsHost() string {
-	host := "localhost" // Default
+	host := "nats" // Default
 	if envHost := os.Getenv("NATS_SERVER_HOST"); envHost != "" {
 		host = envHost
 	}
@@ -40,7 +40,7 @@ func (s *NatsAuthIntegrationTestSuite) SetupSuite() {
 
 	// Create logger
 	s.logger = log.New("nats-auth-integration-test")
-	
+
 	// Log environment setup
 	s.logger.Info("NATS test setup", log.KV{
 		"host": getNatsHost(),
@@ -60,10 +60,10 @@ func (s *NatsAuthIntegrationTestSuite) TestBasicAuth() {
 	// Create producer with basic auth
 	natsHost := getNatsHost()
 	producerConfig := &nats.ProducerConfig{
-		URL:      fmt.Sprintf("nats://%s:4222", natsHost), // URL without auth info
-		Subject:  "test.auth.basic",
-		AuthType: nats.AuthTypeBasic,
-		Username: "testuser",
+		URL:                     fmt.Sprintf("nats://%s:4222", natsHost), // URL without auth info
+		Subject:                 "test.auth.basic",
+		AuthType:                nats.AuthTypeBasic,
+		Username:                "testuser",
 		DefaultCredentialConfig: nats.StringPasswordConfig("testpassword"),
 	}
 
@@ -85,10 +85,10 @@ func (s *NatsAuthIntegrationTestSuite) TestBasicAuth() {
 
 	// Test with invalid credentials - this should always fail
 	invalidConfig := &nats.ProducerConfig{
-		URL:      fmt.Sprintf("nats://%s:4222", natsHost),
-		Subject:  "test.auth.basic",
-		AuthType: nats.AuthTypeBasic,
-		Username: "testuser",
+		URL:                     fmt.Sprintf("nats://%s:4222", natsHost),
+		Subject:                 "test.auth.basic",
+		AuthType:                nats.AuthTypeBasic,
+		Username:                "testuser",
 		DefaultCredentialConfig: nats.StringPasswordConfig("wrongpassword"),
 	}
 
@@ -153,7 +153,7 @@ func (s *NatsAuthIntegrationTestSuite) TestDirectURLAuth() {
 
 	connected := producer.IsConnected()
 	assert.True(s.T(), connected, "Producer should be connected with URL auth")
-	
+
 	// Only try publishing if we're connected
 	if connected {
 		// Test publishing a message
