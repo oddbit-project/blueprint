@@ -192,4 +192,5 @@ func TestClickhouseIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 	suite.Run(t, new(ClickhouseIntegrationTestSuite))
+	suite.Run(t, new(ClickhouseMigrationTestSuite))
 }

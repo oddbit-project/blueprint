@@ -22,10 +22,10 @@ const (
 type ProgressFn func(msgType int, migrationName string, e error)
 
 type MigrationRecord struct {
-	Created  time.Time `db:"created"`
-	Name     string    `db:"name"`
-	SHA2     string    `db:"sha2"`
-	Contents string    `db:"contents"`
+	Created  time.Time `db:"created" ch:"created"`
+	Name     string    `db:"name" ch:"name"`
+	SHA2     string    `db:"sha2" ch:"sha2"`
+	Contents string    `db:"contents" ch:"contents"`
 }
 
 type Source interface {
@@ -34,7 +34,7 @@ type Source interface {
 }
 
 type Manager interface {
-	List(ctx context.Context) ([]*MigrationRecord, error)
+	List(ctx context.Context) ([]MigrationRecord, error)
 	MigrationExists(ctx context.Context, name string, sha2 string) (bool, error)
 	RunMigration(ctx context.Context, m *MigrationRecord) error
 	RegisterMigration(ctx context.Context, m *MigrationRecord) error

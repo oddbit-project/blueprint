@@ -264,6 +264,7 @@ func (r *repository) Insert(rows ...any) error {
 	}
 	for _, r := range rows {
 		if err := batch.AppendStruct(r); err != nil {
+			batch.Abort()
 			return err
 		}
 	}
