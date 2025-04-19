@@ -64,10 +64,10 @@ func TestProducerConfigValidate(t *testing.T) {
 		{
 			name: "Valid Token Auth",
 			config: &ProducerConfig{
-				URL:      "nats://localhost:4222",
-				Subject:  "test.subject",
-				AuthType: AuthTypeToken,
-				Token:    "test-token",
+				URL:                     "nats://localhost:4222",
+				Subject:                 "test.subject",
+				AuthType:                AuthTypeToken,
+				DefaultCredentialConfig: StringPasswordConfig("test-token"),
 			},
 			expected: nil,
 		},

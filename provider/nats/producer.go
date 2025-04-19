@@ -2,6 +2,7 @@ package nats
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/nats-io/nats.go"
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
@@ -24,7 +25,6 @@ type ProducerConfig struct {
 	AuthType string `json:"authType"`
 	Username string `json:"username"`
 	secure.DefaultCredentialConfig
-	Token        string `json:"token"`
 	ProducerName string `json:"ProducerName"`
 	tlsProvider.ClientConfig
 	ProducerOptions
@@ -78,7 +78,8 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 	var password string
 	var err error
 
-	if cfg.AuthType == AuthTypeBasic {
+	switch cfg.AuthType {
+	case AuthTypeToken, AuthTypeBasic:
 		key, err = secure.GenerateKey()
 		if err != nil {
 			return nil, err
@@ -90,6 +91,7 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		if err != nil {
 			return nil, err
 		}
+
 	}
 
 	// Configure connection options
@@ -110,7 +112,7 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		opts.User = cfg.Username
 		opts.Password = password
 	case AuthTypeToken:
-		opts.Token = cfg.Token
+		opts.Token = password
 	}
 
 	// Apply TLS settings
@@ -155,40 +157,69 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 
 // Disconnect closes the connection to NATS
 func (p *Producer) Disconnect() {
-	if p.Conn != nil {
-		if p.Conn.IsDraining() {
-			return
-		}
+	// Check if producer is nil or already disconnected
+	if p == nil || p.Conn == nil {
+		return
+	}
+
+	// Check if already draining
+	if p.Conn.IsDraining() {
+		return
+	}
+
+	// Log disconnect if logger is available
+	if p.Logger != nil {
 		p.Logger.Info("Closing producer connection", log.KV{
 			"subject": p.Subject,
 		})
-		// Use Drain for graceful shutdown
-		if err := p.Conn.Drain(); err != nil {
-			p.Logger.Error(err, "Error during NATS connection drain", nil)
-		}
-		p.Conn.Close()
-		p.Conn = nil
 	}
+
+	// Use Drain for graceful shutdown
+	if err := p.Conn.Drain(); err != nil && p.Logger != nil {
+		p.Logger.Error(err, "Error during NATS connection drain", nil)
+	}
+
+	// Close and clean up
+	p.Conn.Close()
+	p.Conn = nil
 }
 
 // IsConnected returns true if the NATS connection is connected
 func (p *Producer) IsConnected() bool {
-	return p.Conn != nil && p.Conn.IsConnected()
+	// Check if producer or connection is nil
+	if p == nil || p.Conn == nil {
+		return false
+	}
+	return p.Conn.IsConnected()
 }
 
 // Publish publishes a message to the configured subject
 func (p *Producer) Publish(data []byte) error {
+	// Check for nil producer or disconnected state
+	if p == nil {
+		return errors.New("publisher is nil")
+	}
+
 	if !p.IsConnected() {
-		p.Logger.Error(ErrProducerClosed, "Failed to publish message - producer closed", nil)
+		if p.Logger != nil {
+			p.Logger.Error(ErrProducerClosed, "Failed to publish message - producer closed", nil)
+		}
+		return ErrProducerClosed
+	}
+
+	// Sanity check for nil connection that might have escaped IsConnected
+	if p.Conn == nil {
 		return ErrProducerClosed
 	}
 
 	err := p.Conn.Publish(p.Subject, data)
 	if err != nil {
-		p.Logger.Error(err, "Failed to publish message to NATS", log.KV{
-			"subject":      p.Subject,
-			"message_size": len(data),
-		})
+		if p.Logger != nil {
+			p.Logger.Error(err, "Failed to publish message to NATS", log.KV{
+				"subject":      p.Subject,
+				"message_size": len(data),
+			})
+		}
 		return err
 	}
 
@@ -197,17 +228,31 @@ func (p *Producer) Publish(data []byte) error {
 
 // PublishMsg publishes a message with a specific subject
 func (p *Producer) PublishMsg(subject string, data []byte) error {
+	// Check for nil producer
+	if p == nil {
+		return errors.New("publisher is nil")
+	}
+
 	if !p.IsConnected() {
-		p.Logger.Error(ErrProducerClosed, "Failed to publish message - producer closed", nil)
+		if p.Logger != nil {
+			p.Logger.Error(ErrProducerClosed, "Failed to publish message - producer closed", nil)
+		}
+		return ErrProducerClosed
+	}
+
+	// Sanity check for nil connection
+	if p.Conn == nil {
 		return ErrProducerClosed
 	}
 
 	err := p.Conn.Publish(subject, data)
 	if err != nil {
-		p.Logger.Error(err, "Failed to publish message to NATS", log.KV{
-			"subject":      subject,
-			"message_size": len(data),
-		})
+		if p.Logger != nil {
+			p.Logger.Error(err, "Failed to publish message to NATS", log.KV{
+				"subject":      subject,
+				"message_size": len(data),
+			})
+		}
 		return err
 	}
 
@@ -216,18 +261,32 @@ func (p *Producer) PublishMsg(subject string, data []byte) error {
 
 // PublishRequest publishes a request message and waits for a response
 func (p *Producer) PublishRequest(subject string, reply string, data []byte) error {
+	// Check for nil producer
+	if p == nil {
+		return errors.New("publisher is nil")
+	}
+
 	if !p.IsConnected() {
-		p.Logger.Error(ErrProducerClosed, "Failed to publish request - producer closed", nil)
+		if p.Logger != nil {
+			p.Logger.Error(ErrProducerClosed, "Failed to publish request - producer closed", nil)
+		}
+		return ErrProducerClosed
+	}
+
+	// Sanity check for nil connection
+	if p.Conn == nil {
 		return ErrProducerClosed
 	}
 
 	err := p.Conn.PublishRequest(subject, reply, data)
 	if err != nil {
-		p.Logger.Error(err, "Failed to publish request to NATS", log.KV{
-			"subject":      subject,
-			"reply":        reply,
-			"message_size": len(data),
-		})
+		if p.Logger != nil {
+			p.Logger.Error(err, "Failed to publish request to NATS", log.KV{
+				"subject":      subject,
+				"reply":        reply,
+				"message_size": len(data),
+			})
+		}
 		return err
 	}
 
@@ -236,19 +295,31 @@ func (p *Producer) PublishRequest(subject string, reply string, data []byte) err
 
 // Request publishes a request message and waits for a response with a timeout
 func (p *Producer) Request(subject string, data []byte, timeout time.Duration) (*nats.Msg, error) {
+	// Check if producer is connected
 	if !p.IsConnected() {
-		p.Logger.Error(ErrProducerClosed, "Failed to make request - producer closed", nil)
+		if p.Logger != nil {
+			p.Logger.Error(ErrProducerClosed, "Failed to make request - producer closed", nil)
+		}
 		return nil, ErrProducerClosed
 	}
 
+	// Make the request
 	msg, err := p.Conn.Request(subject, data, timeout)
 	if err != nil {
-		p.Logger.Error(err, "Failed to make request to NATS", log.KV{
-			"subject":      subject,
-			"message_size": len(data),
-			"timeout":      timeout,
-		})
+		// Only log the error if we have a logger
+		if p.Logger != nil {
+			p.Logger.Error(err, "Failed to make request to NATS", log.KV{
+				"subject":      subject,
+				"message_size": len(data),
+				"timeout":      timeout,
+			})
+		}
 		return nil, err
+	}
+
+	// Check if response is nil (shouldn't happen, but being defensive)
+	if msg == nil {
+		return nil, errors.New("received nil response from NATS request")
 	}
 
 	return msg, nil

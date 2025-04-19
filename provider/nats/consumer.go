@@ -27,7 +27,6 @@ type ConsumerConfig struct {
 	AuthType string `json:"authType"` // Authentication type
 	Username string `json:"username"` // Username for basic auth
 	secure.DefaultCredentialConfig
-	Token        string `json:"token"`        // Auth token
 	ConsumerName string `json:"consumerName"` // Optional consumer name
 	tlsProvider.ClientConfig
 	ConsumerOptions
@@ -131,7 +130,7 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		opts.User = cfg.Username
 		opts.Password = password
 	case AuthTypeToken:
-		opts.Token = cfg.Token
+		opts.Token = password
 	}
 
 	// Apply TLS settings
@@ -178,39 +177,53 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 
 // IsConnected returns true if the consumer is connected
 func (c *Consumer) IsConnected() bool {
-	return c.Conn != nil && c.Conn.IsConnected()
+	// Check if consumer or connection is nil
+	if c == nil || c.Conn == nil {
+		return false
+	}
+	return c.Conn.IsConnected()
 }
 
 // Disconnect disconnects from NATS server
 func (c *Consumer) Disconnect() {
-	if c.Conn != nil {
-		if c.Conn.IsDraining() {
-			return
-		}
+	// Check if consumer is nil or already disconnected
+	if c == nil || c.Conn == nil {
+		return
+	}
+
+	// Check if already draining
+	if c.Conn.IsDraining() {
+		return
+	}
+
+	// Log disconnect if logger is available
+	if c.Logger != nil {
 		c.Logger.Info("Closing consumer connection", log.KV{
 			"subject": c.Subject,
 			"queue":   c.Queue,
 		})
-
-		// Unsubscribe from all subscriptions
-		c.subsLock.Lock()
-		for _, sub := range c.subs {
-			if err := sub.Unsubscribe(); err != nil {
-				c.Logger.Error(err, "Error unsubscribing from NATS subject", log.KV{
-					"subject": sub.Subject,
-				})
-			}
-		}
-		c.subs = make([]*nats.Subscription, 0)
-		c.subsLock.Unlock()
-
-		// Use Drain for graceful shutdown
-		if err := c.Conn.Drain(); err != nil {
-			c.Logger.Error(err, "Error during NATS connection drain", nil)
-		}
-		c.Conn.Close()
-		c.Conn = nil
 	}
+
+	// Unsubscribe from all subscriptions
+	c.subsLock.Lock()
+	for _, sub := range c.subs {
+		if err := sub.Unsubscribe(); err != nil && c.Logger != nil {
+			c.Logger.Error(err, "Error unsubscribing from NATS subject", log.KV{
+				"subject": sub.Subject,
+			})
+		}
+	}
+	c.subs = make([]*nats.Subscription, 0)
+	c.subsLock.Unlock()
+
+	// Use Drain for graceful shutdown
+	if err := c.Conn.Drain(); err != nil && c.Logger != nil {
+		c.Logger.Error(err, "Error during NATS connection drain", nil)
+	}
+
+	// Close and clean up
+	c.Conn.Close()
+	c.Conn = nil
 }
 
 // Convert nats.Msg to Message
@@ -412,16 +425,26 @@ func (c *Consumer) Unsubscribe(sub *nats.Subscription) error {
 
 // Request sends a request and waits for a response
 func (c *Consumer) Request(subject string, data []byte, timeout time.Duration) (*Message, error) {
+	// Check if consumer is connected
 	if !c.IsConnected() {
 		return nil, ErrConsumerClosed
 	}
 
+	// Make the request
 	msg, err := c.Conn.Request(subject, data, timeout)
 	if err != nil {
-		c.Logger.Error(err, "Failed to send request to NATS", log.KV{
-			"subject": subject,
-		})
+		// Only log the error if we have a logger
+		if c.Logger != nil {
+			c.Logger.Error(err, "Failed to send request to NATS", log.KV{
+				"subject": subject,
+			})
+		}
 		return nil, err
+	}
+
+	// Check if response is nil (shouldn't happen, but being defensive)
+	if msg == nil {
+		return nil, errors.New("received nil response from NATS request")
 	}
 
 	// Convert to our Message type

@@ -6,6 +6,7 @@ This directory contains comprehensive documentation for the Blueprint framework.
 
 The documentation is organized by module:
 
+- `batchwriter/` - Batch processing utilities documentation
 - `config/` - Configuration system documentation
 - `crypt/` - Security and cryptography documentation
 - `db/` - Database access and repository pattern documentation
@@ -17,4 +18,5 @@ The documentation is organized by module:
   - `mqtt/` - MQTT client documentation
   - `pgsql/` - PostgreSQL client documentation
   - `tls/` - TLS configuration documentation
+- `threadpool/` - Concurrent worker pool documentation
 

@@ -2,7 +2,9 @@ package threadpool
 
 import (
 	"context"
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/utils"
+	"time"
 )
 
 const (
@@ -15,18 +17,32 @@ const (
 type Pool interface {
 	Stop() error
 	Dispatch(j Job)
-	Start() error
+	TryDispatch(j Job) bool
+	DispatchWithTimeout(j Job, timeout time.Duration) bool
+	DispatchWithContext(ctx context.Context, j Job) error
+	Start(ctx context.Context) error
 }
 
 type ThreadPool struct {
 	workers     *WorkerGroup
 	workerCount int
 	jobQueue    chan Job
+	logger      *log.Logger
 }
 
-// NewThreadPool is a constructor function that creates a new ThreadPool instance. It takes in two parameters:
+type OptionsFn func(*ThreadPool)
+
+// WithLogger adds a logger to the threadpool
+func WithLogger(logger *log.Logger) OptionsFn {
+	return func(t *ThreadPool) {
+		t.logger = logger
+	}
+}
+
+// NewThreadPool is a constructor function that creates a new ThreadPool instance. It takes in parameters:
 // - workerCount: the number of workers to be created in the ThreadPool. Must be greater than 0. If it's less than 1, it returns ErrInvalidWorkerCount.
 // - queueSize: the size of the job queue in the ThreadPool. Must be greater than 0. If it's less than 1, it returns ErrInvalidQueueSize.
+// - opts: optional functional options like WithLogger
 // It returns a pointer to the created ThreadPool and an error.
 //
 // Example usage:
@@ -36,9 +52,13 @@ type ThreadPool struct {
 //	  // handle error
 //	}
 //
+// // Or with options:
+// logger := log.NewLogger()
+// pool, err := NewThreadPool(5, 10, WithLogger(logger))
+//
 // pool.Dispatch(job)
 // ...
-func NewThreadPool(workerCount int, queueSize int) (*ThreadPool, error) {
+func NewThreadPool(workerCount int, queueSize int, opts ...OptionsFn) (*ThreadPool, error) {
 	if workerCount < 1 {
 		return nil, ErrInvalidWorkerCount
 	}
@@ -49,6 +69,9 @@ func NewThreadPool(workerCount int, queueSize int) (*ThreadPool, error) {
 		workers:     nil,
 		workerCount: workerCount,
 		jobQueue:    make(chan Job, queueSize),
+	}
+	for _, opt := range opts {
+		opt(pool)
 	}
 	return pool, nil
 }
@@ -96,8 +119,12 @@ func (t *ThreadPool) Start(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if t.logger != nil {
+		t.logger.Info("Starting threadpool...", log.KV{"workerCount": t.workerCount, "queueSize": cap(t.jobQueue)})
+	}
 	var err error
-	t.workers, err = NewWorkerGroup(t.workerCount, t.jobQueue, ctx)
+	// Create a worker group with the logger
+	t.workers, err = NewWorkerGroup(t.workerCount, t.jobQueue, ctx, t.logger)
 	return err
 }
 
@@ -108,6 +135,9 @@ func (t *ThreadPool) Start(ctx context.Context) error {
 func (t *ThreadPool) Stop() error {
 	if t.workers == nil {
 		return ErrPoolNotStarted
+	}
+	if t.logger != nil {
+		t.logger.Info("Shutting down threadpool...")
 	}
 	t.workers.Stop()
 	t.workers = nil
@@ -126,4 +156,64 @@ func (t *ThreadPool) Stop() error {
 // Note: This function is blocking if jobQueue is full
 func (t *ThreadPool) Dispatch(j Job) {
 	t.jobQueue <- j
+}
+
+// TryDispatch attempts to dispatch a job to the ThreadPool without blocking.
+// It returns true if the job was successfully dispatched, false if the queue is full.
+//
+// Example usage:
+//
+//	job := MyJob{}
+//	if !threadPool.TryDispatch(job) {
+//	  // Handle job rejection (queue full)
+//	}
+func (t *ThreadPool) TryDispatch(j Job) bool {
+	select {
+	case t.jobQueue <- j:
+		return true
+	default:
+		return false
+	}
+}
+
+// DispatchWithTimeout attempts to dispatch a job with a specified timeout.
+// It returns true if the job was successfully dispatched, false if the timeout was reached.
+//
+// Example usage:
+//
+//	job := MyJob{}
+//	if !threadPool.DispatchWithTimeout(job, 100*time.Millisecond) {
+//	  // Handle job timeout
+//	}
+func (t *ThreadPool) DispatchWithTimeout(j Job, timeout time.Duration) bool {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case t.jobQueue <- j:
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+// DispatchWithContext attempts to dispatch a job respecting context cancellation.
+// It returns nil if the job was successfully dispatched, or an error if the context was canceled.
+//
+// Example usage:
+//
+//	job := MyJob{}
+//	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+//	defer cancel()
+//	
+//	if err := threadPool.DispatchWithContext(ctx, job); err != nil {
+//	  // Handle dispatch error (context canceled or deadline exceeded)
+//	}
+func (t *ThreadPool) DispatchWithContext(ctx context.Context, j Job) error {
+	select {
+	case t.jobQueue <- j:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
