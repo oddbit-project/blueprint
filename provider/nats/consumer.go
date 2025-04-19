@@ -27,7 +27,6 @@ type ConsumerConfig struct {
 	AuthType string `json:"authType"` // Authentication type
 	Username string `json:"username"` // Username for basic auth
 	secure.DefaultCredentialConfig
-	Token        string `json:"token"`        // Auth token
 	ConsumerName string `json:"consumerName"` // Optional consumer name
 	tlsProvider.ClientConfig
 	ConsumerOptions
@@ -131,7 +130,7 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		opts.User = cfg.Username
 		opts.Password = password
 	case AuthTypeToken:
-		opts.Token = cfg.Token
+		opts.Token = password
 	}
 
 	// Apply TLS settings
@@ -191,12 +190,12 @@ func (c *Consumer) Disconnect() {
 	if c == nil || c.Conn == nil {
 		return
 	}
-	
+
 	// Check if already draining
 	if c.Conn.IsDraining() {
 		return
 	}
-	
+
 	// Log disconnect if logger is available
 	if c.Logger != nil {
 		c.Logger.Info("Closing consumer connection", log.KV{
@@ -221,7 +220,7 @@ func (c *Consumer) Disconnect() {
 	if err := c.Conn.Drain(); err != nil && c.Logger != nil {
 		c.Logger.Error(err, "Error during NATS connection drain", nil)
 	}
-	
+
 	// Close and clean up
 	c.Conn.Close()
 	c.Conn = nil

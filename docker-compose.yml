@@ -44,15 +44,13 @@ services:
       - 4222:4222
       - 8222:8222
       - 6222:6222
-    command:  ["-js", "-m", "8222", "--user", "testuser", "--pass", "testpassword"]
     healthcheck:
       test: nc -z localhost 4222 || exit 1
       interval: 30s
       retries: 5
       start_period: 10s
       timeout: 10s
-    volumes:
-      - ./test-deps/nats:/etc/nats
+    command:  ["-js", "-m", "8222", "--user", "testuser", "--pass", "testpassword"]
 
   zookeeper:
     container_name: zookeeper

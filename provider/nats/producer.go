@@ -25,7 +25,6 @@ type ProducerConfig struct {
 	AuthType string `json:"authType"`
 	Username string `json:"username"`
 	secure.DefaultCredentialConfig
-	Token        string `json:"token"`
 	ProducerName string `json:"ProducerName"`
 	tlsProvider.ClientConfig
 	ProducerOptions
@@ -79,7 +78,8 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 	var password string
 	var err error
 
-	if cfg.AuthType == AuthTypeBasic {
+	switch cfg.AuthType {
+	case AuthTypeToken, AuthTypeBasic:
 		key, err = secure.GenerateKey()
 		if err != nil {
 			return nil, err
@@ -91,6 +91,7 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		if err != nil {
 			return nil, err
 		}
+
 	}
 
 	// Configure connection options
@@ -111,7 +112,7 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		opts.User = cfg.Username
 		opts.Password = password
 	case AuthTypeToken:
-		opts.Token = cfg.Token
+		opts.Token = password
 	}
 
 	// Apply TLS settings
@@ -160,24 +161,24 @@ func (p *Producer) Disconnect() {
 	if p == nil || p.Conn == nil {
 		return
 	}
-	
+
 	// Check if already draining
 	if p.Conn.IsDraining() {
 		return
 	}
-	
+
 	// Log disconnect if logger is available
 	if p.Logger != nil {
 		p.Logger.Info("Closing producer connection", log.KV{
 			"subject": p.Subject,
 		})
 	}
-	
+
 	// Use Drain for graceful shutdown
 	if err := p.Conn.Drain(); err != nil && p.Logger != nil {
 		p.Logger.Error(err, "Error during NATS connection drain", nil)
 	}
-	
+
 	// Close and clean up
 	p.Conn.Close()
 	p.Conn = nil
@@ -198,7 +199,7 @@ func (p *Producer) Publish(data []byte) error {
 	if p == nil {
 		return errors.New("publisher is nil")
 	}
-	
+
 	if !p.IsConnected() {
 		if p.Logger != nil {
 			p.Logger.Error(ErrProducerClosed, "Failed to publish message - producer closed", nil)
@@ -231,7 +232,7 @@ func (p *Producer) PublishMsg(subject string, data []byte) error {
 	if p == nil {
 		return errors.New("publisher is nil")
 	}
-	
+
 	if !p.IsConnected() {
 		if p.Logger != nil {
 			p.Logger.Error(ErrProducerClosed, "Failed to publish message - producer closed", nil)
@@ -264,7 +265,7 @@ func (p *Producer) PublishRequest(subject string, reply string, data []byte) err
 	if p == nil {
 		return errors.New("publisher is nil")
 	}
-	
+
 	if !p.IsConnected() {
 		if p.Logger != nil {
 			p.Logger.Error(ErrProducerClosed, "Failed to publish request - producer closed", nil)

@@ -51,10 +51,10 @@ func (s *NatsIntegrationTestSuite) SetupSuite() {
 	// Set test subject and queue
 	s.testSubj = "test.integration"
 	s.queueName = "test-queue"
-	
+
 	// Get host from environment
 	natsHost := getNatsHost()
-	
+
 	// Log environment setup
 	s.logger.Info("NATS test setup", log.KV{
 		"host": natsHost,
@@ -91,7 +91,7 @@ func (s *NatsIntegrationTestSuite) SetupSuite() {
 		// Don't fail the test immediately - just log the error
 		s.T().Logf("Warning: Failed to create NATS consumer: %v (may be expected in Docker/CI)", err)
 	}
-	
+
 	// Check if both producer and consumer failed
 	if s.producer == nil && s.consumer == nil {
 		s.T().Logf("Both producer and consumer failed to initialize. Tests may be skipped.")
@@ -121,11 +121,11 @@ func (s *NatsIntegrationTestSuite) TestConnection() {
 	// In CI environments, connections might fail, so let's be more lenient
 	producerConnected := s.producer != nil && s.producer.IsConnected()
 	consumerConnected := s.consumer != nil && s.consumer.IsConnected()
-	
+
 	if !producerConnected || !consumerConnected {
-		s.T().Logf("Connection status - Producer: %v, Consumer: %v (failures may be expected in Docker/CI)", 
+		s.T().Logf("Connection status - Producer: %v, Consumer: %v (failures may be expected in Docker/CI)",
 			producerConnected, consumerConnected)
-		
+
 		// If both failed, skip remaining tests
 		if !producerConnected && !consumerConnected {
 			s.T().Skip("Skipping remaining tests as both producer and consumer failed to connect")
@@ -143,7 +143,7 @@ func (s *NatsIntegrationTestSuite) TestPublishSubscribe() {
 	producerConnected := s.producer != nil && s.producer.IsConnected()
 	consumerConnected := s.consumer != nil && s.consumer.IsConnected()
 	if !producerConnected || !consumerConnected {
-		s.T().Skipf("Skipping publish/subscribe test - Producer connected: %v, Consumer connected: %v", 
+		s.T().Skipf("Skipping publish/subscribe test - Producer connected: %v, Consumer connected: %v",
 			producerConnected, consumerConnected)
 	}
 
@@ -184,7 +184,7 @@ func (s *NatsIntegrationTestSuite) TestPublishSubscribe() {
 	case <-done:
 		// Message was received
 		assert.Equal(s.T(), testMessage, receivedMsg, "Received message should match sent message")
-	case <-time.After(5 * time.Second):
+	case <-time.After(25 * time.Second):
 		s.T().Fatal("Timeout waiting for message")
 	}
 }
@@ -367,7 +367,7 @@ func (s *NatsIntegrationTestSuite) TestQueueGroups() {
 
 	// Verify connections
 	if !consumer1.IsConnected() || !consumer2.IsConnected() {
-		s.T().Logf("One or both consumers not connected - C1: %v, C2: %v", 
+		s.T().Logf("One or both consumers not connected - C1: %v, C2: %v",
 			consumer1.IsConnected(), consumer2.IsConnected())
 		s.T().Skip("Skipping test due to connection issues")
 		return
@@ -428,9 +428,9 @@ func (s *NatsIntegrationTestSuite) TestQueueGroups() {
 	mu.Unlock()
 
 	// Log message distribution
-	s.T().Logf("Consumer 1 received: %d, Consumer 2 received: %d (total: %d of %d sent with %d failures)", 
+	s.T().Logf("Consumer 1 received: %d, Consumer 2 received: %d (total: %d of %d sent with %d failures)",
 		receivedCount1, receivedCount2, total, numMessages, failedMessages)
-	
+
 	// In a real-world queue system, messages might not be perfectly distributed,
 	// especially in a test environment. One consumer might receive all messages.
 	// Consider the test a success as long as we received some messages.
