@@ -69,8 +69,8 @@ func (b *pgMigrationManager) registerMigration(ctx context.Context, m *migration
 	return tx.Commit()
 }
 
-func (b *pgMigrationManager) List(ctx context.Context) ([]*migrations.MigrationRecord, error) {
-	result := make([]*migrations.MigrationRecord, 0)
+func (b *pgMigrationManager) List(ctx context.Context) ([]migrations.MigrationRecord, error) {
+	result := make([]migrations.MigrationRecord, 0)
 	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", EngineMigrationTable)
 	if err := b.db.SelectContext(ctx, &result, qry); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -79,7 +79,6 @@ func (b *pgMigrationManager) List(ctx context.Context) ([]*migrations.MigrationR
 		return nil, err
 	}
 	return result, nil
-
 }
 
 func (b *pgMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
