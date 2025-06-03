@@ -91,6 +91,7 @@ func (r *repository) SqlDelete() *goqu.DeleteDataset {
 }
 
 // FetchOne fetch a record; target must be a struct
+// returns sql.ErrNoRows if nothing read
 // Example:
 //
 //		wallets[i] = record

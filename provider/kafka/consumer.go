@@ -10,6 +10,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
+	"io"
 	"strings"
 	"time"
 )
@@ -325,9 +326,12 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-
-			c.Logger.Error(err, "Error reading Kafka message", nil)
-			return err
+			if errors.Is(err, io.EOF) {
+				c.Logger.Info("Kafka consumer received EOF, ignoring...")
+			} else {
+				c.Logger.Error(err, "Error reading Kafka message", nil)
+				return err
+			}
 		}
 
 		// Process message with handler
@@ -370,7 +374,11 @@ func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error 
 				// clean exit
 				return nil
 			}
-			return err
+			if errors.Is(err, io.EOF) {
+				c.Logger.Info("Kafka consumer received EOF, ignoring...")
+			} else {
+				return err
+			}
 		}
 		ch <- msg
 	}
@@ -391,7 +399,11 @@ func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFun
 				// clean exit
 				return nil
 			}
-			return err
+			if errors.Is(err, io.EOF) {
+				c.Logger.Info("Kafka consumer received EOF, ignoring...")
+			} else {
+				return err
+			}
 		}
 		if err := handler(ctx, msg); err != nil {
 			return err
