@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// Define routes
-	// Auth endpoint - returns a JWT token with user data
+	// VerifyUser endpoint - returns a JWT token with user data
 	server.Route().POST("/auth", func(c *gin.Context) {
 		// Simulate authentication
 		var credentials struct {

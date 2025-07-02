@@ -123,7 +123,7 @@ func (s *NatsAuthIntegrationTestSuite) _TestTokenAuth() {
 		// Check connection - may still fail due to auth mechanism
 		if producer.IsConnected() {
 			// If connected, test publishing a message
-			err = producer.Publish([]byte("Token Auth Test"))
+			err = producer.Publish([]byte("Token VerifyUser Test"))
 			assert.NoError(s.T(), err, "Publishing with token auth should succeed")
 		} else {
 			s.T().Log("Token auth not configured in NATS server")
@@ -140,7 +140,7 @@ func (s *NatsAuthIntegrationTestSuite) TestDirectURLAuth() {
 	producerConfig := &nats.ProducerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", natsHost),
 		Subject:  "test.auth.url",
-		AuthType: nats.AuthTypeNone, // Auth is in URL
+		AuthType: nats.AuthTypeNone, // VerifyUser is in URL
 	}
 
 	producer, err := nats.NewProducer(producerConfig, s.logger)
@@ -157,7 +157,7 @@ func (s *NatsAuthIntegrationTestSuite) TestDirectURLAuth() {
 	// Only try publishing if we're connected
 	if connected {
 		// Test publishing a message
-		err = producer.Publish([]byte("URL Auth Test"))
+		err = producer.Publish([]byte("URL VerifyUser Test"))
 		assert.NoError(s.T(), err, "Publishing with URL auth should succeed")
 	}
 }

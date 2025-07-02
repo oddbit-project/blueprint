@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
+	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	"net/http"
 	"os"
 )
@@ -20,10 +21,6 @@ func main() {
 	srvConfig.Port = 8089
 	srvConfig.Debug = true
 
-	// Configure auth token through options map
-	srvConfig.Options[httpserver.OptAuthTokenHeader] = "X-API-Key"
-	srvConfig.Options[httpserver.OptAuthTokenSecret] = "secret-token-value"
-
 	// Initialize the server
 	server, err := httpserver.NewServer(srvConfig, logger)
 	if err != nil {
@@ -31,12 +28,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Process configured options to set up the auth middleware
-	err = server.ProcessOptions()
-	if err != nil {
-		logger.Fatal(err, "could not process server options")
-		os.Exit(1)
-	}
+	// Don't use ProcessOptions() as it applies auth globally
+	// Instead, create auth middleware manually and apply it only to protected routes
+	authToken := auth.NewAuthToken("X-API-Key", "secret-token-value")
 
 	// Public endpoint - no authentication required
 	server.Route().GET("/public", func(c *gin.Context) {
@@ -45,8 +39,9 @@ func main() {
 		})
 	})
 
-	// Create a protected group that will use the configured auth token middleware
+	// Create a protected group that will use the auth token middleware
 	protected := server.Route().Group("/protected")
+	protected.Use(auth.AuthMiddleware(authToken))
 
 	// Protected endpoints - require valid token
 	protected.GET("/resource", func(c *gin.Context) {

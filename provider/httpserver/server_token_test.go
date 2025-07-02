@@ -25,11 +25,11 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 		{
 			name: "Valid auth token",
 			options: map[string]string{
-				OptAuthTokenHeader: "X-Test-Auth",
+				OptAuthTokenHeader: "X-Test-VerifyUser",
 				OptAuthTokenSecret: "test-secret",
 			},
 			requestHeaders: map[string]string{
-				"X-Test-Auth": "test-secret",
+				"X-Test-VerifyUser": "test-secret",
 			},
 			expectedStatus: http.StatusOK,
 			testEndpoint:   "/test",
@@ -37,11 +37,11 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 		{
 			name: "Invalid auth token",
 			options: map[string]string{
-				OptAuthTokenHeader: "X-Test-Auth",
+				OptAuthTokenHeader: "X-Test-VerifyUser",
 				OptAuthTokenSecret: "test-secret",
 			},
 			requestHeaders: map[string]string{
-				"X-Test-Auth": "wrong-secret",
+				"X-Test-VerifyUser": "wrong-secret",
 			},
 			expectedStatus: http.StatusUnauthorized,
 			testEndpoint:   "/test",
@@ -49,7 +49,7 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 		{
 			name: "Missing auth token",
 			options: map[string]string{
-				OptAuthTokenHeader: "X-Test-Auth",
+				OptAuthTokenHeader: "X-Test-VerifyUser",
 				OptAuthTokenSecret: "test-secret",
 			},
 			requestHeaders: map[string]string{},
