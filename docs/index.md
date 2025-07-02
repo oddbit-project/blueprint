@@ -13,11 +13,13 @@
 ## Security
 
 - [Secure Credentials](crypt/secure-credentials.md)
+- [htpasswd Authentication](provider/htpasswd.md)
 - [TLS](provider/tls.md)
 
 ## Providers
 
 - [Clickhouse](provider/clickhouse.md)
+- [htpasswd](provider/htpasswd.md)
 - [Kafka](provider/kafka.md)
 - [PostgreSQL](provider/pgsql.md)
 - [MQTT](provider/mqtt.md)

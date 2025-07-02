@@ -11,6 +11,7 @@ Go application framework for building web applications and microservices with bu
 - Configuration management
 - Structured logging with file rotation
 - HTTP server with security features (TLS, CSRF protection, security headers, session management)
+- Authentication providers (htpasswd)
 - Database connectivity (PostgreSQL, ClickHouse)
 - Message queue integration (Kafka, MQTT)
 - Metrics endpoint for Prometheus monitoring
