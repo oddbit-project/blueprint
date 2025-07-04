@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Auth Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #333;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background-color: #95a5a6;
+        }
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .token-display {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-authenticated {
+            background-color: #27ae60;
+        }
+        .status-unauthenticated {
+            background-color: #e74c3c;
+        }
+        .endpoints {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .endpoint {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .endpoint h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+        }
+        .method-get { background-color: #27ae60; }
+        .method-post { background-color: #3498db; }
+        .method-put { background-color: #f39c12; }
+        .method-delete { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 JWT Authentication Demo</h1>
+            <p>Interactive demonstration of Blueprint's JWT authentication system</p>
+            <div>
+                <span class="status-indicator" id="authStatus"></span>
+                <span id="authText">Not Authenticated</span>
+            </div>
+        </div>
+
+        <!-- Authentication Section -->
+        <div class="section">
+            <h3>🚪 Authentication</h3>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" value="admin" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" value="password" placeholder="Enter password">
+            </div>
+            <button onclick="login()">Login</button>
+            <button onclick="logout()" class="btn-danger">Logout</button>
+            <div id="loginResult" class="result" style="display: none;"></div>
+            <div id="tokenDisplay" class="token-display" style="display: none;"></div>
+        </div>
+
+        <!-- User Profile Section -->
+        <div class="section">
+            <h3>👤 User Profile</h3>
+            <button onclick="getProfile()">Get Profile</button>
+            <button onclick="refreshToken()" class="btn-secondary">Refresh Token</button>
+            <div id="profileResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Admin Section -->
+        <div class="section">
+            <h3>⚙️ Admin Dashboard</h3>
+            <button onclick="getAdminInfo()">Get Admin Info</button>
+            <button onclick="revokeToken()" class="btn-danger">Revoke Current Token</button>
+            <div id="adminResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- System Info Section -->
+        <div class="section">
+            <h3>📊 System Information</h3>
+            <button onclick="getHealth()">Health Check</button>
+            <button onclick="getJWKS()">Get JWKS</button>
+            <div id="systemResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- API Endpoints Reference -->
+        <div class="section">
+            <h3>📋 Available Endpoints</h3>
+            <div class="endpoints">
+                <div class="endpoint">
+                    <h4><span class="method method-post">POST</span> /login</h4>
+                    <p>Authenticate with username and password</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-get">GET</span> /profile</h4>
+                    <p>Get authenticated user profile</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-post">POST</span> /refresh</h4>
+                    <p>Refresh JWT token</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-get">GET</span> /admin</h4>
+                    <p>Admin dashboard (requires admin role)</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-post">POST</span> /revoke</h4>
+                    <p>Revoke current token</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-post">POST</span> /logout</h4>
+                    <p>Logout and clear session</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-get">GET</span> /health</h4>
+                    <p>Server health check</p>
+                </div>
+                <div class="endpoint">
+                    <h4><span class="method method-get">GET</span> /.well-known/jwks.json</h4>
+                    <p>JSON Web Key Set for public keys</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentToken = null;
+
+        function updateAuthStatus(authenticated, username = null) {
+            const statusEl = document.getElementById('authStatus');
+            const textEl = document.getElementById('authText');
+            
+            if (authenticated) {
+                statusEl.className = 'status-indicator status-authenticated';
+                textEl.textContent = `Authenticated as ${username || 'User'}`;
+            } else {
+                statusEl.className = 'status-indicator status-unauthenticated';
+                textEl.textContent = 'Not Authenticated';
+                currentToken = null;
+                document.getElementById('tokenDisplay').style.display = 'none';
+            }
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.className = `result ${isError ? 'error' : 'success'}`;
+            el.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function showToken(token) {
+            const el = document.getElementById('tokenDisplay');
+            el.style.display = 'block';
+            el.textContent = `Token: ${token}`;
+        }
+
+        async function makeRequest(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+
+            if (currentToken) {
+                defaultOptions.headers['Authorization'] = `Bearer ${currentToken}`;
+            }
+
+            const finalOptions = {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            };
+
+            try {
+                const response = await fetch(url, finalOptions);
+                const data = await response.json();
+                
+                // Check for new token in response body
+                if (data.token) {
+                    currentToken = data.token;
+                    showToken(currentToken);
+                }
+                
+                // Check for new token in Authorization header
+                const authHeader = response.headers.get('Authorization');
+                if (authHeader && authHeader.startsWith('Bearer ')) {
+                    currentToken = authHeader.substring(7);
+                    showToken(currentToken);
+                }
+                
+                return { data, status: response.status, ok: response.ok };
+            } catch (error) {
+                return { data: { error: error.message }, status: 0, ok: false };
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const result = await makeRequest('/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password })
+            });
+
+            showResult('loginResult', result.data, !result.ok);
+            
+            if (result.ok && result.data.success) {
+                updateAuthStatus(true, username);
+                currentToken = result.data.token;
+                showToken(currentToken);
+            }
+        }
+
+        async function logout() {
+            const result = await makeRequest('/logout', {
+                method: 'POST'
+            });
+
+            showResult('loginResult', result.data, !result.ok);
+            updateAuthStatus(false);
+        }
+
+        async function getProfile() {
+            const result = await makeRequest('/profile');
+            showResult('profileResult', result.data, !result.ok);
+        }
+
+        async function refreshToken() {
+            const result = await makeRequest('/refresh', {
+                method: 'POST'
+            });
+
+            showResult('profileResult', result.data, !result.ok);
+            
+            if (result.ok && result.data.token) {
+                currentToken = result.data.token;
+                showToken(currentToken);
+            }
+        }
+
+        async function getAdminInfo() {
+            const result = await makeRequest('/admin');
+            showResult('adminResult', result.data, !result.ok);
+        }
+
+        async function revokeToken() {
+            const result = await makeRequest('/revoke', {
+                method: 'POST'
+            });
+
+            showResult('adminResult', result.data, !result.ok);
+            
+            if (result.ok) {
+                updateAuthStatus(false);
+            }
+        }
+
+        async function getHealth() {
+            const result = await makeRequest('/health');
+            showResult('systemResult', result.data, !result.ok);
+        }
+
+        async function getJWKS() {
+            const result = await makeRequest('/.well-known/jwks.json');
+            showResult('systemResult', result.data, !result.ok);
+        }
+
+        // Initialize page
+        updateAuthStatus(false);
+    </script>
+</body>
+</html>
