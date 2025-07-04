@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"fmt"
+	storage2 "github.com/oddbit-project/blueprint/provider/auth/jwt/storage"
 	"strings"
 	"sync"
 	"time"
@@ -10,19 +11,18 @@ import (
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver/fingerprint"
 	"github.com/oddbit-project/blueprint/provider/httpserver/session"
-	"github.com/oddbit-project/blueprint/provider/httpserver/session/storage"
 )
 
 // EnhancedJWTConfig extends JWT configuration with security features
 type EnhancedJWTConfig struct {
 	*JWTConfig                                        // Embed existing JWT configuration
 	SecurityConfig           *SecurityConfig          // Enhanced security configuration
-	SecurityStorage          storage.SecurityStorage  // Storage for security data
+	SecurityStorage          storage2.SecurityStorage // Storage for security data
 	SessionSecurityValidator SessionSecurityValidator // Custom session security validator (optional)
 }
 
 // NewEnhancedJWTConfig creates a new enhanced JWT configuration with security enabled by default
-func NewEnhancedJWTConfig(jwtConfig *JWTConfig, securityConfig *SecurityConfig, securityStorage storage.SecurityStorage) *EnhancedJWTConfig {
+func NewEnhancedJWTConfig(jwtConfig *JWTConfig, securityConfig *SecurityConfig, securityStorage storage2.SecurityStorage) *EnhancedJWTConfig {
 	if jwtConfig == nil {
 		jwtConfig = NewJWTConfig(RandomJWTKey())
 	}
@@ -30,7 +30,7 @@ func NewEnhancedJWTConfig(jwtConfig *JWTConfig, securityConfig *SecurityConfig, 
 		securityConfig = NewSecurityConfig() // Security enabled by default
 	}
 	if securityStorage == nil {
-		securityStorage = storage.NewMemorySecurityStorage()
+		securityStorage = storage2.NewMemorySecurityStorage()
 	}
 
 	return &EnhancedJWTConfig{
@@ -154,7 +154,7 @@ func (m *EnhancedJWTSessionManager) Middleware() gin.HandlerFunc {
 			if err != nil {
 				// Handle JWT errors with security logging
 				m.handleJWTError(c, err, clientIP, userAgent)
-				
+
 				// If token is invalid or expired, create a new session
 				if err == ErrJWTInvalid || err == ErrJWTExpired {
 					sessionData, _ = m.manager.NewSession()
@@ -184,7 +184,7 @@ func (m *EnhancedJWTSessionManager) Middleware() gin.HandlerFunc {
 		if exists {
 			if s, ok := modifiedSession.(*session.SessionData); ok {
 				shouldRotate := m.shouldRotateToken(s, tokenString)
-				
+
 				if shouldRotate {
 					// Generate a new rotated token
 					newToken, err := m.manager.Generate(s.ID, s)
@@ -248,7 +248,7 @@ func (m *EnhancedJWTSessionManager) validateSessionSecurity(c *gin.Context, sess
 // validateIPAddress validates IP address changes
 func (m *EnhancedJWTSessionManager) validateIPAddress(sessionData *session.SessionData, currentIP string) bool {
 	config := m.config.SecurityConfig
-	
+
 	// Get stored IP from session
 	storedIP, exists := sessionData.Values["_ip_address"]
 	if !exists {
@@ -322,10 +322,10 @@ func (m *EnhancedJWTSessionManager) validateSessionLimit(sessionData *session.Se
 	}
 
 	userIDStr := fmt.Sprintf("%v", userID)
-	
+
 	// Get current sessions for this user
 	sessions := m.config.SecurityStorage.GetUserSessions(userIDStr)
-	
+
 	// Check if we're under the limit
 	return len(sessions) < config.MaxConcurrentSessions
 }
@@ -400,12 +400,12 @@ func (m *EnhancedJWTSessionManager) Stop() {
 // DeviceFingerprintValidator validates device fingerprints
 type DeviceFingerprintValidator struct {
 	requireBinding bool
-	storage        storage.SecurityStorage
+	storage        storage2.SecurityStorage
 	logger         *log.Logger
 }
 
 // NewDeviceFingerprintValidator creates a new device fingerprint validator
-func NewDeviceFingerprintValidator(requireBinding bool, storage storage.SecurityStorage, logger *log.Logger) *DeviceFingerprintValidator {
+func NewDeviceFingerprintValidator(requireBinding bool, storage storage2.SecurityStorage, logger *log.Logger) *DeviceFingerprintValidator {
 	return &DeviceFingerprintValidator{
 		requireBinding: requireBinding,
 		storage:        storage,
@@ -418,7 +418,7 @@ func (v *DeviceFingerprintValidator) ValidateDeviceFingerprint(c *gin.Context, s
 	// Generate current fingerprint using a generator
 	generator := fingerprint.NewGenerator(fingerprint.NewDefaultConfig())
 	fp := generator.Generate(c)
-	
+
 	// Get stored fingerprint from session
 	storedFP, exists := sessionData.Values["_device_fingerprint"]
 	if !exists {
@@ -434,7 +434,7 @@ func (v *DeviceFingerprintValidator) ValidateDeviceFingerprint(c *gin.Context, s
 		if userAgent, ok := storedFPMap["user_agent"].(string); ok {
 			storedFingerprint.UserAgent = userAgent
 		}
-		
+
 		// Use the generator's comparison method
 		return generator.Compare(storedFingerprint, fp, v.requireBinding)
 	}

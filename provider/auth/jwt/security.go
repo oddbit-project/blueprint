@@ -1,11 +1,11 @@
 package jwt
 
 import (
+	storage2 "github.com/oddbit-project/blueprint/provider/auth/jwt/storage"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/provider/httpserver/fingerprint"
-	"github.com/oddbit-project/blueprint/provider/httpserver/session/storage"
 	"github.com/oddbit-project/blueprint/utils"
 )
 
@@ -47,13 +47,13 @@ type SecurityConfig struct {
 // NewSecurityConfig creates a new security configuration with security enabled by default
 func NewSecurityConfig() *SecurityConfig {
 	return &SecurityConfig{
-		Enabled:                     true, // ENABLED BY DEFAULT for security
-		DeviceFingerprintingEnabled: true, // Enabled by default
-		RequireDeviceBinding:        true, // Enabled by default
-		IPValidationEnabled:         true, // Enabled by default
-		AllowIPSubnetChange:         true, // Allow subnet changes for mobile users
+		Enabled:                     true,  // ENABLED BY DEFAULT for security
+		DeviceFingerprintingEnabled: true,  // Enabled by default
+		RequireDeviceBinding:        true,  // Enabled by default
+		IPValidationEnabled:         true,  // Enabled by default
+		AllowIPSubnetChange:         true,  // Allow subnet changes for mobile users
 		GeolocationValidation:       false, // Disabled by default (requires external service)
-		NonceValidationEnabled:      true, // Enabled by default
+		NonceValidationEnabled:      true,  // Enabled by default
 		NonceWindow:                 5 * time.Minute,
 		MaxConcurrentSessions:       3, // Reasonable default limit
 		SuspiciousActivityThreshold: 3,
@@ -105,7 +105,7 @@ func NewMobileFriendlySecurityConfig() *SecurityConfig {
 		DeviceFingerprintingEnabled: true,
 		RequireDeviceBinding:        false, // Mobile devices change frequently
 		IPValidationEnabled:         true,
-		AllowIPSubnetChange:         true, // Mobile networks change subnets
+		AllowIPSubnetChange:         true,  // Mobile networks change subnets
 		GeolocationValidation:       false, // May be problematic for VPN users
 		NonceValidationEnabled:      true,
 		NonceWindow:                 10 * time.Minute, // Longer window for mobile latency
@@ -197,9 +197,9 @@ func (c *SecurityConfig) Validate() error {
 type SecurityLevel string
 
 const (
-	SecurityLevelDisabled      SecurityLevel = "disabled"
-	SecurityLevelBalanced      SecurityLevel = "balanced"
-	SecurityLevelHigh          SecurityLevel = "high"
+	SecurityLevelDisabled       SecurityLevel = "disabled"
+	SecurityLevelBalanced       SecurityLevel = "balanced"
+	SecurityLevelHigh           SecurityLevel = "high"
 	SecurityLevelMobileFriendly SecurityLevel = "mobile_friendly"
 )
 
@@ -236,22 +236,22 @@ const (
 type SecurityAction string
 
 const (
-	SecurityActionAllow           SecurityAction = "allow"
-	SecurityActionWarn            SecurityAction = "warn"
-	SecurityActionBlock           SecurityAction = "block"
+	SecurityActionAllow             SecurityAction = "allow"
+	SecurityActionWarn              SecurityAction = "warn"
+	SecurityActionBlock             SecurityAction = "block"
 	SecurityActionRegenerateSession SecurityAction = "regenerate_session"
-	SecurityActionExtendedBlock   SecurityAction = "extended_block"
+	SecurityActionExtendedBlock     SecurityAction = "extended_block"
 )
 
 // DefaultSessionSecurityValidator provides default security validation logic
 type DefaultSessionSecurityValidator struct {
-	storage storage.SecurityStorage
+	storage storage2.SecurityStorage
 }
 
 // NewDefaultSessionSecurityValidator creates a new default session security validator
 func NewDefaultSessionSecurityValidator() *DefaultSessionSecurityValidator {
 	return &DefaultSessionSecurityValidator{
-		storage: storage.NewMemorySecurityStorage(),
+		storage: storage2.NewMemorySecurityStorage(),
 	}
 }
 
@@ -259,7 +259,7 @@ func NewDefaultSessionSecurityValidator() *DefaultSessionSecurityValidator {
 func (v *DefaultSessionSecurityValidator) ValidateSecurityEvent(c *gin.Context, event SecurityEvent) (SecurityAction, error) {
 	// This is a simplified implementation
 	// In a real-world scenario, you'd implement sophisticated logic here
-	
+
 	switch event.Type {
 	case SecurityEventNonceValidationFailed:
 		return SecurityActionWarn, nil

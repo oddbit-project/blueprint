@@ -1,18 +1,18 @@
 package jwt
 
 import (
+	"github.com/oddbit-project/blueprint/provider/auth/jwt/storage"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/provider/httpserver/fingerprint"
-	"github.com/oddbit-project/blueprint/provider/httpserver/session/storage"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewSecurityConfig(t *testing.T) {
 	config := NewSecurityConfig()
-	
+
 	// Should be enabled by default
 	assert.True(t, config.Enabled)
 	assert.True(t, config.DeviceFingerprintingEnabled)
@@ -30,7 +30,7 @@ func TestNewSecurityConfig(t *testing.T) {
 
 func TestNewDisabledSecurityConfig(t *testing.T) {
 	config := NewDisabledSecurityConfig()
-	
+
 	// Should be disabled
 	assert.False(t, config.Enabled)
 	assert.False(t, config.DeviceFingerprintingEnabled)
@@ -48,7 +48,7 @@ func TestNewDisabledSecurityConfig(t *testing.T) {
 
 func TestNewHighSecurityConfig(t *testing.T) {
 	config := NewHighSecurityConfig()
-	
+
 	assert.True(t, config.Enabled)
 	assert.True(t, config.DeviceFingerprintingEnabled)
 	assert.True(t, config.RequireDeviceBinding)
@@ -56,8 +56,8 @@ func TestNewHighSecurityConfig(t *testing.T) {
 	assert.False(t, config.AllowIPSubnetChange) // Strict IP validation
 	assert.True(t, config.GeolocationValidation)
 	assert.True(t, config.NonceValidationEnabled)
-	assert.Equal(t, 2*time.Minute, config.NonceWindow) // Shorter window
-	assert.Equal(t, 1, config.MaxConcurrentSessions)   // Single session only
+	assert.Equal(t, 2*time.Minute, config.NonceWindow)     // Shorter window
+	assert.Equal(t, 1, config.MaxConcurrentSessions)       // Single session only
 	assert.Equal(t, 1, config.SuspiciousActivityThreshold) // Immediate blocking
 	assert.Equal(t, 1*time.Hour, config.BlockDuration)     // Longer blocks
 	assert.True(t, config.AutoSessionRegeneration)
@@ -65,18 +65,18 @@ func TestNewHighSecurityConfig(t *testing.T) {
 
 func TestNewMobileFriendlySecurityConfig(t *testing.T) {
 	config := NewMobileFriendlySecurityConfig()
-	
+
 	assert.True(t, config.Enabled)
 	assert.True(t, config.DeviceFingerprintingEnabled)
 	assert.False(t, config.RequireDeviceBinding) // Mobile devices change frequently
 	assert.True(t, config.IPValidationEnabled)
-	assert.True(t, config.AllowIPSubnetChange) // Mobile networks change subnets
+	assert.True(t, config.AllowIPSubnetChange)    // Mobile networks change subnets
 	assert.False(t, config.GeolocationValidation) // May be problematic for VPN users
 	assert.True(t, config.NonceValidationEnabled)
-	assert.Equal(t, 10*time.Minute, config.NonceWindow) // Longer window for mobile latency
-	assert.Equal(t, 5, config.MaxConcurrentSessions)    // Allow multiple device types
+	assert.Equal(t, 10*time.Minute, config.NonceWindow)    // Longer window for mobile latency
+	assert.Equal(t, 5, config.MaxConcurrentSessions)       // Allow multiple device types
 	assert.Equal(t, 5, config.SuspiciousActivityThreshold) // More lenient
-	assert.Equal(t, 15*time.Minute, config.BlockDuration)   // Shorter blocks
+	assert.Equal(t, 15*time.Minute, config.BlockDuration)  // Shorter blocks
 	assert.True(t, config.AutoSessionRegeneration)
 }
 
@@ -197,7 +197,7 @@ func TestFeatureController(t *testing.T) {
 		assert.False(t, config.RequireDeviceBinding)
 		assert.False(t, config.NonceValidationEnabled)
 		assert.Equal(t, 0, config.MaxConcurrentSessions)
-		
+
 		// These should still be enabled
 		assert.True(t, config.Enabled)
 		assert.True(t, config.IPValidationEnabled)
@@ -308,7 +308,7 @@ func TestSecurityLevels(t *testing.T) {
 func TestSecurityConfigWithFeatureController(t *testing.T) {
 	config := NewSecurityConfig()
 	featureController := config.WithFeatureControl()
-	
+
 	assert.NotNil(t, featureController)
 	assert.Equal(t, config, featureController.config)
 
@@ -339,7 +339,7 @@ func TestSessionSecurityValidatorInterface(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(nil)
 	event := SecurityEvent{Type: SecurityEventNonceValidationFailed}
-	
+
 	action, err := validator.ValidateSecurityEvent(c, event)
 	assert.NoError(t, err)
 	assert.Equal(t, SecurityActionWarn, action)
@@ -347,10 +347,10 @@ func TestSessionSecurityValidatorInterface(t *testing.T) {
 
 func TestDefaultSessionSecurityValidatorStorage(t *testing.T) {
 	validator := NewDefaultSessionSecurityValidator()
-	
+
 	// Verify it creates a memory storage by default
 	assert.NotNil(t, validator.storage)
-	
+
 	// Test that it's actually a memory storage by checking interface compliance
 	var _ storage.SecurityStorage = validator.storage
 }
