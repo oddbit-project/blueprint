@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/provider/auth/jwt"
 	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	"github.com/oddbit-project/blueprint/provider/httpserver/security"
 	"github.com/oddbit-project/blueprint/provider/httpserver/session"
@@ -59,18 +60,18 @@ func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.L
 }
 
 // UseJWTSession adds session middleware with JWT token support
-func (s *Server) UseJWTSession(jwtConfig *session.JWTConfig, logger *log.Logger) (*session.JWTSessionManager, error) {
+func (s *Server) UseJWTSession(jwtConfig *jwt.JWTConfig, logger *log.Logger) (*jwt.JWTSessionManager, error) {
 	if jwtConfig == nil {
-		jwtConfig = session.NewJWTConfig()
+		jwtConfig = jwt.NewJWTConfig(jwt.RandomJWTKey())
 	}
 	// Create JWT manager
-	jwtManager, err := session.NewJWTManager(jwtConfig, logger)
+	jwtManager, err := jwt.NewJWTManager(jwtConfig, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create session manager
-	manager := session.NewJWTSessionManager(jwtManager)
+	manager := jwt.NewJWTSessionManager(jwtManager)
 
 	// Add middleware
 	s.AddMiddleware(manager.Middleware())
