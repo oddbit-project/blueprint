@@ -23,7 +23,7 @@ const (
 
 	// common JWT signing algorithms
 	HS256 = "HS256"
-	JS384 = "HS384"
+	HS384 = "HS384"
 	HS512 = "HS512"
 	RS256 = "RS256"
 	RS512 = "RS512"
@@ -70,7 +70,7 @@ type jwtProvider struct {
 
 func NewJWTConfig() *JWTConfig {
 	return &JWTConfig{
-		SignAlgorithms:  []string{HS256, JS384, HS512},
+		SignAlgorithms:  []string{HS256, HS384, HS512},
 		TokenTTLMinutes: DefaultTTL.Minutes(),
 	}
 }
@@ -147,7 +147,11 @@ func (j *jwtProvider) ParseToken(tokenString string) (jwt.MapClaims, error) {
 			if !slices.Contains(j.allowedAlgos, token.Method.Alg()) {
 				return nil, jwt.ErrSignatureInvalid
 			}
-			return j.jwtSecret.GetBytes(), nil
+			secret, err := j.jwtSecret.GetBytes()
+			if err != nil {
+				return nil, err
+			}
+			return secret, nil
 		})
 
 	if err != nil {
@@ -199,7 +203,7 @@ func (j *jwtProvider) ValidateClaims(claims jwt.MapClaims) error {
 		return err
 	}
 
-	return j.ValidateClaims(claims)
+	return j.ValidateNbf(claims)
 }
 
 // ValidateExp validate claims expiry
