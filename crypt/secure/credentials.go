@@ -118,7 +118,12 @@ func (sc *Credential) GetBytes() ([]byte, error) {
 
 // Update updates the credential with a new plaintext value
 func (sc *Credential) Update(plaintext string) error {
-	if plaintext == "" {
+	return sc.UpdateBytes([]byte(plaintext))
+}
+
+// UpdateBytes updates the credential with a new value
+func (sc *Credential) UpdateBytes(data []byte) error {
+	if len(data) == 0 {
 		sc.Clear()
 		return nil
 	}
@@ -127,7 +132,7 @@ func (sc *Credential) Update(plaintext string) error {
 	defer sc.mu.Unlock()
 
 	var err error
-	sc.encryptedData, sc.nonce, err = encrypt([]byte(plaintext), sc.key)
+	sc.encryptedData, sc.nonce, err = encrypt(data, sc.key)
 	return err
 }
 
