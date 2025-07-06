@@ -13,10 +13,7 @@ import (
 const (
 	ErrInvalidSigningAlgorithm = utils.Error("JWT signing algorithm is invalid")
 	ErrInvalidToken            = utils.Error("invalid token")
-	ErrInvalidExpClaim         = utils.Error("invalid exp claim type")
-	ErrInvalidNbfClaim         = utils.Error("invalid nbf claim type")
 	ErrTokenExpired            = utils.Error("token has expired")
-	ErrNbfNotValid             = utils.Error("nbf not yet valid")
 	ErrMissingIssuer           = utils.Error("issuer validation failed")
 	ErrMissingAudience         = utils.Error("audience validation failed")
 	ErrNoRevocationManager     = utils.Error("revocation manager not available")
@@ -132,13 +129,7 @@ func (j *jwtProvider) GenerateToken(subject string, data map[string]any) (string
 		} else {
 			return token.SignedString(key)
 		}
-	case EdDSA:
-		if key, err := j.cfg.privateKey.GetBytes(); err != nil {
-			return "", err
-		} else {
-			return token.SignedString(key)
-		}
-	case RS256, RS384, RS512, ES256, ES384, ES512:
+	case RS256, RS384, RS512, ES256, ES384, ES512, EdDSA:
 		if data, err := j.cfg.privateKey.GetBytes(); err == nil {
 			if cert, err := x509.ParsePKCS8PrivateKey(data); err == nil {
 				return token.SignedString(cert)
@@ -166,10 +157,7 @@ func (j *jwtProvider) ParseToken(tokenString string) (*Claims, error) {
 		switch j.cfg.SigningAlgorithm {
 		case HS256, HS384, HS512:
 			return j.cfg.signingKey.GetBytes()
-		case EdDSA:
-			return j.cfg.privateKey.GetBytes()
-
-		case RS256, RS384, RS512, ES256, ES384, ES512:
+		case RS256, RS384, RS512, ES256, ES384, ES512, EdDSA:
 			bytes, err := j.cfg.publicKey.GetBytes()
 			if err != nil {
 				return nil, err
@@ -281,7 +269,10 @@ func (j *jwtProvider) RevokeToken(tokenString string) error {
 	}
 
 	// Use token's expiration time for revocation expiry
-	expiresAt := claims.ExpiresAt.Time
+	var expiresAt time.Time
+	if claims.ExpiresAt != nil {
+		expiresAt = claims.ExpiresAt.Time
+	}
 	if expiresAt.IsZero() {
 		// If no expiration set, use a far future date
 		expiresAt = time.Now().Add(24 * time.Hour * 365)

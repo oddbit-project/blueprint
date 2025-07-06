@@ -208,7 +208,7 @@ func (c *JWTConfig) requireECDSA() error {
 			return err
 		}
 
-		data, err := x509.MarshalPKIXPublicKey(privateCert.(*ecdsa.PrivateKey).PublicKey)
+		data, err := x509.MarshalPKIXPublicKey(&privateCert.(*ecdsa.PrivateKey).PublicKey)
 		if err != nil {
 			return err
 		}
