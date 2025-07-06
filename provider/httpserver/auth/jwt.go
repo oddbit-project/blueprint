@@ -29,13 +29,8 @@ func (a *authJWT) CanAccess(c *gin.Context) bool {
 	}
 
 	claims, err := a.parser.ParseToken(authHeader[7:])
-	if err != nil || len(claims) == 0 {
+	if err != nil || len(claims.ID) == 0 {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-		return false
-	}
-
-	if err = a.parser.ValidateClaims(claims); err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return false
 	}
 
