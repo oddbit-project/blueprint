@@ -56,7 +56,7 @@ func (c DefaultCredentialConfig) Fetch() (string, error) {
 
 // IsEmpty returns true if credential source is empty
 func (c KeyConfig) IsEmpty() bool {
-	return strings.TrimSpace(c.KeyFile) == "" &&
+	return strings.TrimSpace(c.Key) == "" &&
 		strings.TrimSpace(c.KeyEnvVar) == "" &&
 		strings.TrimSpace(c.KeyFile) == ""
 }
