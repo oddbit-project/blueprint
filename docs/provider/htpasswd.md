@@ -18,13 +18,13 @@ Key features:
 
 | Algorithm | Prefix | Security | Recommended |
 |-----------|--------|----------|-------------|
-| **bcrypt** | `$2a$`, `$2y$` | High | ✅ **Yes** (default) |
-| **Apache MD5** | `$apr1$` | Medium | ⚠️ Legacy compatibility |
-| **SHA256** | `{SHA256}` | Medium | ⚠️ No salt |
-| **SHA512** | `{SHA512}` | Medium | ⚠️ No salt |
-| **SHA1** | `{SHA}` | Low | ❌ Deprecated |
-| **Crypt** | None (13 chars) | Low | ❌ Deprecated |
-| **Plain** | None | None | ❌ Development only |
+| **bcrypt** | `$2a$`, `$2y$` | High |  **Yes** (default) |
+| **Apache MD5** | `$apr1$` | Medium | ️ Legacy compatibility |
+| **SHA256** | `{SHA256}` | Medium | ️ No salt |
+| **SHA512** | `{SHA512}` | Medium | ️ No salt |
+| **SHA1** | `{SHA}` | Low |  Deprecated |
+| **Crypt** | None (13 chars) | Low |  Deprecated |
+| **Plain** | None | None |  Development only |
 
 ## Container API
 
@@ -170,15 +170,15 @@ The provider includes comprehensive validation:
 
 ```go
 // Username validation
-err := htpasswd.ValidateUsername("alice")      // ✅ Valid
-err = htpasswd.ValidateUsername("")            // ❌ Empty
-err = htpasswd.ValidateUsername("user:name")   // ❌ Contains colon
-err = htpasswd.ValidateUsername(string(make([]byte, 256))) // ❌ > 255 bytes
+err := htpasswd.ValidateUsername("alice")      // Valid
+err = htpasswd.ValidateUsername("")            // Not valid - empty
+err = htpasswd.ValidateUsername("user:name")   // Not valid - contains colon
+err = htpasswd.ValidateUsername(string(make([]byte, 256))) // Not valid > 255 bytes
 
 // Password validation  
-err = htpasswd.ValidatePassword("secret123")   // ✅ Valid
-err = htpasswd.ValidatePassword("")            // ❌ Empty
-err = htpasswd.ValidatePassword("\xFF\xFE")    // ❌ Invalid UTF-8
+err = htpasswd.ValidatePassword("secret123")   // Valid
+err = htpasswd.ValidatePassword("")            // Not valid - empty
+err = htpasswd.ValidatePassword("\xFF\xFE")    // Not valid - invalid UTF-8
 ```
 
 ### Validation Rules
@@ -308,13 +308,6 @@ if err != nil {
 }
 ```
 
-## Performance Notes
-
-- **Thread-safe operations** incur minimal overhead
-- **bcrypt** is computationally expensive by design (security feature)
-- **File operations** are I/O bound
-- **In-memory operations** are very fast for user lookups
-
 ## Testing
 
 The provider includes comprehensive test coverage:
@@ -328,57 +321,4 @@ go test -cover ./provider/htpasswd/...
 
 # Run with race detection
 go test -race ./provider/htpasswd/...
-```
-
-## Integration Examples
-
-### Web Authentication
-
-```go
-func authenticateUser(username, password string) bool {
-    container, err := htpasswd.NewFromFile("/etc/webapp/.htpasswd")
-    if err != nil {
-        log.Printf("Failed to load htpasswd: %v", err)
-        return false
-    }
-    
-    valid, err := container.VerifyUser(username, password)
-    if err != nil {
-        log.Printf("Authentication error: %v", err)
-        return false
-    }
-    
-    return valid
-}
-```
-
-### User Registration
-
-```go
-func registerUser(username, password string) error {
-    container, err := htpasswd.NewFromFile("/etc/webapp/.htpasswd")
-    if err != nil {
-        // Create new file if doesn't exist
-        container = htpasswd.NewContainer()
-    }
-    
-    if container.UserExists(username) {
-        return fmt.Errorf("user already exists")
-    }
-    
-    err = container.AddUserPassword(username, password)
-    if err != nil {
-        return fmt.Errorf("failed to add user: %w", err)
-    }
-    
-    // Save back to file
-    file, err := os.OpenFile("/etc/webapp/.htpasswd", 
-        os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-    if err != nil {
-        return fmt.Errorf("failed to open file: %w", err)
-    }
-    defer file.Close()
-    
-    return container.Write(file)
-}
 ```
