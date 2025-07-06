@@ -25,7 +25,7 @@ if err != nil {
 }
 
 // Create a new credential with a plaintext password
-credential, err := secure.NewCredential("my-secure-password", key, false)
+credential, err := secure.NewCredential(string("my-secure-password"), key, false)
 if err != nil {
     // handle error
 }
@@ -64,7 +64,8 @@ configCredential, err := secure.CredentialFromConfig(config, key, false)
 
 ## Configuration
 
-The `DefaultCredentialConfig` struct provides a standard way to configure credential sources with priority handling:
+The `DefaultCredentialConfig` struct provides a standard way to configure credential sources with 
+priority handling:
 
 ```go
 type DefaultCredentialConfig struct {
@@ -74,13 +75,23 @@ type DefaultCredentialConfig struct {
 }
 ```
 
+The `KeyConfig` struct provides similar functionality to `DefaultCredentialConfig`, but named in 
+a suitable way for Key handling:
+
+```go
+type KeyConfig struct {
+    Key       string `json:"key"`       // Highest priority
+    KeyEnvVar string `json:"keyEnvVar"` // Second priority
+    KeyFile   string `json:"keyFile"`   // Lowest priority
+}
+```
+
 You can also implement your own configuration by implementing the `CredentialConfig` interface:
 
 ```go
 type CredentialConfig interface {
-    GetPassword() string
-    GetEnvVar() string
-    GetFileName() string
+    Fetch() (string, error)
+    IsEmpty() bool
 }
 ```
 
