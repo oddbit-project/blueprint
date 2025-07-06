@@ -1,31 +1,39 @@
 # Session Management
 
-Blueprint provides built-in session management for HTTP applications. The session management system is designed to be 
-flexible and secure, with support for multiple storage backends:
+Blueprint provides a flexible session management system for HTTP applications with support for multiple storage backends and session types:
 
-1. **Cookie-based Sessions**: Using in-memory or Redis storage
-2. **JWT-based Sessions**: Using stateless JSON Web Tokens
+1. **Cookie-based Sessions**: Traditional server-side sessions using cookies for session ID storage
+2. **JWT-based Sessions**: Stateless sessions using JWT tokens (see [JWT Authentication](../auth/jwt.md))
 
-> **Note**: The cookie-based session management integrates well with Blueprint's built-in CSRF protection.
-> For enhanced security when using cookies, it's recommended to use both features together.
+## Architecture Overview
+
+The session system consists of three main components:
+
+- **SessionData**: Core data structure for storing session values (`provider/httpserver/session/session_data.go`)
+- **SessionManager**: Middleware and session lifecycle management (`provider/httpserver/session/middleware.go`)
+- **Store**: Backend storage abstraction supporting various KV stores (`provider/httpserver/session/store.go`)
+
+> **Integration Note**: JWT-based sessions use the same `SessionData` structure but store the data within JWT claims instead of server-side storage. This provides a consistent API regardless of session type.
 
 ## Features
 
-- Multiple session mechanisms:
-  - Cookie-based sessions with server-side storage
-  - JWT-based sessions using Authorization header
-- Multiple storage backends:
-  - In-memory session store
-  - Redis session store
-  - JWT stateless tokens
-- Security features:
-  - Automatic session expiration and cleanup
-  - Session regeneration (prevents session fixation attacks)
-  - Secure cookies with configurable options (HttpOnly, Secure, SameSite, etc.)
-- Developer-friendly features:
-  - Flash messages
-  - Type-safe getters and setters
-  - Consistent API across all storage types
+### Core Session Features
+- **Flexible Storage**: Support for any KV backend (memory, Redis, etc.)
+- **Type-safe Access**: Typed getters for common data types (string, int, bool)
+- **Flash Messages**: One-time messages that persist across requests
+- **Session Regeneration**: Built-in protection against session fixation
+- **Automatic Cleanup**: Configurable cleanup intervals for expired sessions
+
+### Cookie Configuration
+- **Security Flags**: HttpOnly, Secure, and SameSite support
+- **Flexible Expiration**: Separate expiration and idle timeout settings
+- **Domain/Path Control**: Fine-grained cookie scope configuration
+
+### JWT Integration
+- **Seamless API**: Same session interface for both cookie and JWT sessions
+- **Stateless Operation**: JWT tokens carry session data in claims
+- **Enhanced Security**: Support for asymmetric algorithms and token revocation
+- **JWKS Support**: Public key distribution for third-party verification
 
 ## Using Sessions
 
@@ -84,11 +92,12 @@ For stateless, API-focused applications:
 // configure logger
 logger := log.New("session-sample")
 
-// Configure JWT
-jwtConfig := session.NewJWTConfig()
-jwtConfig.SigningKey = []byte("your-secure-signing-key")
+// Configure JWT (from provider/auth/jwt package)
+jwtConfig := jwt.NewJWTConfig(jwt.RandomJWTKey())
+jwtConfig.SigningAlgorithm = "HS256" // or RS256, ES256, EdDSA
+jwtConfig.ExpirationSeconds = 3600
 
-// Use session middleware with JWT
+// Use JWT session middleware
 jwtManager, err := server.UseJWTSession(jwtConfig, logger)
 if err != nil {
     logger.Fatal(err, "could not create JWT session manager")
@@ -96,97 +105,127 @@ if err != nil {
 }
 ```
 
+> **Note**: JWT configuration is now handled by the `provider/auth/jwt` package. See the [JWT Authentication documentation](../auth/jwt.md) for advanced features like asymmetric algorithms, JWKS, and token revocation.
+
 ## Session Configuration
 
-The `Config` struct contains all the configuration options for sessions. The struct can be used internally or updated from
-a config provider, such as a JSON file:
+The `Config` struct in `provider/httpserver/session/config.go` contains all configuration options for cookie-based sessions:
 
 ```go
 type Config struct {
-  CookieName             string `json:"cookieName"`             // CookieName is the name of the cookie used to store the session ID
-  ExpirationSeconds      int    `json:"expirationSeconds"`      // Expiration is the maximum lifetime of a session
-  IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // IdleTimeoutSeconds is the maximum time a session can be inactive
-  Secure                 bool   `json:"secure"`                 // Secure sets the Secure flag on cookies (should be true in production)
-  HttpOnly               bool   `json:"httpOnly"`               // HttpOnly sets the HttpOnly flag on cookies (should be true)
-  SameSite               int    `json:"sameSite"`               // SameSite sets the SameSite policy for cookies
-  Domain                 string `json:"domain"`                 // Domain sets the domain for the cookie
-  Path                   string `json:"path"`                   // Path sets the path for the cookie
-  CleanupIntervalSeconds int    `json:"cleanupIntervalSeconds"` // CleanupIntervalSeconds sets how often the session cleanup runs
+    CookieName             string `json:"cookieName"`             // Cookie name for session ID (default: "blueprint_session")
+    ExpirationSeconds      int    `json:"expirationSeconds"`      // Maximum session lifetime (default: 1800 = 30 min)
+    IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // Maximum idle time (default: 900 = 15 min)
+    Secure                 bool   `json:"secure"`                 // HTTPS-only cookies (default: true)
+    HttpOnly               bool   `json:"httpOnly"`               // No JS access (default: true)
+    SameSite               int    `json:"sameSite"`               // CSRF protection (default: Strict)
+    Domain                 string `json:"domain"`                 // Cookie domain scope
+    Path                   string `json:"path"`                   // Cookie path scope (default: "/")
+    CleanupIntervalSeconds int    `json:"cleanupIntervalSeconds"` // Cleanup frequency (default: 300 = 5 min)
 }
 ```
 
-Default sensible options are provided by `NewConfig()`:
+### Default Configuration
 
 ```go
-func NewConfig() *Config {
-    return &Config{
-    CookieName:             DefaultSessionCookieName,
-    ExpirationSeconds:      DefaultSessionExpiration,
-    IdleTimeoutSeconds:     DefaultSessionIdleTimeout,
-    Secure:                 DefaultSecure,
-    HttpOnly:               DefaultHttpOnly,
-    SameSite:               DefaultSameSite,
-    Path:                   "/",
-    Domain:                 "",
-    CleanupIntervalSeconds: DefaultCleanupInterval,
-  }
+const (
+    DefaultSessionCookieName  = "blueprint_session"  // Cookie name
+    DefaultSessionExpiration  = 1800                  // 30 minutes
+    DefaultSessionIdleTimeout = 900                   // 15 minutes
+    DefaultSecure             = true                  // HTTPS only
+    DefaultHttpOnly           = true                  // No JS access
+    DefaultSameSite           = http.SameSiteStrictMode
+    DefaultCleanupInterval    = 300                   // 5 minutes
+)
+```
+
+### Configuration Validation
+
+The configuration includes built-in validation:
+
+```go
+func (c *Config) Validate() error {
+    // Validates positive integers for timeouts
+    // Validates SameSite values
+    // Returns specific errors for invalid configurations
 }
 ```
 
 ## Working with Sessions
 
+### Session Data Structure
+
+All session types use the same `SessionData` structure:
+
+```go
+type SessionData struct {
+    Values       map[string]any
+    LastAccessed time.Time
+    Created      time.Time
+    ID           string
+}
+```
+
 ### Reading and Writing Session Data
 
 ```go
 // Get the session from the gin context
-session := session.Get(c)
+sess := session.Get(c)
 
 // Store a value
-session.Set(c, "user_id", 123)
+sess.Set("user_id", 123)
 
 // Get a value
-userId, ok := session.GetInt(c, "user_id")
+userId, ok := sess.GetInt("user_id")
 if ok {
     // Use userId
 }
 
 // Delete a value
-session.Delete(c, "user_id")
+sess.Delete("user_id")
 
 // Check if a key exists
-if session.Has(c, "user_id") {
+if sess.Has("user_id") {
     // Key exists
 }
 ```
 
 ### Typed Getters
 
-The session package provides typed getters for convenience:
+The `SessionData` struct provides typed getters for common data types:
 
 ```go
+sess := session.Get(c)
+
 // Get string
-str, ok := session.GetString(c, "name")
+str, ok := sess.GetString("name")
 
 // Get int
-num, ok := session.GetInt(c, "count")
+num, ok := sess.GetInt("count")
 
 // Get bool
-val, ok := session.GetBool(c, "enabled")
+val, ok := sess.GetBool("enabled")
 
 // Get any value
-val, ok := session.GetValue(c, "complex")
+val, ok := sess.Get("complex")
 ```
 
 ### Flash Messages
 
-Flash messages are temporary messages that are typically used to display one-time notifications:
+Flash messages are one-time values that persist only until retrieved:
 
 ```go
-// Set a flash message
-session.FlashString(c, "message", "Operation completed successfully")
+sess := session.Get(c)
 
-// Get a flash message (this will remove it from the session)
-message, ok := session.GetFlashString(c, "message")
+// Set a flash message
+sess.FlashString("Operation completed successfully")
+
+// Get a flash message (automatically removes it)
+message, ok := sess.GetFlashString()
+
+// Generic flash for non-string values
+sess.Flash(complexData)
+data, ok := sess.GetFlash()
 ```
 
 ### Security Operations
@@ -213,104 +252,160 @@ sessionManager.Clear(c)
 
 ## Full Examples
 
-- **Cookie-based Sessions**: See `/sample/session/main.go` for a complete example of cookie-based session usage
-- **JWT-based Sessions**: See `/sample/jwt_session/main.go` for a RESTful API example using JWT sessions
+### Cookie-based Sessions
+See `/samples/session/` for a complete example demonstrating:
+- Session creation and management
+- Flash messages
+- Session regeneration
+- CSRF integration
 
-## JWT Configuration
+### JWT-based Sessions  
+See `/samples/jwt-auth/` for a comprehensive JWT example featuring:
+- JWT token generation and validation
+- Session data in JWT claims
+- Token refresh and revocation
+- JWKS endpoint for public keys
+- Interactive web interface
 
-When using JWT-based sessions, you can configure the token behavior using the `JWTConfig`; the struct can be updated from
-a config provider. The SigningMethod and Expiration fields are updated on `Validate()`, from the respective configuration
-values:
+## Session Storage
 
-```go
-type JWTConfig struct {
-  SigningKey        []byte            `json:"signingKey"`        // SigningKey is the key used to sign JWT tokens; if json, base64-encoded key
-  SigningAlgorithm  string            `json:"signingAlgorithm"`  // SigningAlgorithm, one of HS256, HS384, HS512
-  ExpirationSeconds int               `json:"expirationSeconds"` // ExpirationSeconds
-  Issuer            string            `json:"issuer"`            // Issuer is the issuer of the token
-  Audience          string            `json:"audience"`          // Audience is the audience of the token
-  SigningMethod     jwt.SigningMethod `json:"-"`                 // SigningMethod is the method used to sign the token; filled on Validate()
-  Expiration        time.Duration     `json:"-"`                 // Expiration is the expiration time for tokens; filled on Validate()
-}
-```
-
-Default values are provided by `NewJWTConfig()`:
+The session system uses a flexible storage abstraction that works with any KV backend:
 
 ```go
-func NewJWTConfig() *JWTConfig {
-  // random signing key, should be overriden by user
-  buf := make([]byte, 128)
-  _, err := rand.Read(buf)
-  if err != nil {
-      panic(err)
-  }
-  return &JWTConfig{
-    SigningKey:        buf, // Must be set by the user
-    SigningAlgorithm:  "HS256",
-    SigningMethod:     jwt.SigningMethodHS256,
-    ExpirationSeconds: 86400,
-    Expiration:        time.Second * 86400, // 24 hours
-    Issuer:            "blueprint",
-    Audience:          "api",
-  }
+// Store manages session data in a KV backend
+type Store struct {
+    config   *Config
+    backend  kv.KV
+    logger   *log.Logger
+    stopChan chan struct{}
 }
+
+// Create a new store with any KV backend
+store := session.NewStore(config, backend, logger)
+
+// Available backends:
+// - kv.NewMemoryKV() - In-memory storage
+// - redis.NewClient(config) - Redis storage
+// - Any implementation of the kv.KV interface
 ```
+
+### Automatic Cleanup
+
+The store automatically cleans up expired sessions based on the configured interval:
+- Runs in a separate goroutine
+- Removes sessions older than `ExpirationSeconds`
+- Removes sessions idle longer than `IdleTimeoutSeconds`
+- Cleanup interval configured via `CleanupIntervalSeconds`
 
 ## Best Practices
 
-### For Cookie-based Sessions:
+### Cookie-based Sessions
 
-1. Always use HTTPS in production with `config.Secure = true`
-2. Use `HttpOnly` cookies to prevent JavaScript access to session IDs
-3. Use appropriate `SameSite` settings (Strict or Lax) to prevent CSRF attacks
-4. Enable CSRF protection with `server.UseCSRFProtection()`
-5. Regenerate sessions after login to prevent session fixation
-6. Clear sessions at logout
-7. Use Redis store for distributed applications
+1. **Security Configuration**
+   - Always use `Secure = true` in production (HTTPS only)
+   - Keep `HttpOnly = true` to prevent XSS attacks
+   - Use `SameSite = Strict` or `Lax` for CSRF protection
+   - Enable additional CSRF protection with `server.UseCSRFProtection()`
 
-### For JWT-based Sessions:
+2. **Session Management**
+   - Regenerate session ID after authentication
+   - Clear sessions explicitly on logout
+   - Use appropriate expiration and idle timeouts
+   - Configure cleanup intervals based on traffic
 
-1. Use a strong, secure signing key (at least 32 bytes)
-2. Store signing keys securely, not in source code
-3. Set appropriate token expiration time
-4. Regenerate tokens regularly for sensitive operations
-5. Use HTTPS for all API communication
-6. Implement token revocation for logout if needed (requires additional storage)
-7. Consider using asymmetric keys (RS256) for production applications
+3. **Storage Selection**
+   - Use in-memory storage for development/single-instance
+   - Use Redis for distributed/production deployments
+   - Consider custom KV backends for specific requirements
 
-## Integrating Cookie Sessions with CSRF Protection
+### JWT-based Sessions
 
-Blueprint's session management works well with the built-in CSRF protection. Here's how to set up both:
+1. **Algorithm Selection**
+   - Use asymmetric algorithms (RS256, ES256, EdDSA) for production
+   - Reserve HMAC (HS256) for simple, trusted environments
+   - Enable JWKS for public key distribution
+
+2. **Security Configuration**
+   - Use strong keys (min 2048-bit for RSA)
+   - Enable issuer and audience validation
+   - Implement token revocation for sensitive apps
+   - Use short expiration times (15-60 minutes)
+
+3. **Integration Guidelines**
+   - Use Authorization header, not cookies
+   - Implement automatic token refresh
+   - Handle token expiration gracefully
+   - See [JWT Authentication](../auth/jwt.md) for detailed configuration
+
+## Session Middleware Integration
+
+The `SessionManager` provides Gin middleware for automatic session handling:
+
+```go
+type SessionManager struct {
+    store  *Store
+    config *Config
+    logger *log.Logger
+}
+
+// Middleware automatically:
+// 1. Loads existing sessions from cookies
+// 2. Creates new sessions for new visitors
+// 3. Saves session changes after request processing
+// 4. Manages cookie lifecycle
+```
+
+### Helper Functions
+
+```go
+// Get session from Gin context
+sess := session.Get(c)
+
+// Regenerate session ID (e.g., after login)
+manager.Regenerate(c)
+
+// Clear session and remove cookie
+manager.Clear(c)
+```
+
+## CSRF Protection Integration
+
+Cookie sessions integrate seamlessly with CSRF protection:
 
 ```go
 // 1. Set up session management
-logger := log.New("sample-logger")
+logger := log.New("app")
 backend := kv.NewMemoryKV()
 sessionConfig := session.NewConfig()
-sessionManager := server.UseSession(sessionConfig, backend, logger)
+manager := server.UseSession(sessionConfig, backend, logger)
 
 // 2. Enable CSRF protection
 server.UseCSRFProtection()
 
-// 3. In your handler, generate and provide CSRF token
+// 3. Generate CSRF token in handlers
 router.GET("/form", func(c *gin.Context) {
-    // Generate CSRF token
     csrfToken := security.GenerateCSRFToken(c)
-    
-    // Render the form with the CSRF token
     c.HTML(http.StatusOK, "form.html", gin.H{
         "csrfToken": csrfToken,
     })
 })
 
-// 4. In your HTML form
-// <form method="POST" action="/submit">
-//     <input type="hidden" name="_csrf" value="{{ .csrfToken }}">
-//     <!-- other form fields -->
-// </form>
+// 4. Include token in forms
+// <input type="hidden" name="_csrf" value="{{ .csrfToken }}">
 ```
 
-This integration ensures that:
-- Each user session has its own CSRF token
-- Form submissions are protected against CSRF attacks
-- The CSRF token is verified server-side before processing the request
+## Migration from JWT in Session Package
+
+If you have existing code using JWT from the old session package location:
+
+```go
+// OLD: JWT types were in session package
+import "github.com/oddbit-project/blueprint/provider/httpserver/session"
+jwtConfig := session.NewJWTConfig()
+
+// NEW: JWT functionality moved to dedicated package
+import "github.com/oddbit-project/blueprint/provider/auth/jwt"
+jwtConfig := jwt.NewJWTConfig(jwt.RandomJWTKey())
+```
+
+The session API remains the same - only the JWT configuration and management has moved. See [JWT Authentication](../auth/jwt.md) for the complete JWT documentation.
