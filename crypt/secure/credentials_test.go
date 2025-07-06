@@ -278,25 +278,6 @@ func TestKeyEncoding(t *testing.T) {
 	}
 }
 
-// Mock implementation of CredentialConfig for testing
-type mockCredentialConfig struct {
-	password string
-	envVar   string
-	fileName string
-}
-
-func (m mockCredentialConfig) GetPassword() string {
-	return m.password
-}
-
-func (m mockCredentialConfig) GetEnvVar() string {
-	return m.envVar
-}
-
-func (m mockCredentialConfig) GetFileName() string {
-	return m.fileName
-}
-
 func TestCredentialFromConfig(t *testing.T) {
 	// Generate a key
 	key, err := GenerateKey()
@@ -305,10 +286,10 @@ func TestCredentialFromConfig(t *testing.T) {
 	}
 
 	// Test with direct password
-	config := mockCredentialConfig{
-		password: "direct-password",
-		envVar:   "",
-		fileName: "",
+	config := DefaultCredentialConfig{
+		Password:       "direct-password",
+		PasswordEnvVar: "",
+		PasswordFile:   "",
 	}
 
 	credential, err := CredentialFromConfig(config, key, false)
@@ -329,10 +310,10 @@ func TestCredentialFromConfig(t *testing.T) {
 	os.Setenv(envVarName, "env-var-password")
 	defer os.Unsetenv(envVarName)
 
-	config = mockCredentialConfig{
-		password: "",
-		envVar:   envVarName,
-		fileName: "",
+	config = DefaultCredentialConfig{
+		Password:       "",
+		PasswordEnvVar: envVarName,
+		PasswordFile:   "",
 	}
 
 	credential, err = CredentialFromConfig(config, key, false)
@@ -362,10 +343,10 @@ func TestCredentialFromConfig(t *testing.T) {
 		t.Fatalf("Failed to create secret file: %v", err)
 	}
 
-	config = mockCredentialConfig{
-		password: "",
-		envVar:   "",
-		fileName: secretFile,
+	config = DefaultCredentialConfig{
+		Password:       "",
+		PasswordEnvVar: "",
+		PasswordFile:   secretFile,
 	}
 
 	credential, err = CredentialFromConfig(config, key, false)
@@ -382,10 +363,10 @@ func TestCredentialFromConfig(t *testing.T) {
 	}
 
 	// Test with empty config and allowEmpty=false
-	config = mockCredentialConfig{
-		password: "",
-		envVar:   "",
-		fileName: "",
+	config = DefaultCredentialConfig{
+		Password:       "",
+		PasswordEnvVar: "",
+		PasswordFile:   "",
 	}
 
 	_, err = CredentialFromConfig(config, key, false)
@@ -400,25 +381,5 @@ func TestCredentialFromConfig(t *testing.T) {
 	}
 	if !credential.IsEmpty() {
 		t.Errorf("Credential should be empty")
-	}
-}
-
-func TestDefaultCredentialConfig(t *testing.T) {
-	cfg := DefaultCredentialConfig{
-		Password:       "test-password",
-		PasswordEnvVar: "TEST_ENV_VAR",
-		PasswordFile:   "/path/to/secret/file",
-	}
-
-	if cfg.GetPassword() != "test-password" {
-		t.Errorf("GetPassword returned incorrect value: expected %s, got %s", "test-password", cfg.GetPassword())
-	}
-
-	if cfg.GetEnvVar() != "TEST_ENV_VAR" {
-		t.Errorf("GetEnvVar returned incorrect value: expected %s, got %s", "TEST_ENV_VAR", cfg.GetEnvVar())
-	}
-
-	if cfg.GetFileName() != "/path/to/secret/file" {
-		t.Errorf("GetFileName returned incorrect value: expected %s, got %s", "/path/to/secret/file", cfg.GetFileName())
 	}
 }

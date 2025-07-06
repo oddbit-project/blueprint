@@ -9,22 +9,12 @@ import (
 	"github.com/oddbit-project/blueprint/utils/env"
 	"github.com/oddbit-project/blueprint/utils/fs"
 	"io"
-	"strings"
 	"sync"
 )
 
 type CredentialConfig interface {
-	GetPassword() string
-	GetEnvVar() string
-	GetFileName() string
-}
-
-// DefaultCredentialConfig misc options for credentials
-// if different field names are required, just implement CredentialConfig interface
-type DefaultCredentialConfig struct {
-	Password       string `json:"password"`       // Password plaintext password; if set, is used instead of the rest
-	PasswordEnvVar string `json:"passwordEnvVar"` // PasswordEnvVar name of env var with secret
-	PasswordFile   string `json:"passwordFile"`   // PasswordFile name of secrets file, to be read; if none of the above set, this one is used
+	Fetch() (string, error)
+	IsEmpty() bool
 }
 
 var (
@@ -260,50 +250,16 @@ func DecodeKey(encodedKey string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(encodedKey)
 }
 
-// GetPassword fetch password value
-func (c DefaultCredentialConfig) GetPassword() string {
-	return c.Password
-}
-
-// GetEnvVar fetch environment var name holding the password
-func (c DefaultCredentialConfig) GetEnvVar() string {
-	return c.PasswordEnvVar
-}
-
-// GetFileName fetch file name holding the password
-func (c DefaultCredentialConfig) GetFileName() string {
-	return c.PasswordFile
-}
-
 // CredentialFromConfig attempts to parse credentials from a CredentialConfig struct
 // if no valid credentials found, returns error; if environment var is used, it is read only once and
 // then overwritten with an empty value
 func CredentialFromConfig(cfg CredentialConfig, encryptionKey []byte, allowEmpty bool) (*Credential, error) {
-	plainText := strings.Trim(cfg.GetPassword(), " ")
-	if plainText == "" {
-		// attempt to read env var, if set
-		envVar := strings.Trim(cfg.GetEnvVar(), " ")
-		if envVar == "" {
-			// attempt to read secrets file, if set
-			secretsFile := cfg.GetFileName()
-			if secretsFile == "" {
-				plainText = ""
-			} else {
-				// read secrets
-				var err error
-				if plainText, err = fs.ReadString(secretsFile); err != nil {
-					return nil, err
-				}
-			}
-		} else {
-			// read from env var
-			plainText = env.GetEnvVar(envVar)
-			_ = env.SetEnvVar(envVar, "")
-		}
+	cred, err := cfg.Fetch()
+	if err != nil {
+		return nil, err
 	}
-
-	if len(plainText) > 0 || (allowEmpty && len(plainText) == 0) {
-		return NewCredential([]byte(plainText), encryptionKey, allowEmpty)
+	if len(cred) > 0 || (allowEmpty && len(cred) == 0) {
+		return NewCredential([]byte(cred), encryptionKey, allowEmpty)
 	}
 	return nil, ErrEmptyCredential
 }
