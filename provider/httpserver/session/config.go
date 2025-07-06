@@ -42,7 +42,7 @@ const (
 // Config holds configuration for the session store
 type Config struct {
 	CookieName             string `json:"cookieName"`             // CookieName is the name of the cookie used to store the session ID
-	ExpirationSeconds      int    `json:"expirationSeconds"`      // Expiration is the maximum lifetime of a session
+	ExpirationSeconds      int    `json:"expirationSeconds"`      // expiration is the maximum lifetime of a session
 	IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // IdleTimeoutSeconds is the maximum time a session can be inactive
 	Secure                 bool   `json:"secure"`                 // Secure sets the Secure flag on cookies (should be true in production)
 	HttpOnly               bool   `json:"httpOnly"`               // HttpOnly sets the HttpOnly flag on cookies (should be true)

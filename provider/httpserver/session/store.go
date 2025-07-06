@@ -92,7 +92,7 @@ func (s *Store) Set(id string, session *SessionData) error {
 		return err
 	}
 
-	// Calculate expiration time (use the smaller of Expiration and IdleTimeout)
+	// Calculate expiration time (use the smaller of expiration and IdleTimeout)
 	expiration := time.Duration(s.config.ExpirationSeconds) * time.Second
 	if time.Duration(s.config.IdleTimeoutSeconds)*time.Second < expiration {
 		expiration = time.Duration(s.config.IdleTimeoutSeconds) * time.Second
