@@ -143,9 +143,10 @@ func main() {
 		}
 
 		// Update visit count
-		visits := 1
+		// please note jwt does not support int format
+		var visits float64 = 1
 		if v, ok := claims.Data["visits"]; ok {
-			visits = v.(int) + 1
+			visits = v.(float64) + 1.0
 		}
 		claims.Data["visits"] = visits
 
@@ -162,7 +163,7 @@ func main() {
 		c.Header("Authorization", "Bearer "+token)
 
 		c.JSON(http.StatusOK, gin.H{
-			"message": fmt.Sprintf("Visit count: %d", visits),
+			"message": fmt.Sprintf("Visit count: %v", visits),
 			"visits":  visits,
 		})
 	})
