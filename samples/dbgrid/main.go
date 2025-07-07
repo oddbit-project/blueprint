@@ -102,29 +102,29 @@ func main() {
 	if err != nil {
 		log.Fatal("Error creating grid query: ", err)
 	}
-	
+
 	// Add sorting by username
 	query1.SortFields = map[string]string{
 		"username": db.SortAscending,
 	}
 
-	// Validate the query
+	// ParseToken the query
 	if err := userGrid.ValidQuery(query1); err != nil {
 		log.Fatal("Invalid query: ", err)
 	}
-	
+
 	// Build the SQL
 	statement1, err := userGrid.Build(nil, query1)
 	if err != nil {
 		log.Fatal("Error building SQL: ", err)
 	}
-	
+
 	// Convert to SQL
 	sql1, args1, err := statement1.ToSQL()
 	if err != nil {
 		log.Fatal("Error generating SQL: ", err)
 	}
-	
+
 	fmt.Println("SQL:", sql1)
 	fmt.Println("Args:", args1)
 
@@ -132,35 +132,35 @@ func main() {
 	fmt.Println("\nExample 2: Filtering")
 	fmt.Println("- Filter: active=yes, role=admin")
 	fmt.Println("- Limit: 5 records")
-	
+
 	query2, err := db.NewGridQuery(db.SearchNone, 5, 0)
 	if err != nil {
 		log.Fatal("Error creating grid query: ", err)
 	}
-	
+
 	// Add filters
 	query2.FilterFields = map[string]any{
 		"active": "yes",
 		"role":   "admin",
 	}
 
-	// Validate the query
+	// ParseToken the query
 	if err := userGrid.ValidQuery(query2); err != nil {
 		log.Fatal("Invalid query: ", err)
 	}
-	
+
 	// Build the SQL
 	statement2, err := userGrid.Build(nil, query2)
 	if err != nil {
 		log.Fatal("Error building SQL: ", err)
 	}
-	
+
 	// Convert to SQL
 	sql2, args2, err := statement2.ToSQL()
 	if err != nil {
 		log.Fatal("Error generating SQL: ", err)
 	}
-	
+
 	fmt.Println("SQL:", sql2)
 	fmt.Println("Args:", args2)
 
@@ -168,31 +168,31 @@ func main() {
 	fmt.Println("\nExample 3: Searching")
 	fmt.Println("- Search: 'john' in searchable fields")
 	fmt.Println("- Search Type: Any (contains)")
-	
+
 	query3, err := db.NewGridQuery(db.SearchAny, 10, 0)
 	if err != nil {
 		log.Fatal("Error creating grid query: ", err)
 	}
-	
+
 	query3.SearchText = "john"
 
-	// Validate the query
+	// ParseToken the query
 	if err := userGrid.ValidQuery(query3); err != nil {
 		log.Fatal("Invalid query: ", err)
 	}
-	
+
 	// Build the SQL
 	statement3, err := userGrid.Build(nil, query3)
 	if err != nil {
 		log.Fatal("Error building SQL: ", err)
 	}
-	
+
 	// Convert to SQL
 	sql3, args3, err := statement3.ToSQL()
 	if err != nil {
 		log.Fatal("Error generating SQL: ", err)
 	}
-	
+
 	fmt.Println("SQL:", sql3)
 	fmt.Println("Args:", args3)
 
@@ -202,12 +202,12 @@ func main() {
 	fmt.Println("- Filter: active=true")
 	fmt.Println("- Sort: id descending")
 	fmt.Println("- Limit: 15, Offset: 30")
-	
+
 	query4, err := db.NewGridQuery(db.SearchAny, 15, 30)
 	if err != nil {
 		log.Fatal("Error creating grid query: ", err)
 	}
-	
+
 	query4.SearchText = "smith"
 	query4.FilterFields = map[string]any{
 		"active": true,
@@ -216,56 +216,56 @@ func main() {
 		"id": db.SortDescending,
 	}
 
-	// Validate the query
+	// ParseToken the query
 	if err := userGrid.ValidQuery(query4); err != nil {
 		log.Fatal("Invalid query: ", err)
 	}
-	
+
 	// Build the SQL
 	statement4, err := userGrid.Build(nil, query4)
 	if err != nil {
 		log.Fatal("Error building SQL: ", err)
 	}
-	
+
 	// Convert to SQL
 	sql4, args4, err := statement4.ToSQL()
 	if err != nil {
 		log.Fatal("Error generating SQL: ", err)
 	}
-	
+
 	fmt.Println("SQL:", sql4)
 	fmt.Println("Args:", args4)
 
 	// Try connecting to a real database if requested
 	if realDB {
 		fmt.Println("\nConnecting to database...")
-		
+
 		// Connect to PostgreSQL
 		pgConfig := pgsql.NewClientConfig()
 		pgConfig.DSN = "postgres://username:password@localhost:5432/database?sslmode=allow"
-		
+
 		client, err := pgsql.NewClient(pgConfig)
 		if err != nil {
 			log.Fatal("Error connecting to database: ", err)
 		}
 		defer client.Disconnect()
-		
+
 		// Execute a query using the database connection
 		sqlStr, args, err := statement1.ToSQL()
 		if err != nil {
 			log.Fatal("Error generating SQL: ", err)
 		}
-		
+
 		rows, err := client.Db().QueryxContext(context.Background(), sqlStr, args...)
 		if err != nil {
 			log.Fatal("Error executing query: ", err)
 		}
 		defer rows.Close()
-		
+
 		// Display results
 		fmt.Println("\nQuery Results:")
 		fmt.Println("-------------")
-		
+
 		var users []User
 		for rows.Next() {
 			var user User
@@ -274,11 +274,11 @@ func main() {
 			}
 			users = append(users, user)
 		}
-		
+
 		if err := rows.Err(); err != nil {
 			log.Fatal("Error iterating rows: ", err)
 		}
-		
+
 		// Display users
 		for _, user := range users {
 			fmt.Printf("ID: %d, Username: %s, Email: %s, Active: %t, Role: %s, Created: %s\n",
@@ -289,36 +289,36 @@ func main() {
 	// ==== Example 5: Custom Select Query ====
 	fmt.Println("\nExample 5: Custom Select with Count")
 	fmt.Println("- Base query: SELECT COUNT(*) FROM users")
-	
+
 	// Create a custom select query
 	customSelect := goqu.Select(goqu.COUNT("*")).From("users")
-	
+
 	query5, err := db.NewGridQuery(db.SearchNone, 0, 0)
 	if err != nil {
 		log.Fatal("Error creating grid query: ", err)
 	}
-	
+
 	query5.FilterFields = map[string]any{
 		"active": "yes",
 	}
 
-	// Validate the query
+	// ParseToken the query
 	if err := userGrid.ValidQuery(query5); err != nil {
 		log.Fatal("Invalid query: ", err)
 	}
-	
+
 	// Build the SQL with the custom select
 	statement5, err := userGrid.Build(customSelect, query5)
 	if err != nil {
 		log.Fatal("Error building SQL: ", err)
 	}
-	
+
 	// Convert to SQL
 	sql5, args5, err := statement5.ToSQL()
 	if err != nil {
 		log.Fatal("Error generating SQL: ", err)
 	}
-	
+
 	fmt.Println("SQL:", sql5)
 	fmt.Println("Args:", args5)
 

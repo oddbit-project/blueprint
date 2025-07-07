@@ -100,7 +100,7 @@ func (a *Application) Run() {
 func main() {
 	// config logger
 	utils.PanicOnError(log.Configure(log.NewDefaultConfig()))
-	
+
 	logger := log.New("sample-application")
 
 	flag.Parse()

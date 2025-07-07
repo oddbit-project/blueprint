@@ -24,13 +24,13 @@ func main() {
 
 	// Create a logger configuration
 	logConfig := log.NewDefaultConfig()
-	
+
 	// Enable file logging with the generated path
 	log.EnableFileOutput(logConfig, logFilePath)
-	
+
 	// Optional: Set file format to console-friendly format (remove for JSON)
 	log.SetFileFormat(logConfig, "console")
-	
+
 	// Configure the logger
 	if err := log.Configure(logConfig); err != nil {
 		fmt.Printf("Error configuring logger: %v\n", err)
