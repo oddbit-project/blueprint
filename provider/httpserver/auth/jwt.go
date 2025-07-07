@@ -2,13 +2,12 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 	"github.com/oddbit-project/blueprint/provider/jwtprovider"
-	"net/http"
 )
 
 const (
-	ErrMissingAuthHeader = "missing or invalid Authorization header"
-	ContextJwtClaims     = "jwtClaims"
+	ContextJwtClaims = "jwtClaims"
 )
 
 type authJWT struct {
@@ -24,13 +23,13 @@ func NewAuthJWT(p jwtprovider.JWTParser) Provider {
 func (a *authJWT) CanAccess(c *gin.Context) bool {
 	token, valid := GetJWTToken(c)
 	if !valid {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": ErrMissingAuthHeader})
+		response.Http401(c)
 		return false
 	}
 
 	claims, err := a.parser.ParseToken(token)
 	if err != nil || len(claims.ID) == 0 {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		response.Http401(c)
 		return false
 	}
 

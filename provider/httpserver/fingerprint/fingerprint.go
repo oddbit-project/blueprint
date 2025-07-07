@@ -20,7 +20,7 @@ type DeviceFingerprint struct {
 	IPSubnet    string `json:"ip_subnet"`
 	Timezone    string `json:"timezone"`
 	Fingerprint string `json:"fingerprint"` // SHA256 hash of components
-	Country     string `json:"country"`
+	Location    string `json:"location"`
 	CreatedAt   int64  `json:"created_at"`
 }
 
@@ -28,19 +28,19 @@ type DeviceFingerprint struct {
 type Config struct {
 	// IncludeUserAgent determines if User-Agent header should be included
 	IncludeUserAgent bool `json:"includeUserAgent"`
-	
+
 	// IncludeAcceptHeaders determines if Accept-* headers should be included
 	IncludeAcceptHeaders bool `json:"includeAcceptHeaders"`
-	
+
 	// IncludeTimezone determines if timezone should be included
 	IncludeTimezone bool `json:"includeTimezone"`
-	
+
 	// IncludeIPAddress determines if IP address should be included
 	IncludeIPAddress bool `json:"includeIPAddress"`
-	
+
 	// UseIPSubnet determines if IP subnet should be used instead of exact IP
 	UseIPSubnet bool `json:"useIPSubnet"`
-	
+
 	// IncludeGeolocation determines if country detection should be included
 	IncludeGeolocation bool `json:"includeGeolocation"`
 }
@@ -81,36 +81,54 @@ func NewPrivacyFriendlyConfig() *Config {
 	}
 }
 
+// GeoResolverFunc convert ip address in location info
+type GeoResolverFunc func(string) string
+
 // Generator generates device fingerprints from HTTP requests
 type Generator struct {
-	config *Config
+	config      *Config
+	geoResolver GeoResolverFunc
+}
+
+type GeneratorOption func(*Generator)
+
+// WithGeoResolver specify custom function to resolve ipaddr -> location
+func WithGeoResolver(geoResolver GeoResolverFunc) GeneratorOption {
+	return func(g *Generator) {
+		g.geoResolver = geoResolver
+	}
 }
 
 // NewGenerator creates a new device fingerprint generator
-func NewGenerator(config *Config) *Generator {
+func NewGenerator(config *Config, opts ...GeneratorOption) *Generator {
 	if config == nil {
 		config = NewDefaultConfig()
 	}
-	return &Generator{
-		config: config,
+	result := &Generator{
+		config:      config,
+		geoResolver: getCountryFromIP,
 	}
+	for _, opt := range opts {
+		opt(result)
+	}
+	return result
 }
 
 // Generate creates a device fingerprint from a Gin context
 func (g *Generator) Generate(c *gin.Context) *DeviceFingerprint {
 	var components []string
-	
+
 	fingerprint := &DeviceFingerprint{
 		CreatedAt: time.Now().Unix(),
 	}
-	
+
 	// User-Agent
 	if g.config.IncludeUserAgent {
 		userAgent := c.GetHeader("User-Agent")
 		fingerprint.UserAgent = userAgent
 		components = append(components, "ua:"+userAgent)
 	}
-	
+
 	// Accept headers
 	if g.config.IncludeAcceptHeaders {
 		acceptLang := c.GetHeader("Accept-Language")
@@ -119,7 +137,7 @@ func (g *Generator) Generate(c *gin.Context) *DeviceFingerprint {
 		fingerprint.AcceptEnc = acceptEnc
 		components = append(components, "al:"+acceptLang, "ae:"+acceptEnc)
 	}
-	
+
 	// Timezone
 	if g.config.IncludeTimezone {
 		timezone := c.GetHeader("X-Timezone")
@@ -129,12 +147,12 @@ func (g *Generator) Generate(c *gin.Context) *DeviceFingerprint {
 		fingerprint.Timezone = timezone
 		components = append(components, "tz:"+timezone)
 	}
-	
+
 	// IP Address
 	if g.config.IncludeIPAddress {
 		ipAddress := getRealIP(c)
 		fingerprint.IPAddress = ipAddress
-		
+
 		if g.config.UseIPSubnet {
 			ipSubnet := calculateIPSubnet(ipAddress)
 			fingerprint.IPSubnet = ipSubnet
@@ -143,19 +161,19 @@ func (g *Generator) Generate(c *gin.Context) *DeviceFingerprint {
 			components = append(components, "ip:"+ipAddress)
 		}
 	}
-	
+
 	// Geolocation
 	if g.config.IncludeGeolocation {
 		country := getCountryFromIP(fingerprint.IPAddress)
-		fingerprint.Country = country
+		fingerprint.Location = country
 		components = append(components, "country:"+country)
 	}
-	
+
 	// Generate fingerprint hash
 	fingerprintData := strings.Join(components, "|")
 	hash := sha256.Sum256([]byte(fingerprintData))
 	fingerprint.Fingerprint = hex.EncodeToString(hash[:])
-	
+
 	return fingerprint
 }
 
@@ -164,12 +182,12 @@ func (g *Generator) Compare(stored, current *DeviceFingerprint, strict bool) boo
 	if stored == nil || current == nil {
 		return false
 	}
-	
+
 	// Always compare core fingerprint if using the same config
 	if stored.Fingerprint == current.Fingerprint {
 		return true
 	}
-	
+
 	// In non-strict mode, allow some flexibility
 	if !strict {
 		// Allow IP subnet changes if configured
@@ -178,52 +196,52 @@ func (g *Generator) Compare(stored, current *DeviceFingerprint, strict bool) boo
 				return stored.IPSubnet == current.IPSubnet
 			}
 		}
-		
+
 		// Compare individual components for partial matches
 		matches := 0
 		total := 0
-		
+
 		if g.config.IncludeUserAgent {
 			total++
 			if stored.UserAgent == current.UserAgent {
 				matches++
 			}
 		}
-		
+
 		if g.config.IncludeTimezone {
 			total++
 			if stored.Timezone == current.Timezone {
 				matches++
 			}
 		}
-		
-		if g.config.IncludeGeolocation && stored.Country != "" && current.Country != "" {
+
+		if g.config.IncludeGeolocation && stored.Location != "" && current.Location != "" {
 			total++
-			if stored.Country == current.Country {
+			if stored.Location == current.Location {
 				matches++
 			}
 		}
-		
+
 		// Require at least 70% match for non-strict comparison
 		return total > 0 && float64(matches)/float64(total) >= 0.7
 	}
-	
+
 	return false
 }
 
 // DetectChanges analyzes differences between fingerprints and returns change flags
 func (g *Generator) DetectChanges(stored, current *DeviceFingerprint) []string {
 	var changes []string
-	
+
 	if stored == nil || current == nil {
 		return changes
 	}
-	
+
 	// Check for User-Agent changes
 	if g.config.IncludeUserAgent && stored.UserAgent != current.UserAgent {
 		changes = append(changes, "user_agent_change")
 	}
-	
+
 	// Check for Accept header changes
 	if g.config.IncludeAcceptHeaders {
 		if stored.AcceptLang != current.AcceptLang {
@@ -233,29 +251,29 @@ func (g *Generator) DetectChanges(stored, current *DeviceFingerprint) []string {
 			changes = append(changes, "accept_encoding_change")
 		}
 	}
-	
+
 	// Check for timezone changes
 	if g.config.IncludeTimezone && stored.Timezone != current.Timezone {
 		changes = append(changes, "timezone_change")
 	}
-	
+
 	// Check for IP address changes
 	if g.config.IncludeIPAddress {
 		if stored.IPAddress != current.IPAddress {
 			changes = append(changes, "ip_change")
-			
+
 			// Check for subnet changes
 			if g.config.UseIPSubnet && stored.IPSubnet != current.IPSubnet {
 				changes = append(changes, "ip_subnet_change")
 			}
 		}
 	}
-	
+
 	// Check for country changes
-	if g.config.IncludeGeolocation && stored.Country != current.Country {
+	if g.config.IncludeGeolocation && stored.Location != current.Location {
 		changes = append(changes, "country_change")
 	}
-	
+
 	return changes
 }
 
@@ -276,26 +294,26 @@ func ValidateFingerprint(fp *DeviceFingerprint) error {
 	if fp == nil {
 		return fmt.Errorf("fingerprint cannot be nil")
 	}
-	
+
 	if fp.Fingerprint == "" {
 		return fmt.Errorf("fingerprint hash cannot be empty")
 	}
-	
+
 	if fp.CreatedAt <= 0 {
 		return fmt.Errorf("fingerprint creation time must be positive")
 	}
-	
-	// Validate fingerprint hash format (should be 64-character hex string for SHA256)
+
+	// ParseToken fingerprint hash format (should be 64-character hex string for SHA256)
 	if len(fp.Fingerprint) != 64 {
 		return fmt.Errorf("fingerprint hash must be 64 characters for SHA256")
 	}
-	
+
 	for _, char := range fp.Fingerprint {
 		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
 			return fmt.Errorf("fingerprint hash must be valid hexadecimal")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -314,7 +332,7 @@ func getRealIP(c *gin.Context) string {
 	if ip := c.GetHeader("X-Forwarded-IP"); ip != "" {
 		return ip
 	}
-	
+
 	// Fall back to remote address
 	return c.ClientIP()
 }
@@ -325,7 +343,7 @@ func calculateIPSubnet(ipAddress string) string {
 	if ip == nil {
 		return ""
 	}
-	
+
 	// Handle IPv4
 	if ip.To4() != nil {
 		// Calculate /24 subnet
@@ -335,7 +353,7 @@ func calculateIPSubnet(ipAddress string) string {
 		}
 		return ipNet.String()
 	}
-	
+
 	// Handle IPv6 with /64 subnet
 	ipNet := &net.IPNet{
 		IP:   ip.Mask(net.CIDRMask(64, 128)),
@@ -369,7 +387,7 @@ func getCountryFromIP(ipAddress string) string {
 		ipAddress == "::1" {
 		return "LOCAL"
 	}
-	
+
 	// For the initial implementation, return a default
 	// In production, this would integrate with a GeoIP service
 	return "UNKNOWN"

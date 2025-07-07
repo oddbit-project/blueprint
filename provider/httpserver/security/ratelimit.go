@@ -2,9 +2,9 @@ package security
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 	"golang.org/x/time/rate"
 	"net"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -93,10 +93,7 @@ func RateLimitMiddleware(r rate.Limit, b int) gin.HandlerFunc {
 
 		// Check if rate limit exceeded
 		if !clientLimiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"success": false,
-				"error":   "Rate limit exceeded",
-			})
+			response.Http429(c)
 			return
 		}
 

@@ -3,6 +3,7 @@ package security
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 	"strings"
 )
 
@@ -127,13 +128,10 @@ func CSRFProtection() gin.HandlerFunc {
 			token = c.PostForm("_csrf")
 		}
 
-		// Validate token (in a real implementation, this would validate against a stored token)
+		// ParseToken token (in a real implementation, this would validate against a stored token)
 		expected := c.GetString("csrf-token")
 		if token == "" || token != expected {
-			c.AbortWithStatusJSON(403, gin.H{
-				"success": false,
-				"error":   "CSRF token validation failed",
-			})
+			response.Http403(c)
 			return
 		}
 

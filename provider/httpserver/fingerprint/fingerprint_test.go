@@ -11,7 +11,7 @@ import (
 
 func TestNewDefaultConfig(t *testing.T) {
 	config := NewDefaultConfig()
-	
+
 	if !config.IncludeUserAgent {
 		t.Error("Expected IncludeUserAgent to be true")
 	}
@@ -34,7 +34,7 @@ func TestNewDefaultConfig(t *testing.T) {
 
 func TestNewStrictConfig(t *testing.T) {
 	config := NewStrictConfig()
-	
+
 	if !config.IncludeUserAgent {
 		t.Error("Expected IncludeUserAgent to be true")
 	}
@@ -57,7 +57,7 @@ func TestNewStrictConfig(t *testing.T) {
 
 func TestNewPrivacyFriendlyConfig(t *testing.T) {
 	config := NewPrivacyFriendlyConfig()
-	
+
 	if !config.IncludeUserAgent {
 		t.Error("Expected IncludeUserAgent to be true")
 	}
@@ -81,14 +81,14 @@ func TestNewPrivacyFriendlyConfig(t *testing.T) {
 func TestNewGenerator(t *testing.T) {
 	config := NewDefaultConfig()
 	generator := NewGenerator(config)
-	
+
 	if generator == nil {
 		t.Fatal("Expected generator to be created")
 	}
 	if generator.config != config {
 		t.Error("Expected generator to use provided config")
 	}
-	
+
 	// Test with nil config (should use default)
 	generator2 := NewGenerator(nil)
 	if generator2 == nil {
@@ -101,11 +101,11 @@ func TestNewGenerator(t *testing.T) {
 
 func TestGeneratorGenerate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create test gin context
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	
+
 	req, _ := http.NewRequest("GET", "/test", nil)
 	req.Header.Set("User-Agent", "test-user-agent")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
@@ -116,7 +116,7 @@ func TestGeneratorGenerate(t *testing.T) {
 
 	generator := NewGenerator(NewDefaultConfig())
 	fingerprint := generator.Generate(c)
-	
+
 	// Test basic fields
 	if fingerprint == nil {
 		t.Fatal("Expected fingerprint to be generated")
@@ -146,11 +146,11 @@ func TestGeneratorGenerate(t *testing.T) {
 
 func TestGeneratorGenerateWithDifferentConfigs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	// Create test gin context
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	
+
 	req, _ := http.NewRequest("GET", "/test", nil)
 	req.Header.Set("User-Agent", "test-agent")
 	req.Header.Set("Accept-Language", "en-US")
@@ -160,7 +160,7 @@ func TestGeneratorGenerateWithDifferentConfigs(t *testing.T) {
 	// Test with privacy config (no accept headers, no timezone)
 	privacyGenerator := NewGenerator(NewPrivacyFriendlyConfig())
 	privacyFP := privacyGenerator.Generate(c)
-	
+
 	if privacyFP.AcceptLang != "" {
 		t.Error("Expected AcceptLang to be empty with privacy config")
 	}
@@ -177,7 +177,7 @@ func TestGeneratorGenerateWithDifferentConfigs(t *testing.T) {
 
 func TestGeneratorCompare(t *testing.T) {
 	generator := NewGenerator(NewDefaultConfig())
-	
+
 	// Create two identical fingerprints
 	fp1 := &DeviceFingerprint{
 		UserAgent:   "test-agent",
@@ -187,10 +187,10 @@ func TestGeneratorCompare(t *testing.T) {
 		IPSubnet:    "192.168.1.0/24",
 		Timezone:    "UTC",
 		Fingerprint: "abc123",
-		Country:     "US",
+		Location:    "US",
 		CreatedAt:   time.Now().Unix(),
 	}
-	
+
 	fp2 := &DeviceFingerprint{
 		UserAgent:   "test-agent",
 		AcceptLang:  "en-US",
@@ -199,10 +199,10 @@ func TestGeneratorCompare(t *testing.T) {
 		IPSubnet:    "192.168.1.0/24",
 		Timezone:    "UTC",
 		Fingerprint: "abc123",
-		Country:     "US",
+		Location:    "US",
 		CreatedAt:   time.Now().Unix(),
 	}
-	
+
 	// Test identical fingerprints
 	if !generator.Compare(fp1, fp2, true) {
 		t.Error("Expected identical fingerprints to match in strict mode")
@@ -210,7 +210,7 @@ func TestGeneratorCompare(t *testing.T) {
 	if !generator.Compare(fp1, fp2, false) {
 		t.Error("Expected identical fingerprints to match in non-strict mode")
 	}
-	
+
 	// Test with nil fingerprints
 	if generator.Compare(nil, fp2, true) {
 		t.Error("Expected nil fingerprint comparison to fail")
@@ -218,24 +218,24 @@ func TestGeneratorCompare(t *testing.T) {
 	if generator.Compare(fp1, nil, false) {
 		t.Error("Expected nil fingerprint comparison to fail")
 	}
-	
+
 	// Test with different fingerprint hashes
 	fp3 := *fp1
 	fp3.Fingerprint = "different"
 	if generator.Compare(fp1, &fp3, true) {
 		t.Error("Expected different fingerprint hashes to not match in strict mode")
 	}
-	
+
 	// Test subnet matching in non-strict mode
 	fp4 := *fp1
 	fp4.IPAddress = "192.168.1.101" // Different IP, same subnet
 	fp4.Fingerprint = "different"
-	
+
 	// Should fail in strict mode
 	if generator.Compare(fp1, &fp4, true) {
 		t.Error("Expected different IPs to not match in strict mode")
 	}
-	
+
 	// Should potentially pass in non-strict mode if enough components match
 	// (This tests the partial matching logic with 70% threshold)
 }
@@ -243,7 +243,7 @@ func TestGeneratorCompare(t *testing.T) {
 func TestGeneratorDetectChanges(t *testing.T) {
 	// Use strict config to include geolocation for comprehensive change detection
 	generator := NewGenerator(NewStrictConfig())
-	
+
 	fp1 := &DeviceFingerprint{
 		UserAgent:  "test-agent",
 		AcceptLang: "en-US",
@@ -251,21 +251,21 @@ func TestGeneratorDetectChanges(t *testing.T) {
 		IPAddress:  "192.168.1.100",
 		IPSubnet:   "192.168.1.0/24",
 		Timezone:   "UTC",
-		Country:    "US",
+		Location:   "US",
 	}
-	
+
 	fp2 := &DeviceFingerprint{
-		UserAgent:  "different-agent",    // Changed
+		UserAgent:  "different-agent", // Changed
 		AcceptLang: "en-US",
-		AcceptEnc:  "deflate",           // Changed
-		IPAddress:  "192.168.2.100",     // Changed
-		IPSubnet:   "192.168.2.0/24",    // Changed (but strict config has UseIPSubnet=false)
-		Timezone:   "EST",               // Changed
-		Country:    "CA",                // Changed
+		AcceptEnc:  "deflate",        // Changed
+		IPAddress:  "192.168.2.100",  // Changed
+		IPSubnet:   "192.168.2.0/24", // Changed (but strict config has UseIPSubnet=false)
+		Timezone:   "EST",            // Changed
+		Location:   "CA",             // Changed
 	}
-	
+
 	changes := generator.DetectChanges(fp1, fp2)
-	
+
 	// Note: strict config has UseIPSubnet=false, so ip_subnet_change won't be detected
 	expectedChanges := []string{
 		"user_agent_change",
@@ -274,23 +274,23 @@ func TestGeneratorDetectChanges(t *testing.T) {
 		"ip_change",
 		"country_change",
 	}
-	
+
 	if len(changes) != len(expectedChanges) {
 		t.Errorf("Expected %d changes, got %d: %v", len(expectedChanges), len(changes), changes)
 	}
-	
+
 	// Check that all expected changes are present
 	changeMap := make(map[string]bool)
 	for _, change := range changes {
 		changeMap[change] = true
 	}
-	
+
 	for _, expected := range expectedChanges {
 		if !changeMap[expected] {
 			t.Errorf("Expected change '%s' not found", expected)
 		}
 	}
-	
+
 	// Test with nil fingerprints
 	nilChanges := generator.DetectChanges(nil, fp2)
 	if len(nilChanges) != 0 {
@@ -301,7 +301,7 @@ func TestGeneratorDetectChanges(t *testing.T) {
 func TestGeneratorDetectChangesWithDefaultConfig(t *testing.T) {
 	// Test with default config that includes IP subnet detection
 	generator := NewGenerator(NewDefaultConfig())
-	
+
 	fp1 := &DeviceFingerprint{
 		UserAgent:  "test-agent",
 		AcceptLang: "en-US",
@@ -309,21 +309,21 @@ func TestGeneratorDetectChangesWithDefaultConfig(t *testing.T) {
 		IPAddress:  "192.168.1.100",
 		IPSubnet:   "192.168.1.0/24",
 		Timezone:   "UTC",
-		Country:    "US",
+		Location:   "US",
 	}
-	
+
 	fp2 := &DeviceFingerprint{
-		UserAgent:  "different-agent",    // Changed
+		UserAgent:  "different-agent", // Changed
 		AcceptLang: "en-US",
-		AcceptEnc:  "deflate",           // Changed
-		IPAddress:  "192.168.2.100",     // Changed
-		IPSubnet:   "192.168.2.0/24",    // Changed (will be detected with default config)
-		Timezone:   "EST",               // Changed
-		Country:    "CA",                // Changed (but won't be detected as geolocation is disabled)
+		AcceptEnc:  "deflate",        // Changed
+		IPAddress:  "192.168.2.100",  // Changed
+		IPSubnet:   "192.168.2.0/24", // Changed (will be detected with default config)
+		Timezone:   "EST",            // Changed
+		Location:   "CA",             // Changed (but won't be detected as geolocation is disabled)
 	}
-	
+
 	changes := generator.DetectChanges(fp1, fp2)
-	
+
 	// Default config has UseIPSubnet=true but IncludeGeolocation=false
 	expectedChanges := []string{
 		"user_agent_change",
@@ -332,17 +332,17 @@ func TestGeneratorDetectChangesWithDefaultConfig(t *testing.T) {
 		"ip_change",
 		"ip_subnet_change",
 	}
-	
+
 	if len(changes) != len(expectedChanges) {
 		t.Errorf("Expected %d changes, got %d: %v", len(expectedChanges), len(changes), changes)
 	}
-	
+
 	// Check that all expected changes are present
 	changeMap := make(map[string]bool)
 	for _, change := range changes {
 		changeMap[change] = true
 	}
-	
+
 	for _, expected := range expectedChanges {
 		if !changeMap[expected] {
 			t.Errorf("Expected change '%s' not found", expected)
@@ -353,18 +353,18 @@ func TestGeneratorDetectChangesWithDefaultConfig(t *testing.T) {
 func TestGeneratorGetSetConfig(t *testing.T) {
 	config1 := NewDefaultConfig()
 	config2 := NewStrictConfig()
-	
+
 	generator := NewGenerator(config1)
-	
+
 	if generator.GetConfig() != config1 {
 		t.Error("Expected GetConfig to return original config")
 	}
-	
+
 	generator.SetConfig(config2)
 	if generator.GetConfig() != config2 {
 		t.Error("Expected GetConfig to return updated config")
 	}
-	
+
 	// Test setting nil config (should be ignored)
 	generator.SetConfig(nil)
 	if generator.GetConfig() != config2 {
@@ -377,17 +377,17 @@ func TestValidateFingerprint(t *testing.T) {
 		Fingerprint: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", // 64 chars
 		CreatedAt:   time.Now().Unix(),
 	}
-	
+
 	// Test valid fingerprint
 	if err := ValidateFingerprint(validFP); err != nil {
 		t.Errorf("Expected valid fingerprint to pass validation: %v", err)
 	}
-	
+
 	// Test nil fingerprint
 	if err := ValidateFingerprint(nil); err == nil {
 		t.Error("Expected nil fingerprint to fail validation")
 	}
-	
+
 	// Test empty fingerprint hash
 	invalidFP1 := &DeviceFingerprint{
 		Fingerprint: "",
@@ -396,7 +396,7 @@ func TestValidateFingerprint(t *testing.T) {
 	if err := ValidateFingerprint(invalidFP1); err == nil {
 		t.Error("Expected empty fingerprint hash to fail validation")
 	}
-	
+
 	// Test invalid creation time
 	invalidFP2 := &DeviceFingerprint{
 		Fingerprint: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
@@ -405,7 +405,7 @@ func TestValidateFingerprint(t *testing.T) {
 	if err := ValidateFingerprint(invalidFP2); err == nil {
 		t.Error("Expected negative CreatedAt to fail validation")
 	}
-	
+
 	// Test invalid hash length
 	invalidFP3 := &DeviceFingerprint{
 		Fingerprint: "short",
@@ -414,7 +414,7 @@ func TestValidateFingerprint(t *testing.T) {
 	if err := ValidateFingerprint(invalidFP3); err == nil {
 		t.Error("Expected short fingerprint hash to fail validation")
 	}
-	
+
 	// Test invalid hex characters
 	invalidFP4 := &DeviceFingerprint{
 		Fingerprint: "ghijkl1234567890abcdef1234567890abcdef1234567890abcdef1234567890", // Contains 'g', 'h', etc.
@@ -431,13 +431,13 @@ func TestCalculateIPSubnet(t *testing.T) {
 	if ipv4Subnet != "192.168.1.0/24" {
 		t.Errorf("Expected IPv4 subnet '192.168.1.0/24', got '%s'", ipv4Subnet)
 	}
-	
+
 	// Test IPv6
 	ipv6Subnet := calculateIPSubnet("2001:db8::1")
 	if ipv6Subnet == "" {
 		t.Error("Expected non-empty IPv6 subnet")
 	}
-	
+
 	// Test invalid IP
 	invalidSubnet := calculateIPSubnet("invalid-ip")
 	if invalidSubnet != "" {
@@ -449,19 +449,19 @@ func TestGetCountryFromIP(t *testing.T) {
 	// Test local/private IPs
 	localIPs := []string{
 		"192.168.1.1",
-		"10.0.0.1", 
+		"10.0.0.1",
 		"172.16.0.1",
 		"127.0.0.1",
 		"::1",
 	}
-	
+
 	for _, ip := range localIPs {
 		country := getCountryFromIP(ip)
 		if country != "LOCAL" {
 			t.Errorf("Expected 'LOCAL' for IP %s, got '%s'", ip, country)
 		}
 	}
-	
+
 	// Test public IP (should return UNKNOWN in basic implementation)
 	publicCountry := getCountryFromIP("8.8.8.8")
 	if publicCountry != "UNKNOWN" {
@@ -471,7 +471,7 @@ func TestGetCountryFromIP(t *testing.T) {
 
 func TestGetRealIP(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	tests := []struct {
 		name     string
 		headers  map[string]string
@@ -509,19 +509,19 @@ func TestGetRealIP(t *testing.T) {
 			expected: "192.168.1.1", // Should fall back to ClientIP()
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			
+
 			req, _ := http.NewRequest("GET", "/test", nil)
 			for header, value := range tt.headers {
 				req.Header.Set(header, value)
 			}
 			req.RemoteAddr = tt.remoteIP
 			c.Request = req
-			
+
 			ip := getRealIP(c)
 			if ip != tt.expected {
 				t.Errorf("Expected IP '%s', got '%s'", tt.expected, ip)
