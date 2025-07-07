@@ -71,10 +71,12 @@ func generateECDSAKeyPairForCurve(t *testing.T, curve elliptic.Curve) (privateKe
 }
 
 func generateEdDSAKeyPair(t *testing.T) (privateKeyPEM, publicKeyPEM []byte) {
+	// ed25519.GenerateKey returns (publicKey, privateKey, error)
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 
-	// Encode private key
+	// For EdDSA, we need to ensure the PKCS8/PKIX encoding works correctly
+	// Encode private key using PKCS8 format
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	require.NoError(t, err)
 	privateKeyPEM = pem.EncodeToMemory(&pem.Block{
@@ -82,13 +84,26 @@ func generateEdDSAKeyPair(t *testing.T) (privateKeyPEM, publicKeyPEM []byte) {
 		Bytes: privateKeyBytes,
 	})
 
-	// Encode public key
+	// Encode public key using PKIX format
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	require.NoError(t, err)
 	publicKeyPEM = pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: publicKeyBytes,
 	})
+
+	// Verify that we can decode them back correctly
+	block, _ := pem.Decode(privateKeyPEM)
+	require.NotNil(t, block, "Failed to decode private key PEM")
+	parsedPrivKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	require.NoError(t, err, "Failed to parse PKCS8 private key")
+	require.IsType(t, ed25519.PrivateKey{}, parsedPrivKey, "Private key should be ed25519.PrivateKey")
+
+	pubBlock, _ := pem.Decode(publicKeyPEM)
+	require.NotNil(t, pubBlock, "Failed to decode public key PEM")
+	parsedPubKey, err := x509.ParsePKIXPublicKey(pubBlock.Bytes)
+	require.NoError(t, err, "Failed to parse PKIX public key")
+	require.IsType(t, ed25519.PublicKey{}, parsedPubKey, "Public key should be ed25519.PublicKey")
 
 	return privateKeyPEM, publicKeyPEM
 }

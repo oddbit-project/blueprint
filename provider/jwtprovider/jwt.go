@@ -1,6 +1,7 @@
 package jwtprovider
 
 import (
+	"crypto/ed25519"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -134,13 +135,22 @@ func (j *jwtProvider) GenerateToken(subject string, data map[string]any) (string
 		} else {
 			return token.SignedString(key)
 		}
-	case RS256, RS384, RS512, ES256, ES384, ES512, EdDSA:
+	case RS256, RS384, RS512, ES256, ES384, ES512:
 		if data, err := j.cfg.privateKey.GetBytes(); err == nil {
 			if cert, err := x509.ParsePKCS8PrivateKey(data); err == nil {
 				return token.SignedString(cert)
 			} else {
 				return "", err
 			}
+		} else {
+			return "", err
+		}
+	case EdDSA:
+		// For EdDSA, convert raw bytes back to ed25519.PrivateKey
+		if data, err := j.cfg.privateKey.GetBytes(); err == nil {
+			// data should be raw ed25519.PrivateKey bytes (64 bytes)
+			privKey := ed25519.PrivateKey(data)
+			return token.SignedString(privKey)
 		} else {
 			return "", err
 		}
@@ -162,12 +172,21 @@ func (j *jwtProvider) ParseToken(tokenString string) (*Claims, error) {
 		switch j.cfg.SigningAlgorithm {
 		case HS256, HS384, HS512:
 			return j.cfg.signingKey.GetBytes()
-		case RS256, RS384, RS512, ES256, ES384, ES512, EdDSA:
+		case RS256, RS384, RS512, ES256, ES384, ES512:
 			bytes, err := j.cfg.publicKey.GetBytes()
 			if err != nil {
 				return nil, err
 			}
 			return x509.ParsePKIXPublicKey(bytes)
+		case EdDSA:
+			// For EdDSA, convert raw bytes back to ed25519.PublicKey
+			if data, err := j.cfg.publicKey.GetBytes(); err == nil {
+				// data should be raw ed25519.PublicKey bytes (32 bytes)
+				pubKey := ed25519.PublicKey(data)
+				return pubKey, nil
+			} else {
+				return nil, err
+			}
 		default:
 			return nil, ErrInvalidSigningAlgorithm
 		}
