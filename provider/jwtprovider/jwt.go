@@ -39,6 +39,10 @@ type JWTSigner interface {
 	GenerateToken(string, map[string]any) (string, error)
 }
 
+type JWTRefresher interface {
+	Refresh(string) (string, error)
+}
+
 type JWTRevoker interface {
 	RevokeToken(tokenString string) error
 	RevokeTokenByID(tokenID string, expiresAt time.Time) error
@@ -49,6 +53,7 @@ type JWTProvider interface {
 	JWTParser
 	JWTSigner
 	JWTRevoker
+	JWTRefresher
 	GetRevocationManager() *RevocationManager
 }
 
