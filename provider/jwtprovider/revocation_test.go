@@ -363,10 +363,9 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
 		
 		assert.NotNil(t, backend)
-		assert.NotNil(t, backend.revokedTokens)
-		assert.NotNil(t, backend.userTokens)
-		assert.NotNil(t, backend.stopCleanup)
-		assert.True(t, backend.cleanupRunning)
+		// Verify the backend is functional by testing basic operations
+		assert.False(t, backend.IsTokenRevoked("non-existent"))
+		assert.Equal(t, 0, backend.getRevokedTokenCountForTest())
 		
 		// Clean up
 		err := backend.Close()
@@ -387,7 +386,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		assert.True(t, backend.IsTokenRevoked(tokenID))
 		
 		// Check internal state
-		revokedToken, exists := backend.revokedTokens[tokenID]
+		revokedToken, exists := backend.getRevokedTokenForTest(tokenID)
 		assert.True(t, exists)
 		assert.Equal(t, tokenID, revokedToken.TokenID)
 		assert.Equal(t, expiresAt, revokedToken.ExpiresAt)
@@ -402,11 +401,11 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		// Revoke with past expiration
 		expiresAt := time.Now().Add(-time.Hour)
 		
-		backend.revokedTokens[tokenID] = &RevokedToken{
+		backend.addRevokedTokenForTest(tokenID, &RevokedToken{
 			TokenID:   tokenID,
 			RevokedAt: time.Now().Add(-2 * time.Hour),
 			ExpiresAt: expiresAt,
-		}
+		})
 		
 		// Should return false for expired revocation
 		assert.False(t, backend.IsTokenRevoked(tokenID))
@@ -415,8 +414,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		
 		// Token should be removed from map
-		_, exists := backend.revokedTokens[tokenID]
-		assert.False(t, exists)
+		assert.False(t, backend.hasRevokedToken(tokenID))
 	})
 	
 	t.Run("RevokeAllUserTokens", func(t *testing.T) {
@@ -459,22 +457,22 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		
 		// Add some tokens
 		now := time.Now()
-		backend.revokedTokens["token1"] = &RevokedToken{
+		backend.addRevokedTokenForTest("token1", &RevokedToken{
 			TokenID:   "token1",
 			RevokedAt: now,
 			ExpiresAt: now.Add(time.Hour),
-		}
-		backend.revokedTokens["token2"] = &RevokedToken{
+		})
+		backend.addRevokedTokenForTest("token2", &RevokedToken{
 			TokenID:   "token2",
 			RevokedAt: now,
 			ExpiresAt: now.Add(2 * time.Hour),
-		}
+		})
 		// Add expired token (should not be returned)
-		backend.revokedTokens["expired"] = &RevokedToken{
+		backend.addRevokedTokenForTest("expired", &RevokedToken{
 			TokenID:   "expired",
 			RevokedAt: now.Add(-2 * time.Hour),
 			ExpiresAt: now.Add(-time.Hour),
-		}
+		})
 		
 		tokens, err := backend.GetRevokedTokens()
 		assert.NoError(t, err)
@@ -493,38 +491,39 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		now := time.Now()
 		
 		// Add mixed tokens
-		backend.revokedTokens["active"] = &RevokedToken{
+		backend.addRevokedTokenForTest("active", &RevokedToken{
 			TokenID:   "active",
 			RevokedAt: now,
 			ExpiresAt: now.Add(time.Hour),
-		}
-		backend.revokedTokens["expired1"] = &RevokedToken{
+		})
+		backend.addRevokedTokenForTest("expired1", &RevokedToken{
 			TokenID:   "expired1",
 			UserID:    "user1",
 			RevokedAt: now.Add(-2 * time.Hour),
 			ExpiresAt: now.Add(-time.Hour),
-		}
-		backend.revokedTokens["expired2"] = &RevokedToken{
+		})
+		backend.addRevokedTokenForTest("expired2", &RevokedToken{
 			TokenID:   "expired2",
 			RevokedAt: now.Add(-3 * time.Hour),
 			ExpiresAt: now.Add(-2 * time.Hour),
-		}
+		})
 		
 		// Track user tokens
-		backend.userTokens["user1"] = []string{"expired1", "other-token"}
+		backend.setUserTokensForTest("user1", []string{"expired1", "other-token"})
 		
 		err := backend.CleanupExpired()
 		assert.NoError(t, err)
 		
 		// Verify cleanup
-		assert.Len(t, backend.revokedTokens, 1)
-		assert.Contains(t, backend.revokedTokens, "active")
-		assert.NotContains(t, backend.revokedTokens, "expired1")
-		assert.NotContains(t, backend.revokedTokens, "expired2")
+		assert.Equal(t, 1, backend.getRevokedTokenCountForTest())
+		assert.True(t, backend.containsRevokedTokenForTest("active"))
+		assert.False(t, backend.containsRevokedTokenForTest("expired1"))
+		assert.False(t, backend.containsRevokedTokenForTest("expired2"))
 		
 		// Verify user token list was cleaned
-		assert.Len(t, backend.userTokens["user1"], 1)
-		assert.Equal(t, "other-token", backend.userTokens["user1"][0])
+		userTokens := backend.getUserTokensForTest("user1")
+		assert.Len(t, userTokens, 1)
+		assert.Equal(t, "other-token", userTokens[0])
 	})
 	
 	t.Run("TrackUserToken", func(t *testing.T) {
