@@ -64,7 +64,7 @@ type SqlxReaderCtx interface {
 
 type GridOps interface {
 	Grid(record any) (*Grid, error)
-	QueryGrid(record any, args GridQuery, dest any) error
+	QueryGrid(record any, args *GridQuery, dest any) error
 }
 
 type Repository interface {
@@ -264,7 +264,7 @@ func (r *repository) Grid(record any) (*Grid, error) {
 }
 
 // QueryGrid creates a new Grid object and performs a query using GridQuery
-func (r *repository) QueryGrid(record any, args GridQuery, dest any) error {
+func (r *repository) QueryGrid(record any, args *GridQuery, dest any) error {
 	var (
 		err  error
 		qry  *goqu.SelectDataset

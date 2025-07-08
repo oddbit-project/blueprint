@@ -100,7 +100,7 @@ func TestNewGridQuery(t *testing.T) {
 			query, err := NewGridQuery(tt.searchType, tt.limit, tt.offset)
 			if tt.expectErr {
 				assert.Error(t, err)
-				assert.Empty(t, query.SearchText)
+				assert.Nil(t, query)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.searchType, query.SearchType)
@@ -292,7 +292,7 @@ func TestGrid_ValidQuery(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := grid.ValidQuery(tt.query)
+			err := grid.ValidQuery(&tt.query)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -493,7 +493,7 @@ func TestGrid_Build(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := grid.Build(tt.qry, tt.args)
+			result, err := grid.Build(tt.qry, &tt.args)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, result)
@@ -521,12 +521,12 @@ func TestGrid_Build_Specific(t *testing.T) {
 		SearchText: "test",
 	}
 	
-	result, err := grid.Build(nil, query)
+	result, err := grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err := result.ToSQL()
 	assert.NoError(t, err)
 	assert.Contains(t, sql, "LIKE")
-	assert.Contains(t, sql, "'%test'") // For different SQL dialects, the value might be quoted
+	assert.Contains(t, sql, "'test%'") // SearchStart: matches beginning
 	
 	// Test case: SearchEnd
 	query = GridQuery{
@@ -534,12 +534,12 @@ func TestGrid_Build_Specific(t *testing.T) {
 		SearchText: "test",
 	}
 	
-	result, err = grid.Build(nil, query)
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)
 	assert.Contains(t, sql, "LIKE")
-	assert.Contains(t, sql, "'test%'") // For different SQL dialects, the value might be quoted
+	assert.Contains(t, sql, "'%test'") // SearchEnd: matches end
 	
 	// Test case: SearchAny
 	query = GridQuery{
@@ -547,7 +547,7 @@ func TestGrid_Build_Specific(t *testing.T) {
 		SearchText: "test",
 	}
 	
-	result, err = grid.Build(nil, query)
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)
@@ -560,7 +560,7 @@ func TestGrid_Build_Specific(t *testing.T) {
 		SortFields: map[string]string{"id": SortAscending, "name": SortDescending},
 	}
 	
-	result, err = grid.Build(nil, query)
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)
@@ -575,7 +575,7 @@ func TestGrid_Build_Specific(t *testing.T) {
 		Offset:     20,
 	}
 	
-	result, err = grid.Build(nil, query)
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)

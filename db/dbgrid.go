@@ -29,7 +29,7 @@ type Grid struct {
 type GridQuery struct {
 	SearchType   uint              `db:"searchType"`
 	SearchText   string            `json:"searchText,omitempty"`
-	FilterFields map[string]any    `json:"filterFields,omitEmpty"`
+	FilterFields map[string]any    `json:"filterFields,omitempty"`
 	SortFields   map[string]string `json:"sortFields,omitempty"`
 	Offset       uint              `json:"offset,omitempty"`
 	Limit        uint              `json:"limit,omitempty"`
@@ -55,15 +55,15 @@ func (err GridError) Error() string {
 }
 
 // NewGridQuery helper to create a GridQuery
-func NewGridQuery(searchType uint, limit uint, offset uint) (GridQuery, error) {
-	if slices.Index(validSearchType, searchType) < 0 {
-		return GridQuery{}, GridError{
+func NewGridQuery(searchType uint, limit uint, offset uint) (*GridQuery, error) {
+	if !slices.Contains(validSearchType, searchType) {
+		return nil, GridError{
 			Scope:   "search",
 			Field:   "",
 			Message: "invalid search type",
 		}
 	}
-	return GridQuery{
+	return &GridQuery{
 		SearchType:   searchType,
 		SearchText:   "",
 		FilterFields: nil,
@@ -74,7 +74,7 @@ func NewGridQuery(searchType uint, limit uint, offset uint) (GridQuery, error) {
 }
 
 // Page calculates offset and limit from page information
-func (g GridQuery) Page(page, itemsPerPage int) {
+func (g *GridQuery) Page(page, itemsPerPage int) {
 	if page < 1 {
 		page = 1
 	}
@@ -111,10 +111,10 @@ func (grid *Grid) AddFilterFunc(dbField string, f GridFilterFunc) *Grid {
 }
 
 // ValidQuery validates if a GridQuery request is valid
-func (grid *Grid) ValidQuery(query GridQuery) error {
+func (grid *Grid) ValidQuery(query *GridQuery) error {
 	// match filterable fields
 	if query.FilterFields != nil {
-		for f := range query.FilterFields {
+		for f, _ := range query.FilterFields {
 			fname, ok := grid.spec.LookupAlias(f)
 			if !ok {
 				return GridError{
@@ -124,7 +124,7 @@ func (grid *Grid) ValidQuery(query GridQuery) error {
 				}
 			}
 			// lookup db field to see if its filterable
-			if slices.Index(grid.spec.FilterFields(), fname) < 0 {
+			if !slices.Contains(grid.spec.FilterFields(), fname) {
 				return GridError{
 					Scope:   "filter",
 					Field:   f,
@@ -133,7 +133,7 @@ func (grid *Grid) ValidQuery(query GridQuery) error {
 			}
 
 			// validate filter func
-			if fn, ok := grid.filterFunc[f]; ok {
+			if fn, ok := grid.filterFunc[fname]; ok {
 				if _, err := fn(query.FilterFields[f]); err != nil {
 					return err
 				}
@@ -153,7 +153,7 @@ func (grid *Grid) ValidQuery(query GridQuery) error {
 				}
 			}
 			// lookup db field to see if its sortable
-			if slices.Index(grid.spec.SortFields(), fname) < 0 {
+			if !slices.Contains(grid.spec.SortFields(), fname) {
 				return GridError{
 					Scope:   "sort",
 					Field:   f,
@@ -161,7 +161,7 @@ func (grid *Grid) ValidQuery(query GridQuery) error {
 				}
 			}
 			if len(v) > 0 {
-				if slices.Index(validSortFields, v) < 0 {
+				if !slices.Contains(validSortFields, v) {
 					return GridError{
 						Scope:   "sort",
 						Field:   f,
@@ -183,7 +183,7 @@ func (grid *Grid) ValidQuery(query GridQuery) error {
 	return nil
 }
 
-func (grid *Grid) Build(qry *goqu.SelectDataset, args GridQuery) (*goqu.SelectDataset, error) {
+func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectDataset, error) {
 	if qry == nil {
 		qry = goqu.Select().From(grid.tableName)
 	}
@@ -200,7 +200,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args GridQuery) (*goqu.SelectDa
 				}
 			}
 			// lookup db field to see if its filterable
-			if slices.Index(grid.spec.FilterFields(), fname) < 0 {
+			if !slices.Contains(grid.spec.FilterFields(), fname) {
 				return nil, GridError{
 					Scope:   "filter",
 					Field:   f,
@@ -233,9 +233,9 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args GridQuery) (*goqu.SelectDa
 				Field:   "",
 				Message: "search not allowed",
 			}
-		case SearchStart:
-			searchExpr = "%" + args.SearchText
 		case SearchEnd:
+			searchExpr = "%" + args.SearchText
+		case SearchStart:
 			searchExpr = args.SearchText + "%"
 		case SearchAny:
 			searchExpr = "%" + args.SearchText + "%"
@@ -271,7 +271,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args GridQuery) (*goqu.SelectDa
 				}
 			}
 			// lookup db field to see if its sortable
-			if slices.Index(grid.spec.SortFields(), fname) < 0 {
+			if !slices.Contains(grid.spec.SortFields(), fname) {
 				return nil, GridError{
 					Scope:   "sort",
 					Field:   f,
@@ -280,7 +280,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args GridQuery) (*goqu.SelectDa
 			}
 
 			// check sort direction
-			if slices.Index(validSortFields, sorting) < 0 {
+			if !slices.Contains(validSortFields, sorting) {
 				return nil, GridError{
 					Scope:   "sort",
 					Field:   f,
