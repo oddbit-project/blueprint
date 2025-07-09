@@ -2,135 +2,226 @@ package smtp
 
 import (
 	"crypto/tls"
-	"path/filepath"
 	"strings"
 
-	"github.com/oddbit-project/blueprint/config"
-	"github.com/rs/zerolog/log"
+	"github.com/oddbit-project/blueprint/crypt/secure"
+	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+	"github.com/oddbit-project/blueprint/utils"
 	"github.com/wneessen/go-mail"
 )
 
 const (
-	ConfigKey = "smtpServer"
+	ErrMissingHost     = utils.Error("SMTP host is required")
+	ErrMissingPort     = utils.Error("Port number is required")
+	ErrMissingFrom     = utils.Error("From address is required")
+	ErrInvalidFrom     = utils.Error("From address is not valid")
+	ErrInvalidBcc      = utils.Error("BCC address is not valid")
+	ErrInvalidConfig   = utils.Error("Config is not valid")
+	ErrCreatingClient  = utils.Error("Error creating client")
+	ErrInvalidPassword = utils.Error("Invalid Password")
+	ErrClient          = utils.Error("Failed creating client")
+	ErrSMTPServer      = utils.Error("Failed to dial SMTP server")
+	ErrMessage         = utils.Error("Failed to send email message")
 )
 
+type Config struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	secure.DefaultCredentialConfig
+	tlsProvider.ClientConfig
+	From string `json:"from"`
+	Bcc  string `json:"bcc,omitempty"`
+}
+
 type Mailer struct {
-	Host     string `json:"host,omitempty"`
-	Port     int    `json:"port,omitempty"`
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	TLS      bool   `json:"TLS,omitempty"`
-	From     string `json:"from,omitempty"`
-	Bcc      string `json:"bcc,omitempty"`
+	config *Config
 }
 
-// File attachment
-type Attachment struct {
-	FilePath string
-	Name     string
+type MessageOpts func(*mail.Msg)
+
+func isValidEmail(email string) bool {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return false
+	}
+	if strings.Count(email, "@") != 1 {
+		return false
+	}
+
+	if !strings.Contains(email, ".") {
+		return false
+	}
+
+	return true
 }
 
-// mailer return default config
-func mailer() *Mailer {
-	return &Mailer{
+func (c *Config) Validate() error {
+	if c.Host == "" {
+		return ErrMissingHost
+	}
+	if c.Port < 1 {
+		return ErrMissingPort
+	}
+	if c.From == "" {
+		return ErrMissingFrom
+	}
+	// Email validation
+	if !isValidEmail(c.From) {
+		return ErrInvalidFrom
+	}
+	// BCC validation (if provided)
+	if c.Bcc != "" {
+		bccList := strings.Split(c.Bcc, ",")
+		for _, bcc := range bccList {
+			if !isValidEmail(strings.TrimSpace(bcc)) {
+				return ErrInvalidBcc
+			}
+		}
+	}
+	return nil
+}
+
+// New smtp configuration with default values
+func NewConfig() *Config {
+	return &Config{
 		Host:     "127.0.0.1",
 		Port:     1025,
 		Username: "",
-		Password: "",
-		TLS:      false,
-		From:     "no-reply@acme.co",
-		Bcc:      "",
+		DefaultCredentialConfig: secure.DefaultCredentialConfig{
+			Password:       "",
+			PasswordEnvVar: "SMTP_PASSWORD",
+			PasswordFile:   "",
+		},
+		ClientConfig: tlsProvider.ClientConfig{
+			TLSCA:   "",
+			TLSCert: "",
+			TLSKey:  "",
+			TlsKeyCredential: tlsProvider.TlsKeyCredential{
+				Password:       "",
+				PasswordEnvVar: "",
+				PasswordFile:   "",
+			},
+			TLSEnable:             false,
+			TLSInsecureSkipVerify: false,
+		},
+		From: "no-reply@acme.co",
+		Bcc:  "",
 	}
 }
-
-func NewMailer(config config.ConfigInterface) (*Mailer, error) {
-	m := mailer()
-	if err := config.GetKey(ConfigKey, m); err != nil {
+func NewMailer(cfg *Config) (*Mailer, error) {
+	if cfg == nil {
+		return nil, ErrInvalidConfig
+	}
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	return m, nil
+
+	return &Mailer{config: cfg}, nil
 }
 
-// NewHtmlMessage creates a new HTML message with support for attachments
-func (m *Mailer) NewHtmlMessage(from string, to string, bcc string, subject string, content string, attachments []Attachment) *mail.Msg {
-	message := mail.NewMsg()
+func WithTo(to string) MessageOpts {
+	return func(msg *mail.Msg) {
+		msg.To(to)
+	}
+}
 
-	// Set From header
-	if err := message.From(m.From); err != nil {
-		log.Error().Str("From", m.From).Err(err).Msg("Failed to set From header")
-		return nil
+func WithSubject(subject string) MessageOpts {
+	return func(msg *mail.Msg) {
+		msg.Subject(subject)
+	}
+}
+
+func WithHTML(body string) MessageOpts {
+	return func(msg *mail.Msg) {
+		msg.SetBodyString(mail.TypeTextHTML, body)
+	}
+}
+
+func WithPlainText(content string) MessageOpts {
+	return func(msg *mail.Msg) {
+		msg.SetBodyString(mail.TypeTextPlain, content)
+	}
+}
+
+func WithAttachment(path string) MessageOpts {
+	return func(msg *mail.Msg) {
+		msg.AttachFile(path)
+	}
+}
+
+// Creates a new message with support for attachments
+func (m *Mailer) NewMessage(opts ...MessageOpts) (*mail.Msg, error) {
+	msg := mail.NewMsg()
+
+	// Validate From field
+	if err := msg.From(m.config.From); err != nil {
+		return nil, ErrInvalidFrom
 	}
 
-	// Set To headers
-	for _, t := range strings.Split(to, ",") {
-		if err := message.AddTo(strings.TrimSpace(t)); err != nil {
-			log.Error().Str("To", t).Err(err).Msg("Failed to set To header")
-			return nil
+	for _, opt := range opts {
+		opt(msg)
+	}
+
+	return msg, nil
+}
+
+func (m *Mailer) CreateClient() (*mail.Client, error) {
+	password := m.config.GetPassword()
+
+	if password == "" {
+		return nil, ErrInvalidPassword
+	}
+
+	clientOpts := []mail.Option{
+		mail.WithPort(m.config.Port),
+	}
+
+	// Add authentication
+	if m.config.Username != "" {
+		clientOpts = append(clientOpts,
+			mail.WithUsername(m.config.Username),
+			mail.WithPassword(password),
+			mail.WithSMTPAuth(mail.SMTPAuthPlain),
+		)
+	}
+
+	if m.config.TLSEnable {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: m.config.TLSInsecureSkipVerify,
 		}
+		clientOpts = append(clientOpts,
+			mail.WithTLSConfig(tlsConfig),
+		)
 	}
 
-	// Set BCC headers from config
-	if len(m.Bcc) > 0 {
-		bccList := strings.Split(m.Bcc, ",")
-		for i := range bccList {
-			if err := message.AddBcc(strings.TrimSpace(bccList[i])); err != nil {
-				log.Error().Str("Bcc", bccList[i]).Err(err).Msg("Failed to set Bcc header")
-				return nil
-			}
-		}
+	client, err := mail.NewClient(m.config.Host, clientOpts...)
+	if err != nil {
+		return nil, ErrCreatingClient
 	}
-	message.Subject(subject)
-	message.SetBodyString(mail.TypeTextHTML, content)
 
-	// Add attachments
-	if len(attachments) > 0 {
-		for _, attachment := range attachments {
-			fileName := attachment.Name
-			if fileName == "" {
-				fileName = filepath.Base(attachment.FilePath)
-			}
-			message.AttachFile(attachment.FilePath, mail.WithFileName(fileName))
-
-			log.Info().Str("Attachment", fileName).Str("Path", attachment.FilePath).Msg("File attached successfully")
-		}
-	}
-	return message
+	return client, nil
 }
 
 func (m *Mailer) Send(msg ...*mail.Msg) error {
-	var d *mail.Client
-	var err error
-	if m.TLS {
-		d, err = mail.NewClient(m.Host,
-			mail.WithPort(m.Port),
-			mail.WithUsername(m.Username),
-			mail.WithPassword(m.Password),
-			mail.WithSMTPAuth(mail.SMTPAuthPlain),
-			mail.WithTLSPortPolicy(mail.TLSMandatory),
-			mail.WithTLSConfig(&tls.Config{InsecureSkipVerify: true}),
-		)
-	} else {
-		d, err = mail.NewClient(m.Host,
-			mail.WithPort(m.Port),
-			mail.WithUsername(m.Username),
-			mail.WithPassword(m.Password),
-			mail.WithSMTPAuth(mail.SMTPAuthPlain),
-		)
+
+	if len(msg) == 0 {
+		return nil
 	}
 
+	client, err := m.CreateClient()
+
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create new mail delivery client")
-		return err
+		return ErrClient
 	}
 
 	for _, message := range msg {
 		if message != nil {
-			log.Info().Str("To", strings.Join(message.GetToString(), ",")).Msg("Sending email message...")
-			if err := d.DialAndSend(message); err != nil {
-				log.Error().Err(err).Msg("Failed to send email message")
-				return err
+			if err := client.DialAndSend(message); err != nil {
+				return ErrMessage
 			}
 		}
 	}
+
 	return nil
 }
