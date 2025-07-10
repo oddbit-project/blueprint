@@ -2,19 +2,20 @@ package smtp
 
 import (
 	"crypto/tls"
+	"net/mail"
 	"strings"
 
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils"
-	"github.com/wneessen/go-mail"
+	gomail "github.com/wneessen/go-mail"
 )
 
 const (
 	ErrMissingHost     = utils.Error("SMTP host is required")
 	ErrMissingPort     = utils.Error("Port number is required")
-	ErrMissingFrom     = utils.Error("From address is required")
-	ErrInvalidFrom     = utils.Error("From address is not valid")
+	ErrInvalidFrom     = utils.Error("From is not valid")
+	ErrInvalidTo       = utils.Error("To address is not valid")
 	ErrInvalidBcc      = utils.Error("BCC address is not valid")
 	ErrInvalidConfig   = utils.Error("Config is not valid")
 	ErrCreatingClient  = utils.Error("Error creating client")
@@ -36,24 +37,20 @@ type Config struct {
 
 type Mailer struct {
 	config *Config
+	client *gomail.Client
 }
 
-type MessageOpts func(*mail.Msg)
+type MessageOpts func(*gomail.Msg)
 
 func isValidEmail(email string) bool {
 	email = strings.TrimSpace(email)
 	if email == "" {
 		return false
 	}
-	if strings.Count(email, "@") != 1 {
-		return false
-	}
 
-	if !strings.Contains(email, ".") {
-		return false
-	}
+	_, err := mail.ParseAddress(email)
 
-	return true
+	return err == nil
 }
 
 func (c *Config) Validate() error {
@@ -62,13 +59,6 @@ func (c *Config) Validate() error {
 	}
 	if c.Port < 1 {
 		return ErrMissingPort
-	}
-	if c.From == "" {
-		return ErrMissingFrom
-	}
-	// Email validation
-	if !isValidEmail(c.From) {
-		return ErrInvalidFrom
 	}
 	// BCC validation (if provided)
 	if c.Bcc != "" {
@@ -82,6 +72,31 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+func WithFrom(from string) MessageOpts {
+	return func(msg *gomail.Msg) {
+		msg.From(from)
+	}
+}
+
+func WithBody(plainText, htmlBody string) MessageOpts {
+	return func(msg *gomail.Msg) {
+		if plainText != "" && htmlBody != "" {
+			msg.SetBodyString(gomail.TypeTextPlain, plainText)
+			msg.AddAlternativeString(gomail.TypeTextHTML, htmlBody)
+		} else if htmlBody != "" {
+			msg.SetBodyString(gomail.TypeTextHTML, htmlBody)
+		} else if plainText != "" {
+			msg.SetBodyString(gomail.TypeTextPlain, plainText)
+		}
+	}
+}
+
+func WithAttachment(path string) MessageOpts {
+	return func(msg *gomail.Msg) {
+		msg.AttachFile(path)
+	}
+}
+
 // New smtp configuration with default values
 func NewConfig() *Config {
 	return &Config{
@@ -90,7 +105,7 @@ func NewConfig() *Config {
 		Username: "",
 		DefaultCredentialConfig: secure.DefaultCredentialConfig{
 			Password:       "",
-			PasswordEnvVar: "SMTP_PASSWORD",
+			PasswordEnvVar: "",
 			PasswordFile:   "",
 		},
 		ClientConfig: tlsProvider.ClientConfig{
@@ -109,6 +124,7 @@ func NewConfig() *Config {
 		Bcc:  "",
 	}
 }
+
 func NewMailer(cfg *Config) (*Mailer, error) {
 	if cfg == nil {
 		return nil, ErrInvalidConfig
@@ -117,47 +133,69 @@ func NewMailer(cfg *Config) (*Mailer, error) {
 		return nil, err
 	}
 
-	return &Mailer{config: cfg}, nil
-}
-
-func WithTo(to string) MessageOpts {
-	return func(msg *mail.Msg) {
-		msg.To(to)
+	key, err := secure.GenerateKey()
+	if err != nil {
+		return nil, err
 	}
-}
 
-func WithSubject(subject string) MessageOpts {
-	return func(msg *mail.Msg) {
-		msg.Subject(subject)
+	credential, err := secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true)
+	if err != nil {
+		return nil, err
 	}
-}
 
-func WithHTML(body string) MessageOpts {
-	return func(msg *mail.Msg) {
-		msg.SetBodyString(mail.TypeTextHTML, body)
+	password, err := credential.Get()
+	if err != nil {
+		return nil, ErrInvalidPassword
 	}
-}
 
-func WithPlainText(content string) MessageOpts {
-	return func(msg *mail.Msg) {
-		msg.SetBodyString(mail.TypeTextPlain, content)
+	clientOpts := []gomail.Option{
+		gomail.WithPort(cfg.Port),
 	}
-}
 
-func WithAttachment(path string) MessageOpts {
-	return func(msg *mail.Msg) {
-		msg.AttachFile(path)
+	if cfg.Username != "" {
+		clientOpts = append(clientOpts,
+			gomail.WithUsername(cfg.Username),
+			gomail.WithPassword(password),
+			gomail.WithSMTPAuth(gomail.SMTPAuthPlain),
+		)
 	}
+
+	if cfg.TLSEnable {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: cfg.TLSInsecureSkipVerify,
+		}
+		clientOpts = append(clientOpts,
+			gomail.WithTLSConfig(tlsConfig),
+		)
+	}
+
+	client, err := gomail.NewClient(cfg.Host, clientOpts...)
+	if err != nil {
+		return nil, ErrCreatingClient
+	}
+
+	return &Mailer{
+		config: cfg,
+		client: client,
+	}, nil
 }
 
 // Creates a new message with support for attachments
-func (m *Mailer) NewMessage(opts ...MessageOpts) (*mail.Msg, error) {
-	msg := mail.NewMsg()
+func (m *Mailer) NewMessage(to string, subject string, opts ...MessageOpts) (*gomail.Msg, error) {
+	msg := gomail.NewMsg()
 
-	// Validate From field
-	if err := msg.From(m.config.From); err != nil {
-		return nil, ErrInvalidFrom
+	if !isValidEmail(to) {
+		return nil, ErrInvalidTo
 	}
+
+	if m.config.From != "" {
+		if err := msg.From(m.config.From); err != nil {
+			return nil, ErrInvalidFrom
+		}
+	}
+
+	msg.To(to)
+	msg.Subject(subject)
 
 	for _, opt := range opts {
 		opt(msg)
@@ -166,58 +204,15 @@ func (m *Mailer) NewMessage(opts ...MessageOpts) (*mail.Msg, error) {
 	return msg, nil
 }
 
-func (m *Mailer) CreateClient() (*mail.Client, error) {
-	password := m.config.GetPassword()
-
-	if password == "" {
-		return nil, ErrInvalidPassword
-	}
-
-	clientOpts := []mail.Option{
-		mail.WithPort(m.config.Port),
-	}
-
-	// Add authentication
-	if m.config.Username != "" {
-		clientOpts = append(clientOpts,
-			mail.WithUsername(m.config.Username),
-			mail.WithPassword(password),
-			mail.WithSMTPAuth(mail.SMTPAuthPlain),
-		)
-	}
-
-	if m.config.TLSEnable {
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: m.config.TLSInsecureSkipVerify,
-		}
-		clientOpts = append(clientOpts,
-			mail.WithTLSConfig(tlsConfig),
-		)
-	}
-
-	client, err := mail.NewClient(m.config.Host, clientOpts...)
-	if err != nil {
-		return nil, ErrCreatingClient
-	}
-
-	return client, nil
-}
-
-func (m *Mailer) Send(msg ...*mail.Msg) error {
+func (m *Mailer) Send(msg ...*gomail.Msg) error {
 
 	if len(msg) == 0 {
 		return nil
 	}
 
-	client, err := m.CreateClient()
-
-	if err != nil {
-		return ErrClient
-	}
-
 	for _, message := range msg {
 		if message != nil {
-			if err := client.DialAndSend(message); err != nil {
+			if err := m.client.DialAndSend(message); err != nil {
 				return ErrMessage
 			}
 		}
