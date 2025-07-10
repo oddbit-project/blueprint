@@ -10,20 +10,22 @@ import (
 
 // UpdateBuilder provides a fluent interface for building UPDATE statements with complex WHERE clauses
 type UpdateBuilder struct {
-	sqlBuilder *SqlBuilder
-	tableName  string
-	record     any
-	where      WhereClause
-	options    *UpdateOptions
+	sqlBuilder  *SqlBuilder
+	tableName   string
+	record      any
+	where       WhereClause
+	options     *UpdateOptions
+	fieldValues map[string]any
 }
 
 // Update creates a new UpdateBuilder instance
 func (s *SqlBuilder) Update(tableName string, record any) *UpdateBuilder {
 	return &UpdateBuilder{
-		sqlBuilder: s,
-		tableName:  tableName,
-		record:     record,
-		options:    nil, // Will use defaults
+		sqlBuilder:  s,
+		tableName:   tableName,
+		record:      record,
+		options:     nil, // Will use defaults
+		fieldValues: nil, // optional field values
 	}
 }
 
@@ -52,7 +54,86 @@ func (b *UpdateBuilder) Build() (string, []any, error) {
 	if b.where == nil {
 		return "", nil, ValidationError("WHERE clause is required for UPDATE")
 	}
-	return b.buildUpdateSQL()
+	if b.fieldValues == nil {
+		return b.buildUpdateSQL()
+	} else {
+		return b.buildFieldValuesUpdateSQL()
+	}
+}
+
+// buildFieldValuesUpdateSQL builds an update clause from a map
+func (b *UpdateBuilder) buildFieldValuesUpdateSQL() (string, []any, error) {
+	// Use default options if none provided
+	opts := DefaultUpdateOptions()
+	if b.options != nil {
+		opts = b.options
+	}
+
+	// Validate that fieldValues is valid
+	if err := validateNotNil(b.fieldValues, "fieldValues"); err != nil {
+		return "", nil, err
+	}
+
+	// validate record
+	v, err := b.validateBuildArgs()
+	if err != nil {
+		return "", nil, err
+	}
+
+	metadata, err := field.GetStructMeta(v.Type())
+	if err != nil {
+		return "", nil, StructParsingError(v.Type(), err)
+	}
+
+	tableName, err := b.sqlBuilder.dialect.Table(b.tableName)
+	if err != nil {
+		return "", nil, DialectError(fmt.Sprintf("failed to quote table name '%s'", b.tableName), err)
+	}
+
+	count := 1
+	var setClauses []string
+	var values []any
+	var validDbFields = make([]string, len(metadata))
+
+	for i, f := range metadata {
+		validDbFields[i] = f.DbName
+	}
+
+	// iterate field->value map
+	for fname, value := range b.fieldValues {
+		if !slices.Contains(validDbFields, fname) {
+			return "", nil, FieldMappingError(fname, fname, fmt.Errorf("db field not found in struct"))
+		}
+		setClauses = append(setClauses,
+			fmt.Sprintf("%s = %s",
+				b.sqlBuilder.dialect.Field(fname), b.sqlBuilder.dialect.Placeholder(count)))
+		values = append(values, value)
+		count++
+	}
+
+	// Build WHERE clause
+	whereSql, whereValues, _ := b.where.Build(b.sqlBuilder.dialect, count)
+
+	// Construct final SQL
+	sql := fmt.Sprintf("UPDATE %s SET %s WHERE %s",
+		tableName,
+		strings.Join(setClauses, ", "),
+		whereSql)
+
+	// Add RETURNING clause if specified
+	if len(opts.ReturningFields) > 0 {
+		var returningFields []string
+		for _, fieldName := range opts.ReturningFields {
+			if fieldName == "*" {
+				returningFields = append(returningFields, "*")
+			} else {
+				returningFields = append(returningFields, b.sqlBuilder.dialect.Field(fieldName))
+			}
+		}
+		sql += fmt.Sprintf(" RETURNING %s", strings.Join(returningFields, ", "))
+	}
+
+	return sql, append(values, whereValues...), nil
 }
 
 // buildUpdateSQL contains the core UPDATE SQL generation logic
@@ -63,25 +144,8 @@ func (b *UpdateBuilder) buildUpdateSQL() (string, []any, error) {
 		opts = b.options
 	}
 
-	// Input validation
-	if err := validateNotNil(b.record, "record"); err != nil {
-		return "", nil, err
-	}
-
-	if err := validateNotEmpty(b.tableName, "table name"); err != nil {
-		return "", nil, err
-	}
-
-	v := reflect.ValueOf(b.record)
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return "", nil, InvalidInputError("record pointer cannot be nil", nil)
-		}
-		v = v.Elem()
-	}
-
-	// Validate that we have a struct
-	if err := validateStructType(v.Type(), "record"); err != nil {
+	v, err := b.validateBuildArgs()
+	if err != nil {
 		return "", nil, err
 	}
 
@@ -90,11 +154,10 @@ func (b *UpdateBuilder) buildUpdateSQL() (string, []any, error) {
 		return "", nil, StructParsingError(v.Type(), err)
 	}
 
-	quotedTableName, err := b.sqlBuilder.dialect.Table(b.tableName)
+	tableName, err := b.sqlBuilder.dialect.Table(b.tableName)
 	if err != nil {
 		return "", nil, DialectError(fmt.Sprintf("failed to quote table name '%s'", b.tableName), err)
 	}
-	tableName := quotedTableName
 
 	var validDbFields = make([]string, len(metadata))
 	var setClauses []string
@@ -178,20 +241,39 @@ func (b *UpdateBuilder) buildUpdateSQL() (string, []any, error) {
 			if field == "*" {
 				returningFields = append(returningFields, "*")
 			} else {
-				if !slices.Contains(returningFields, field) {
-					return "", nil, ValidationError(fmt.Sprintf("invalid return field '%s'", field))
-				}
-
 				returningFields = append(returningFields, b.sqlBuilder.dialect.Field(field))
 			}
 		}
 		sql += fmt.Sprintf(" RETURNING %s", strings.Join(returningFields, ", "))
 	}
 
-	// Combine all values
-	allValues := append(values, whereValues...)
+	return sql, append(values, whereValues...), nil
+}
 
-	return sql, allValues, nil
+func (b *UpdateBuilder) validateBuildArgs() (reflect.Value, error) {
+	v := reflect.ValueOf(b.record)
+	// Input validation
+	if err := validateNotNil(b.record, "record"); err != nil {
+		return v, err
+	}
+
+	if err := validateNotEmpty(b.tableName, "table name"); err != nil {
+		return v, err
+	}
+
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return v, InvalidInputError("record pointer cannot be nil", nil)
+		}
+		v = v.Elem()
+	}
+
+	// Validate that we have a struct
+	if err := validateStructType(v.Type(), "record"); err != nil {
+		return v, err
+	}
+
+	return v, nil
 }
 
 // Convenience methods for common WHERE patterns
@@ -258,6 +340,12 @@ func (b *UpdateBuilder) IncludeFields(fields ...string) *UpdateBuilder {
 		b.options = DefaultUpdateOptions()
 	}
 	b.options.IncludeFields = append(b.options.IncludeFields, fields...)
+	return b
+}
+
+// FieldsValues use only the fields/values for update
+func (b *UpdateBuilder) FieldsValues(fieldValues map[string]any) *UpdateBuilder {
+	b.fieldValues = fieldValues
 	return b
 }
 

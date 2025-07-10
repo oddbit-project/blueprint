@@ -24,7 +24,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Email: "john@example.com",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "email") VALUES (?, ?) RETURNING "id"`
@@ -49,7 +49,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Email: "jane@example.com",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "created_at"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "created_at"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "email") VALUES (?, ?) RETURNING "id", "created_at"`
@@ -75,7 +75,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Description: "High-quality wireless headphones",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("products", product, []string{"id", "name", "price", "description"})
+		sql, args, err := builder.InsertReturning("products", product, []string{"id", "name", "price", "description"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "products" ("name", "price", "description") VALUES (?, ?, ?) RETURNING "id", "name", "price", "description"`
@@ -98,7 +98,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Name: "Admin User",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "name"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "name"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name") VALUES (?) RETURNING "id", "name"`
@@ -132,7 +132,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Email: "postgres@example.com",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "name"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "name"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "email") VALUES ($1, $2) RETURNING "id", "name"`
@@ -156,7 +156,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Email: "schema@example.com",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("public.users", user, []string{"id"})
+		sql, args, err := builder.InsertReturning("public.users", user, []string{"id"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "public"."users" ("name", "email") VALUES (?, ?) RETURNING "id"`
@@ -184,7 +184,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Age:         nil, // Will be omitted
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "name", "email"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "name", "email"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "email") VALUES (?, ?) RETURNING "id", "name", "email"`
@@ -208,7 +208,7 @@ func TestBuildSQLInsertReturning(t *testing.T) {
 			Email: "pointer@example.com",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "name"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "name"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "email") VALUES (?, ?) RETURNING "id", "name"`
@@ -230,7 +230,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 
 		user := User{Name: "Test User"}
 
-		_, _, err := builder.BuildSQLInsertReturning("users", user, []string{})
+		_, _, err := builder.InsertReturning("users", user, []string{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "empty return fields")
 	})
@@ -245,7 +245,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 
 		user := User{Name: "Test User"}
 
-		_, _, err := builder.BuildSQLInsertReturning("users", user, nil)
+		_, _, err := builder.InsertReturning("users", user, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "empty return fields")
 	})
@@ -254,7 +254,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 		builder := NewSqlBuilder(DefaultSqlDialect())
 
 		// Test with nil data
-		_, _, err := builder.BuildSQLInsertReturning("users", nil, []string{"id"})
+		_, _, err := builder.InsertReturning("users", nil, []string{"id"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "data cannot be nil")
 	})
@@ -269,7 +269,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 
 		user := User{Name: "Test User"}
 
-		_, _, err := builder.BuildSQLInsertReturning("", user, []string{"id"})
+		_, _, err := builder.InsertReturning("", user, []string{"id"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "table name cannot be empty")
 	})
@@ -284,7 +284,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 
 		user := User{Name: "Test User"}
 
-		_, _, err := builder.BuildSQLInsertReturning("invalid.table.name", user, []string{"id"})
+		_, _, err := builder.InsertReturning("invalid.table.name", user, []string{"id"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid table name format")
 	})
@@ -303,7 +303,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 			Data: "some data",
 		}
 
-		_, _, err := builder.BuildSQLInsertReturning("users", user, []string{"id"})
+		_, _, err := builder.InsertReturning("users", user, []string{"id"})
 		require.NoError(t, err) // Should succeed without mapper
 	})
 
@@ -311,7 +311,7 @@ func TestBuildSQLInsertReturning_ErrorCases(t *testing.T) {
 		builder := NewSqlBuilder(DefaultSqlDialect())
 
 		// Test with non-struct data
-		_, _, err := builder.BuildSQLInsertReturning("users", "not a struct", []string{"id"})
+		_, _, err := builder.InsertReturning("users", "not a struct", []string{"id"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be a struct")
 	})
@@ -339,7 +339,7 @@ func TestBuildSQLInsertReturning_Integration(t *testing.T) {
 			IsActive: true,
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "created_at", "updated_at"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "created_at", "updated_at"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("username", "email", "full_name", "is_active") VALUES (?, ?, ?, ?) RETURNING "id", "created_at", "updated_at"`
@@ -373,7 +373,7 @@ func TestBuildSQLInsertReturning_Integration(t *testing.T) {
 			IsActive:    true,
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("products", product, []string{"id", "sku", "created_at"})
+		sql, args, err := builder.InsertReturning("products", product, []string{"id", "sku", "created_at"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "products" ("sku", "name", "description", "price", "stock", "is_active") VALUES (?, ?, ?, ?, ?, ?) RETURNING "id", "sku", "created_at"`
@@ -405,7 +405,7 @@ func TestBuildSQLInsertReturning_Integration(t *testing.T) {
 			UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("audit_logs", logEntry, []string{"id", "created_at"})
+		sql, args, err := builder.InsertReturning("audit_logs", logEntry, []string{"id", "created_at"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "audit_logs" ("user_id", "action", "resource", "ip_address", "user_agent") VALUES (?, ?, ?, ?, ?) RETURNING "id", "created_at"`
@@ -431,7 +431,7 @@ func TestBuildSQLInsertReturning_FieldQuoting(t *testing.T) {
 			UserOrder: 1,
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "order"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "order"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "order") VALUES (?, ?) RETURNING "id", "order"`
@@ -455,7 +455,7 @@ func TestBuildSQLInsertReturning_FieldQuoting(t *testing.T) {
 			SpecialField: "special value",
 		}
 
-		sql, args, err := builder.BuildSQLInsertReturning("users", user, []string{"id", "special-field"})
+		sql, args, err := builder.InsertReturning("users", user, []string{"id", "special-field"})
 		require.NoError(t, err)
 
 		expectedSQL := `INSERT INTO "users" ("name", "special-field") VALUES (?, ?) RETURNING "id", "special-field"`
@@ -493,7 +493,7 @@ func TestBuildSQLInsertReturning_Performance(t *testing.T) {
 
 		returningFields := []string{"id", "field1", "field2", "field3", "field4", "field5", "field6", "field7", "field8", "field9", "field10"}
 
-		sql, args, err := builder.BuildSQLInsertReturning("large_table", data, returningFields)
+		sql, args, err := builder.InsertReturning("large_table", data, returningFields)
 		require.NoError(t, err)
 
 		// Verify the structure is correct

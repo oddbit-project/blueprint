@@ -68,7 +68,7 @@ func TestBuildSQLUpdate_Basic(t *testing.T) {
 				IsActive: true,
 			},
 			whereClause: Eq("id", 4),
-			options: UpdateOptions{
+			options: &UpdateOptions{
 				IncludeZeroValues: false,
 			},
 			expectedSQL:  `UPDATE "update_test" SET "name" = ?, "is_active" = ? WHERE "id" = ?`,
@@ -83,7 +83,7 @@ func TestBuildSQLUpdate_Basic(t *testing.T) {
 				IsActive: false,
 			},
 			whereClause: Eq("id", 5),
-			options: UpdateOptions{
+			options: &UpdateOptions{
 				ExcludeFields: []string{"Email", "Age", "IsActive"},
 			},
 			expectedSQL:  `UPDATE "update_test" SET "name" = ? WHERE "id" = ?`,
@@ -98,7 +98,7 @@ func TestBuildSQLUpdate_Basic(t *testing.T) {
 				IsActive: true,
 			},
 			whereClause: Eq("id", 6),
-			options: UpdateOptions{
+			options: &UpdateOptions{
 				IncludeFields: []string{"Name", "Email"},
 			},
 			expectedSQL:  `UPDATE "update_test" SET "name" = ?, "email" = ? WHERE "id" = ?`,
@@ -112,7 +112,7 @@ func TestBuildSQLUpdate_Basic(t *testing.T) {
 				UpdatedAt: time.Date(2023, 12, 25, 10, 0, 0, 0, time.UTC),
 			},
 			whereClause: Eq("id", 7),
-			options: UpdateOptions{
+			options: &UpdateOptions{
 				UpdateAutoFields: true,
 				IncludeFields:    []string{"Name", "Email", "UpdatedAt"},
 			},
@@ -190,7 +190,7 @@ func TestBuildSQLUpdate_Basic(t *testing.T) {
 				ID: 1, // Only auto field
 			},
 			whereClause: Eq("id", 1),
-			options: UpdateOptions{
+			options: &UpdateOptions{
 				IncludeFields: []string{"NonExistentField"},
 			},
 			expectedError: true,
@@ -205,7 +205,7 @@ func TestBuildSQLUpdate_Basic(t *testing.T) {
 				tableName = ""
 			}
 
-			sql, args, err := builder.BuildSQLUpdate(tableName, tt.data, tt.whereClause, &tt.options)
+			sql, args, err := builder.Update(tableName, tt.data).Where(tt.whereClause).WithOptions(tt.options).Build()
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -265,7 +265,7 @@ func TestBuildSQLUpdateByID(t *testing.T) {
 				IsActive: true,
 			},
 			id: 2,
-			options: UpdateOptions{
+			options: &UpdateOptions{
 				IncludeFields: []string{"Name", "Age"},
 			},
 			expectedSQL:  `UPDATE "users" SET "name" = ?, "age" = ? WHERE "id" = ?`,
@@ -275,7 +275,7 @@ func TestBuildSQLUpdateByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sql, args, err := builder.BuildSQLUpdateByID("users", tt.data, tt.id, &tt.options)
+			sql, args, err := builder.Update("users", tt.data).WhereEq("id", tt.id).WithOptions(tt.options).Build()
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedSQL, sql)
 			assert.Equal(t, tt.expectedArgs, args)
@@ -375,7 +375,7 @@ func TestBuildSQLUpdate_WithDifferentDialects(t *testing.T) {
 
 	whereClause := Eq("id", 1)
 
-	sql, args, err := builder.BuildSQLUpdate("users", data, whereClause, nil)
+	sql, args, err := builder.Update("users", data).Where(whereClause).Build()
 	require.NoError(t, err)
 
 	expectedSQL := `UPDATE "users" SET "name" = $1, "email" = $2, "age" = $3, "is_active" = $4 WHERE "id" = $5`
@@ -400,7 +400,7 @@ func BenchmarkBuildSQLUpdate(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _, err := builder.BuildSQLUpdate("users", data, whereClause, nil)
+		_, _, err := builder.Update("users", data).Where(whereClause).Build()
 		if err != nil {
 			b.Fatal(err)
 		}

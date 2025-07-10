@@ -55,7 +55,8 @@ func validateTableName(tableName string) error {
 		return err
 	}
 
-	match, err := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]*$`, tableName)
+	// Allow simple table names or schema.table format
+	match, err := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$`, tableName)
 	if err != nil {
 		return ValidationError(fmt.Sprintf("error checking table name '%s' characters", tableName))
 	}

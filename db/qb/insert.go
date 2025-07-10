@@ -111,8 +111,8 @@ func (s *SqlBuilder) BuildSQLInsert(tableName string, data any) (string, []any, 
 	return sql, values, nil
 }
 
-// BuildSQLInsertReturning
-func (s *SqlBuilder) BuildSQLInsertReturning(tableName string, data any, returningFields []string) (string, []any, error) {
+// InsertReturning
+func (s *SqlBuilder) InsertReturning(tableName string, data any, returningFields []string) (string, []any, error) {
 	if len(returningFields) == 0 {
 		return "", nil, errors.New("empty return fields")
 	}

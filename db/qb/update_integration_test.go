@@ -56,7 +56,7 @@ func TestUpdateIntegration_UserManagement(t *testing.T) {
 			IsActive:  true,
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("users", user, 123, nil)
+		sql, args, err := builder.Update("users", user).WhereEq("id", 123).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "username" = ?, "email" = ?, "first_name" = ?, "last_name" = ?, "age" = ?, "is_active" = ? WHERE "id" = ?`
@@ -79,7 +79,7 @@ func TestUpdateIntegration_UserManagement(t *testing.T) {
 			ExcludeFields: []string{"Email", "IsActive"}, // Don't update sensitive fields
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("users", user, 456, &options)
+		sql, args, err := builder.Update("users", user).WhereEq("id", 456).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "username" = ?, "first_name" = ?, "last_name" = ?, "age" = ? WHERE "id" = ?`
@@ -100,7 +100,7 @@ func TestUpdateIntegration_UserManagement(t *testing.T) {
 			IncludeFields: []string{"FirstName", "LastName"},
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("users", user, 789, &options)
+		sql, args, err := builder.Update("users", user).WhereEq("id", 789).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "first_name" = ?, "last_name" = ? WHERE "id" = ?`
@@ -120,7 +120,7 @@ func TestUpdateIntegration_UserManagement(t *testing.T) {
 			IncludeFields: []string{"LastLogin"},
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("users", user, 123, &options)
+		sql, args, err := builder.Update("users", user).WhereEq("id", 123).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "last_login" = ? WHERE "id" = ?`
@@ -146,7 +146,7 @@ func TestUpdateIntegration_ProductManagement(t *testing.T) {
 			IncludeFields: []string{"Stock", "IsActive"},
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("products", product, 101, &options)
+		sql, args, err := builder.Update("products", product).WhereEq("id", 101).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "products" SET "stock" = ?, "is_active" = ? WHERE "id" = ?`
@@ -167,7 +167,7 @@ func TestUpdateIntegration_ProductManagement(t *testing.T) {
 			ExcludeFields: []string{"Stock", "IsActive"}, // Don't update stock and active status
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("products", product, 102, &options)
+		sql, args, err := builder.Update("products", product).WhereEq("id", 102).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "products" SET "name" = ?, "description" = ?, "price" = ? WHERE "id" = ?`
@@ -201,7 +201,7 @@ func TestUpdateIntegration_OrderManagement(t *testing.T) {
 			Eq("status", "processing"),
 		)
 
-		sql, args, err := builder.BuildSQLUpdate("orders", order, whereClause, &options)
+		sql, args, err := builder.Update("orders", order).Where(whereClause).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "orders" SET "status" = ? WHERE ("id" = ? AND "status" = ?)`
@@ -222,7 +222,7 @@ func TestUpdateIntegration_OrderManagement(t *testing.T) {
 			IncludeFields: []string{"Status", "ShippedAt"},
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("orders", order, 1002, &options)
+		sql, args, err := builder.Update("orders", order).WhereEq("id", 1002).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "orders" SET "status" = ?, "shipped_at" = ? WHERE "id" = ?`
@@ -257,7 +257,7 @@ func TestUpdateIntegration_AdvancedScenarios(t *testing.T) {
 			Gte("age", 18),
 		)
 
-		sql, args, err := builder.BuildSQLUpdate("users", user, whereClause, &options)
+		sql, args, err := builder.Update("users", user).Where(whereClause).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "is_active" = ? WHERE ("last_login" < ? AND "is_active" = ? AND "age" >= ?)`
@@ -281,7 +281,7 @@ func TestUpdateIntegration_AdvancedScenarios(t *testing.T) {
 			IncludeZeroValues: false,
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("users", user, 999, &options)
+		sql, args, err := builder.Update("users", user).WhereEq("id", 999).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "username" = ?, "first_name" = ?, "is_active" = ? WHERE "id" = ?`
@@ -303,7 +303,7 @@ func TestUpdateIntegration_AdvancedScenarios(t *testing.T) {
 			UpdateAutoFields: true,
 		}
 
-		sql, args, err := builder.BuildSQLUpdateByID("users", user, 1, &options)
+		sql, args, err := builder.Update("users", user).WhereEq("id", 1).WithOptions(&options).Build()
 		require.NoError(t, err)
 
 		expectedSQL := `UPDATE "users" SET "username" = ?, "updated_at" = ? WHERE "id" = ?`
@@ -322,7 +322,7 @@ func TestUpdateIntegration_ErrorScenarios(t *testing.T) {
 	t.Run("update with invalid table name", func(t *testing.T) {
 		user := User{Username: "test"}
 
-		_, _, err := builder.BuildSQLUpdateByID("invalid.table.name", user, 1, nil)
+		_, _, err := builder.Update("invalid.table.name", user).WhereEq("id", 1).Build()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid table name format")
 	})
@@ -335,7 +335,7 @@ func TestUpdateIntegration_ErrorScenarios(t *testing.T) {
 
 		data := TestStruct{Data: "test"}
 
-		_, _, err := builder.BuildSQLUpdateByID("test", data, 1, nil)
+		_, _, err := builder.Update("test", data).WhereEq("id", 1).Build()
 		require.NoError(t, err) // Should succeed without mapper
 	})
 
@@ -388,7 +388,7 @@ func TestUpdateIntegration_PostgreSQLDialect(t *testing.T) {
 		ExcludeFields: []string{"Preferences"}, // Exclude complex field
 	}
 
-	sql, args, err := builder.BuildSQLUpdateByID("users", user, 123, &options)
+	sql, args, err := builder.Update("users", user).WhereEq("id", 123).WithOptions(&options).Build()
 	require.NoError(t, err)
 
 	expectedSQL := `UPDATE "users" SET "username" = $1, "email" = $2, "first_name" = $3, "last_name" = $4, "age" = $5, "is_active" = $6 WHERE "id" = $7`
