@@ -5,6 +5,7 @@ import (
 	"github.com/oddbit-project/blueprint/runtime"
 	"github.com/oddbit-project/blueprint/utils"
 	"reflect"
+	"slices"
 	"sync"
 )
 
@@ -13,11 +14,12 @@ const (
 	ErrInvalidStruct = utils.Error("field spec requires a pointer to a struct; invalid type")
 
 	// tags
-	tagDb   = "db"   // database/sql tag
-	tagCh   = "ch"   // clickhouse tag
-	tagAuto = "auto" // optional tag that defines if field is automatically generated (skipupdate/skipinsert produce the same result)
-	tagGrid = "grid" // grid options
-	tagGoqu = "goqu" // possible tag names: skipupdate, skipinsert, defaultifempty, omitnil, omitempty
+	tagDb     = "db"     // database/sql tag
+	tagCh     = "ch"     // clickhouse tag
+	tagAuto   = "auto"   // optional tag that defines if field is automatically generated (skipupdate/skipinsert produce the same result)
+	tagGrid   = "grid"   // grid options
+	tagGoqu   = "goqu"   // possible tag names: skipupdate, skipinsert, defaultifempty, omitnil, omitempty
+	tagMapper = "mapper" // custom mapper tag for field transformation
 
 	// alias tags - used to search for a possible Alias value
 	tagJson  = "json"
@@ -97,10 +99,10 @@ func scanStruct(arg any) ([]Metadata, error) {
 		if !field.IsExported() {
 			continue
 		}
-		
+
 		reserved := IsReservedType(field.Type.String())
-		if field.Type.Kind() == reflect.Struct && !reserved {
-			// resolve embedded structs
+		if field.Type.Kind() == reflect.Struct && !reserved && field.Anonymous {
+			// resolve embedded structs (only anonymous fields)
 			structMap, err := scanStruct(v.Field(i).Interface())
 			if err != nil {
 				return nil, err
@@ -121,9 +123,17 @@ func scanStruct(arg any) ([]Metadata, error) {
 			// additional tags other than name are added to DbOptions
 			tagContent := runtime.ParseTagList(field, dbTagList)
 			if len(tagContent) > 0 {
+				// Skip fields with db:"-" tag
+				if tagContent[0] == "-" {
+					continue
+				}
 				meta.DbName = tagContent[0]
 				if len(tagContent) > 1 {
 					meta.DbOptions = tagContent[1:]
+					// support auto in db tag
+					if slices.Contains(meta.DbOptions, tagAuto) {
+						meta.Auto = true
+					}
 				}
 			}
 

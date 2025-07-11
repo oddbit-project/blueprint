@@ -146,14 +146,15 @@ func TestGetStructMeta_EmbeddedStruct(t *testing.T) {
 func TestGetStructMeta_NestedStruct(t *testing.T) {
 	meta, err := GetStructMeta(reflect.TypeOf(NestedStruct{}))
 	require.NoError(t, err)
-	require.Len(t, meta, 3) // ID + 2 fields from nested struct
+	require.Len(t, meta, 2) // ID + Nested field (not flattened since it's named)
 	
-	// Check that nested struct fields are flattened
-	field1 := findFieldByDbName(meta, "field1")
-	require.NotNil(t, field1)
+	// Check that nested struct is treated as a single field (not flattened)
+	idField := findFieldByDbName(meta, "id")
+	require.NotNil(t, idField)
 	
-	field2 := findFieldByDbName(meta, "field2")
-	require.NotNil(t, field2)
+	nestedField := findFieldByDbName(meta, "Nested")
+	require.NotNil(t, nestedField)
+	assert.Equal(t, "Nested", nestedField.DbName)
 }
 
 func TestGetStructMeta_ReservedTypes(t *testing.T) {

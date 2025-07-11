@@ -2,13 +2,31 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
+	"github.com/oddbit-project/blueprint/db/field"
+	"github.com/oddbit-project/blueprint/db/qb"
+	"reflect"
+	"strings"
 )
+
+type SqlAdapter interface {
+	sqlx.QueryerContext
+	sqlx.ExecerContext
+	SqlxReaderCtx
+}
 
 func RawExec(ctx context.Context, conn sqlx.ExecerContext, sql string, args ...any) error {
 	_, err := conn.ExecContext(ctx, sql, args...)
 	return err
+}
+
+func RawFetch(ctx context.Context, conn sqlx.QueryerContext, sql string, args []any, target any) error {
+	if target == nil {
+		return ErrInvalidParameters
+	}
+	return conn.QueryRowxContext(ctx, sql, args...).StructScan(target)
 }
 
 func Exec(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.SelectDataset) error {
@@ -26,7 +44,7 @@ func FetchOne(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDat
 	if target == nil || qry == nil {
 		return ErrInvalidParameters
 	}
-	qry.Limit(1)
+	qry = qry.Limit(1)
 	sqlQry, args, err := qry.ToSQL()
 	if err != nil {
 		return err
@@ -92,7 +110,7 @@ func Exists(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDatas
 	return result > 0, err
 }
 
-func Del(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) error {
+func Delete(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset) error {
 	if qry == nil {
 		return ErrInvalidParameters
 	}
@@ -111,35 +129,159 @@ func DeleteWhere(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteD
 	for field, value := range fieldNameValue {
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
-	return Del(ctx, conn, qry)
+	return Delete(ctx, conn, qry)
 }
 
 func DeleteByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, keyField string, value any) error {
 	qry = qry.Where(goqu.C(keyField).Eq(value))
-	return Del(ctx, conn, qry)
+	return Delete(ctx, conn, qry)
 }
 
-func Insert(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.InsertDataset, rows ...any) error {
-	if len(rows) == 0 {
+func RawInsert(ctx context.Context, conn sqlx.ExecerContext, qry string, values []any) error {
+	if len(values) == 0 {
 		return ErrInvalidParameters
 	}
-	sqlQry, args, err := qry.Rows(rows...).Prepared(true).ToSQL()
-	if err != nil {
-		return err
-	}
-	_, err = conn.ExecContext(ctx, sqlQry, args...)
+	_, err := conn.ExecContext(ctx, qry, values...)
 	return err
 }
 
-func InsertReturning(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.InsertDataset, record any, returnFields []interface{}, target ...any) error {
-	if record == nil || returnFields == nil || len(target) == 0 {
+func RawInsertReturning(ctx context.Context, conn sqlx.QueryerContext, qry string, values []any, target ...any) error {
+	if len(target) == 0 {
 		return ErrInvalidParameters
 	}
-	sqlQry, values, err := qry.Rows(record).Prepared(true).Returning(returnFields...).ToSQL()
-	if err != nil {
-		return err
+	return conn.QueryRowxContext(ctx, qry, values...).Scan(target...)
+}
+
+// RawInsertReturningFlexible provides intelligent target scanning for InsertReturning operations.
+// It automatically detects the target type and uses the appropriate scanning method:
+// - *struct: uses StructScan() for automatic field mapping by name/tag
+// - []any: uses Scan() for positional mapping to multiple variables
+// - *variable: uses Scan() for single value mapping
+func RawInsertReturningFlexible(ctx context.Context, conn sqlx.QueryerContext, sql string, args []any, target any) error {
+	if target == nil {
+		return fmt.Errorf("target cannot be nil")
 	}
-	return conn.QueryRowxContext(ctx, sqlQry, values...).Scan(target...)
+
+	// Execute the query
+	row := conn.QueryRowxContext(ctx, sql, args...)
+
+	// Intelligent type detection and scanning
+	return scanTarget(row, target)
+}
+
+// scanTarget determines the appropriate scanning method based on target type
+func scanTarget(row *sqlx.Row, target any) error {
+	targetValue := reflect.ValueOf(target)
+
+	if !targetValue.IsValid() {
+		return fmt.Errorf("invalid target value")
+	}
+
+	targetType := targetValue.Type()
+
+	switch {
+	case targetType.Kind() == reflect.Ptr && targetType.Elem().Kind() == reflect.Struct:
+		// reserved structs are parsed as a single field, eg. time.Time
+		if field.IsReservedType(strings.Replace(targetType.String(), "*", "", 1)) {
+			return row.Scan(target)
+		}
+		// Struct pointer - use StructScan for field mapping by name/tag
+		return row.StructScan(target)
+
+	case targetType.Kind() == reflect.Slice:
+		// Slice of variables - convert to []any and use positional Scan
+		slice, ok := target.([]any)
+		if !ok {
+			return fmt.Errorf("slice target must be []any, got %T", target)
+		}
+		return row.Scan(slice...)
+
+	case targetType.Kind() == reflect.Ptr:
+		// Single variable pointer - use direct Scan
+		return row.Scan(target)
+
+	default:
+		return fmt.Errorf("unsupported target type %T: expected *struct, []any, or *variable", target)
+	}
+}
+
+// RawUpdateReturning
+// helper function for RawUpdateReturningFlexible
+func RawUpdateReturning(ctx context.Context, conn sqlx.QueryerContext, qry string, args []any, target ...any) error {
+	if target == nil {
+		return fmt.Errorf("target cannot be nil")
+	}
+
+	// Single target: use intelligent scanning (supports structs and single variables)
+	if len(target) == 1 {
+		return RawUpdateReturningFlexible(ctx, conn, qry, args, target[0])
+	}
+
+	// Multiple targets: convert to []any slice and use flexible scanning
+	targetSlice := make([]any, len(target))
+	copy(targetSlice, target)
+	return RawUpdateReturningFlexible(ctx, conn, qry, args, targetSlice)
+}
+
+// RawUpdateReturningFlexible provides intelligent target scanning for UpdateReturning operations.
+// It automatically detects the target type and uses the appropriate scanning method:
+// - *struct: uses StructScan() for automatic field mapping by name/tag
+// - []any: uses Scan() for positional mapping to multiple variables
+// - *variable: uses Scan() for single value mapping
+func RawUpdateReturningFlexible(ctx context.Context, conn sqlx.QueryerContext, sql string, args []any, target any) error {
+	if target == nil {
+		return fmt.Errorf("target cannot be nil")
+	}
+
+	// Execute the query
+	row := conn.QueryRowxContext(ctx, sql, args...)
+
+	// Use the same intelligent type detection and scanning as InsertReturning
+	return scanTarget(row, target)
+}
+
+func Do(ctx context.Context, conn SqlAdapter, qry any, target ...any) error {
+	if qry == nil {
+		return ErrInvalidParameters
+	}
+	switch qry.(type) {
+	case *goqu.SelectDataset:
+		if target == nil {
+			return ErrInvalidParameters
+		}
+		return Fetch(ctx, conn, qry.(*goqu.SelectDataset), target[0])
+	case *goqu.UpdateDataset:
+		return Update(ctx, conn, qry.(*goqu.UpdateDataset))
+	case *goqu.InsertDataset:
+		gQry := qry.(*goqu.InsertDataset)
+		sqlQry, args, err := gQry.Prepared(true).ToSQL()
+		if err != nil {
+			return err
+		}
+		_, err = conn.ExecContext(ctx, sqlQry, args...)
+		return err
+
+	case *goqu.DeleteDataset:
+		return Delete(ctx, conn, qry.(*goqu.DeleteDataset))
+
+	case *qb.UpdateBuilder:
+		param := qry.(*qb.UpdateBuilder)
+		qrySql, args, err := param.Build()
+		if err != nil {
+			return err
+		}
+		if param.HasReturnFields() {
+			if target == nil {
+				return ErrInvalidParameters
+			}
+			return RawUpdateReturning(ctx, conn, qrySql, args, target...)
+		} else {
+			// no return fields
+			return RawExec(ctx, conn, qrySql, args...)
+		}
+	default:
+		return ErrInvalidParameters
+	}
 }
 
 func Update(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDataset) error {
@@ -152,26 +294,6 @@ func Update(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDatase
 	}
 	_, err = conn.ExecContext(ctx, qrySql, values...)
 	return err
-}
-
-func UpdateRecord(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDataset, record any, whereFieldsValues map[string]any) error {
-	if record == nil {
-		return ErrInvalidParameters
-	}
-	qry = qry.Set(record)
-	if whereFieldsValues != nil {
-		for field, value := range whereFieldsValues {
-			qry = qry.Where(goqu.C(field).Eq(value))
-		}
-	}
-	return Update(ctx, conn, qry)
-}
-
-func UpdateByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDataset, record any, keyField string, value any) error {
-	if record == nil {
-		return ErrInvalidParameters
-	}
-	return Update(ctx, conn, qry.Set(record).Where(goqu.C(keyField).Eq(value)))
 }
 
 func Count(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset) (int64, error) {

@@ -28,6 +28,18 @@ func DefaultSqlDialect() SqlDialect {
 	}
 }
 
+func PostgreSQLDialect() SqlDialect {
+	return SqlDialect{
+		PlaceHolderFragment:   "$",
+		IncludePlaceholderNum: true,
+		QuoteTable:            `"%s"`,
+		QuoteField:            `"%s"`,
+		QuoteSchema:           `"%s"`,
+		QuoteDatabase:         `"%s"`,
+		QuoteSeparator:        `.`,
+	}
+}
+
 func (d SqlDialect) Placeholder(count int) string {
 	if count >= 0 {
 		if d.IncludePlaceholderNum {

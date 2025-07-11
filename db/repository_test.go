@@ -86,7 +86,6 @@ func TestRepositoryGrid(t *testing.T) {
 	// (we're only testing the Grid method which doesn't use the database)
 	repo := &repository{
 		tableName: "test_table",
-		spec:      nil, // Start with nil spec
 	}
 	
 	// Test creating a grid with a new record type
@@ -94,17 +93,14 @@ func TestRepositoryGrid(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, grid)
 	assert.Equal(t, "test_table", grid.tableName)
-	
-	// The spec should now be cached
-	assert.NotNil(t, repo.spec)
+	assert.NotNil(t, grid.spec)
 	
 	// Test creating another grid with the same record type
-	// This should use the cached spec
-	cachedSpec := repo.spec
 	grid2, err := repo.Grid(&TestGridStruct{})
 	assert.NoError(t, err)
 	assert.NotNil(t, grid2)
-	assert.Equal(t, cachedSpec, repo.spec) // Should use the same spec
+	assert.Equal(t, "test_table", grid2.tableName)
+	assert.NotNil(t, grid2.spec)
 }
 
 // TestRepositoryQueryGrid_InvalidRecord tests the QueryGrid method with an invalid record
@@ -113,7 +109,6 @@ func TestRepositoryQueryGrid_InvalidRecord(t *testing.T) {
 	// (we'll only test the error case that doesn't use the connection)
 	repo := &repository{
 		tableName: "test_users",
-		spec:      nil,
 	}
 	
 	// Create a grid query

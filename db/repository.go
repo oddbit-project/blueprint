@@ -7,6 +7,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
+	"github.com/oddbit-project/blueprint/db/qb"
 )
 
 type Builder interface {
@@ -15,6 +16,12 @@ type Builder interface {
 	SqlInsert() *goqu.InsertDataset
 	SqlUpdate() *goqu.UpdateDataset
 	SqlDelete() *goqu.DeleteDataset
+}
+
+type SqlBuilder interface {
+	SqlDialect() qb.SqlDialect
+	SqlBuilder() *qb.SqlBuilder
+	SqlUpdateX(record any) *qb.UpdateBuilder
 }
 
 type Reader interface {
@@ -35,16 +42,20 @@ type Executor interface {
 	Exec(qry *goqu.SelectDataset) error
 	RawExec(sql string, args ...any) error
 	Select(sql string, target any, args ...any) error
+	Do(qry any, target ...any) error
 }
 
 type Writer interface {
 	Insert(records ...any) error
-	InsertReturning(record any, returnFields []interface{}, target ...any) error
+	InsertReturning(record any, returnFields []string, target ...any) error
 }
 type Updater interface {
 	Update(qry *goqu.UpdateDataset) error
+	UpdateReturning(record any, whereFieldsValues map[string]any, returnFields []string, target ...any) error
 	UpdateRecord(record any, whereFieldsValues map[string]any) error
-	UpdateByKey(record any, keyField string, keyValue any) error
+	UpdateFields(record any, fieldsValues map[string]any, whereFieldsValues map[string]any) error
+	UpdateFieldsReturning(record any, fieldsValues map[string]any, whereFieldsValues map[string]any, returnFields []string, target ...any) error
+	UpdateByKey(record any, keyField string, value any) error
 }
 
 type Deleter interface {
@@ -67,6 +78,9 @@ type GridOps interface {
 	QueryGrid(record any, args *GridQuery, dest any) error
 }
 
+type Dialect interface {
+}
+
 type Repository interface {
 	Identifier
 	Builder
@@ -77,6 +91,7 @@ type Repository interface {
 	Updater
 	Counter
 	GridOps
+	SqlBuilder
 	NewTransaction(opts *sql.TxOptions) (Transaction, error)
 }
 
@@ -88,7 +103,7 @@ type Transaction interface {
 	Deleter
 	Updater
 	Counter
-
+	SqlBuilder
 	Db() *sqlx.Tx
 	Name() string
 
@@ -99,18 +114,19 @@ type Transaction interface {
 type FV map[string]any // alias for fieldValues maps
 
 type repository struct {
-	conn      *sqlx.DB
-	ctx       context.Context
-	tableName string
-	dialect   goqu.DialectWrapper
-	spec      *FieldSpec
+	conn       *sqlx.DB
+	ctx        context.Context
+	tableName  string
+	dialect    goqu.DialectWrapper
+	sqlBuilder *qb.SqlBuilder
 }
 
 type tx struct {
-	conn      *sqlx.Tx
-	ctx       context.Context
-	tableName string
-	dialect   goqu.DialectWrapper
+	conn       *sqlx.Tx
+	ctx        context.Context
+	tableName  string
+	dialect    goqu.DialectWrapper
+	sqlBuilder *qb.SqlBuilder
 }
 
 func (r *repository) NewTransaction(opts *sql.TxOptions) (Transaction, error) {
@@ -119,11 +135,24 @@ func (r *repository) NewTransaction(opts *sql.TxOptions) (Transaction, error) {
 		return nil, err
 	}
 	return &tx{
-		conn:      t,
-		ctx:       r.ctx,
-		tableName: r.tableName,
-		dialect:   r.dialect,
+		conn:       t,
+		ctx:        r.ctx,
+		tableName:  r.tableName,
+		dialect:    r.dialect,
+		sqlBuilder: r.sqlBuilder,
 	}, nil
+}
+
+func (r *repository) SqlDialect() qb.SqlDialect {
+	return r.sqlBuilder.Dialect()
+}
+
+func (r *repository) SqlBuilder() *qb.SqlBuilder {
+	return r.sqlBuilder
+}
+
+func (r *repository) SqlUpdateX(record any) *qb.UpdateBuilder {
+	return r.SqlBuilder().Update(r.tableName, record)
 }
 
 func (r *repository) Db() *sqlx.DB {
@@ -144,11 +173,15 @@ func (r *repository) SqlSelect() *goqu.SelectDataset {
 }
 
 // SqlInsert returns an Insert query builder
+// Compatibility note: goqu prepared statements are *not* compatible with postgresql extended
+// types; build update clauses with SqlBuilder() instead
 func (r *repository) SqlInsert() *goqu.InsertDataset {
 	return r.dialect.Insert(r.tableName)
 }
 
 // SqlUpdate returns an Update query builder
+// Compatibility note: goqu prepared statements are *not* compatible with postgresql extended
+// types; build update clauses with SqlBuilder() instead
 func (r *repository) SqlUpdate() *goqu.UpdateDataset {
 	return r.dialect.Update(r.tableName)
 }
@@ -219,7 +252,7 @@ func (r *repository) Exists(fieldName string, fieldValue any, skip ...any) (bool
 }
 
 func (r *repository) Delete(qry *goqu.DeleteDataset) error {
-	return Del(r.ctx, r.conn, qry)
+	return Delete(r.ctx, r.conn, qry)
 }
 
 func (r *repository) DeleteWhere(fieldNameValue map[string]any) error {
@@ -235,7 +268,11 @@ func (r *repository) Select(sql string, target any, args ...any) error {
 }
 
 func (r *repository) Insert(rows ...any) error {
-	return Insert(r.ctx, r.conn, r.SqlInsert(), rows...)
+	qry, args, err := r.sqlBuilder.BuildSQLBatchInsert(r.tableName, rows)
+	if err != nil {
+		return err
+	}
+	return RawInsert(r.ctx, r.conn, qry, args)
 }
 
 // Count returns the total number of rows in the database table
@@ -254,13 +291,7 @@ func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 
 // Grid creates a new Grid object for the record, and caches the field spec for more efficient usage
 func (r *repository) Grid(record any) (*Grid, error) {
-	if r.spec == nil {
-		var err error
-		if r.spec, err = NewFieldSpec(record); err != nil {
-			return nil, err
-		}
-	}
-	return NewGridWithSpec(r.tableName, r.spec), nil
+	return NewGrid(r.tableName, record)
 }
 
 // QueryGrid creates a new Grid object and performs a query using GridQuery
@@ -286,28 +317,195 @@ func (r *repository) QueryGrid(record any, args *GridQuery, dest any) error {
 
 // InsertReturning inserts a record, and returns the specified return fields into target
 //
-// Example:
+// Examples:
 //
-//	record := &SomeRecord{}
-//	err := InsertReturning(record, []any{"id_table"}, &record.Id)
-func (r *repository) InsertReturning(record any, returnFields []interface{}, target ...any) error {
-	return InsertReturning(r.ctx, r.conn, r.SqlInsert(), record, returnFields, target...)
+//	// Struct target (NEW) - automatic field mapping
+//	result := &User{}
+//	err := repo.InsertReturning(user, []string{"id", "name", "created_at"}, result)
+//
+//	// Individual variables (EXISTING) - positional mapping
+//	var id int64
+//	var name string
+//	err := repo.InsertReturning(user, []string{"id", "name"}, &id, &name)
+//
+//	// Single variable (EXISTING)
+//	var id int64
+//	err := repo.InsertReturning(user, []string{"id"}, &id)
+func (r *repository) InsertReturning(record any, returnFields []string, target ...any) error {
+	if len(target) == 0 {
+		return ErrInvalidParameters
+	}
+
+	qry, args, err := r.sqlBuilder.InsertReturning(r.tableName, record, returnFields)
+	if err != nil {
+		return err
+	}
+
+	// Single target: use intelligent scanning (supports structs and single variables)
+	if len(target) == 1 {
+		return RawInsertReturningFlexible(r.ctx, r.conn, qry, args, target[0])
+	}
+
+	// Multiple targets: convert to []any slice and use flexible scanning
+	targetSlice := make([]any, len(target))
+	copy(targetSlice, target)
+	return RawInsertReturningFlexible(r.ctx, r.conn, qry, args, targetSlice)
 }
 
 // Update execute an update query
+// goqu.InsertDataset/goqu.UpdateDataset() have problems serializing some data types
+// Deprecated: use UpdateRecord instead
 func (r *repository) Update(qry *goqu.UpdateDataset) error {
 	return Update(r.ctx, r.conn, qry)
 }
 
-// UpdateRecord updates a record using a WHERE condition with AND
-// record can be a map[string]any specifying fields & values
+// Do helper to execute a query
+func (r *repository) Do(qry any, target ...any) error {
+	return Do(r.ctx, r.conn, qry, target...)
+}
+
+// UpdateRecord updates a record using a WHERE condition
+// whereFieldsValues are matched as field=value, and if multiple entries present, will be
+// concatenated using AND
 func (r *repository) UpdateRecord(record any, whereFieldsValues map[string]any) error {
-	return UpdateRecord(r.ctx, r.conn, r.SqlUpdate(), record, whereFieldsValues)
+	builder := r.sqlBuilder.Update(r.tableName, record).WithOptions(qb.DefaultUpdateOptions())
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	return RawExec(r.ctx, r.conn, qry, args...)
+}
+
+// UpdateFields update specific fields of a given record, using a WHERE condition
+// whereFieldsValues are matched as field=value, and if multiple entries present, will be
+// concatenated using AND
+func (r *repository) UpdateFields(record any, fieldsValues map[string]any, whereFieldsValues map[string]any) error {
+	builder := r.sqlBuilder.Update(r.tableName, record).
+		WithOptions(qb.DefaultUpdateOptions()).
+		FieldsValues(fieldsValues)
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	return RawExec(r.ctx, r.conn, qry, args...)
+}
+
+// UpdateReturning updates a record using a WHERE condition with AND
+// Examples:
+//
+//	// Struct target (NEW) - automatic field mapping
+//	result := &User{}
+//	err := repo.UpdateReturning(user, map[string]any{"id": 1}, []string{"id", "name", "updated_at"}, result)
+//
+//	// Individual variables (EXISTING) - positional mapping
+//	var id int64
+//	var name string
+//	err := repo.UpdateReturning(user, map[string]any{"id": 1}, []string{"id", "name"}, &id, &name)
+//
+//	// Single variable (EXISTING)
+//	var id int64
+//	err := repo.UpdateReturning(user, map[string]any{"id": 1}, []string{"id"}, &id)
+func (r *repository) UpdateReturning(record any, whereFieldsValues map[string]any, returnFields []string, target ...any) error {
+	if len(target) == 0 {
+		return ErrInvalidParameters
+	}
+
+	// Set up options with RETURNING fields
+	opts := qb.DefaultUpdateOptions()
+	opts.ReturningFields = returnFields
+
+	builder := r.sqlBuilder.Update(r.tableName, record).WithOptions(opts)
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	return RawUpdateReturning(r.ctx, r.conn, qry, args, target...)
+}
+
+// UpdateFieldsReturning updates specific fields using FieldsValues with RETURNING support
+// target can be:
+// - *struct: for automatic field mapping by name/tag
+// - []any: for positional mapping to multiple variables
+// - *variable: for single value mapping
+func (r *repository) UpdateFieldsReturning(record any, fieldsValues map[string]any, whereFieldsValues map[string]any, returnFields []string, target ...any) error {
+	if len(target) == 0 {
+		return ErrInvalidParameters
+	}
+
+	// Set up options with RETURNING fields
+	opts := qb.DefaultUpdateOptions()
+	opts.ReturningFields = returnFields
+
+	builder := r.sqlBuilder.Update(r.tableName, record).
+		WithOptions(opts).
+		FieldsValues(fieldsValues)
+
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+
+	// Single target: use intelligent scanning (supports structs and single variables)
+	if len(target) == 1 {
+		return RawUpdateReturningFlexible(r.ctx, r.conn, qry, args, target[0])
+	}
+
+	// Multiple targets: convert to []any slice and use flexible scanning
+	targetSlice := make([]any, len(target))
+	copy(targetSlice, target)
+	return RawUpdateReturningFlexible(r.ctx, r.conn, qry, args, targetSlice)
 }
 
 // UpdateByKey updates a record using WHERE keyField=value
 func (r *repository) UpdateByKey(record any, keyField string, value any) error {
-	return UpdateByKey(r.ctx, r.conn, r.SqlUpdate(), record, keyField, value)
+	qry, args, err := r.sqlBuilder.Update(r.tableName, record).
+		WithOptions(qb.DefaultUpdateOptions()).
+		Where(qb.Eq(keyField, value)).
+		Build()
+	if err != nil {
+		return err
+	}
+	return RawExec(r.ctx, r.conn, qry, args...)
+}
+
+func (t *tx) SqlDialect() qb.SqlDialect {
+	return t.sqlBuilder.Dialect()
+}
+
+func (t *tx) SqlBuilder() *qb.SqlBuilder {
+	return t.sqlBuilder
+}
+
+func (t *tx) SqlUpdateX(record any) *qb.UpdateBuilder {
+	return t.SqlBuilder().Update(t.tableName, record)
 }
 
 func (t *tx) Commit() error {
@@ -334,10 +532,16 @@ func (t *tx) SqlSelect() *goqu.SelectDataset {
 	return t.dialect.From(t.tableName)
 }
 
+// SqlInsert
+// Compatibility note: goqu prepared statements are *not* compatible with postgresql extended
+// types; build update clauses with SqlBuilder() instead
 func (t *tx) SqlInsert() *goqu.InsertDataset {
 	return t.dialect.Insert(t.tableName)
 }
 
+// SqlUpdate
+// Compatibility note: goqu prepared statements are *not* compatible with postgresql extended
+// types; build update clauses with SqlBuilder() instead
 func (t *tx) SqlUpdate() *goqu.UpdateDataset {
 	return t.dialect.Update(t.tableName)
 }
@@ -385,7 +589,7 @@ func (t *tx) RawExec(sql string, args ...any) error {
 }
 
 func (t *tx) Delete(qry *goqu.DeleteDataset) error {
-	return Del(t.ctx, t.conn, qry)
+	return Delete(t.ctx, t.conn, qry)
 }
 
 func (t *tx) DeleteWhere(fieldNameValue map[string]any) error {
@@ -401,12 +605,33 @@ func (t *tx) Select(sql string, target any, args ...any) error {
 }
 
 func (t *tx) Insert(rows ...any) error {
-	return Insert(t.ctx, t.conn, t.SqlInsert(), rows...)
+	qry, args, err := t.sqlBuilder.BuildSQLBatchInsert(t.tableName, rows)
+	if err != nil {
+		return err
+	}
+	return RawInsert(t.ctx, t.conn, qry, args)
 }
 
 // InsertReturning inserts a record, and returns the specified return fields into target
-func (t *tx) InsertReturning(record any, returnFields []interface{}, target ...any) error {
-	return InsertReturning(t.ctx, t.conn, t.SqlInsert(), record, returnFields, target...)
+func (t *tx) InsertReturning(record any, returnFields []string, target ...any) error {
+	qry, args, err := t.sqlBuilder.InsertReturning(t.tableName, record, returnFields)
+	if err != nil {
+		return err
+	}
+
+	if len(target) == 0 {
+		return ErrInvalidParameters
+	}
+
+	// Single target: use intelligent scanning (supports structs and single variables)
+	if len(target) == 1 {
+		return RawInsertReturningFlexible(t.ctx, t.conn, qry, args, target[0])
+	}
+
+	// Multiple targets: convert to []any slice and use flexible scanning
+	targetSlice := make([]any, len(target))
+	copy(targetSlice, target)
+	return RawInsertReturningFlexible(t.ctx, t.conn, qry, args, targetSlice)
 }
 
 // Update execute an update query
@@ -414,15 +639,150 @@ func (t *tx) Update(qry *goqu.UpdateDataset) error {
 	return Update(t.ctx, t.conn, qry)
 }
 
+// Do helper to execute a query
+func (t *tx) Do(qry any, target ...any) error {
+	return Do(t.ctx, t.conn, qry, target)
+}
+
 // UpdateRecord updates a record using a WHERE condition
-// record can be a map[string]any specifying fields & values
+// whereFieldsValues are matched as field=value, and if multiple entries present, will be
+// concatenated using AND
 func (t *tx) UpdateRecord(record any, whereFieldsValues map[string]any) error {
-	return UpdateRecord(t.ctx, t.conn, t.SqlUpdate(), record, whereFieldsValues)
+	builder := t.sqlBuilder.Update(t.tableName, record).WithOptions(qb.DefaultUpdateOptions())
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	return RawExec(t.ctx, t.conn, qry, args...)
+}
+
+// UpdateFields update specific fields of a given record, using a WHERE condition
+// whereFieldsValues are matched as field=value, and if multiple entries present, will be
+// concatenated using AND
+func (t *tx) UpdateFields(record any, fieldsValues map[string]any, whereFieldsValues map[string]any) error {
+	builder := t.sqlBuilder.Update(t.tableName, record).
+		WithOptions(qb.DefaultUpdateOptions()).
+		FieldsValues(fieldsValues)
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+	return RawExec(t.ctx, t.conn, qry, args...)
+}
+
+// UpdateReturning updates a record using a WHERE condition with AND
+// Examples:
+//
+//	// Struct target (NEW) - automatic field mapping
+//	result := &User{}
+//	err := repo.UpdateReturning(user, map[string]any{"id": 1}, []string{"id", "name", "updated_at"}, result)
+//
+//	// Individual variables (EXISTING) - positional mapping
+//	var id int64
+//	var name string
+//	err := repo.UpdateReturning(user, map[string]any{"id": 1}, []string{"id", "name"}, &id, &name)
+//
+//	// Single variable (EXISTING)
+//	var id int64
+//	err := repo.UpdateReturning(user, map[string]any{"id": 1}, []string{"id"}, &id)
+func (t *tx) UpdateReturning(record any, whereFieldsValues map[string]any, returnFields []string, target ...any) error {
+	if len(target) == 0 {
+		return ErrInvalidParameters
+	}
+
+	// Set up options with RETURNING fields
+	opts := qb.DefaultUpdateOptions()
+	opts.ReturningFields = returnFields
+
+	builder := t.sqlBuilder.Update(t.tableName, record).WithOptions(opts)
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+
+	// Single target: use intelligent scanning (supports structs and single variables)
+	if len(target) == 1 {
+		return RawUpdateReturningFlexible(t.ctx, t.conn, qry, args, target[0])
+	}
+
+	// Multiple targets: convert to []any slice and use flexible scanning
+	targetSlice := make([]any, len(target))
+	copy(targetSlice, target)
+	return RawUpdateReturningFlexible(t.ctx, t.conn, qry, args, targetSlice)
+}
+
+// UpdateFieldsReturning updates specific fields using FieldsValues with RETURNING support
+// target can be:
+// - *struct: for automatic field mapping by name/tag
+// - []any: for positional mapping to multiple variables
+// - *variable: for single value mapping
+func (t *tx) UpdateFieldsReturning(record any, fieldsValues map[string]any, whereFieldsValues map[string]any, returnFields []string, target ...any) error {
+	if len(target) == 0 {
+		return ErrInvalidParameters
+	}
+
+	// Set up options with RETURNING fields
+	opts := qb.DefaultUpdateOptions()
+	opts.ReturningFields = returnFields
+
+	builder := t.sqlBuilder.Update(t.tableName, record).
+		WithOptions(opts).
+		FieldsValues(fieldsValues)
+
+	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
+		for key, value := range whereFieldsValues {
+			clauses = append(clauses, qb.Eq(key, value))
+		}
+		builder = builder.WhereAnd(clauses...)
+	}
+	qry, args, err := builder.Build()
+	if err != nil {
+		return err
+	}
+
+	// Single target: use intelligent scanning (supports structs and single variables)
+	if len(target) == 1 {
+		return RawUpdateReturningFlexible(t.ctx, t.conn, qry, args, target[0])
+	}
+
+	// Multiple targets: convert to []any slice and use flexible scanning
+	targetSlice := make([]any, len(target))
+	copy(targetSlice, target)
+	return RawUpdateReturningFlexible(t.ctx, t.conn, qry, args, targetSlice)
 }
 
 // UpdateByKey updates a record using WHERE keyField=value
 func (t *tx) UpdateByKey(record any, keyField string, value any) error {
-	return UpdateByKey(t.ctx, t.conn, t.SqlUpdate(), record, keyField, value)
+	qry, args, err := t.sqlBuilder.Update(t.tableName, record).
+		WithOptions(qb.DefaultUpdateOptions()).
+		Where(qb.Eq(keyField, value)).
+		Build()
+	if err != nil {
+		return err
+	}
+	return RawExec(t.ctx, t.conn, qry, args...)
 }
 
 // Count returns the total number of rows in the database table

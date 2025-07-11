@@ -22,7 +22,7 @@ type GridFilterFunc func(lookupValue any) (any, error)
 
 type Grid struct {
 	tableName  string
-	spec       *FieldSpec
+	spec       *fieldSpec
 	filterFunc map[string]GridFilterFunc // filtering functions to translate GridQuery filter values to db values, eg: field:yes -> field:true
 }
 
@@ -88,19 +88,15 @@ func (g *GridQuery) Page(page, itemsPerPage int) {
 
 // NewGrid create a new grid
 func NewGrid(tableName string, record any) (*Grid, error) {
-	spec, err := NewFieldSpec(record)
+	spec, err := getFieldSpec(record)
 	if err != nil {
 		return nil, err
 	}
-	return NewGridWithSpec(tableName, spec), nil
-}
-
-func NewGridWithSpec(tableName string, spec *FieldSpec) *Grid {
 	return &Grid{
 		tableName:  tableName,
 		spec:       spec,
 		filterFunc: make(map[string]GridFilterFunc),
-	}
+	}, nil
 }
 
 // AddFilterFunc register a new filtering function
@@ -115,7 +111,7 @@ func (grid *Grid) ValidQuery(query *GridQuery) error {
 	// match filterable fields
 	if query.FilterFields != nil {
 		for f, _ := range query.FilterFields {
-			fname, ok := grid.spec.LookupAlias(f)
+			fname, ok := grid.spec.aliasField[f]
 			if !ok {
 				return GridError{
 					Scope:   "filter",
@@ -124,7 +120,7 @@ func (grid *Grid) ValidQuery(query *GridQuery) error {
 				}
 			}
 			// lookup db field to see if its filterable
-			if !slices.Contains(grid.spec.FilterFields(), fname) {
+			if !slices.Contains(grid.spec.filterFields, fname) {
 				return GridError{
 					Scope:   "filter",
 					Field:   f,
@@ -144,7 +140,7 @@ func (grid *Grid) ValidQuery(query *GridQuery) error {
 	// match sortable fields
 	if query.SortFields != nil {
 		for f, v := range query.SortFields {
-			fname, ok := grid.spec.LookupAlias(f)
+			fname, ok := grid.spec.aliasField[f]
 			if !ok {
 				return GridError{
 					Scope:   "sort",
@@ -153,7 +149,7 @@ func (grid *Grid) ValidQuery(query *GridQuery) error {
 				}
 			}
 			// lookup db field to see if its sortable
-			if !slices.Contains(grid.spec.SortFields(), fname) {
+			if !slices.Contains(grid.spec.sortFields, fname) {
 				return GridError{
 					Scope:   "sort",
 					Field:   f,
@@ -191,7 +187,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectD
 	// process filters
 	if args.FilterFields != nil {
 		for f, v := range args.FilterFields {
-			fname, ok := grid.spec.LookupAlias(f)
+			fname, ok := grid.spec.aliasField[f]
 			if !ok {
 				return nil, GridError{
 					Scope:   "filter",
@@ -200,7 +196,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectD
 				}
 			}
 			// lookup db field to see if its filterable
-			if !slices.Contains(grid.spec.FilterFields(), fname) {
+			if !slices.Contains(grid.spec.filterFields, fname) {
 				return nil, GridError{
 					Scope:   "filter",
 					Field:   f,
@@ -247,9 +243,8 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectD
 			}
 		}
 
-		searchFields := grid.spec.SearchFields()
-		expr := make([]goqu.Expression, len(searchFields))
-		for i, field := range searchFields {
+		expr := make([]goqu.Expression, len(grid.spec.searchFields))
+		for i, field := range grid.spec.searchFields {
 			expr[i] = goqu.I(field).Like(searchExpr)
 		}
 		qry = qry.Where(goqu.Or(expr...))
@@ -262,7 +257,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectD
 			if len(v) > 0 {
 				sorting = v
 			}
-			fname, ok := grid.spec.LookupAlias(f)
+			fname, ok := grid.spec.aliasField[f]
 			if !ok {
 				return nil, GridError{
 					Scope:   "sort",
@@ -271,7 +266,7 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectD
 				}
 			}
 			// lookup db field to see if its sortable
-			if !slices.Contains(grid.spec.SortFields(), fname) {
+			if !slices.Contains(grid.spec.sortFields, fname) {
 				return nil, GridError{
 					Scope:   "sort",
 					Field:   f,
