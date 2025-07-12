@@ -1,7 +1,7 @@
 site_name: Blueprint Framework Documentation
 site_description: Documentation for the Blueprint Go framework
 site_author: Blueprint Framework
-site_url: https://blueprint.github.io/oddbit/
+site_url: https://oddbit-project.github.io/blueprint/
 
 repo_name: blueprint
 repo_url: https://github.com/oddbit-project/blueprint

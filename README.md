@@ -4,6 +4,11 @@
 ![go-build](https://img.shields.io/github/actions/workflow/status/oddbit-project/blueprint/run-tests.yml)
 ![go-reportcard](https://goreportcard.com/badge/github.com/oddbit-project/blueprint)
 
+---
+
+**Documentation:** [https://oddbit-project.github.io/blueprint/](https://oddbit-project.github.io/blueprint/)
+
+---
 
 Go application framework for building web applications and microservices with built-in support for:
 
