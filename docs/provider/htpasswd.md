@@ -4,9 +4,12 @@ Blueprint htpasswd provider for managing Apache-style password files.
 
 ## Overview
 
-The htpasswd provider offers a comprehensive solution for managing user authentication files compatible with Apache's htpasswd format. It supports multiple hash algorithms, thread-safe operations, and provides both programmatic API and command-line tools.
+The htpasswd provider offers a comprehensive solution for managing user authentication files compatible with Apache's
+htpasswd format. It supports multiple hash algorithms, thread-safe operations, and provides both programmatic API and
+command-line tools.
 
 Key features:
+
 - Multiple hash algorithms (bcrypt, Apache MD5, SHA1/256/512, crypt, plaintext)
 - Thread-safe container operations with mutex protection
 - Apache htpasswd file format compatibility
@@ -16,15 +19,15 @@ Key features:
 
 ## Supported Hash Algorithms
 
-| Algorithm | Prefix | Security | Recommended |
-|-----------|--------|----------|-------------|
-| **bcrypt** | `$2a$`, `$2y$` | High |  **Yes** (default) |
-| **Apache MD5** | `$apr1$` | Medium | ️ Legacy compatibility |
-| **SHA256** | `{SHA256}` | Medium | ️ No salt |
-| **SHA512** | `{SHA512}` | Medium | ️ No salt |
-| **SHA1** | `{SHA}` | Low |  Deprecated |
-| **Crypt** | None (13 chars) | Low |  Deprecated |
-| **Plain** | None | None |  Development only |
+| Algorithm      | Prefix          | Security | Recommended            |
+|----------------|-----------------|----------|------------------------|
+| **bcrypt**     | `$2a$`, `$2y$`  | High     | **Yes** (default)      |
+| **Apache MD5** | `$apr1$`        | Medium   | ️ Legacy compatibility |
+| **SHA256**     | `{SHA256}`      | Medium   | ️ No salt              |
+| **SHA512**     | `{SHA512}`      | Medium   | ️ No salt              |
+| **SHA1**       | `{SHA}`         | Low      | Deprecated             |
+| **Crypt**      | None (13 chars) | Low      | Deprecated             |
+| **Plain**      | None            | None     | Development only       |
 
 ## Container API
 
@@ -34,39 +37,39 @@ Key features:
 package main
 
 import (
-    "fmt"
-    "os"
-    "github.com/oddbit-project/blueprint/provider/htpasswd"
+	"fmt"
+	"os"
+	"github.com/oddbit-project/blueprint/provider/htpasswd"
 )
 
 func main() {
-    // Create new container
-    container := htpasswd.NewContainer()
-    
-    // Add user with bcrypt (recommended)
-    err := container.AddUserPassword("alice", "secret123")
-    if err != nil {
-        panic(err)
-    }
-    
-    // Verify user password
-    valid, err := container.VerifyUser("alice", "secret123")
-    if err != nil {
-        panic(err)
-    }
-    fmt.Printf("Password valid: %v\n", valid)
-    
-    // Save to file
-    file, err := os.Create("users.htpasswd")
-    if err != nil {
-        panic(err)
-    }
-    defer file.Close()
-    
-    err = container.Write(file)
-    if err != nil {
-        panic(err)
-    }
+	// Create new container
+	container := htpasswd.NewContainer()
+
+	// Add user with bcrypt (recommended)
+	err := container.AddUserPassword("alice", "secret123")
+	if err != nil {
+		panic(err)
+	}
+
+	// Verify user password
+	valid, err := container.VerifyUser("alice", "secret123")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Password valid: %v\n", valid)
+
+	// Save to file
+	file, err := os.Create("users.htpasswd")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	err = container.Write(file)
+	if err != nil {
+		panic(err)
+	}
 }
 ```
 
@@ -76,19 +79,19 @@ func main() {
 // Load existing htpasswd file
 container, err := htpasswd.NewFromFile("/etc/apache2/.htpasswd")
 if err != nil {
-    panic(err)
+panic(err)
 }
 
 // Or from any io.Reader
 file, err := os.Open("users.htpasswd")
 if err != nil {
-    panic(err)
+panic(err)
 }
 defer file.Close()
 
 container, err = htpasswd.NewFromReader(file)
 if err != nil {
-    panic(err)
+panic(err)
 }
 ```
 
@@ -97,13 +100,13 @@ if err != nil {
 ```go
 // Check if user exists
 if container.UserExists("alice") {
-    fmt.Println("User alice exists")
+fmt.Println("User alice exists")
 }
 
 // Get user entry
 entry, err := container.GetUser("alice")
 if err != nil {
-    panic(err)
+panic(err)
 }
 fmt.Printf("Username: %s, Hash: %s\n", entry.Username, entry.Hash)
 
@@ -114,7 +117,7 @@ fmt.Printf("Total users: %d\n", container.Count())
 // Delete user
 err = container.DeleteUser("alice")
 if err != nil {
-    panic(err)
+panic(err)
 }
 ```
 
@@ -135,7 +138,7 @@ err = container.AddUserWithHash("dave", "password", htpasswd.HashTypeSHA256)
 // Generate hash
 hash, err := htpasswd.HashPassword("mypassword", htpasswd.HashTypeBcrypt)
 if err != nil {
-    panic(err)
+panic(err)
 }
 fmt.Printf("Generated hash: %s\n", hash)
 
@@ -170,26 +173,28 @@ The provider includes comprehensive validation:
 
 ```go
 // Username validation
-err := htpasswd.ValidateUsername("alice")      // Valid
-err = htpasswd.ValidateUsername("")            // Not valid - empty
-err = htpasswd.ValidateUsername("user:name")   // Not valid - contains colon
+err := htpasswd.ValidateUsername("alice") // Valid
+err = htpasswd.ValidateUsername("") // Not valid - empty
+err = htpasswd.ValidateUsername("user:name") // Not valid - contains colon
 err = htpasswd.ValidateUsername(string(make([]byte, 256))) // Not valid > 255 bytes
 
 // Password validation  
-err = htpasswd.ValidatePassword("secret123")   // Valid
-err = htpasswd.ValidatePassword("")            // Not valid - empty
-err = htpasswd.ValidatePassword("\xFF\xFE")    // Not valid - invalid UTF-8
+err = htpasswd.ValidatePassword("secret123") // Valid
+err = htpasswd.ValidatePassword("") // Not valid - empty
+err = htpasswd.ValidatePassword("\xFF\xFE") // Not valid - invalid UTF-8
 ```
 
 ### Validation Rules
 
 **Username constraints:**
+
 - Must not be empty (after trimming whitespace)
 - Cannot contain colon (`:`) character
 - Maximum 255 bytes length
 - Must be valid UTF-8
 
 **Password constraints:**
+
 - Must not be empty
 - Must be valid UTF-8
 
@@ -228,15 +233,15 @@ go build -o htpasswd main.go
 
 ### Command-Line Options
 
-| Option | Description |
-|--------|-------------|
-| `-c` | Create a new file |
-| `-D` | Delete the specified user |
-| `-v` | Verify password for the specified user |
-| `-b` | Use batch mode (password on command line) |
+| Option         | Description                                                            |
+|----------------|------------------------------------------------------------------------|
+| `-c`           | Create a new file                                                      |
+| `-D`           | Delete the specified user                                              |
+| `-v`           | Verify password for the specified user                                 |
+| `-b`           | Use batch mode (password on command line)                              |
 | `-B algorithm` | Force hash algorithm (bcrypt, apr1, sha, sha256, sha512, crypt, plain) |
-| `-h` | Show help message |
-| `-version` | Show version information |
+| `-h`           | Show help message                                                      |
+| `-version`     | Show version information                                               |
 
 ## Security Considerations
 
@@ -260,23 +265,24 @@ go build -o htpasswd main.go
 // Migrate from SHA1 to bcrypt
 container, err := htpasswd.NewFromFile("legacy.htpasswd")
 if err != nil {
-    panic(err)
+panic(err)
 }
 
 for _, username := range container.ListUsers() {
-    entry, _ := container.GetUser(username)
-    
-    // Check if using weak hash
-    if htpasswd.DetectHashType(entry.Hash) == htpasswd.HashTypeSHA1 {
-        fmt.Printf("User %s uses weak hash, manual password reset required\n", username)
-        // Note: Cannot migrate without knowing original password
-    }
+entry, _ := container.GetUser(username)
+
+// Check if using weak hash
+if htpasswd.DetectHashType(entry.Hash) == htpasswd.HashTypeSHA1 {
+fmt.Printf("User %s uses weak hash, manual password reset required\n", username)
+// Note: Cannot migrate without knowing original password
+}
 }
 ```
 
 ## File Format
 
 Standard Apache htpasswd format:
+
 ```
 username1:$2y$10$abcdefghijklmnopqrstuvwxyz0123456789
 username2:{SHA}5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8
@@ -292,19 +298,19 @@ container := htpasswd.NewContainer()
 // Handle validation errors
 err := container.AddUser("user:invalid", "password")
 if err != nil {
-    fmt.Printf("Validation error: %v\n", err)
+fmt.Printf("Validation error: %v\n", err)
 }
 
 // Handle file errors
 _, err = htpasswd.NewFromFile("nonexistent.htpasswd")
 if err != nil {
-    fmt.Printf("File error: %v\n", err)
+fmt.Printf("File error: %v\n", err)
 }
 
 // Handle user not found
 _, err = container.GetUser("missing")
 if err != nil {
-    fmt.Printf("User not found: %v\n", err)
+fmt.Printf("User not found: %v\n", err)
 }
 ```
 

@@ -452,7 +452,6 @@ func setupMultipleAuth(router *gin.Engine) {
    - Set appropriate expiration times (15-60 minutes)
    - Implement token revocation for sensitive applications
    - Validate issuer and audience claims
-   - See [JWT Authentication](../auth/jwt.md) for detailed JWT security
 
 3. **Header Security**
    - Use standard headers when possible (`Authorization: Bearer`)

@@ -1,0 +1,116 @@
+site_name: Blueprint Framework Documentation
+site_description: Documentation for the Blueprint Go framework
+site_author: Blueprint Framework
+site_url: https://blueprint.github.io/oddbit/
+
+repo_name: blueprint
+repo_url: https://github.com/oddbit-project/blueprint
+edit_uri: edit/develop/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/lightbulb
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+nav:
+  - Home: index.md
+  
+  - Configuration:
+    - Config: config/config.md
+  
+  - Database:
+    - Overview: db/index.md
+    - Structs and Tags: db/structs-and-tags.md
+    - Client Interface: db/client.md
+    - Repository Pattern: db/repository.md
+    - Data Grid System: db/dbgrid.md
+    - Field Specifications: db/fields.md
+    - Query Builder: db/query-builder.md
+    - Database Functions: db/functions.md
+    - Migration System: db/migrations.md
+    - SQL Update API: db/sql-update-api.md
+  
+  - Security:
+    - Secure Credentials: crypt/secure-credentials.md
+    - htpasswd Authentication: provider/htpasswd.md
+    - TLS: provider/tls.md
+  
+  - HTTP Server:
+    - Overview: provider/httpserver/index.md
+    - API Reference: provider/httpserver/api-reference.md
+    - Middleware Components: provider/httpserver/middleware.md
+    - Authentication: provider/httpserver/auth.md
+    - Security & Headers: provider/httpserver/security.md
+    - Session Management: provider/httpserver/session.md
+    - Request Utilities: provider/httpserver/request.md
+    - Integration Examples: provider/httpserver/examples.md
+    - Troubleshooting Guide: provider/httpserver/troubleshooting.md
+    - Performance Guide: provider/httpserver/performance.md
+  
+  - Providers:
+    - ClickHouse: provider/clickhouse.md
+    - Kafka: provider/kafka.md
+    - PostgreSQL: provider/pgsql.md
+    - MQTT: provider/mqtt.md
+    - NATS: provider/nats.md
+    - TLS: provider/tls.md
+  
+  - Logging:
+    - Overview: log/logging.md
+    - File Logging: log/file_logging.md
+  
+  - Utilities:
+    - BatchWriter: batchwriter/batchwriter.md
+    - ThreadPool: threadpool/threadpool.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/oddbit-project/blueprint
+  generator: false
+
+copyright: Copyright &copy; 2025 Blueprint Framework

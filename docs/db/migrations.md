@@ -267,13 +267,13 @@ func customProgressTracking(manager migrations.Manager, source migrations.Source
     progressFn := func(msgType int, migrationName string, err error) {
         switch msgType {
         case migrations.MsgRunMigration:
-            fmt.Printf("⏳ Running: %s\n", migrationName)
+            fmt.Printf("Running: %s\n", migrationName)
         case migrations.MsgFinishedMigration:
-            fmt.Printf("✅ Completed: %s\n", migrationName)
+            fmt.Printf("Completed: %s\n", migrationName)
         case migrations.MsgSkipMigration:
-            fmt.Printf("⏭️  Skipped: %s (already executed)\n", migrationName)
+            fmt.Printf(" Skipped: %s (already executed)\n", migrationName)
         case migrations.MsgError:
-            fmt.Printf("❌ Error in %s: %v\n", migrationName, err)
+            fmt.Printf("Error in %s: %v\n", migrationName, err)
         }
     }
     

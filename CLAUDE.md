@@ -7,9 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run all tests: `go test -v ./...`
 - Run tests in specific package: `go test -v ./path/to/package/...`
 - Run with race detection: `go test -v -race ./...`
-- Run integration tests: `go test -v -tags=integration ./integration/...`
-- Run specific NATS tests: `./run_nats_tests.sh`
-- Run specific PostgreSQL tests: `./run_pgsql_tests.sh`
+- Run integration tests locally: `go test -v -tags=integration ./...`
 - Docker-based tests: `make test`
 
 ## Code Style Guidelines

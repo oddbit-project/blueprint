@@ -1,253 +1,55 @@
 # Changelog
 
-All notable changes between `main` and `develop` branches.
+All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2025-07-07
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-### Major Features
+## [Unreleased]
 
-#### JWT Provider System
-- **NEW**: Complete JWT authentication and authorization system (`provider/jwtprovider/`)
-  - Support for symmetric (HMAC) and asymmetric (RSA, ECDSA, EdDSA) algorithms
-  - JWT token generation, validation, and parsing
-  - Configurable expiration, issuer, and audience validation
-  - Advanced key management with file and environment variable support
-  - Comprehensive test coverage (1000+ lines of tests)
+### Added
 
-#### Token Revocation System
-- **NEW**: Advanced JWT token revocation capabilities
-  - Memory-based revocation backend with automatic cleanup
-  - Individual token revocation and bulk user token revocation
-  - Expiration-based cleanup with configurable intervals
-  - Thread-safe operations with proper synchronization
+- New SQL Query Builder (db/qb package) with support for INSERT and UPDATE with complex WHERE conditions
+- JWT Provider (provider/jwtprovider) with multiple signing algorithms (RS256, ES256, EdDSA)
+- Token revocation system with in-memory storage for enhanced security
+- Field metadata mapping system for database operations with struct tag support
+- HTPasswd authentication provider for basic HTTP authentication
+- Browser fingerprinting middleware for enhanced session security
+- Enhanced CSRF protection with improved token handling
+- Rate limiting enhancements for HTTP server security
+- Generic Map implementation in types/collections package
+- Comprehensive documentation for database operations
+- HTTP server security and authentication documentation
+- Provider-specific documentation (HTPasswd, TLS, secure credentials)
 
-#### HTTP Server Authentication
-- **NEW**: JWT-based authentication middleware (`provider/httpserver/auth/jwt.go`)
-  - Seamless integration with Gin framework
-  - Claims extraction and context injection
-  - Authorization header parsing with Bearer token support
+### Changed
 
-#### Device Fingerprinting
-- **NEW**: Browser fingerprinting system (`provider/httpserver/fingerprint/`)
-  - Multiple configuration modes (Default, Strict, Privacy-friendly)
-  - Device identification using User-Agent, Accept headers, IP, timezone
-  - Fingerprint comparison with strict/non-strict matching
-  - Change detection for security monitoring
-  - IP subnet calculation for privacy protection
+- **Breaking:** Session management architecture - JWT functionality moved from session package to dedicated jwtprovider package
+- **Breaking:** Credentials system interface changes affecting CredentialConfig implementations
+- **Breaking:** Session store architecture updated with new middleware interfaces
+- Database Repository pattern enhanced with improved error handling and integration with new SQL query builder
+- Project structure reorganized - samples moved from `sample/` to `samples/` directory
+- Session middleware interfaces updated for better modularity
+- Database operation interfaces improved with batch processing capabilities
 
-#### HTPasswd Authentication
-- **NEW**: Complete HTPasswd authentication provider (`provider/htpasswd/`)
-  - Support for multiple hash formats (bcrypt, SHA, MD5, plain text)
-  - User authentication and password verification
-  - Integration with existing authentication systems
+### Deprecated
 
-### Database Improvements
+- Old JWT implementation in session package (replaced by dedicated jwtprovider package)
+- Legacy session JWT integration methods (use new jwtprovider with session middleware)
 
-#### SQL Builder Package Enhancements
-- **RENAMED**: Package `db/sql` renamed to `db/sqlbuilder` for clarity
-- **REMOVED**: Custom mapper support removed from SQL builder
-  - FieldMapper interface and all built-in mappers removed due to complexity issues
-  - RegisterMapper() method and mapper:"name" struct tags no longer supported
-  - Simplified SQL builder with focus on core functionality and reliability
-  - Better performance without mapper overhead
-- **IMPROVED**: Simplified error handling in sqlbuilder package
-  - Removed overengineered error types
-  - Clear, actionable error messages
-  - Better error context with record indices in batch operations
-- **REMOVED**: SqlBuilder mapper registry (part of mapper removal)
-  - Eliminated thread safety concerns by removing mapper functionality
-  - Simplified SqlBuilder struct without mapper state
-  - Removed mapper-related synchronization code
-- **OPTIMIZED**: Batch insert performance improvements
-  - Pre-computed metadata lookups eliminate nested loops
-  - O(n*m) complexity instead of O(n*m*k)
-  - Minimal memory allocations
-- **NEW**: Comprehensive benchmark suite comparing Blueprint vs Goqu
-  - Single insert: 2.3-2.7x faster
-  - Batch insert: 1.5-2.4x faster
-  - 40-77% less memory usage
+### Fixed
 
-### Core Improvements
-
-#### Session Management Overhaul
-- **BREAKING**: Complete session system refactoring
-  - Separated JWT functionality into dedicated `jwtprovider` package
-  - Cookie-based sessions with configurable backends (memory, Redis)
-  - Flash message support for one-time notifications
-  - Session regeneration for security (prevents fixation attacks)
-  - Automatic cleanup with TTL management
-  - Type-safe session data accessors
-
-#### Credentials System Enhancement
-- **BREAKING**: Major credentials interface refactoring
-  - New `CredentialConfig` interface for unified credential management
-  - Enhanced TLS credential handling with better validation
-  - Improved error handling and validation
-  - Extended test coverage for credential scenarios
-
-#### Security Enhancements
-- Enhanced CSRF protection with better token generation
-- Improved rate limiting with configurable burst limits
-- Security headers middleware with comprehensive defaults
-- Input validation and sanitization improvements
-
-### Documentation
-
-#### New Documentation
-- **NEW**: Comprehensive JWT authentication guide (`docs/httpserver/auth.md`)
-- **NEW**: HTTP server security documentation (`docs/httpserver/security.md`)
-- **NEW**: HTPasswd provider documentation (`docs/provider/htpasswd.md`)
-- **NEW**: Secure credentials guide (`docs/crypt/secure-credentials.md`)
-- **UPDATED**: SQL batch operations guide (`docs/db/sql-batch-operations.md`)
-  - Complete documentation for `BuildSQLBatchInsert`
-  - Removed mapper references and updated with manual serialization examples
-  - Performance considerations and best practices
-  - Examples showing alternatives to deprecated mappers
-
-#### Updated Documentation
-- **UPDATED**: Session management documentation (removed JWT references, focused on cookies)
-- **UPDATED**: TLS provider documentation with enhanced examples
-- **UPDATED**: Main documentation index with new features
-- **UPDATED**: SQL field mappers documentation (`docs/db/sql-mappers.md`)
-  - Converted to deprecation notice explaining mapper removal
-  - Added migration guide with alternatives to mappers
-  - Updated examples to show manual serialization approaches
-
-### 🛠 Development & Samples
-
-#### New Sample Applications
-- **NEW**: JWT provider example (`samples/jwtprovider_example/`)
-  - Complete JWT authentication demo
-  - Token generation, validation, refresh, and logout
-  - Visit tracking with stateful sessions
-  - Comprehensive README with usage examples
-
-- **NEW**: HTPasswd authentication sample (`samples/htpasswd/`)
-  - User authentication with multiple hash formats
-  - Integration example with HTTP server
-
-- **NEW**: ClickHouse migrations sample (`samples/ch-migrations/`)
-  - Database migration management example
-
-#### Sample Reorganization
-- **BREAKING**: Moved all samples from `sample/` to `samples/` directory
-- Updated import paths and configuration in all sample applications
-- Enhanced sample applications with better error handling
-
-### Bug Fixes
-
-#### Critical Fixes
-- **FIXED**: Data race in JWT revocation tests
-  - Added thread-safe test helper methods
-  - Proper mutex synchronization for concurrent access
-  - Eliminated race conditions in memory backend tests
-
-#### General Fixes
-- **FIXED**: Kafka consumer EOF handling improvements
-- **FIXED**: NATS integration test stability
-- **FIXED**: Session middleware cookie handling edge cases
-- **FIXED**: TLS certificate validation in test scenarios
-
-### ⚡ Performance & Quality
-
-#### Testing Improvements
-- Added comprehensive race condition testing
-- Enhanced test coverage across all new components
-- Improved integration test reliability
-- Added property-based testing for JWT scenarios
-
-#### Code Quality
-- Enhanced error handling with specific error types
-- Improved logging and debugging capabilities
-- Better separation of concerns in session management
-- Consistent API patterns across providers
-
-### Breaking Changes
-
-#### SQL Builder System
-- **BREAKING**: Custom field mappers completely removed from SQL builder
-- **BREAKING**: `RegisterMapper()` method no longer exists
-- **BREAKING**: `mapper:"name"` struct tags no longer supported
-- **BREAKING**: All built-in mappers removed (JSONMapper, TimestampMapper, etc.)
-
-#### Session System
-- **BREAKING**: JWT functionality moved from `provider/httpserver/session` to `provider/jwtprovider`
-- **BREAKING**: Session middleware API changes for cookie-based sessions
-- **BREAKING**: Removed JWT-related methods from session package
-
-#### Credentials System
-- **BREAKING**: `CredentialConfig` interface changes require updates to custom implementations
-- **BREAKING**: TLS credential loading methods have new signatures
-
-#### Directory Structure
-- **BREAKING**: Sample applications moved from `sample/` to `samples/`
-- **BREAKING**: Import path changes for sample applications
-
-### Dependencies
-
-#### New Dependencies
-- Enhanced JWT library support for additional algorithms
-- Improved cryptographic libraries for secure operations
-
-#### Removed Dependencies
-- Cleaned up unused dependencies from session refactoring
-- Removed deprecated authentication libraries
+- Data race conditions in JWT provider tests
+- EdDSA key handling issues in JWT provider
+- Various database operation edge cases and error handling
+- Kafka EOF handling improvements
+- Session management stability issues
+- Database connection handling in repository pattern
 
 ### Security
 
-#### Enhancements
-- Improved token validation with stricter checks
-- Enhanced session security with configurable cookie attributes
-- Better protection against timing attacks in authentication
-- Strengthened random number generation for session IDs
-
-#### Vulnerability Fixes
-- Fixed potential timing vulnerabilities in password comparison
-- Enhanced protection against session fixation attacks
-- Improved CSRF token validation
-
-### Statistics
-
-- **Files Changed**: 88 files
-- **Lines Added**: ~10,500
-- **Lines Removed**: ~1,800
-- **New Tests**: 15+ new test files
-- **New Documentation**: 5 new documentation files
-- **New Samples**: 3 new sample applications
-
-### Migration Guide
-
-#### For Custom Mapper Users
-1. Remove all `RegisterMapper()` calls from your code
-2. Remove `mapper:"name"` tags from struct fields  
-3. Replace with manual serialization before SQL operations:
-   ```go
-   // Before (with mappers)
-   type User struct {
-       Settings map[string]interface{} `db:"settings" mapper:"json"`
-   }
-   
-   // After (manual serialization)
-   type User struct {
-       Settings string `db:"settings"` // JSON as string
-   }
-   settingsJSON, _ := json.Marshal(userSettings)
-   user.Settings = string(settingsJSON)
-   ```
-4. For complex types, consider database-specific types (e.g., `pq.StringArray` for PostgreSQL)
-
-#### For JWT Users
-1. Update imports from `provider/httpserver/session` to `provider/jwtprovider`
-2. Replace `session.NewJWTConfig()` with `jwtprovider.NewJWTConfig()`
-3. Update authentication middleware usage
-
-#### For Session Users
-1. Review cookie-based session configuration
-2. Update session middleware initialization
-3. Migrate JWT sessions to new JWT provider if needed
-
-#### For Sample Users
-1. Update import paths from `sample/` to `samples/`
-2. Review configuration changes in sample applications
-
----
+- Token revocation system implementation for JWT security
+- Browser fingerprinting for enhanced session validation
+- Secure credential storage improvements with better encryption handling
+- CSRF token generation and validation enhancements
+- Enhanced authentication flows with improved security headers
+- Rate limiting improvements to prevent abuse

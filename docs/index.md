@@ -21,10 +21,7 @@
 
 - [Secure Credentials](crypt/secure-credentials.md)
 - [htpasswd Authentication](provider/htpasswd.md)
-- [JWT Provider](provider/jwtprovider.md)
 - [TLS](provider/tls.md)
-- [JWT Authentication](auth/jwt.md)
-- [Session & JWT Integration](auth/session-jwt-integration.md)
 
 ## Providers
 
@@ -35,6 +32,7 @@
 - [MQTT](provider/mqtt.md)
 - [NATS](provider/nats.md)
 - [TLS](provider/tls.md)
+- [JWT Provider](provider/jwtprovider.md)
 
 ## Logging
 
@@ -42,15 +40,15 @@
 
 ## HTTP Server
 
-- [HTTP Server Framework](httpserver/index.md) - Complete overview and quick start
-- [API Reference](httpserver/api-reference.md) - Complete server API documentation
-- [Middleware Components](httpserver/middleware.md) - All middleware and utilities
-- [Integration Examples](httpserver/examples.md) - REST API, web app, and microservice examples
-- [Troubleshooting Guide](httpserver/troubleshooting.md) - Debugging and common issues
-- [Performance Guide](httpserver/performance.md) - Optimization and production deployment
-- [Authentication](httpserver/auth.md) - Token and JWT authentication providers
-- [Security & Headers](httpserver/security.md) - Security middleware and CSRF protection
-- [Session Management](httpserver/session.md) - Cookie-based session system
+- [HTTP Server Framework](provider/httpserver/index.md) - Complete overview and quick start
+- [API Reference](provider/httpserver/api-reference.md) - Complete server API documentation
+- [Middleware Components](provider/httpserver/middleware.md) - All middleware and utilities
+- [Integration Examples](provider/httpserver/examples.md) - REST API, web app, and microservice examples
+- [Troubleshooting Guide](provider/httpserver/troubleshooting.md) - Debugging and common issues
+- [Performance Guide](provider/httpserver/performance.md) - Optimization and production deployment
+- [Authentication](provider/httpserver/auth.md) - Token and JWT authentication providers
+- [Security & Headers](provider/httpserver/security.md) - Security middleware and CSRF protection
+- [Session Management](provider/httpserver/session.md) - Cookie-based session system
 - [Request Utilities](provider/httpserver/request.md) - Request helper functions
 
 ## Utilities

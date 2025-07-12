@@ -302,4 +302,4 @@ if gridErr, ok := err.(db.GridError); ok {
 - [Getting Started Guide](../index.md)
 - [Provider Documentation](../provider/)
 - [Configuration Management](../config/)
-- [Security Best Practices](../httpserver/security.md)
+- [Security Best Practices](../provider/httpserver/security.md)
