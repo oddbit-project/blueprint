@@ -88,6 +88,25 @@ func Http400(ctx *gin.Context, message string) {
 	ctx.AbortWithStatus(http.StatusBadRequest)
 }
 
+// Http429 generates a 429 Too many requests
+func Http429(ctx *gin.Context) {
+	// Log the forbidden access attempt
+	log.RequestWarn(ctx, "Too many requests", map[string]interface{}{
+		"status": http.StatusTooManyRequests,
+	})
+
+	if request.IsJSONRequest(ctx) {
+		ctx.AbortWithStatusJSON(http.StatusTooManyRequests, JSONResponseError{
+			Success: false,
+			Error: ErrorDetail{
+				Message: http.StatusText(http.StatusTooManyRequests),
+			},
+		})
+		return
+	}
+	ctx.AbortWithStatus(http.StatusTooManyRequests)
+}
+
 // Http500 generates a 500 Internal Server Error response with logging
 func Http500(ctx *gin.Context, err error) {
 	// Log the server error with stack trace

@@ -11,11 +11,11 @@ import (
 
 func TestNewAuthToken(t *testing.T) {
 	tests := []struct {
-		name        string
-		headerName  string
-		key         string
-		wantHeader  string
-		wantKey     string
+		name       string
+		headerName string
+		key        string
+		wantHeader string
+		wantKey    string
 	}{
 		{
 			name:       "Default header name",
@@ -26,9 +26,9 @@ func TestNewAuthToken(t *testing.T) {
 		},
 		{
 			name:       "Custom header name",
-			headerName: "X-Custom-Auth",
+			headerName: "X-Custom-VerifyUser",
 			key:        "another-secret",
-			wantHeader: "X-Custom-Auth",
+			wantHeader: "X-Custom-VerifyUser",
 			wantKey:    "another-secret",
 		},
 		{
@@ -43,11 +43,11 @@ func TestNewAuthToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			provider := NewAuthToken(tt.headerName, tt.key)
-			
+
 			// Type assertion to access private fields for testing
 			authTokenProvider, ok := provider.(*authToken)
 			assert.True(t, ok, "Expected *authToken type")
-			
+
 			assert.Equal(t, tt.wantHeader, authTokenProvider.headerName)
 			assert.Equal(t, tt.wantKey, authTokenProvider.key)
 		})
@@ -56,12 +56,12 @@ func TestNewAuthToken(t *testing.T) {
 
 func TestAuthToken_CanAccess(t *testing.T) {
 	tests := []struct {
-		name        string
-		headerName  string
-		key         string
-		reqHeader   string
-		reqValue    string
-		wantAccess  bool
+		name       string
+		headerName string
+		key        string
+		reqHeader  string
+		reqValue   string
+		wantAccess bool
 	}{
 		{
 			name:       "Valid token",
@@ -91,7 +91,7 @@ func TestAuthToken_CanAccess(t *testing.T) {
 			name:       "Wrong header name",
 			headerName: "X-API-Key",
 			key:        "secret-token",
-			reqHeader:  "X-Auth-Token",
+			reqHeader:  "X-VerifyUser-Token",
 			reqValue:   "secret-token",
 			wantAccess: false,
 		},
@@ -111,18 +111,18 @@ func TestAuthToken_CanAccess(t *testing.T) {
 			gin.SetMode(gin.TestMode)
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			
+
 			// Create request with headers
 			req, _ := http.NewRequest("GET", "/test", nil)
 			if tt.reqHeader != "" {
 				req.Header.Set(tt.reqHeader, tt.reqValue)
 			}
 			c.Request = req
-			
+
 			// Create token provider and test
 			provider := NewAuthToken(tt.headerName, tt.key)
 			gotAccess := provider.CanAccess(c)
-			
+
 			assert.Equal(t, tt.wantAccess, gotAccess)
 		})
 	}
@@ -143,7 +143,7 @@ func TestAuthMiddleware(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/test", nil)
 				req.Header.Set("X-API-Key", "valid-token")
 				c.Request = req
-				
+
 				provider := NewAuthToken("X-API-Key", "valid-token")
 				return provider, c, w
 			},
@@ -158,7 +158,7 @@ func TestAuthMiddleware(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/test", nil)
 				req.Header.Set("X-API-Key", "invalid-token")
 				c.Request = req
-				
+
 				provider := NewAuthToken("X-API-Key", "valid-token")
 				return provider, c, w
 			},
@@ -171,23 +171,23 @@ func TestAuthMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gin.SetMode(gin.TestMode)
 			provider, c, w := tt.setup()
-			
+
 			// Set up router for testing middleware
 			router := gin.New()
-			
+
 			// Add the middleware
 			router.Use(AuthMiddleware(provider))
-			
+
 			// Add a handler that records it was called
 			var handlerCalled bool
 			router.GET("/test", func(c *gin.Context) {
 				handlerCalled = true
 				c.Status(http.StatusOK)
 			})
-			
+
 			// Serve the request through the router
 			router.ServeHTTP(w, c.Request)
-			
+
 			// Check results
 			assert.Equal(t, tt.wantStatus, w.Code)
 			assert.Equal(t, tt.wantCalled, handlerCalled)

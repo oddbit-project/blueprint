@@ -34,7 +34,7 @@ func TestProducerConfigValidate(t *testing.T) {
 			expected: ErrMissingProducerTopic,
 		},
 		{
-			name: "Invalid Auth Type",
+			name: "Invalid VerifyUser Type",
 			config: &ProducerConfig{
 				URL:      "nats://localhost:4222",
 				Subject:  "test.subject",
@@ -52,7 +52,7 @@ func TestProducerConfigValidate(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name: "Valid Basic Auth",
+			name: "Valid Basic VerifyUser",
 			config: &ProducerConfig{
 				URL:      "nats://localhost:4222",
 				Subject:  "test.subject",
@@ -62,7 +62,7 @@ func TestProducerConfigValidate(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name: "Valid Token Auth",
+			name: "Valid Token VerifyUser",
 			config: &ProducerConfig{
 				URL:                     "nats://localhost:4222",
 				Subject:                 "test.subject",
@@ -114,7 +114,7 @@ func TestConsumerConfigValidate(t *testing.T) {
 			expected: ErrMissingConsumerTopic,
 		},
 		{
-			name: "Invalid Auth Type",
+			name: "Invalid VerifyUser Type",
 			config: &ConsumerConfig{
 				URL:      "nats://localhost:4222",
 				Subject:  "test.subject",

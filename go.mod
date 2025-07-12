@@ -7,6 +7,7 @@ toolchain go1.23.8
 require (
 	github.com/ClickHouse/ch-go v0.58.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.18.0
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/gin-gonic/gin v1.9.0
@@ -25,6 +26,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.step.sm/crypto v0.43.1
 	golang.org/x/crypto v0.31.0
+	golang.org/x/term v0.27.0
 	golang.org/x/time v0.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )

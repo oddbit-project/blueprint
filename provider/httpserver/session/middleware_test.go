@@ -27,7 +27,7 @@ func TestSessionMiddleware(t *testing.T) {
 		assert.NotNil(t, session)
 
 		// Set a value
-		Set(c, "test", "value")
+		session.Set("test", "value")
 
 		c.String(http.StatusOK, "OK")
 	})
@@ -73,7 +73,7 @@ func TestSessionRegenerate(t *testing.T) {
 
 	// Add a route to set a session value
 	router.GET("/set", func(c *gin.Context) {
-		Set(c, "test", "value")
+		Get(c).Set("test", "value")
 		c.String(http.StatusOK, "OK")
 	})
 
@@ -85,7 +85,7 @@ func TestSessionRegenerate(t *testing.T) {
 
 	// Add a route to get the session value
 	router.GET("/get", func(c *gin.Context) {
-		val, ok := GetString(c, "test")
+		val, ok := Get(c).GetString("test")
 		if ok {
 			c.String(http.StatusOK, val)
 		} else {
@@ -154,7 +154,7 @@ func TestClearSession(t *testing.T) {
 
 	// Add a route to set a session value
 	router.GET("/set", func(c *gin.Context) {
-		Set(c, "test", "value")
+		Get(c).Set("test", "value")
 		c.String(http.StatusOK, "OK")
 	})
 
@@ -166,7 +166,7 @@ func TestClearSession(t *testing.T) {
 
 	// Add a route to get the session value
 	router.GET("/get", func(c *gin.Context) {
-		val, ok := GetString(c, "test")
+		val, ok := Get(c).GetString("test")
 		if ok {
 			c.String(http.StatusOK, val)
 		} else {
@@ -234,13 +234,13 @@ func TestFlashMessages(t *testing.T) {
 
 	// Add a route to set a flash message
 	router.GET("/flash", func(c *gin.Context) {
-		FlashString(c, "message", "Hello, flash!")
+		Get(c).FlashString("Hello, flash!")
 		c.String(http.StatusOK, "Flash set")
 	})
 
 	// Add a route to get the flash message
 	router.GET("/get-flash", func(c *gin.Context) {
-		msg, ok := GetFlashString(c, "message")
+		msg, ok := Get(c).GetFlashString()
 		if ok {
 			c.String(http.StatusOK, msg)
 		} else {

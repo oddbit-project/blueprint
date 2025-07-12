@@ -100,7 +100,7 @@ func TestNewGridQuery(t *testing.T) {
 			query, err := NewGridQuery(tt.searchType, tt.limit, tt.offset)
 			if tt.expectErr {
 				assert.Error(t, err)
-				assert.Empty(t, query.SearchText)
+				assert.Nil(t, query)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.searchType, query.SearchType)
@@ -129,19 +129,29 @@ func TestNewGrid(t *testing.T) {
 	assert.Nil(t, grid)
 }
 
-func TestNewGridWithSpec(t *testing.T) {
-	spec, _ := NewFieldSpec(&TestGridRecord{})
-	grid := NewGridWithSpec("test_table", spec)
-	
+func TestGrid_FieldMapping(t *testing.T) {
+	grid, err := NewGrid("test_table", &TestGridRecord{})
+	assert.NoError(t, err)
 	assert.NotNil(t, grid)
 	assert.Equal(t, "test_table", grid.tableName)
-	assert.Equal(t, spec, grid.spec)
+	assert.NotNil(t, grid.spec)
 	assert.NotNil(t, grid.filterFunc)
+
+	// Verify the spec functionality is preserved
+	// Check that all fields are properly mapped
+	dbField, ok := grid.spec.aliasField["name"]
+	assert.True(t, ok)
+	assert.Equal(t, "name", dbField)
+
+	// Check filter/sort/search fields
+	assert.Contains(t, grid.spec.filterFields, "name")
+	assert.Contains(t, grid.spec.sortFields, "name")
+	assert.Contains(t, grid.spec.searchFields, "name")
 }
 
 func TestGrid_AddFilterFunc(t *testing.T) {
 	grid, _ := NewGrid("test_table", &TestGridRecord{})
-	
+
 	// Test filter function for boolean conversion
 	filterFunc := func(value any) (any, error) {
 		if value == "yes" {
@@ -149,19 +159,19 @@ func TestGrid_AddFilterFunc(t *testing.T) {
 		}
 		return false, nil
 	}
-	
+
 	result := grid.AddFilterFunc("status", filterFunc)
-	
+
 	// Should return the grid for chaining
 	assert.Equal(t, grid, result)
-	
+
 	// Verify filter function was added
 	assert.Contains(t, grid.filterFunc, "status")
 }
 
 func TestGrid_ValidQuery(t *testing.T) {
 	grid, _ := NewGrid("test_table", &TestGridRecord{})
-	
+
 	// Add a filter function for testing
 	grid.AddFilterFunc("status", func(value any) (any, error) {
 		if value == "invalid" {
@@ -173,7 +183,7 @@ func TestGrid_ValidQuery(t *testing.T) {
 		}
 		return true, nil
 	})
-	
+
 	tests := []struct {
 		name      string
 		query     GridQuery
@@ -289,10 +299,10 @@ func TestGrid_ValidQuery(t *testing.T) {
 			expectErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := grid.ValidQuery(tt.query)
+			err := grid.ValidQuery(&tt.query)
 			if tt.expectErr {
 				assert.Error(t, err)
 			} else {
@@ -304,7 +314,7 @@ func TestGrid_ValidQuery(t *testing.T) {
 
 func TestGrid_Build(t *testing.T) {
 	grid, _ := NewGrid("test_table", &TestGridRecord{})
-	
+
 	// Add a filter function for testing
 	grid.AddFilterFunc("status", func(value any) (any, error) {
 		if value == "yes" {
@@ -319,7 +329,7 @@ func TestGrid_Build(t *testing.T) {
 		}
 		return false, nil
 	})
-	
+
 	tests := []struct {
 		name      string
 		qry       *goqu.SelectDataset
@@ -490,17 +500,17 @@ func TestGrid_Build(t *testing.T) {
 			expectErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := grid.Build(tt.qry, tt.args)
+			result, err := grid.Build(tt.qry, &tt.args)
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, result)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
-				
+
 				// Verify that the result is a valid SelectDataset
 				sql, _, err := result.ToSQL()
 				assert.NoError(t, err)
@@ -512,70 +522,70 @@ func TestGrid_Build(t *testing.T) {
 
 func TestGrid_Build_Specific(t *testing.T) {
 	// This test focuses on specific cases to verify the SQL generated
-	
+
 	grid, _ := NewGrid("test_table", &TestGridRecord{})
-	
+
 	// Test case: SearchStart
 	query := GridQuery{
 		SearchType: SearchStart,
 		SearchText: "test",
 	}
-	
-	result, err := grid.Build(nil, query)
+
+	result, err := grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err := result.ToSQL()
 	assert.NoError(t, err)
 	assert.Contains(t, sql, "LIKE")
-	assert.Contains(t, sql, "'%test'") // For different SQL dialects, the value might be quoted
-	
+	assert.Contains(t, sql, "'test%'") // SearchStart: matches beginning
+
 	// Test case: SearchEnd
 	query = GridQuery{
 		SearchType: SearchEnd,
 		SearchText: "test",
 	}
-	
-	result, err = grid.Build(nil, query)
+
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)
 	assert.Contains(t, sql, "LIKE")
-	assert.Contains(t, sql, "'test%'") // For different SQL dialects, the value might be quoted
-	
+	assert.Contains(t, sql, "'%test'") // SearchEnd: matches end
+
 	// Test case: SearchAny
 	query = GridQuery{
 		SearchType: SearchAny,
 		SearchText: "test",
 	}
-	
-	result, err = grid.Build(nil, query)
+
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)
 	assert.Contains(t, sql, "LIKE")
 	assert.Contains(t, sql, "'%test%'") // For different SQL dialects, the value might be quoted
-	
+
 	// Test case: SortAscending and SortDescending
 	query = GridQuery{
 		SearchType: SearchNone,
 		SortFields: map[string]string{"id": SortAscending, "name": SortDescending},
 	}
-	
-	result, err = grid.Build(nil, query)
+
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)
 	assert.Contains(t, sql, "ORDER BY")
 	assert.Contains(t, sql, "ASC")
 	assert.Contains(t, sql, "DESC")
-	
+
 	// Test case: Limit and Offset
 	query = GridQuery{
 		SearchType: SearchNone,
 		Limit:      10,
 		Offset:     20,
 	}
-	
-	result, err = grid.Build(nil, query)
+
+	result, err = grid.Build(nil, &query)
 	assert.NoError(t, err)
 	sql, _, err = result.ToSQL()
 	assert.NoError(t, err)

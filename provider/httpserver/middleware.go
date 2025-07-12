@@ -57,23 +57,3 @@ func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.L
 
 	return manager
 }
-
-// UseJWTSession adds session middleware with JWT token support
-func (s *Server) UseJWTSession(jwtConfig *session.JWTConfig, logger *log.Logger) (*session.JWTSessionManager, error) {
-	if jwtConfig == nil {
-		jwtConfig = session.NewJWTConfig()
-	}
-	// Create JWT manager
-	jwtManager, err := session.NewJWTManager(jwtConfig, logger)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create session manager
-	manager := session.NewJWTSessionManager(jwtManager)
-
-	// Add middleware
-	s.AddMiddleware(manager.Middleware())
-
-	return manager, nil
-}

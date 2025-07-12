@@ -48,12 +48,12 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 		os.RemoveAll(tempDir)
 		t.Fatalf("Failed to write cert file: %v", err)
 	}
-	
+
 	if err := os.WriteFile(keyFile, []byte(keyPEM), 0600); err != nil {
 		os.RemoveAll(tempDir)
 		t.Fatalf("Failed to write key file: %v", err)
 	}
-	
+
 	if err := os.WriteFile(caFile, []byte(caPEM), 0600); err != nil {
 		os.RemoveAll(tempDir)
 		t.Fatalf("Failed to write CA file: %v", err)
@@ -221,15 +221,11 @@ func TestClientConfig_TLSConfig_WithPassword(t *testing.T) {
 	}
 
 	// Just verify that the fields are set correctly
-	if config.TlsKeyCredential.GetPassword() != "test-password" {
-		t.Errorf("Expected Password to be 'test-password', got '%s'", config.TlsKeyCredential.GetPassword())
+	key, err := config.TlsKeyCredential.Fetch()
+	if err != nil {
+		t.Fatalf("Unexpected error when fetching key: %v", err)
 	}
-	
-	if config.TlsKeyCredential.GetEnvVar() != "TEST_PASSWORD_ENV" {
-		t.Errorf("Expected PasswordEnvVar to be 'TEST_PASSWORD_ENV', got '%s'", config.TlsKeyCredential.GetEnvVar())
-	}
-	
-	if config.TlsKeyCredential.GetFileName() != "/path/to/password.txt" {
-		t.Errorf("Expected PasswordFile to be '/path/to/password.txt', got '%s'", config.TlsKeyCredential.GetFileName())
+	if key != "test-password" {
+		t.Errorf("Expected Password to be 'test-password', got '%s'", key)
 	}
 }

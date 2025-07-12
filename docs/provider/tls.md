@@ -21,11 +21,11 @@ clientConfig := &tls.ClientConfig{
 }
 
 // For encrypted keys, set the key password
-clientConfig.TlsKeyCredential.Password = "keypassword"
+clientConfig.TlsKeyCredential.Key = "keypassword"
 // Or use environment variables
-clientConfig.TlsKeyCredential.PasswordEnvVar = "KEY_PASSWORD"
+clientConfig.TlsKeyCredential.KeyEnvVar = "KEY_PASSWORD"
 // Or use a file
-clientConfig.TlsKeyCredential.PasswordFile = "/path/to/keypassword.txt"
+clientConfig.TlsKeyCredential.KeyFile = "/path/to/keypassword.txt"
 
 // Generate the TLS configuration
 tlsConfig, err := clientConfig.TLSConfig()
@@ -59,11 +59,11 @@ serverConfig := &tls.ServerConfig{
 }
 
 // For encrypted keys, set the key password
-serverConfig.TlsKeyCredential.Password = "keypassword"
+serverConfig.TlsKeyCredential.Key = "keypassword"
 // Or use environment variables
-serverConfig.TlsKeyCredential.PasswordEnvVar = "KEY_PASSWORD"
+serverConfig.TlsKeyCredential.KeyEnvVar = "KEY_PASSWORD"
 // Or use a file
-serverConfig.TlsKeyCredential.PasswordFile = "/path/to/keypassword.txt"
+serverConfig.TlsKeyCredential.KeyFile = "/path/to/keypassword.txt"
 
 // Generate the TLS configuration
 tlsConfig, err := serverConfig.TLSConfig()

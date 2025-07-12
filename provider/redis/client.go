@@ -127,7 +127,13 @@ func (c *Client) Key(key string) string {
 }
 
 // Prune stub method for compatibility with kv.KV interface
-func (c *Client) PruneExpired() error {
+func (c *Client) Prune() error {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+
+	if err := c.Client.FlushDB(ctx).Err(); err != nil {
+		return err
+	}
 	return nil
 }
 

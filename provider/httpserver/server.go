@@ -185,6 +185,8 @@ func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
 		s.UseAuth(authToken)
 	}
 
+	// auth user
+
 	for _, withOption := range withOptions {
 		if err := withOption(s); err != nil {
 			return err

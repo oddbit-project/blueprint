@@ -7,6 +7,7 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
 	"github.com/oddbit-project/blueprint/db"
+	"github.com/oddbit-project/blueprint/db/qb"
 	"github.com/oddbit-project/blueprint/utils"
 	"strings"
 )
@@ -14,9 +15,6 @@ import (
 const (
 	ErrNotSupported      = utils.Error("method not supported")
 	ErrInvalidParameters = utils.Error("invalid parameters")
-
-	ErrInsertReturningNotSupported = utils.Error("INSERT...RETURNING is not supported by ClickHouse")
-	ErrDeleteNotSupported          = utils.Error("DELETE is not supported by ClickHouse")
 )
 
 type Repository interface {
@@ -32,23 +30,27 @@ type Repository interface {
 }
 
 type repository struct {
-	conn      clickhouse.Conn
-	ctx       context.Context
-	tableName string
-	mapper    *structMap
-	dialect   goqu.DialectWrapper
-	spec      *db.FieldSpec
+	conn       clickhouse.Conn
+	ctx        context.Context
+	tableName  string
+	mapper     *structMap
+	dialect    goqu.DialectWrapper
+	sqlDialect qb.SqlDialect
 }
 
 func NewRepository(ctx context.Context, conn clickhouse.Conn, tableName string) Repository {
 	return &repository{
-		conn:      conn,
-		ctx:       ctx,
-		tableName: tableName,
-		mapper:    &structMap{},
-		dialect:   goqu.Dialect("clickhouse"),
-		spec:      nil,
+		conn:       conn,
+		ctx:        ctx,
+		tableName:  tableName,
+		mapper:     &structMap{},
+		dialect:    goqu.Dialect("clickhouse"),
+		sqlDialect: qb.DefaultSqlDialect(),
 	}
+}
+
+func (r *repository) SqlDialect() qb.SqlDialect {
+	return r.sqlDialect
 }
 
 // Db not supported
@@ -82,15 +84,20 @@ func (r *repository) SqlInsert() *goqu.InsertDataset {
 
 // SqlUpdate returns an Update query builder
 func (r *repository) SqlUpdate() *goqu.UpdateDataset {
-	return r.dialect.Update(r.tableName)
+	// Clickhouse does not support Update;
+	// Update queries are performed via Alter Table
+	return nil
 }
 
 // SqlDelete returns a Delete query builder
 func (r *repository) SqlDelete() *goqu.DeleteDataset {
-	return r.dialect.Delete(r.tableName)
+	// Clickhouse does not support Update;
+	// Update queries are performed via Delete
+	return nil
 }
 
 // FetchOne fetch a record; target must be a struct
+// returns sql.ErrNoRows if nothing read
 // Example:
 //
 //		wallets[i] = record
@@ -257,8 +264,11 @@ func (r *repository) Select(sql string, target any, args ...any) error {
 // Insert inserts a collection of rows
 // Note: inserts are always batched
 func (r *repository) Insert(rows ...any) error {
-
-	batch, err := r.conn.PrepareBatch(r.ctx, fmt.Sprintf("INSERT INTO %s", r.tableName))
+	tableName, err := r.sqlDialect.Table(r.tableName)
+	if err != nil {
+		return err
+	}
+	batch, err := r.conn.PrepareBatch(r.ctx, fmt.Sprintf("INSERT INTO %s", tableName))
 	if err != nil {
 		return err
 	}
@@ -273,16 +283,26 @@ func (r *repository) Insert(rows ...any) error {
 
 // InsertAsync inserts a single record async
 func (r *repository) InsertAsync(record any) error {
+	tableName, err := r.sqlDialect.Table(r.tableName)
+	if err != nil {
+		return err
+	}
 	cols, values, err := r.mapper.Map("InsertAsync", record, false)
 	if err != nil {
 		return err
 	}
+	placeholders := make([]string, len(cols))
+	for i, _ := range cols {
+		placeholders[i] = r.sqlDialect.Placeholder(-1)
+	}
+
 	// create string
 	var qry strings.Builder
 	qry.WriteString("INSERT INTO ")
-	qry.WriteString(r.tableName)
+	qry.WriteString(tableName)
+	qry.WriteString(fmt.Sprintf("(%s)", strings.Join(cols, ",")))
 	qry.WriteString(" VALUES(")
-	qry.WriteString(strings.Join(cols, ","))
+	qry.WriteString(strings.Join(placeholders, ","))
 	qry.WriteString(")")
 
 	return r.conn.AsyncInsert(r.ctx, qry.String(), false, values...)
@@ -320,23 +340,17 @@ func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 }
 
 // InsertReturning is not supported
-func (r *repository) InsertReturning(record any, returnFields []interface{}, target ...any) error {
+func (r *repository) InsertReturning(record any, returnFields []string, target ...any) error {
 	return ErrNotSupported
 }
 
 // Grid creates a new Grid object for the record, and caches the field spec for more efficient usage
 func (r *repository) Grid(record any) (*db.Grid, error) {
-	if r.spec == nil {
-		var err error
-		if r.spec, err = db.NewFieldSpec(record); err != nil {
-			return nil, err
-		}
-	}
-	return db.NewGridWithSpec(r.tableName, r.spec), nil
+	return db.NewGrid(r.tableName, record)
 }
 
 // QueryGrid creates a new Grid object and performs a query using GridQuery
-func (r *repository) QueryGrid(record any, args db.GridQuery, dest any) error {
+func (r *repository) QueryGrid(record any, args *db.GridQuery, dest any) error {
 	var (
 		err    error
 		qry    *goqu.SelectDataset

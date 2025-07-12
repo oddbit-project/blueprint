@@ -30,7 +30,10 @@ package tls
 import (
 	"crypto/tls"
 	"github.com/oddbit-project/blueprint/utils"
+	"github.com/oddbit-project/blueprint/utils/env"
+	"github.com/oddbit-project/blueprint/utils/fs"
 	"github.com/rs/zerolog/log"
+	"strings"
 )
 
 const (
@@ -111,17 +114,36 @@ func ParseTLSVersion(version string) (uint16, error) {
 	return 0, ErrInvalidTlsVersion
 }
 
-// GetPassword get tls key password
-func (c TlsKeyCredential) GetPassword() string {
-	return c.Password
+// IsEmpty returns true if credential source is empty
+func (c TlsKeyCredential) IsEmpty() bool {
+	return strings.TrimSpace(c.Password) == "" &&
+		strings.TrimSpace(c.PasswordEnvVar) == "" &&
+		strings.TrimSpace(c.PasswordFile) == ""
 }
 
-// GetEnvVar get tls key password env var
-func (c TlsKeyCredential) GetEnvVar() string {
-	return c.PasswordEnvVar
-}
-
-// GetFileName get tls key password file
-func (c TlsKeyCredential) GetFileName() string {
-	return c.PasswordFile
+// Fetch retrieve the contents of the credential
+func (c TlsKeyCredential) Fetch() (string, error) {
+	plainText := strings.TrimSpace(c.Password)
+	if plainText == "" {
+		// attempt to read env var, if set
+		envVar := strings.TrimSpace(c.PasswordEnvVar)
+		if envVar == "" {
+			// attempt to read secrets file, if set
+			secretsFile := c.PasswordFile
+			if secretsFile == "" {
+				plainText = ""
+			} else {
+				// read secrets
+				var err error
+				if plainText, err = fs.ReadString(secretsFile); err != nil {
+					return "", err
+				}
+			}
+		} else {
+			// read from env var and clear it
+			plainText = env.GetEnvVar(envVar)
+			_ = env.SetEnvVar(envVar, "")
+		}
+	}
+	return plainText, nil
 }

@@ -8,7 +8,7 @@ import (
 func TestClientConfigValidate(t *testing.T) {
 
 	defaultCfg := NewClientConfig()
-	defaultCfg.DSN = getDSN()
+	defaultCfg.DSN = resolveDSN()
 
 	testCases := []struct {
 		name     string
