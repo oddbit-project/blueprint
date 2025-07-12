@@ -1,10 +1,9 @@
-package postgresql
+package pgsql
 
 import (
 	"context"
 	"fmt"
 	"github.com/oddbit-project/blueprint/db"
-	"github.com/oddbit-project/blueprint/provider/pgsql"
 	"github.com/stretchr/testify/suite"
 	"os"
 	"testing"
@@ -15,6 +14,17 @@ type PGIntegrationTestSuite struct {
 	suite.Suite
 	client *db.SqlClient
 	ctx    context.Context
+}
+
+func dbClient(t *testing.T) *db.SqlClient {
+
+	cfg := NewClientConfig()
+	cfg.DSN = resolveDSN()
+	client, err := NewClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
 }
 
 func resolveDSN() string {
@@ -32,10 +42,10 @@ func (s *PGIntegrationTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 
 	// Create client config
-	config := pgsql.NewClientConfig()
+	config := NewClientConfig()
 	config.DSN = resolveDSN()
 	var err error
-	s.client, err = pgsql.NewClient(config)
+	s.client, err = NewClient(config)
 	if err != nil {
 		s.T().Fatalf("Failed to create PostgreSQL client: %v", err)
 	}
@@ -47,7 +57,7 @@ func (s *PGIntegrationTestSuite) SetupSuite() {
 // Teardown the test suite
 func (s *PGIntegrationTestSuite) TearDownSuite() {
 	// Drop the test table
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", pgsql.MigrationTable))
+	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	if err != nil {
 		s.T().Logf("Failed to drop test table: %v", err)
 	}

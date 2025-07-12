@@ -55,7 +55,7 @@ func TestGetStructMeta_Simple(t *testing.T) {
 	meta, err := GetStructMeta(reflect.TypeOf(SimpleStruct{}))
 	require.NoError(t, err)
 	require.Len(t, meta, 2)
-	
+
 	// Check ID field
 	idField := findFieldByName(meta, "ID")
 	require.NotNil(t, idField)
@@ -67,7 +67,7 @@ func TestGetStructMeta_Simple(t *testing.T) {
 	assert.False(t, idField.Sortable)
 	assert.False(t, idField.Filterable)
 	assert.False(t, idField.Searchable)
-	
+
 	// Check Name field
 	nameField := findFieldByName(meta, "Name")
 	require.NotNil(t, nameField)
@@ -81,12 +81,12 @@ func TestGetStructMeta_ComplexTags(t *testing.T) {
 	meta, err := GetStructMeta(reflect.TypeOf(StructWithTags{}))
 	require.NoError(t, err)
 	require.Len(t, meta, 8)
-	
+
 	// Test auto field
 	idField := findFieldByName(meta, "ID")
 	require.NotNil(t, idField)
 	assert.True(t, idField.Auto)
-	
+
 	// Test grid tags
 	nameField := findFieldByName(meta, "Name")
 	require.NotNil(t, nameField)
@@ -94,30 +94,30 @@ func TestGetStructMeta_ComplexTags(t *testing.T) {
 	assert.True(t, nameField.Searchable)
 	assert.False(t, nameField.Filterable)
 	assert.Equal(t, "full_name", nameField.Alias)
-	
+
 	emailField := findFieldByName(meta, "Email")
 	require.NotNil(t, emailField)
 	assert.True(t, emailField.Filterable)
 	assert.False(t, emailField.Sortable)
 	assert.False(t, emailField.Searchable)
-	
+
 	// Test goqu tags
 	ageField := findFieldByName(meta, "Age")
 	require.NotNil(t, ageField)
 	assert.True(t, ageField.OmitEmpty)
 	assert.False(t, ageField.OmitNil)
-	
+
 	scoreField := findFieldByName(meta, "Score")
 	require.NotNil(t, scoreField)
 	assert.True(t, scoreField.OmitNil)
 	assert.False(t, scoreField.OmitEmpty)
 	assert.Equal(t, "*float64", scoreField.TypeName)
-	
+
 	// Test auto detection from goqu tags
 	updatedAtField := findFieldByName(meta, "UpdatedAt")
 	require.NotNil(t, updatedAtField)
 	assert.True(t, updatedAtField.Auto)
-	
+
 	// Test alias tag
 	descField := findFieldByName(meta, "Description")
 	require.NotNil(t, descField)
@@ -128,16 +128,16 @@ func TestGetStructMeta_EmbeddedStruct(t *testing.T) {
 	meta, err := GetStructMeta(reflect.TypeOf(EmbeddedStruct{}))
 	require.NoError(t, err)
 	require.Len(t, meta, 3) // 2 from SimpleStruct + 1 ExtraField
-	
+
 	// Verify embedded fields are included
 	idField := findFieldByName(meta, "ID")
 	require.NotNil(t, idField)
 	assert.Equal(t, "id", idField.DbName)
-	
+
 	nameField := findFieldByName(meta, "Name")
 	require.NotNil(t, nameField)
 	assert.Equal(t, "name", nameField.DbName)
-	
+
 	extraField := findFieldByName(meta, "ExtraField")
 	require.NotNil(t, extraField)
 	assert.Equal(t, "extra", extraField.DbName)
@@ -147,24 +147,24 @@ func TestGetStructMeta_NestedStruct(t *testing.T) {
 	meta, err := GetStructMeta(reflect.TypeOf(NestedStruct{}))
 	require.NoError(t, err)
 	require.Len(t, meta, 2) // ID + Nested field (not flattened since it's named)
-	
+
 	// Check that nested struct is treated as a single field (not flattened)
 	idField := findFieldByDbName(meta, "id")
 	require.NotNil(t, idField)
 	
-	nestedField := findFieldByDbName(meta, "Nested")
+	nestedField := findFieldByDbName(meta, "nested")
 	require.NotNil(t, nestedField)
-	assert.Equal(t, "Nested", nestedField.DbName)
+	assert.Equal(t, "nested", nestedField.DbName)
 }
 
 func TestGetStructMeta_ReservedTypes(t *testing.T) {
 	// Ensure time.Time is reserved
 	assert.True(t, IsReservedType("time.Time"))
-	
+
 	meta, err := GetStructMeta(reflect.TypeOf(ReservedTypeStruct{}))
 	require.NoError(t, err)
 	require.Len(t, meta, 3)
-	
+
 	// time.Time should not be recursively parsed
 	timestampField := findFieldByName(meta, "Timestamp")
 	require.NotNil(t, timestampField)
@@ -176,11 +176,11 @@ func TestGetStructMeta_Errors(t *testing.T) {
 	var nilPtr *SimpleStruct
 	_, err := scanStruct(nilPtr)
 	assert.ErrorIs(t, err, ErrNilPointer)
-	
+
 	// Test with non-struct
 	_, err = scanStruct("not a struct")
 	assert.ErrorIs(t, err, ErrInvalidStruct)
-	
+
 	// Test with duplicate field names
 	_, err = GetStructMeta(reflect.TypeOf(DuplicateFieldStruct{}))
 	assert.Error(t, err)
@@ -190,15 +190,15 @@ func TestGetStructMeta_Errors(t *testing.T) {
 func TestGetStructMeta_Caching(t *testing.T) {
 	// Clear cache first
 	fieldCache = sync.Map{}
-	
+
 	// First call should scan
 	meta1, err := GetStructMeta(reflect.TypeOf(SimpleStruct{}))
 	require.NoError(t, err)
-	
+
 	// Second call should use cache
 	meta2, err := GetStructMeta(reflect.TypeOf(SimpleStruct{}))
 	require.NoError(t, err)
-	
+
 	// Should return same data
 	assert.Equal(t, meta1, meta2)
 }
@@ -206,14 +206,14 @@ func TestGetStructMeta_Caching(t *testing.T) {
 func TestGetStructMeta_ConcurrentAccess(t *testing.T) {
 	// Clear cache
 	fieldCache = sync.Map{}
-	
+
 	const numGoroutines = 100
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	errors := make(chan error, numGoroutines)
 	results := make(chan []Metadata, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
@@ -225,16 +225,16 @@ func TestGetStructMeta_ConcurrentAccess(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	wg.Wait()
 	close(errors)
 	close(results)
-	
+
 	// Check no errors
 	for err := range errors {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	
+
 	// Verify all results are identical
 	var firstResult []Metadata
 	for result := range results {
@@ -252,21 +252,21 @@ func TestGetStructMeta_DbOptions(t *testing.T) {
 		Field2 string `grid:"sort,custom1,custom2"`
 		Field3 string `goqu:"skipinsert,custom3"`
 	}
-	
+
 	meta, err := GetStructMeta(reflect.TypeOf(OptionsStruct{}))
 	require.NoError(t, err)
-	
+
 	field1 := findFieldByName(meta, "Field1")
 	require.NotNil(t, field1)
 	assert.Contains(t, field1.DbOptions, "option1")
 	assert.Contains(t, field1.DbOptions, "option2")
-	
+
 	field2 := findFieldByName(meta, "Field2")
 	require.NotNil(t, field2)
 	assert.True(t, field2.Sortable)
 	assert.Contains(t, field2.DbOptions, "custom1")
 	assert.Contains(t, field2.DbOptions, "custom2")
-	
+
 	field3 := findFieldByName(meta, "Field3")
 	require.NotNil(t, field3)
 	assert.True(t, field3.Auto) // skipinsert sets Auto to true
@@ -277,11 +277,11 @@ func TestGetStructMeta_AllTagCombinations(t *testing.T) {
 	type AllTagsStruct struct {
 		Field1 string `db:"f1" ch:"cf1" auto:"true" grid:"sort,search,filter,auto" goqu:"skipupdate,omitnil,omitempty" json:"field_1" xml:"Field1" alias:"f_1"`
 	}
-	
+
 	meta, err := GetStructMeta(reflect.TypeOf(AllTagsStruct{}))
 	require.NoError(t, err)
 	require.Len(t, meta, 1)
-	
+
 	field := meta[0]
 	assert.Equal(t, "Field1", field.Name)
 	assert.Equal(t, "f1", field.DbName)
@@ -328,7 +328,7 @@ func BenchmarkGetStructMeta_Complex(b *testing.B) {
 func BenchmarkGetStructMeta_Cached(b *testing.B) {
 	// Ensure it's cached first
 	GetStructMeta(reflect.TypeOf(StructWithTags{}))
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		GetStructMeta(reflect.TypeOf(StructWithTags{}))

@@ -22,6 +22,7 @@ type SqlBuilder interface {
 	SqlDialect() qb.SqlDialect
 	SqlBuilder() *qb.SqlBuilder
 	SqlUpdateX(record any) *qb.UpdateBuilder
+	Do(qry any, target ...any) error
 }
 
 type Reader interface {
@@ -42,7 +43,6 @@ type Executor interface {
 	Exec(qry *goqu.SelectDataset) error
 	RawExec(sql string, args ...any) error
 	Select(sql string, target any, args ...any) error
-	Do(qry any, target ...any) error
 }
 
 type Writer interface {

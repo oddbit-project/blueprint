@@ -101,7 +101,8 @@ func testFunctions(t *testing.T, repo testRepository) {
 		records = append(records, row)
 	}
 	// insert multiple records
-	assert.Nil(t, repo.Insert(records))
+	// we need to convert to []any
+	assert.Nil(t, repo.Insert(db.ToAnySlice(records)...))
 
 	// read multiple records
 	records = make([]*sampleRecord, 0)
@@ -157,7 +158,7 @@ func testFunctions(t *testing.T, repo testRepository) {
 		CreatedAt: time.Now(),
 		Label:     "something different",
 	}
-	assert.Nil(t, repo.InsertReturning(record, []any{"id_sample_table"}, &record.Id))
+	assert.Nil(t, repo.InsertReturning(record, []string{"id_sample_table"}, &record.Id))
 	assert.True(t, record.Id > 0)
 
 	// update last insert using whole record
@@ -167,7 +168,8 @@ func testFunctions(t *testing.T, repo testRepository) {
 	assert.Nil(t, repo.FetchRecord(map[string]any{"label": "foo"}, record))
 
 	// update last insert using just label
-	assert.Nil(t, repo.UpdateRecord(map[string]any{"label": "bar"}, map[string]any{"label": "foo"}))
+	assert.Nil(t, repo.UpdateFields(record, map[string]any{"label": "bar"}, map[string]any{"label": "foo"}))
+
 	// re-fetch using new label
 	assert.Nil(t, repo.FetchRecord(map[string]any{"label": "bar"}, record))
 

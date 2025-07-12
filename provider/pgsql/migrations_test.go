@@ -1,18 +1,17 @@
 //go:build integration
 // +build integration
 
-package postgresql
+package pgsql
 
 import (
 	"context"
 	"fmt"
 	"github.com/oddbit-project/blueprint/db/migrations"
-	"github.com/oddbit-project/blueprint/provider/pgsql"
 	assert "github.com/stretchr/testify/assert"
 )
 
 func (s *PGIntegrationTestSuite) TestMigrations() {
-	_, err := s.client.Conn.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", pgsql.EngineMigrationTable))
+	_, err := s.client.Conn.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", EngineMigrationTable))
 	assert.Nil(s.T(), err)
 
 	src := migrations.NewMemorySource()
@@ -21,7 +20,7 @@ func (s *PGIntegrationTestSuite) TestMigrations() {
 	src.Add("sample2.sql", "create table sample(id int);")
 	src.Add("sample3.sql", "insert into sample(id) values(1);")
 
-	mgr, err := pgsql.NewMigrationManager(context.Background(), s.client)
+	mgr, err := NewMigrationManager(context.Background(), s.client)
 	assert.Nil(s.T(), err)
 
 	list, err := mgr.List(context.Background())

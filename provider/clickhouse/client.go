@@ -5,10 +5,11 @@ import (
 	"crypto/tls"
 	"github.com/ClickHouse/ch-go/compress"
 	"github.com/ClickHouse/clickhouse-go/v2"
-	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/oddbit-project/blueprint/crypt/secure"
+	"github.com/oddbit-project/blueprint/db"
+	"github.com/oddbit-project/blueprint/db/qb"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils"
 	"slices"
@@ -235,4 +236,5 @@ func DialectOptions() *goqu.SQLDialectOptions {
 
 func init() {
 	goqu.RegisterDialect("clickhouse", DialectOptions())
+	db.RegisterDialect("clickhouse", qb.DefaultSqlDialect())
 }

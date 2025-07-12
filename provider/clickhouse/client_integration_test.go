@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oddbit-project/blueprint/provider/clickhouse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -16,12 +15,12 @@ import (
 // Integration test struct for ClickHouse client
 type ClickhouseIntegrationTestSuite struct {
 	suite.Suite
-	client *clickhouse.Client
+	client *Client
 	ctx    context.Context
 }
 
 // Record type for testing
-type TestRecord struct {
+type ClientTestRecord struct {
 	ID        int32     `ch:"id"`
 	Name      string    `ch:"name"`
 	Value     float64   `ch:"value"`
@@ -35,7 +34,7 @@ func (s *ClickhouseIntegrationTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 
 	// Create client config
-	config := clickhouse.NewClientConfig()
+	config := NewClientConfig()
 	config.Hosts = []string{"clickhouse:9000"} // Docker-exposed port
 	config.Database = "default"
 	config.Username = "default"
@@ -43,7 +42,7 @@ func (s *ClickhouseIntegrationTestSuite) SetupSuite() {
 
 	// Create client
 	var err error
-	s.client, err = clickhouse.NewClient(config)
+	s.client, err = NewClient(config)
 	if err != nil {
 		s.T().Fatalf("Failed to create ClickHouse client: %v", err)
 	}
@@ -120,14 +119,14 @@ func (s *ClickhouseIntegrationTestSuite) TestRepositoryOperations() {
 	// Insert test records
 	now := time.Now().Round(time.Second) // Round to seconds as ClickHouse DateTime doesn't store milliseconds
 	records := []interface{}{
-		&TestRecord{
+		&ClientTestRecord{
 			ID:        1,
 			Name:      "Test Record 1",
 			Value:     123.45,
 			Timestamp: now,
 			IsActive:  1,
 		},
-		&TestRecord{
+		&ClientTestRecord{
 			ID:        2,
 			Name:      "Test Record 2",
 			Value:     678.90,
@@ -147,14 +146,14 @@ func (s *ClickhouseIntegrationTestSuite) TestRepositoryOperations() {
 	assert.Equal(s.T(), uint64(2), count, "Should have 2 records")
 
 	// Fetch active records
-	var activeRecords []TestRecord
+	var activeRecords []ClientTestRecord
 	err = repo.FetchWhere(map[string]any{"is_active": uint8(1)}, &activeRecords)
 	assert.NoError(s.T(), err, "FetchWhere should succeed")
 	assert.Len(s.T(), activeRecords, 1, "Should have 1 active record")
 	assert.Equal(s.T(), "Test Record 1", activeRecords[0].Name)
 
 	// Fetch by key
-	var record TestRecord
+	var record ClientTestRecord
 	err = repo.FetchByKey("id", int32(2), &record)
 	assert.NoError(s.T(), err, "FetchByKey should succeed")
 	assert.Equal(s.T(), "Test Record 2", record.Name)
@@ -179,7 +178,7 @@ func (s *ClickhouseIntegrationTestSuite) TestDirectSQLExecution() {
 	assert.NoError(s.T(), err, "Direct SQL execution should succeed")
 
 	// Verify the record was inserted
-	var fetchedRecord TestRecord
+	var fetchedRecord ClientTestRecord
 	err = repo.FetchByKey("id", int32(3), &fetchedRecord)
 	assert.NoError(s.T(), err, "FetchByKey should succeed after direct SQL insert")
 	assert.Equal(s.T(), "Direct SQL Record", fetchedRecord.Name)

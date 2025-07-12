@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/oddbit-project/blueprint/log"
-	"github.com/oddbit-project/blueprint/provider/nats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -22,8 +21,8 @@ type NatsIntegrationTestSuite struct {
 	suite.Suite
 	ctx       context.Context
 	cancel    context.CancelFunc
-	producer  *nats.Producer
-	consumer  *nats.Consumer
+	producer  *Producer
+	consumer  *Consumer
 	logger    *log.Logger
 	testSubj  string
 	queueName string
@@ -61,32 +60,32 @@ func (s *NatsIntegrationTestSuite) SetupSuite() {
 	})
 
 	// Create producer config with host from environment
-	producerConfig := &nats.ProducerConfig{
+	producerConfig := &ProducerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", natsHost),
 		Subject:  s.testSubj,
-		AuthType: nats.AuthTypeNone, // Credentials are in URL
+		AuthType: AuthTypeNone, // Credentials are in URL
 	}
 
 	// Create consumer config with host from environment
-	consumerConfig := &nats.ConsumerConfig{
+	consumerConfig := &ConsumerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", natsHost),
 		Subject:  s.testSubj,
-		AuthType: nats.AuthTypeNone, // Credentials are in URL
-		ConsumerOptions: nats.ConsumerOptions{
+		AuthType: AuthTypeNone, // Credentials are in URL
+		ConsumerOptions: ConsumerOptions{
 			QueueGroup: s.queueName,
 		},
 	}
 
 	// Create producer
 	var err error
-	s.producer, err = nats.NewProducer(producerConfig, s.logger)
+	s.producer, err = NewProducer(producerConfig, s.logger)
 	if err != nil {
 		// Don't fail the test immediately - just log the error
 		s.T().Logf("Warning: Failed to create NATS producer: %v (may be expected in Docker/CI)", err)
 	}
 
 	// Create consumer
-	s.consumer, err = nats.NewConsumer(consumerConfig, s.logger)
+	s.consumer, err = NewConsumer(consumerConfig, s.logger)
 	if err != nil {
 		// Don't fail the test immediately - just log the error
 		s.T().Logf("Warning: Failed to create NATS consumer: %v (may be expected in Docker/CI)", err)
@@ -156,7 +155,7 @@ func (s *NatsIntegrationTestSuite) TestPublishSubscribe() {
 	receivedMsg := ""
 
 	// Subscribe to the test subject
-	handler := func(ctx context.Context, msg nats.Message) error {
+	handler := func(ctx context.Context, msg Message) error {
 		receivedMsg = string(msg.Data)
 		wg.Done()
 		return nil
@@ -213,7 +212,7 @@ func (s *NatsIntegrationTestSuite) TestJSONMessages() {
 	var receivedMessage TestMessage
 
 	// Subscribe to the test subject
-	handler := func(ctx context.Context, msg nats.Message) error {
+	handler := func(ctx context.Context, msg Message) error {
 		err := json.Unmarshal(msg.Data, &receivedMessage)
 		assert.NoError(s.T(), err, "JSON unmarshaling should succeed")
 		wg.Done()
@@ -223,10 +222,10 @@ func (s *NatsIntegrationTestSuite) TestJSONMessages() {
 	// Subscribe to test subject with a unique subject for this test
 	jsonSubject := s.testSubj + ".json"
 	natsHost := getNatsHost()
-	consumer, err := nats.NewConsumer(&nats.ConsumerConfig{
+	consumer, err := NewConsumer(&ConsumerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", natsHost),
 		Subject:  jsonSubject,
-		AuthType: nats.AuthTypeNone, // Credentials are in URL
+		AuthType: AuthTypeNone, // Credentials are in URL
 	}, s.logger)
 	assert.NoError(s.T(), err, "Creating consumer should succeed")
 	defer consumer.Disconnect()
@@ -269,16 +268,16 @@ func (s *NatsIntegrationTestSuite) TestRequestReply() {
 	// Subscribe to handle requests
 	go func() {
 		// Create consumer for request handling
-		responder, err := nats.NewConsumer(&nats.ConsumerConfig{
+		responder, err := NewConsumer(&ConsumerConfig{
 			URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", getNatsHost()),
 			Subject:  requestSubject,
-			AuthType: nats.AuthTypeNone, // Credentials are in URL
+			AuthType: AuthTypeNone, // Credentials are in URL
 		}, s.logger)
 		assert.NoError(s.T(), err, "Creating responder should succeed")
 		defer responder.Disconnect()
 
 		// Handler for requests
-		handler := func(ctx context.Context, msg nats.Message) error {
+		handler := func(ctx context.Context, msg Message) error {
 			// For request-reply, the msg.Reply is the subject to respond to
 			if msg.Reply != "" {
 				// Send a reply
@@ -335,11 +334,11 @@ func (s *NatsIntegrationTestSuite) TestQueueGroups() {
 	receivedCount2 := 0
 
 	// Create two consumers in the same queue group
-	consumer1, err := nats.NewConsumer(&nats.ConsumerConfig{
+	consumer1, err := NewConsumer(&ConsumerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", getNatsHost()),
 		Subject:  queueSubject,
-		AuthType: nats.AuthTypeNone, // Credentials are in URL
-		ConsumerOptions: nats.ConsumerOptions{
+		AuthType: AuthTypeNone, // Credentials are in URL
+		ConsumerOptions: ConsumerOptions{
 			QueueGroup: queueGroup,
 		},
 	}, s.logger)
@@ -350,11 +349,11 @@ func (s *NatsIntegrationTestSuite) TestQueueGroups() {
 	}
 	defer consumer1.Disconnect()
 
-	consumer2, err := nats.NewConsumer(&nats.ConsumerConfig{
+	consumer2, err := NewConsumer(&ConsumerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", getNatsHost()),
 		Subject:  queueSubject,
-		AuthType: nats.AuthTypeNone, // Credentials are in URL
-		ConsumerOptions: nats.ConsumerOptions{
+		AuthType: AuthTypeNone, // Credentials are in URL
+		ConsumerOptions: ConsumerOptions{
 			QueueGroup: queueGroup,
 		},
 	}, s.logger)
@@ -374,14 +373,14 @@ func (s *NatsIntegrationTestSuite) TestQueueGroups() {
 	}
 
 	// Setup handlers for both consumers
-	handler1 := func(ctx context.Context, msg nats.Message) error {
+	handler1 := func(ctx context.Context, msg Message) error {
 		mu.Lock()
 		receivedCount1++
 		mu.Unlock()
 		return nil
 	}
 
-	handler2 := func(ctx context.Context, msg nats.Message) error {
+	handler2 := func(ctx context.Context, msg Message) error {
 		mu.Lock()
 		receivedCount2++
 		mu.Unlock()

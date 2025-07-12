@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/oddbit-project/blueprint/log"
-	"github.com/oddbit-project/blueprint/provider/nats"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -59,15 +58,15 @@ func (s *NatsAuthIntegrationTestSuite) TearDownSuite() {
 func (s *NatsAuthIntegrationTestSuite) TestBasicAuth() {
 	// Create producer with basic auth
 	natsHost := getNatsHost()
-	producerConfig := &nats.ProducerConfig{
+	producerConfig := &ProducerConfig{
 		URL:                     fmt.Sprintf("nats://%s:4222", natsHost), // URL without auth info
 		Subject:                 "test.auth.basic",
-		AuthType:                nats.AuthTypeBasic,
+		AuthType:                AuthTypeBasic,
 		Username:                "testuser",
-		DefaultCredentialConfig: nats.StringPasswordConfig("testpassword"),
+		DefaultCredentialConfig: StringPasswordConfig("testpassword"),
 	}
 
-	producer, err := nats.NewProducer(producerConfig, s.logger)
+	producer, err := NewProducer(producerConfig, s.logger)
 	if err != nil {
 		// In Docker environments or CI, this could fail due to networking
 		s.T().Logf("Could not create producer with basic auth: %v (may be expected in Docker/CI)", err)
@@ -84,15 +83,15 @@ func (s *NatsAuthIntegrationTestSuite) TestBasicAuth() {
 	}
 
 	// Test with invalid credentials - this should always fail
-	invalidConfig := &nats.ProducerConfig{
+	invalidConfig := &ProducerConfig{
 		URL:                     fmt.Sprintf("nats://%s:4222", natsHost),
 		Subject:                 "test.auth.basic",
-		AuthType:                nats.AuthTypeBasic,
+		AuthType:                AuthTypeBasic,
 		Username:                "testuser",
-		DefaultCredentialConfig: nats.StringPasswordConfig("wrongpassword"),
+		DefaultCredentialConfig: StringPasswordConfig("wrongpassword"),
 	}
 
-	invalidProducer, err := nats.NewProducer(invalidConfig, s.logger)
+	invalidProducer, err := NewProducer(invalidConfig, s.logger)
 	if err == nil {
 		defer invalidProducer.Disconnect()
 		assert.False(s.T(), invalidProducer.IsConnected(), "Producer should not connect with invalid basic auth")
@@ -110,14 +109,14 @@ func (s *NatsAuthIntegrationTestSuite) _TestTokenAuth() {
 
 	// Create producer with token auth
 	natsHost := getNatsHost()
-	producerConfig := &nats.ProducerConfig{
+	producerConfig := &ProducerConfig{
 		URL:                     fmt.Sprintf("nats://%s:4222", natsHost), // URL without auth info
 		Subject:                 "test.auth.token",
-		AuthType:                nats.AuthTypeToken,
-		DefaultCredentialConfig: nats.StringPasswordConfig("testpassword"), // Using password as token for testing
+		AuthType:                AuthTypeToken,
+		DefaultCredentialConfig: StringPasswordConfig("testpassword"), // Using password as token for testing
 	}
 
-	producer, err := nats.NewProducer(producerConfig, s.logger)
+	producer, err := NewProducer(producerConfig, s.logger)
 	if err == nil {
 		defer producer.Disconnect()
 		// Check connection - may still fail due to auth mechanism
@@ -137,13 +136,13 @@ func (s *NatsAuthIntegrationTestSuite) _TestTokenAuth() {
 func (s *NatsAuthIntegrationTestSuite) TestDirectURLAuth() {
 	// Create producer with credentials in URL
 	natsHost := getNatsHost()
-	producerConfig := &nats.ProducerConfig{
+	producerConfig := &ProducerConfig{
 		URL:      fmt.Sprintf("nats://testuser:testpassword@%s:4222", natsHost),
 		Subject:  "test.auth.url",
-		AuthType: nats.AuthTypeNone, // VerifyUser is in URL
+		AuthType: AuthTypeNone, // VerifyUser is in URL
 	}
 
-	producer, err := nats.NewProducer(producerConfig, s.logger)
+	producer, err := NewProducer(producerConfig, s.logger)
 	if err != nil {
 		// In Docker environments or CI, this could fail due to networking
 		s.T().Logf("Could not create producer with URL auth: %v (may be expected in Docker/CI)", err)
@@ -165,17 +164,17 @@ func (s *NatsAuthIntegrationTestSuite) TestDirectURLAuth() {
 // TestConnectionTimeout tests connection timeout handling
 func (s *NatsAuthIntegrationTestSuite) TestConnectionTimeout() {
 	// Create producer with non-existent server and short timeout
-	producerConfig := &nats.ProducerConfig{
+	producerConfig := &ProducerConfig{
 		URL:      "nats://nonexistent-host:4222", // Intentionally using a nonexistent host
 		Subject:  "test.timeout",
-		AuthType: nats.AuthTypeNone,
-		ProducerOptions: nats.ProducerOptions{
+		AuthType: AuthTypeNone,
+		ProducerOptions: ProducerOptions{
 			Timeout: 500, // 500ms timeout
 		},
 	}
 
 	startTime := time.Now()
-	_, err := nats.NewProducer(producerConfig, s.logger)
+	_, err := NewProducer(producerConfig, s.logger)
 	duration := time.Since(startTime)
 
 	// Should fail quickly due to timeout

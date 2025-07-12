@@ -6,6 +6,7 @@ import (
 	"github.com/oddbit-project/blueprint/utils"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -74,6 +75,10 @@ func GetStructMeta(t reflect.Type) ([]Metadata, error) {
 	return meta, err
 }
 
+func dbFieldName(name string) string {
+	return strings.ToLower(name)
+}
+
 func scanStruct(arg any) ([]Metadata, error) {
 	v := reflect.ValueOf(arg)
 
@@ -112,8 +117,8 @@ func scanStruct(arg any) ([]Metadata, error) {
 			// resolve fields
 			meta := Metadata{
 				Name:      field.Name,
-				DbName:    field.Name, // default is field.Name
-				Alias:     field.Name, // default is field.Name
+				DbName:    dbFieldName(field.Name), // default is lowercase field.Name
+				Alias:     field.Name,              // default is field.Name
 				Type:      field.Type,
 				TypeName:  field.Type.String(),
 				DbOptions: make([]string, 0),

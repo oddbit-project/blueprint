@@ -7,6 +7,7 @@ toolchain go1.23.8
 require (
 	github.com/ClickHouse/ch-go v0.58.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.18.0
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/gin-gonic/gin v1.9.0

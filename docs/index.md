@@ -6,9 +6,16 @@
 
 ## Database
 
-- [Repository](db/repository.md)
+- [Database Package Overview](db/index.md)
+- [Structs and Tags](db/structs-and-tags.md)
+- [Client Interface](db/client.md)
+- [Repository Pattern](db/repository.md)
+- [Data Grid System](db/dbgrid.md)
 - [Field Specifications](db/fields.md)
-- [Data Grid](db/dbgrid.md)
+- [Query Builder](db/query-builder.md)
+- [Database Functions](db/functions.md)
+- [Migration System](db/migrations.md)
+- [SQL Update API](db/sql-update-api.md)
 
 ## Security
 
@@ -35,10 +42,16 @@
 
 ## HTTP Server
 
-- [Request Utilities](provider/httpserver/request.md)
-- [Session Management](httpserver/session.md)
-- [Authentication](httpserver/auth.md)
-- [Security & Headers](httpserver/security.md)
+- [HTTP Server Framework](httpserver/index.md) - Complete overview and quick start
+- [API Reference](httpserver/api-reference.md) - Complete server API documentation
+- [Middleware Components](httpserver/middleware.md) - All middleware and utilities
+- [Integration Examples](httpserver/examples.md) - REST API, web app, and microservice examples
+- [Troubleshooting Guide](httpserver/troubleshooting.md) - Debugging and common issues
+- [Performance Guide](httpserver/performance.md) - Optimization and production deployment
+- [Authentication](httpserver/auth.md) - Token and JWT authentication providers
+- [Security & Headers](httpserver/security.md) - Security middleware and CSRF protection
+- [Session Management](httpserver/session.md) - Cookie-based session system
+- [Request Utilities](provider/httpserver/request.md) - Request helper functions
 
 ## Utilities
 

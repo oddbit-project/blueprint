@@ -41,6 +41,32 @@ All notable changes between `main` and `develop` branches.
   - User authentication and password verification
   - Integration with existing authentication systems
 
+### Database Improvements
+
+#### SQL Builder Package Enhancements
+- **RENAMED**: Package `db/sql` renamed to `db/sqlbuilder` for clarity
+- **REMOVED**: Custom mapper support removed from SQL builder
+  - FieldMapper interface and all built-in mappers removed due to complexity issues
+  - RegisterMapper() method and mapper:"name" struct tags no longer supported
+  - Simplified SQL builder with focus on core functionality and reliability
+  - Better performance without mapper overhead
+- **IMPROVED**: Simplified error handling in sqlbuilder package
+  - Removed overengineered error types
+  - Clear, actionable error messages
+  - Better error context with record indices in batch operations
+- **REMOVED**: SqlBuilder mapper registry (part of mapper removal)
+  - Eliminated thread safety concerns by removing mapper functionality
+  - Simplified SqlBuilder struct without mapper state
+  - Removed mapper-related synchronization code
+- **OPTIMIZED**: Batch insert performance improvements
+  - Pre-computed metadata lookups eliminate nested loops
+  - O(n*m) complexity instead of O(n*m*k)
+  - Minimal memory allocations
+- **NEW**: Comprehensive benchmark suite comparing Blueprint vs Goqu
+  - Single insert: 2.3-2.7x faster
+  - Batch insert: 1.5-2.4x faster
+  - 40-77% less memory usage
+
 ### Core Improvements
 
 #### Session Management Overhaul
@@ -72,11 +98,20 @@ All notable changes between `main` and `develop` branches.
 - **NEW**: HTTP server security documentation (`docs/httpserver/security.md`)
 - **NEW**: HTPasswd provider documentation (`docs/provider/htpasswd.md`)
 - **NEW**: Secure credentials guide (`docs/crypt/secure-credentials.md`)
+- **UPDATED**: SQL batch operations guide (`docs/db/sql-batch-operations.md`)
+  - Complete documentation for `BuildSQLBatchInsert`
+  - Removed mapper references and updated with manual serialization examples
+  - Performance considerations and best practices
+  - Examples showing alternatives to deprecated mappers
 
 #### Updated Documentation
 - **UPDATED**: Session management documentation (removed JWT references, focused on cookies)
 - **UPDATED**: TLS provider documentation with enhanced examples
 - **UPDATED**: Main documentation index with new features
+- **UPDATED**: SQL field mappers documentation (`docs/db/sql-mappers.md`)
+  - Converted to deprecation notice explaining mapper removal
+  - Added migration guide with alternatives to mappers
+  - Updated examples to show manual serialization approaches
 
 ### 🛠 Development & Samples
 
@@ -129,6 +164,12 @@ All notable changes between `main` and `develop` branches.
 
 ### Breaking Changes
 
+#### SQL Builder System
+- **BREAKING**: Custom field mappers completely removed from SQL builder
+- **BREAKING**: `RegisterMapper()` method no longer exists
+- **BREAKING**: `mapper:"name"` struct tags no longer supported
+- **BREAKING**: All built-in mappers removed (JSONMapper, TimestampMapper, etc.)
+
 #### Session System
 - **BREAKING**: JWT functionality moved from `provider/httpserver/session` to `provider/jwtprovider`
 - **BREAKING**: Session middleware API changes for cookie-based sessions
@@ -175,6 +216,25 @@ All notable changes between `main` and `develop` branches.
 - **New Samples**: 3 new sample applications
 
 ### Migration Guide
+
+#### For Custom Mapper Users
+1. Remove all `RegisterMapper()` calls from your code
+2. Remove `mapper:"name"` tags from struct fields  
+3. Replace with manual serialization before SQL operations:
+   ```go
+   // Before (with mappers)
+   type User struct {
+       Settings map[string]interface{} `db:"settings" mapper:"json"`
+   }
+   
+   // After (manual serialization)
+   type User struct {
+       Settings string `db:"settings"` // JSON as string
+   }
+   settingsJSON, _ := json.Marshal(userSettings)
+   user.Settings = string(settingsJSON)
+   ```
+4. For complex types, consider database-specific types (e.g., `pq.StringArray` for PostgreSQL)
 
 #### For JWT Users
 1. Update imports from `provider/httpserver/session` to `provider/jwtprovider`

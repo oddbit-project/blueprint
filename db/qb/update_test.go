@@ -283,10 +283,6 @@ func TestBuildSQLUpdateByID(t *testing.T) {
 	}
 }
 
-func TestBuildSQLBatchUpdate(t *testing.T) {
-	t.Skip("BuildSQLBatchUpdate not implemented in current design")
-}
-
 func TestUpdateOptions_Default(t *testing.T) {
 	opts := DefaultUpdateOptions()
 
@@ -405,8 +401,4 @@ func BenchmarkBuildSQLUpdate(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-}
-
-func BenchmarkBuildSQLBatchUpdate(b *testing.B) {
-	b.Skip("BuildSQLBatchUpdate not implemented in current design")
 }

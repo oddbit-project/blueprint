@@ -176,12 +176,6 @@ func TestUpdateIntegration_ProductManagement(t *testing.T) {
 		assert.Equal(t, expectedSQL, sql)
 		assert.Equal(t, expectedArgs, args)
 	})
-
-	t.Run("batch update product prices", func(t *testing.T) {
-		// Note: BuildSQLBatchUpdate doesn't exist in current implementation
-		// This would need to be implemented separately or use individual updates
-		t.Skip("BuildSQLBatchUpdate not implemented in current design")
-	})
 }
 
 func TestUpdateIntegration_OrderManagement(t *testing.T) {
@@ -232,10 +226,6 @@ func TestUpdateIntegration_OrderManagement(t *testing.T) {
 		assert.Equal(t, expectedArgs, args)
 	})
 
-	t.Run("batch update order statuses", func(t *testing.T) {
-		// BuildSQLBatchUpdate not implemented - skip this test
-		t.Skip("BuildSQLBatchUpdate not implemented in current design")
-	})
 }
 
 func TestUpdateIntegration_AdvancedScenarios(t *testing.T) {
@@ -339,26 +329,6 @@ func TestUpdateIntegration_ErrorScenarios(t *testing.T) {
 		require.NoError(t, err) // Should succeed without mapper
 	})
 
-	t.Run("batch update with mismatched types", func(t *testing.T) {
-		// Use simpler structs to avoid mapper complications
-		type SimpleUser struct {
-			ID       int    `db:"id"`
-			Username string `db:"username"`
-		}
-
-		type SimpleProduct struct {
-			ID   int    `db:"id"`
-			Name string `db:"name"`
-		}
-
-		t.Skip("BuildSQLBatchUpdate not implemented")
-	})
-}
-
-func TestUpdateIntegration_PerformanceScenarios(t *testing.T) {
-	t.Run("large batch update", func(t *testing.T) {
-		t.Skip("BuildSQLBatchUpdate not implemented")
-	})
 }
 
 func TestUpdateIntegration_PostgreSQLDialect(t *testing.T) {

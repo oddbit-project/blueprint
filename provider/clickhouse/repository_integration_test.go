@@ -5,20 +5,17 @@ package clickhouse
 
 import (
 	"context"
-	"testing"
-	"time"
-
-	"github.com/doug-martin/goqu/v9"
-	"github.com/oddbit-project/blueprint/provider/clickhouse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"testing"
+	"time"
 )
 
 // Integration test suite for ClickHouse repository operations
 type ClickhouseRepositoryTestSuite struct {
 	suite.Suite
-	client *clickhouse.Client
-	repo   clickhouse.Repository
+	client *Client
+	repo   Repository
 	ctx    context.Context
 }
 
@@ -41,7 +38,7 @@ func (s *ClickhouseRepositoryTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 
 	// Create client config
-	config := clickhouse.NewClientConfig()
+	config := NewClientConfig()
 	config.Hosts = []string{"clickhouse:9000"} // Docker-exposed port
 	config.Database = "default"
 	config.Username = "default"
@@ -49,7 +46,7 @@ func (s *ClickhouseRepositoryTestSuite) SetupSuite() {
 
 	// Create client
 	var err error
-	s.client, err = clickhouse.NewClient(config)
+	s.client, err = NewClient(config)
 	if err != nil {
 		s.T().Fatalf("Failed to create ClickHouse client: %v", err)
 	}
@@ -111,27 +108,6 @@ func (s *ClickhouseRepositoryTestSuite) TestSqlBuilders() {
 	assert.NoError(s.T(), err, "Should generate SELECT SQL")
 	assert.Contains(s.T(), selectSQL, "SELECT", "Should generate select statement")
 	assert.Contains(s.T(), selectSQL, "complex_test", "Should contain table name")
-
-	// Test SqlInsert()
-	insertSQL, _, err := s.repo.SqlInsert().Rows(map[string]interface{}{"id": 1}).ToSQL()
-	assert.NoError(s.T(), err, "Should generate INSERT SQL")
-	assert.Contains(s.T(), insertSQL, "INSERT INTO", "Should generate insert statement")
-	assert.Contains(s.T(), insertSQL, "complex_test", "Should contain table name")
-
-	// Test SqlUpdate() with goqu syntax
-	updateSQL, _, err := s.repo.SqlUpdate().Set(
-		map[string]interface{}{"name": "updated"}).Where(
-		goqu.C("id").Eq(1)).ToSQL()
-	assert.NoError(s.T(), err, "Should generate UPDATE SQL")
-	assert.Contains(s.T(), updateSQL, "UPDATE", "Should generate update statement")
-	assert.Contains(s.T(), updateSQL, "complex_test", "Should contain table name")
-
-	// Test SqlDelete() with goqu syntax
-	deleteSQL, _, err := s.repo.SqlDelete().Where(
-		goqu.C("id").Eq(1)).ToSQL()
-	assert.NoError(s.T(), err, "Should generate DELETE SQL")
-	assert.Contains(s.T(), deleteSQL, "DELETE FROM", "Should generate delete statement")
-	assert.Contains(s.T(), deleteSQL, "complex_test", "Should contain table name")
 }
 
 // Test inserting and fetching complex records

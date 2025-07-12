@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/oddbit-project/blueprint/db/migrations"
-	"github.com/oddbit-project/blueprint/provider/clickhouse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -15,7 +14,7 @@ import (
 // Integration test struct for ClickHouse client
 type ClickhouseMigrationTestSuite struct {
 	suite.Suite
-	client *clickhouse.Client
+	client *Client
 	ctx    context.Context
 }
 
@@ -25,7 +24,7 @@ func (s *ClickhouseMigrationTestSuite) SetupSuite() {
 	s.ctx = context.Background()
 
 	// Create client config
-	config := clickhouse.NewClientConfig()
+	config := NewClientConfig()
 	config.Hosts = []string{"clickhouse:9000"} // Docker-exposed port
 	config.Database = "default"
 	config.Username = "default"
@@ -33,7 +32,7 @@ func (s *ClickhouseMigrationTestSuite) SetupSuite() {
 
 	// Create client
 	var err error
-	s.client, err = clickhouse.NewClient(config)
+	s.client, err = NewClient(config)
 	if err != nil {
 		s.T().Fatalf("Failed to create ClickHouse client: %v", err)
 	}
@@ -42,7 +41,7 @@ func (s *ClickhouseMigrationTestSuite) SetupSuite() {
 // Teardown the test suite
 func (s *ClickhouseMigrationTestSuite) TearDownSuite() {
 	// Drop the test table
-	err := s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", clickhouse.MigrationTable))
+	err := s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	if err != nil {
 		s.T().Logf("Failed to drop test table: %v", err)
 	}
@@ -61,7 +60,7 @@ func (s *ClickhouseMigrationTestSuite) TestMigrationManager() {
 	src.Add("sample2.sql", "insert into sample(id) values(1);")
 
 	// create migration manager
-	mgr, err := clickhouse.NewMigrationManager(context.Background(), s.client, "")
+	mgr, err := NewMigrationManager(context.Background(), s.client, "")
 	assert.Nil(s.T(), err)
 
 	// list existing migrations, should be empty

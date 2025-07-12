@@ -307,3 +307,11 @@ func Count(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDatase
 	}
 	return count, nil
 }
+
+func ToAnySlice[T any](in []T) []any {
+	out := make([]any, len(in))
+	for i, v := range in {
+		out[i] = v
+	}
+	return out
+}
