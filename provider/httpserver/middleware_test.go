@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/oddbit-project/blueprint/provider/httpserver/session"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -170,17 +171,25 @@ func TestUseCSRFProtection(t *testing.T) {
 		Router: gin.New(),
 	}
 
-	// Add the UseCSRFProtection method to our mock server
-	useCSRFProtection := func() {
-		server.AddMiddleware(security.CSRFProtection())
-	}
-
-	// Test adding CSRF protection middleware
-	useCSRFProtection()
-
 	// Create a test request with no CSRF token
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/test", nil)
+
+	config := session.NewConfig()
+	config.Secure = false                       // Set to true in production with HTTPS
+	config.SameSite = int(http.SameSiteLaxMode) // Important for cross-origin
+	config.CookieName = "nextjs_session"        // Custom cookie name
+	config.ExpirationSeconds = 3600             // 1 hour
+	// Create store
+	store := session.NewStore(config, nil, nil)
+
+	// Create manager
+	manager := session.NewManager(store, config, nil)
+
+	// Add session middleware
+	server.AddMiddleware(manager.Middleware())
+	// Add csrf middleware
+	server.AddMiddleware(security.CSRFProtection())
 
 	// Setup a test route
 	server.Router.POST("/test", func(c *gin.Context) {

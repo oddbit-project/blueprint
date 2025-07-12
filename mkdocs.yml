@@ -99,7 +99,7 @@ nav:
     - NATS: provider/nats.md
     - TLS: provider/tls.md
     - JWT Provider: provider/jwtprovider.md
-      
+
   - Logging:
     - Overview: log/logging.md
     - File Logging: log/file_logging.md
