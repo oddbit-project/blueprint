@@ -716,11 +716,15 @@ func TestValidateMandatoryClaims_Optional(t *testing.T) {
 
 // Test Refresh functionality
 func TestRefresh(t *testing.T) {
+	// Create revocation manager
+	backend := NewMemoryRevocationBackend()
+	revManager := NewRevocationManager(backend)
+	
 	cfg := NewJWTConfig()
 	cfg.SigningAlgorithm = HS256
 	cfg.CfgSigningKey = &secure.DefaultCredentialConfig{Password: "test-secret"}
 	
-	provider, err := NewProvider(cfg)
+	provider, err := NewProvider(cfg, WithRevocationManager(revManager))
 	require.NoError(t, err)
 	p := provider.(*jwtProvider)
 
