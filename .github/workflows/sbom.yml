@@ -1,0 +1,53 @@
+name: Generate and Scan SBOM
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  sbom-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install cyclonedx-gomod
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Generate SBOM (CycloneDX JSON)
+        run: cyclonedx-gomod mod -licenses -json -output sbom.json
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan SBOM for Vulnerabilities
+        run: trivy sbom --input sbom.json --format table --severity CRITICAL,HIGH
+
+      - name: Save Trivy Report
+        run: trivy sbom --input sbom.json --format json --output trivy-report.json
+
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
+      - name: Enforce Vulnerability Policy
+        run: |
+          trivy sbom --input sbom.json --exit-code 1 --severity CRITICAL,HIGH
