@@ -40,3 +40,7 @@ func (s *kvStore) AddIfNotExists(nonce string) bool {
 	
 	return true
 }
+
+func (s *kvStore) Close() {
+	// KV interface doesn't have Close method, so this is a no-op
+}

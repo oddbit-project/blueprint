@@ -69,6 +69,6 @@ func (r *redisStore) AddIfNotExists(nonce string) bool {
 }
 
 // Close closes the Redis client connection (optional cleanup)
-func (r *redisStore) Close() error {
-	return r.client.Close()
+func (r *redisStore) Close() {
+	_ = r.client.Close()
 }

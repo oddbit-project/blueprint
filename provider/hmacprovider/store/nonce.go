@@ -12,4 +12,5 @@ const (
 
 type NonceStore interface {
 	AddIfNotExists(nonce string) bool
+	Close()
 }

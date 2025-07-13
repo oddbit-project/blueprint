@@ -5,11 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/provider/hmacprovider/store"
-	"io"
-	"time"
 )
 
 const (
@@ -63,10 +64,21 @@ func NewHmacProvider(secretKey *secure.Credential, opts ...HMACProviderOption) *
 
 // SHA256Sign generate a simple SHA256 HMAC, no nounce, no timestamp
 func (h *HMACProvider) SHA256Sign(data io.Reader) (string, error) {
-	content, err := io.ReadAll(data)
+	// Limit input size to prevent DoS
+	limitedReader := io.LimitReader(data, int64(h.maxInputSize))
+	content, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", err
 	}
+	
+	// Check if we hit the limit
+	if len(content) == h.maxInputSize {
+		// Try to read one more byte to see if there's more data
+		if _, err := data.Read(make([]byte, 1)); err != io.EOF {
+			return "", errors.New("input too large")
+		}
+	}
+	
 	secret, err := h.secret.GetBytes()
 	if err != nil {
 		return "", err

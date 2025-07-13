@@ -111,6 +111,11 @@ func (ns *memStore) AddIfNotExists(nonce string) bool {
 		// for high-traffic apis use other backends for nonce
 		if len(ns.nonces) >= ns.maxSize {
 			ns.evictPolicy(ns)
+			
+			// If still at capacity after eviction, reject
+			if len(ns.nonces) >= ns.maxSize {
+				return false
+			}
 		}
 	}
 
@@ -119,9 +124,8 @@ func (ns *memStore) AddIfNotExists(nonce string) bool {
 	return true
 }
 
-func (ns *memStore) Close() error {
+func (ns *memStore) Close() {
 	close(ns.done)
-	return nil
 }
 
 func (ns *memStore) cleanupExpiredLocked(now time.Time) {
