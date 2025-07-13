@@ -2,7 +2,6 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 	"github.com/oddbit-project/blueprint/provider/jwtprovider"
 )
 
@@ -23,18 +22,15 @@ func NewAuthJWT(p jwtprovider.JWTParser) Provider {
 func (a *authJWT) CanAccess(c *gin.Context) bool {
 	token, valid := GetJWTToken(c)
 	if !valid {
-		response.Http401(c)
 		return false
 	}
 
 	claims, err := a.parser.ParseToken(token)
 	if err != nil || len(claims.ID) == 0 {
-		response.Http401(c)
 		return false
 	}
 
 	c.Set(ContextJwtClaims, claims)
-	c.Next()
 	return true
 }
 
