@@ -14,7 +14,7 @@ import (
 func main() {
 	// Configure logger
 	log.Configure(log.NewDefaultConfig())
-	logger := log.New("jwt-session-sample")
+	logger := log.New("jwtprovider-sample")
 
 	// Create server config
 	srvConfig := httpserver.NewServerConfig()
@@ -37,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 	cfg.ExpirationSeconds = 3600 // 1 hour
-	cfg.Issuer = "jwt-session-example"
+	cfg.Issuer = "jwtprovider-example"
 	cfg.Audience = "api-users"
 
 	// optional - create a revocation manager instance for token revocation

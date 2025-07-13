@@ -93,22 +93,22 @@ func (c *HMACClient) makeRequest(method, path string, body interface{}) (*http.R
 	return c.client.Do(req)
 }
 
-// GET request
+// Get request
 func (c *HMACClient) Get(path string) (*http.Response, error) {
 	return c.makeRequest("GET", path, nil)
 }
 
-// POST request
+// Post request
 func (c *HMACClient) Post(path string, body interface{}) (*http.Response, error) {
 	return c.makeRequest("POST", path, body)
 }
 
-// PUT request
+// Put request
 func (c *HMACClient) Put(path string, body interface{}) (*http.Response, error) {
 	return c.makeRequest("PUT", path, body)
 }
 
-// DELETE request
+// Delete request
 func (c *HMACClient) Delete(path string) (*http.Response, error) {
 	return c.makeRequest("DELETE", path, nil)
 }
