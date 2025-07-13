@@ -32,6 +32,12 @@ type RevocationBackend interface {
 
 	// Close closes the backend and releases resources
 	Close() error
+
+	// TrackUserToken associates a token with a user
+	TrackUserToken(userID, tokenID string, expiresAt time.Time)
+
+	// GetUserTokens returns all active tokens for a user
+	GetUserTokens(userID string) []string
 }
 
 // RevokedToken represents a revoked token
@@ -40,6 +46,16 @@ type RevokedToken struct {
 	UserID    string    `json:"userId,omitempty"`
 	RevokedAt time.Time `json:"revokedAt"`
 	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// TokenMetadata represents metadata for an active token
+type TokenMetadata struct {
+	TokenID   string    `json:"tokenId"`
+	UserID    string    `json:"userId"`
+	IssuedAt  time.Time `json:"issuedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	ClientIP  string    `json:"clientIP,omitempty"`  // For security audit
+	UserAgent string    `json:"userAgent,omitempty"` // For device tracking
 }
 
 // RevocationManager manages token revocation

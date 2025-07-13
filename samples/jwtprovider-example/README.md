@@ -1,6 +1,7 @@
 # JWT Provider Example
 
-This example demonstrates how to implement JWT authentication with the Blueprint framework using the `jwtprovider` package. It showcases a complete JWT authentication system with stateful sessions, token revocation, and proper security practices.
+This example demonstrates how to implement JWT authentication with the Blueprint framework using the `jwtprovider` package.
+It showcases a complete JWT authentication system with stateful sessions, token revocation, and proper security practices.
 
 ## Features
 
@@ -17,7 +18,7 @@ This example demonstrates how to implement JWT authentication with the Blueprint
 
 ```bash
 # Build the example
-go build -o jwt-example main.go
+go build -o jwtprovider-example main.go
 
 # Run the server
 ./jwt-example

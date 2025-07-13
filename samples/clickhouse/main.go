@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/oddbit-project/blueprint/provider/clickhouse"
-	"log"
 	"os"
 	"time"
+
+	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/provider/clickhouse"
 )
 
 // SampleRecord demonstrates a struct for repository operations
@@ -19,6 +20,10 @@ type SampleRecord struct {
 }
 
 func main() {
+	// Configure logger
+	log.Configure(log.NewDefaultConfig())
+	logger := log.New("clickhouse-sample")
+
 	// Create a configuration
 	config := clickhouse.NewClientConfig()
 	config.Hosts = []string{"localhost:9000"}
@@ -29,14 +34,14 @@ func main() {
 	// Connect to ClickHouse
 	client, err := clickhouse.NewClient(config)
 	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
+		logger.Fatal(err, "Failed to create client")
 	}
 	defer client.Close()
 
 	// Test connection with a ping
 	ctx := context.Background()
 	if err = client.Ping(ctx); err != nil {
-		log.Fatalf("Failed to ping server: %v", err)
+		logger.Fatal(err, "Failed to ping server")
 	}
 	fmt.Println("Connected to ClickHouse server")
 
@@ -69,7 +74,7 @@ func main() {
 	) ENGINE = MergeTree() ORDER BY id
 	`
 	if err = client.Conn.Exec(ctx, createTableSQL); err != nil {
-		log.Printf("Note: Could not create table: %v", err)
+		logger.Warn("Could not create table: " + err.Error())
 		// Continue anyway for demo purposes
 	} else {
 		fmt.Println("Sample table created")
@@ -93,14 +98,14 @@ func main() {
 		}
 
 		if err = repo.Insert(sampleRecords...); err != nil {
-			log.Printf("Failed to insert records: %v", err)
+			logger.Error(err, "Failed to insert records")
 		} else {
 			fmt.Println("Inserted sample records")
 
 			// Fetch records - note: ClickHouse uses 1/0 for booleans, not TRUE/FALSE
 			var records []SampleRecord
 			if err = repo.FetchWhere(map[string]any{"is_active": 1}, &records); err != nil {
-				log.Printf("Failed to fetch records: %v", err)
+				logger.Error(err, "Failed to fetch records")
 			} else {
 				fmt.Printf("Found %d active records:\n", len(records))
 				for _, record := range records {
@@ -113,7 +118,7 @@ func main() {
 			var count uint64
 			row := client.Conn.QueryRow(ctx, "SELECT COUNT(*) FROM sample_table")
 			if err := row.Scan(&count); err != nil {
-				log.Printf("Failed to count records: %v", err)
+				logger.Error(err, "Failed to count records")
 			} else {
 				fmt.Printf("Total records: %d\n", count)
 			}

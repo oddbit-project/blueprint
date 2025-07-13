@@ -229,19 +229,40 @@ func main() {
 }
 ```
 
-## Documentation
+Example config file *sample.json*:
+```json
+{
+  "server": {
+    "host": "localhost",
+    "port": 8080,
+    "readTimeout": 30,
+    "writeTimeout": 30,
+    "debug": true,
+    "tlsEnable": false,
+    "tlsCert": "",
+    "tlsKey": "",
+    "options": {
+      "authTokenSecret": "your-api-secret-key-here"
+    }
+  },
+  "jwt": {
+    "signingKey": {
+      "password": "your-jwt-secret-key-change-in-production"
+    },
+    "signingAlgorithm": "HS256",
+    "expirationSeconds": 3600,
+    "issuer": "sample-application",
+    "audience": "api-users",
+    "keyID": "default",
+    "requireIssuer": true,
+    "requireAudience": true,
+    "trackUserTokens": false,
+    "maxUserSessions": 0,
+    "maxTokenSize": 4096
+  }
+}
+```
 
-For comprehensive guides and API documentation, see:
-
-- **HTTP Server Framework**: [docs/provider/httpserver/index.md](docs/provider/httpserver/index.md)
-- **Security & Authentication**: [docs/provider/httpserver/auth.md](docs/provider/httpserver/auth.md)
-- **Middleware System**: [docs/provider/httpserver/middleware.md](docs/provider/httpserver/middleware.md)
-- **CSRF Protection**: [docs/provider/httpserver/security.md](docs/provider/httpserver/security.md)
-- **Session Management**: [docs/provider/httpserver/session.md](docs/provider/httpserver/session.md)
-- **Performance Guide**: [docs/provider/httpserver/performance.md](docs/provider/httpserver/performance.md)
-- **API Reference**: [docs/provider/httpserver/api-reference.md](docs/provider/httpserver/api-reference.md)
-- **Examples**: [docs/provider/httpserver/examples.md](docs/provider/httpserver/examples.md)
-- **Troubleshooting**: [docs/provider/httpserver/troubleshooting.md](docs/provider/httpserver/troubleshooting.md)
 
 ## License information
 

@@ -4,7 +4,8 @@ Blueprint provides a flexible authentication system for HTTP applications with s
 
 1. **Token-based Authentication**: Simple API key authentication using custom headers
 2. **JWT-based Authentication**: Stateless JWT token authentication with full claim validation
-3. **Custom Authentication**: Extensible provider interface for custom authentication methods
+3. **HMAC-based Authentication**: Cryptographic authentication using HMAC signatures with timestamp and nonce protection
+4. **Custom Authentication**: Extensible provider interface for custom authentication methods
 
 ## Architecture Overview
 
@@ -14,8 +15,11 @@ The authentication system consists of a unified interface with multiple implemen
 - **AuthMiddleware**: Gin middleware for applying authentication to routes
 - **Token Provider**: API key authentication (`provider/httpserver/auth/token.go`)
 - **JWT Provider**: JWT token authentication (`provider/httpserver/auth/jwt.go`)
+- **HMAC Provider**: HMAC signature authentication (`provider/httpserver/auth/hmac.go`)
 
-> **Integration Note**: JWT authentication integrates with the `provider/jwtprovider` package for full JWT functionality including asymmetric algorithms, token revocation, and JWKS support.
+> **Integration Notes**: 
+> - JWT authentication integrates with the `provider/jwtprovider` package for full JWT functionality including asymmetric algorithms, token revocation, and JWKS support.
+> - HMAC authentication integrates with the `provider/hmacprovider` package for cryptographic signature verification with replay attack protection.
 
 ## Features
 
@@ -24,12 +28,16 @@ The authentication system consists of a unified interface with multiple implemen
 - **Gin Middleware**: Easy integration with Gin router middleware
 - **Flexible Headers**: Configurable header names for token authentication
 - **JWT Integration**: Full JWT validation with claims context injection
+- **HMAC Authentication**: Cryptographic signature-based authentication
 - **Extensible Design**: Easy to add custom authentication providers
 
 ### Security Features
 - **Bearer Token Support**: Standard Authorization header parsing
 - **Header Validation**: Strict token format validation
 - **Claims Context**: JWT claims available in request context
+- **HMAC Signatures**: Request body integrity verification
+- **Replay Protection**: Timestamp and nonce validation for HMAC
+- **DoS Protection**: Input size limits and rate limiting
 - **401 Response**: Automatic unauthorized response handling
 
 ## Authentication Providers
@@ -92,6 +100,69 @@ router.Use(auth.AuthMiddleware(authProvider))
 - **Claims Context**: JWT claims available via `auth.ContextJwtClaims`
 - **Integration**: Uses `provider/jwtprovider` for all JWT operations
 
+### HMAC-based Authentication
+
+High-security authentication using HMAC-SHA256 signatures with timestamp and nonce protection:
+
+```go
+import (
+    "github.com/oddbit-project/blueprint/provider/hmacprovider"
+    "github.com/oddbit-project/blueprint/crypt/secure"
+)
+
+// Create HMAC provider
+secretConfig := &secure.DefaultCredentialConfig{Password: "your-hmac-secret"}
+key, err := secure.GenerateKey()
+if err != nil {
+    log.Fatal(err)
+}
+
+credential, err := secure.CredentialFromConfig(secretConfig, key, false)
+if err != nil {
+    log.Fatal(err)
+}
+
+hmacProvider := hmacprovider.NewHmacProvider(credential)
+
+// Create HMAC auth provider
+authProvider := auth.HMACAuth(hmacProvider)
+
+// Apply to routes
+router.Use(auth.AuthMiddleware(authProvider))
+```
+
+**HMAC Features:**
+- **Signature Verification**: HMAC-SHA256 signature validation of request body
+- **Timestamp Protection**: Configurable time window validation (default: 5 minutes)
+- **Replay Protection**: Nonce-based replay attack prevention
+- **Request Integrity**: Complete request body verification
+- **Storage Options**: Memory or Redis-based nonce storage
+- **DoS Protection**: Maximum input size limits (default: 32MB)
+
+**Required Headers:**
+- `X-HMAC-Hash`: HMAC-SHA256 signature of `timestamp:nonce:body`
+- `X-HMAC-Timestamp`: RFC3339 timestamp string
+- `X-HMAC-Nonce`: UUID v4 nonce for replay protection
+
+**HMAC Configuration Options:**
+```go
+// Custom nonce store (Redis)
+// Redis nonce store setup
+redisStore := store.NewRedisNonceStore(redisClient)
+
+// Create credential from config
+secretConfig := &secure.DefaultCredentialConfig{PasswordEnvVar: "HMAC_SECRET"}
+key, _ := secure.GenerateKey()
+credential, _ := secure.CredentialFromConfig(secretConfig, key, false)
+
+hmacProvider := hmacprovider.NewHmacProvider(
+    credential,
+    hmacprovider.WithNonceStore(redisStore),
+    hmacprovider.WithKeyInterval(10*time.Minute), // Allow 10-minute time drift
+    hmacprovider.WithMaxInputSize(64*1024*1024),  // 64MB max input
+)
+```
+
 ## Using Authentication
 
 ### Basic Setup
@@ -113,6 +184,10 @@ func main() {
     // Option 2: JWT authentication
     jwtProvider := setupJWTProvider() // See JWT setup below
     jwtAuth := auth.NewAuthJWT(jwtProvider)
+    
+    // Option 3: HMAC authentication
+    hmacProvider := setupHMACProvider() // See HMAC setup below
+    hmacAuth := auth.HMACAuth(hmacProvider)
     
     // Apply authentication to specific routes
     protected := router.Group("/api")
@@ -153,6 +228,32 @@ func setupJWTProvider() jwtprovider.JWTParser {
     if err != nil {
         panic(err)
     }
+    
+    return provider
+}
+
+func setupHMACProvider() *hmacprovider.HMACProvider {
+    // Configure HMAC
+    secretConfig := &secure.DefaultCredentialConfig{
+        Password: "your-hmac-secret-key",
+    }
+    
+    key, err := secure.GenerateKey()
+    if err != nil {
+        panic(err)
+    }
+    
+    credential, err := secure.CredentialFromConfig(secretConfig, key, false)
+    if err != nil {
+        panic(err)
+    }
+    
+    // Create provider with custom options
+    provider := hmacprovider.NewHmacProvider(
+        credential,
+        hmacprovider.WithKeyInterval(10*time.Minute), // 10-minute time drift
+        hmacprovider.WithMaxInputSize(64*1024*1024),  // 64MB max
+    )
     
     return provider
 }
@@ -210,6 +311,32 @@ func protectedHandler(c *gin.Context) {
 }
 ```
 
+#### HMAC Authentication
+
+HMAC authentication injects authentication metadata into the context:
+
+```go
+func protectedHandler(c *gin.Context) {
+    // Check if request was authenticated via HMAC
+    authenticated, exists := c.Get(auth.AuthFlag)
+    if !exists || !authenticated.(bool) {
+        c.JSON(500, gin.H{"error": "authentication info not found"})
+        return
+    }
+    
+    // Get authentication metadata
+    timestamp, _ := c.Get(auth.AuthTimestamp)
+    nonce, _ := c.Get(auth.AuthNonce)
+    
+    c.JSON(200, gin.H{
+        "message": "Access granted via HMAC",
+        "timestamp": timestamp,
+        "nonce": nonce,
+        "client_ip": c.ClientIP(),
+    })
+}
+```
+
 ### Route-specific Authentication
 
 ```go
@@ -239,6 +366,14 @@ func setupRoutes(router *gin.Engine) {
     {
         adminRoutes.GET("/users", listUsersHandler)
         adminRoutes.DELETE("/users/:id", deleteUserHandler)
+    }
+    
+    // High-security routes with HMAC authentication
+    secureRoutes := router.Group("/secure")
+    secureRoutes.Use(auth.AuthMiddleware(hmacAuth))
+    {
+        secureRoutes.POST("/webhook", webhookHandler)
+        secureRoutes.PUT("/config", updateConfigHandler)
     }
 }
 ```
@@ -367,6 +502,8 @@ func createAuthProvider() auth.Provider {
         return createJWTAuth()
     case "token":
         return createTokenAuth()
+    case "hmac":
+        return createHMACAuth()
     default:
         panic("Invalid AUTH_TYPE")
     }
@@ -398,6 +535,35 @@ func createTokenAuth() auth.Provider {
     apiKey := os.Getenv("API_KEY")
     return auth.NewAuthToken(headerName, apiKey)
 }
+
+func createHMACAuth() auth.Provider {
+    secretConfig := &secure.DefaultCredentialConfig{
+        PasswordEnvVar: "HMAC_SECRET",
+    }
+    
+    key, err := secure.GenerateKey()
+    if err != nil {
+        panic(err)
+    }
+    
+    credential, err := secure.CredentialFromConfig(secretConfig, key, false)
+    if err != nil {
+        panic(err)
+    }
+    
+    // Create HMAC provider with environment-based configuration
+    opts := []hmacprovider.HMACProviderOption{}
+    
+    // Optional: Configure with environment variables
+    if intervalStr := os.Getenv("HMAC_KEY_INTERVAL"); intervalStr != "" {
+        if interval, err := time.ParseDuration(intervalStr); err == nil {
+            opts = append(opts, hmacprovider.WithKeyInterval(interval))
+        }
+    }
+    
+    provider := hmacprovider.NewHmacProvider(credential, opts...)
+    return auth.HMACAuth(provider)
+}
 ```
 
 ### Multiple Authentication Methods
@@ -407,6 +573,7 @@ func setupMultipleAuth(router *gin.Engine) {
     // Create different auth providers
     apiKeyAuth := auth.NewAuthToken("X-API-Key", "api-secret")
     jwtAuth := auth.NewAuthJWT(jwtProvider)
+    hmacAuth := auth.HMACAuth(hmacProvider)
     adminAuth := auth.NewAuthToken("X-Admin-Key", "admin-secret")
     
     // Public endpoints
@@ -425,6 +592,14 @@ func setupMultipleAuth(router *gin.Engine) {
     {
         user.GET("/profile", getUserProfileHandler)
         user.PUT("/profile", updateUserProfileHandler)
+    }
+    
+    // HMAC authentication for high-security operations
+    secure := router.Group("/secure")
+    secure.Use(auth.AuthMiddleware(hmacAuth))
+    {
+        secure.POST("/webhook", webhookHandler)
+        secure.PUT("/sensitive-data", updateSensitiveDataHandler)
     }
     
     // Admin authentication for admin operations
@@ -459,6 +634,13 @@ func setupMultipleAuth(router *gin.Engine) {
    - Implement rate limiting on authentication endpoints
    - Log authentication failures for monitoring
 
+4. **HMAC Security**
+   - Use cryptographically strong secret keys (minimum 32 bytes)
+   - Implement proper time drift tolerance (5-10 minutes maximum)
+   - Use Redis or persistent storage for nonce store in production
+   - Monitor and alert on HMAC verification failures
+   - Implement request size limits to prevent DoS attacks
+
 ### Development Practices
 
 1. **Testing**
@@ -485,6 +667,7 @@ func setupMultipleAuth(router *gin.Engine) {
    - Cache validated tokens when appropriate
    - Use Redis for session-based custom authentication
    - Implement token validation caching for JWT
+   - Use Redis nonce store for HMAC in distributed systems
 
 2. **Database Queries**
    - Optimize user lookup queries in custom providers
@@ -608,7 +791,90 @@ const (
     DefaultTokenAuthHeader = "X-API-Key"           // Default header for token auth
     ErrMissingAuthHeader   = "missing or invalid Authorization header"  // JWT auth error
     ContextJwtClaims       = "jwtClaims"          // Context key for JWT claims
+    
+    // HMAC Authentication Headers
+    HeaderHMACHash         = "X-HMAC-Hash"        // HMAC signature header
+    HeaderHMACTimestamp    = "X-HMAC-Timestamp"   // HMAC timestamp header
+    HeaderHMACNonce        = "X-HMAC-Nonce"       // HMAC nonce header
+    
+    // HMAC Context Keys
+    AuthFlag               = "Authenticated"       // Authentication status flag
+    AuthTimestamp          = "AuthTimestamp"      // Authentication timestamp
+    AuthNonce              = "AuthNonce"          // Authentication nonce
 )
+```
+
+## Client-Side HMAC Implementation
+
+When using HMAC authentication, clients must generate the proper headers using the same hmacprovider. Here's an example implementation:
+
+```go
+package main
+
+import (
+    "bytes"
+    "fmt"
+    "net/http"
+    
+    "github.com/oddbit-project/blueprint/provider/hmacprovider"
+    "github.com/oddbit-project/blueprint/crypt/secure"
+)
+
+func makeHMACRequest(url, method string, body []byte, secretKey string) error {
+    // Create HMAC provider (same configuration as server)
+    key, err := secure.GenerateKey()
+    if err != nil {
+        return fmt.Errorf("failed to generate key: %w", err)
+    }
+    
+    credential, err := secure.NewCredential([]byte(secretKey), key, false)
+    if err != nil {
+        return fmt.Errorf("failed to create credential: %w", err)
+    }
+    
+    provider := hmacprovider.NewHmacProvider(credential)
+    
+    // Generate HMAC signature with timestamp and nonce
+    bodyReader := bytes.NewReader(body)
+    hash, timestamp, nonce, err := provider.Sign256(bodyReader)
+    if err != nil {
+        return fmt.Errorf("failed to generate HMAC: %w", err)
+    }
+    
+    // Create request
+    req, err := http.NewRequest(method, url, bytes.NewReader(body))
+    if err != nil {
+        return err
+    }
+    
+    // Set HMAC headers
+    req.Header.Set("X-HMAC-Hash", hash)
+    req.Header.Set("X-HMAC-Timestamp", timestamp)
+    req.Header.Set("X-HMAC-Nonce", nonce)
+    req.Header.Set("Content-Type", "application/json")
+    
+    // Send request
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    
+    fmt.Printf("Response Status: %s\n", resp.Status)
+    return nil
+}
+
+// Example usage
+func main() {
+    body := []byte(`{"message": "Hello, World!"}`)
+    secretKey := "your-shared-secret-key"
+    
+    err := makeHMACRequest("https://api.example.com/webhook", "POST", body, secretKey)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+    }
+}
 ```
 
 The authentication system provides a clean, unified interface for multiple authentication methods while maintaining flexibility and security. Choose the appropriate provider based on your application's requirements and integrate it seamlessly with Blueprint's other HTTP components.

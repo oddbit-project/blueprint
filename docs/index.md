@@ -20,19 +20,21 @@
 ## Security
 
 - [Secure Credentials](crypt/secure-credentials.md)
+- [HMAC Provider](provider/hmacprovider.md)
 - [htpasswd Authentication](provider/htpasswd.md)
 - [TLS](provider/tls.md)
 
 ## Providers
 
 - [Clickhouse](provider/clickhouse.md)
+- [HMAC Provider](provider/hmacprovider.md)
 - [htpasswd](provider/htpasswd.md)
+- [JWT Provider](provider/jwtprovider.md)
 - [Kafka](provider/kafka.md)
-- [PostgreSQL](provider/pgsql.md)
 - [MQTT](provider/mqtt.md)
 - [NATS](provider/nats.md)
+- [PostgreSQL](provider/pgsql.md)
 - [TLS](provider/tls.md)
-- [JWT Provider](provider/jwtprovider.md)
 
 ## Logging
 

@@ -3,10 +3,31 @@ package jwtprovider
 import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
+	"fmt"
+	"strings"
 )
+
+const (
+	JWTIDLength = 32 // bytes of entropy
+)
+
+// GenerateSecureJWTID generates a cryptographically secure JWT ID
+func GenerateSecureJWTID() (string, error) {
+	// Use 32 bytes (256 bits) of entropy
+	bytes := make([]byte, JWTIDLength)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secure random ID: %w", err)
+	}
+
+	// Use URL-safe base64 encoding (no padding)
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
 
 func decodePrivateRSA(data []byte) ([]byte, error) {
 	// Decode the PEM block
@@ -120,4 +141,13 @@ func decodePublicEdDSA(data []byte) ([]byte, error) {
 		return nil, ErrInvalidPublicKeyType
 	}
 	return pubKey, nil
+}
+
+func isReservedClaim(key string) bool {
+	reserved := map[string]bool{
+		"iss": true, "sub": true, "aud": true,
+		"exp": true, "nbf": true, "iat": true,
+		"jti": true, "typ": true, "alg": true,
+	}
+	return reserved[strings.ToLower(key)]
 }
