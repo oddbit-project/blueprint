@@ -2,17 +2,21 @@ package main
 
 import (
 	"fmt"
-	"log"
 
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/jwtprovider"
 )
 
 func main() {
+	// Configure logger
+	log.Configure(log.NewDefaultConfig())
+	logger := log.New("jwt-user-tracking")
+
 	// Create JWT provider with user tracking enabled
 	signingKey := []byte("my-secret-key-for-jwt-signing-must-be-32-bytes-long!")
 	cfg, err := jwtprovider.NewJWTConfigWithKey(signingKey)
 	if err != nil {
-		log.Fatal("Failed to create config:", err)
+		logger.Fatal(err, "Failed to create config")
 	}
 	cfg.TrackUserTokens = true    // Enable user token tracking
 	cfg.MaxUserSessions = 3       // Maximum 3 concurrent sessions per user
@@ -28,7 +32,7 @@ func main() {
 		jwtprovider.WithRevocationManager(revocationMgr),
 	)
 	if err != nil {
-		log.Fatal("Failed to create provider:", err)
+		logger.Fatal(err, "Failed to create provider")
 	}
 	defer revocationMgr.Close()
 
@@ -51,7 +55,7 @@ func main() {
 				fmt.Printf("  Token %d: FAILED - %v\n", i, err)
 				continue
 			}
-			log.Fatal("Failed to generate token:", err)
+			logger.Fatal(err, "Failed to generate token")
 		}
 		
 		tokens = append(tokens, token)
@@ -67,7 +71,7 @@ func main() {
 	// Show active tokens
 	activeTokens, err := provider.GetActiveUserTokens(userID)
 	if err != nil {
-		log.Fatal("Failed to get active tokens:", err)
+		logger.Fatal(err, "Failed to get active tokens")
 	}
 	
 	fmt.Printf("Active tokens for user '%s': %d\n", userID, len(activeTokens))
@@ -82,7 +86,7 @@ func main() {
 		fmt.Printf("Revoking one token manually...\n")
 		err = provider.RevokeToken(tokens[0])
 		if err != nil {
-			log.Fatal("Failed to revoke token:", err)
+			logger.Fatal(err, "Failed to revoke token")
 		}
 		
 		count := provider.GetUserSessionCount(userID)
@@ -93,7 +97,7 @@ func main() {
 	fmt.Printf("Revoking all tokens for user '%s'...\n", userID)
 	err = provider.RevokeAllUserTokens(userID)
 	if err != nil {
-		log.Fatal("Failed to revoke all user tokens:", err)
+		logger.Fatal(err, "Failed to revoke all user tokens")
 	}
 	
 	count := provider.GetUserSessionCount(userID)
