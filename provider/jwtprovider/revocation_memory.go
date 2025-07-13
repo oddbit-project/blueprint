@@ -9,6 +9,7 @@ import (
 type MemoryRevocationBackend struct {
 	revokedTokens  map[string]*RevokedToken
 	userTokens     map[string][]string // userID -> []tokenID
+	tokenMetadata  map[string]*TokenMetadata // tokenID -> metadata
 	mutex          sync.RWMutex
 	cleanupTicker  *time.Ticker
 	stopCleanup    chan bool
@@ -20,6 +21,7 @@ func NewMemoryRevocationBackend() *MemoryRevocationBackend {
 	backend := &MemoryRevocationBackend{
 		revokedTokens: make(map[string]*RevokedToken),
 		userTokens:    make(map[string][]string),
+		tokenMetadata: make(map[string]*TokenMetadata),
 		stopCleanup:   make(chan bool),
 	}
 
@@ -51,23 +53,26 @@ func (m *MemoryRevocationBackend) IsTokenRevoked(tokenID string) bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
+	now := time.Now()
 	revokedToken, exists := m.revokedTokens[tokenID]
-	if !exists {
-		return false
-	}
 
-	// Check if revocation has expired
-	if time.Now().After(revokedToken.ExpiresAt) {
-		// Clean up expired revocation entry
-		go func() {
-			m.mutex.Lock()
+	// Constant-time check: always perform the same operations
+	isRevoked := exists && !now.After(revokedToken.ExpiresAt)
+
+	// Cleanup expired tokens (if needed) after the timing-sensitive check
+	if exists && now.After(revokedToken.ExpiresAt) {
+		// Promote to write lock for cleanup
+		m.mutex.RUnlock()
+		m.mutex.Lock()
+		// Double-check after acquiring write lock
+		if token, stillExists := m.revokedTokens[tokenID]; stillExists && now.After(token.ExpiresAt) {
 			delete(m.revokedTokens, tokenID)
-			m.mutex.Unlock()
-		}()
-		return false
+		}
+		m.mutex.Unlock()
+		m.mutex.RLock() // Reacquire read lock for defer
 	}
 
-	return true
+	return isRevoked
 }
 
 // RevokeAllUserTokens revokes all tokens for a specific user
@@ -75,31 +80,37 @@ func (m *MemoryRevocationBackend) RevokeAllUserTokens(userID string, issuedBefor
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	// Get all tokens for this user
 	tokenIDs, exists := m.userTokens[userID]
-	if !exists {
-		return nil // No tokens to revoke
+	if !exists || len(tokenIDs) == 0 {
+		return nil
 	}
 
-	// Revoke each token issued before the specified time
+	revokedCount := 0
+	now := time.Now()
+	
 	for _, tokenID := range tokenIDs {
-		if revokedToken, exists := m.revokedTokens[tokenID]; exists {
-			// If token already revoked, check if it was issued before
-			if revokedToken.RevokedAt.Before(issuedBefore) {
-				continue
-			}
+		// Skip if already revoked
+		if _, alreadyRevoked := m.revokedTokens[tokenID]; alreadyRevoked {
+			continue
 		}
 
-		// Create a far-future expiration for user token revocation
-		// In practice, you'd want to set this to the original token expiration
-		farFuture := time.Now().Add(24 * time.Hour * 365) // 1 year
+		// Get token metadata for proper expiration
+		var expiresAt time.Time
+		if metadata, hasMetadata := m.tokenMetadata[tokenID]; hasMetadata {
+			expiresAt = metadata.ExpiresAt
+		} else {
+			// Fallback to 24 hours if no metadata
+			expiresAt = now.Add(24 * time.Hour)
+		}
 
+		// Create revocation entry
 		m.revokedTokens[tokenID] = &RevokedToken{
 			TokenID:   tokenID,
 			UserID:    userID,
-			RevokedAt: time.Now(),
-			ExpiresAt: farFuture,
+			RevokedAt: now,
+			ExpiresAt: expiresAt,
 		}
+		revokedCount++
 	}
 
 	return nil
@@ -127,32 +138,46 @@ func (m *MemoryRevocationBackend) CleanupExpired() error {
 	defer m.mutex.Unlock()
 
 	now := time.Now()
+	
+	// Clean expired revocations
 	for tokenID, revokedToken := range m.revokedTokens {
 		if now.After(revokedToken.ExpiresAt) {
 			delete(m.revokedTokens, tokenID)
-
-			// Also clean up user token mapping
-			if revokedToken.UserID != "" {
-				if tokenIDs, exists := m.userTokens[revokedToken.UserID]; exists {
-					// Remove token from user's token list
-					newTokenIDs := make([]string, 0, len(tokenIDs))
-					for _, id := range tokenIDs {
-						if id != tokenID {
-							newTokenIDs = append(newTokenIDs, id)
-						}
-					}
-
-					if len(newTokenIDs) == 0 {
-						delete(m.userTokens, revokedToken.UserID)
-					} else {
-						m.userTokens[revokedToken.UserID] = newTokenIDs
-					}
-				}
-			}
+			m.removeUserToken(revokedToken.UserID, tokenID)
+		}
+	}
+	
+	// Clean expired metadata
+	for tokenID, metadata := range m.tokenMetadata {
+		if now.After(metadata.ExpiresAt) {
+			delete(m.tokenMetadata, tokenID)
+			m.removeUserToken(metadata.UserID, tokenID)
 		}
 	}
 
 	return nil
+}
+
+// removeUserToken removes a token from user's token list (must be called with lock held)
+func (m *MemoryRevocationBackend) removeUserToken(userID, tokenID string) {
+	if userID == "" {
+		return
+	}
+	
+	if tokenIDs, exists := m.userTokens[userID]; exists {
+		newTokenIDs := make([]string, 0, len(tokenIDs))
+		for _, id := range tokenIDs {
+			if id != tokenID {
+				newTokenIDs = append(newTokenIDs, id)
+			}
+		}
+		
+		if len(newTokenIDs) == 0 {
+			delete(m.userTokens, userID)
+		} else {
+			m.userTokens[userID] = newTokenIDs
+		}
+	}
 }
 
 // Close stops the cleanup process and releases resources
@@ -168,6 +193,7 @@ func (m *MemoryRevocationBackend) Close() error {
 	// Clear all data
 	m.revokedTokens = make(map[string]*RevokedToken)
 	m.userTokens = make(map[string][]string)
+	m.tokenMetadata = make(map[string]*TokenMetadata)
 
 	return nil
 }
@@ -198,13 +224,21 @@ func (m *MemoryRevocationBackend) startCleanup() {
 }
 
 // TrackUserToken associates a token with a user for bulk revocation
-func (m *MemoryRevocationBackend) TrackUserToken(userID, tokenID string) {
+func (m *MemoryRevocationBackend) TrackUserToken(userID, tokenID string, expiresAt time.Time) {
 	if userID == "" || tokenID == "" {
 		return
 	}
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	// Store token metadata
+	m.tokenMetadata[tokenID] = &TokenMetadata{
+		TokenID:   tokenID,
+		UserID:    userID,
+		IssuedAt:  time.Now(),
+		ExpiresAt: expiresAt,
+	}
 
 	if tokenIDs, exists := m.userTokens[userID]; exists {
 		// Check if token is already tracked
@@ -219,6 +253,26 @@ func (m *MemoryRevocationBackend) TrackUserToken(userID, tokenID string) {
 	}
 }
 
+// GetUserTokens returns all active tokens for a user
+func (m *MemoryRevocationBackend) GetUserTokens(userID string) []string {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	
+	tokens := make([]string, 0)
+	if tokenIDs, exists := m.userTokens[userID]; exists {
+		// Return a copy to avoid race conditions
+		tokens = make([]string, 0, len(tokenIDs))
+		// Filter out revoked tokens
+		for _, tokenID := range tokenIDs {
+			if _, isRevoked := m.revokedTokens[tokenID]; !isRevoked {
+				tokens = append(tokens, tokenID)
+			}
+		}
+	}
+	
+	return tokens
+}
+
 // Test helper methods for safe access to internal state
 // These methods should only be used in tests
 
@@ -228,57 +282,4 @@ func (m *MemoryRevocationBackend) hasRevokedToken(tokenID string) bool {
 	defer m.mutex.RUnlock()
 	_, exists := m.revokedTokens[tokenID]
 	return exists
-}
-
-// addRevokedTokenForTest adds a revoked token directly (for testing)
-func (m *MemoryRevocationBackend) addRevokedTokenForTest(tokenID string, revokedToken *RevokedToken) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.revokedTokens[tokenID] = revokedToken
-}
-
-// setUserTokensForTest sets user tokens directly (for testing)
-func (m *MemoryRevocationBackend) setUserTokensForTest(userID string, tokenIDs []string) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.userTokens[userID] = tokenIDs
-}
-
-// getRevokedTokenCountForTest returns the number of revoked tokens (for testing)
-func (m *MemoryRevocationBackend) getRevokedTokenCountForTest() int {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-	return len(m.revokedTokens)
-}
-
-// containsRevokedTokenForTest checks if a specific token is revoked (for testing)
-func (m *MemoryRevocationBackend) containsRevokedTokenForTest(tokenID string) bool {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-	_, exists := m.revokedTokens[tokenID]
-	return exists
-}
-
-// getUserTokensForTest gets user tokens (for testing)
-func (m *MemoryRevocationBackend) getUserTokensForTest(userID string) []string {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-	if tokens, exists := m.userTokens[userID]; exists {
-		result := make([]string, len(tokens))
-		copy(result, tokens)
-		return result
-	}
-	return nil
-}
-
-// getRevokedTokenForTest gets a revoked token safely (for testing)
-func (m *MemoryRevocationBackend) getRevokedTokenForTest(tokenID string) (*RevokedToken, bool) {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-	if token, exists := m.revokedTokens[tokenID]; exists {
-		// Return a copy to avoid race conditions
-		tokenCopy := *token
-		return &tokenCopy, true
-	}
-	return nil, false
 }

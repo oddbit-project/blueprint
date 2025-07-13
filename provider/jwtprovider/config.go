@@ -34,21 +34,27 @@ const (
 	ErrInvalidPublicKey      = utils.Error("invalid public key format")
 	ErrInvalidPublicKeyType  = utils.Error("invalid public key type")
 	ErrInvalidDuration       = utils.Error("invalid expirationSeconds value")
+	ErrInvalidMaxTokenSize   = utils.Error("invalid maxTokenSize")
 )
 
 // JWTConfig holds configuration for JWT tokens
 type JWTConfig struct {
-	CfgSigningKey     *secure.DefaultCredentialConfig `json:"signingKey,omitempty"` // SigningKey is the key used to sign JWT tokens
-	CfgPrivateKey     *secure.KeyConfig               `json:"privateKey,omitempty"` // PKCS#8 private key for asymmetric algorithms (RSA, ECDSA, EdDSA)
-	CfgPublicKey      *secure.KeyConfig               `json:"publicKey,omitempty"`  // PEM PKIX public key for asymmetric algorithms (RSA, ECDSA, EdDSA)
-	SigningAlgorithm  string                          `json:"signingAlgorithm"`     // SigningAlgorithm: HS256/HS384/HS512, RS256/RS384/RS512, ES256/ES384/ES512, EdDSA
-	ExpirationSeconds int                             `json:"expirationSeconds"`    // ExpirationSeconds
-	Issuer            string                          `json:"issuer"`               // Issuer is the issuer of the token
-	Audience          string                          `json:"audience"`             // Audience is the audience of the token
-	KeyID             string                          `json:"keyID"`                // KeyID for JWKS support
+	CfgSigningKey     *secure.DefaultCredentialConfig `json:"signingKey,omitempty"`   // SigningKey is the key used to sign JWT tokens
+	CfgPrivateKey     *secure.KeyConfig               `json:"privateKey,omitempty"`   // PKCS#8 private key for asymmetric algorithms (RSA, ECDSA, EdDSA)
+	CfgPublicKey      *secure.KeyConfig               `json:"publicKey,omitempty"`    // PEM PKIX public key for asymmetric algorithms (RSA, ECDSA, EdDSA)
+	SigningAlgorithm  string                          `json:"signingAlgorithm"`       // SigningAlgorithm: HS256/HS384/HS512, RS256/RS384/RS512, ES256/ES384/ES512, EdDSA
+	ExpirationSeconds int                             `json:"expirationSeconds"`      // ExpirationSeconds
+	Issuer            string                          `json:"issuer"`                 // Issuer is the issuer of the token
+	Audience          string                          `json:"audience"`               // Audience is the audience of the token
+	KeyID             string                          `json:"keyID"`                  // KeyID for JWKS support
+	MaxTokenSize      int                             `json:"maxTokenSize,omitempty"` // Max token size
 	// Enhanced validation flags
 	RequireIssuer   bool `json:"requireIssuer"`   // Mandatory issuer validation
 	RequireAudience bool `json:"requireAudience"` // Mandatory audience validation
+
+	// User token tracking
+	TrackUserTokens bool `json:"trackUserTokens"`           // Enable user token tracking
+	MaxUserSessions int  `json:"maxUserSessions,omitempty"` // Maximum concurrent sessions per user (0 = unlimited)
 
 	// internal vars
 	signingMethod jwt.SigningMethod // signingMethod is the method used to sign the token; filled on Validate()
@@ -76,10 +82,13 @@ func NewJWTConfig() *JWTConfig {
 		KeyID:             "default",
 		RequireIssuer:     true, // Enable by default for security
 		RequireAudience:   true, // Enable by default for security
+		TrackUserTokens:   false,
+		MaxUserSessions:   0, // Unlimited by default
 		signingKey:        nil,
 		privateKey:        nil,
 		publicKey:         nil,
 		validated:         false,
+		MaxTokenSize:      MaxJWTLength,
 	}
 }
 
@@ -343,6 +352,12 @@ func (c *JWTConfig) Validate() error {
 		return ErrInvalidSigningAlgorithm
 	}
 
+	if c.MaxTokenSize < 0 {
+		return ErrInvalidMaxTokenSize
+	}
+	if c.MaxTokenSize == 0 {
+		c.MaxTokenSize = MaxJWTLength
+	}
 	if c.ExpirationSeconds <= 0 {
 		return ErrInvalidDuration
 	}

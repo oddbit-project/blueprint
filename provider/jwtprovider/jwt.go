@@ -1,12 +1,12 @@
 package jwtprovider
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/oddbit-project/blueprint/provider/httpserver/session"
 	"github.com/oddbit-project/blueprint/utils"
 	"time"
 )
@@ -18,6 +18,12 @@ const (
 	ErrMissingIssuer           = utils.Error("issuer validation failed")
 	ErrMissingAudience         = utils.Error("audience validation failed")
 	ErrNoRevocationManager     = utils.Error("revocation manager not available")
+	ErrTokenParsingTimeout     = utils.Error("token parsing timeout")
+	ErrTokenTooLarge           = utils.Error("token too large")
+	ErrMaxSessionsExceeded     = utils.Error("maximum concurrent sessions exceeded")
+
+	MaxJWTLength = 8192 // 8KB max
+	MinJWTLength = 20   // Minimum viable JWT
 )
 
 const (
@@ -56,6 +62,9 @@ type JWTProvider interface {
 	JWTRevoker
 	JWTRefresher
 	GetRevocationManager() *RevocationManager
+	GetActiveUserTokens(userID string) ([]string, error)
+	RevokeAllUserTokens(userID string) error
+	GetUserSessionCount(userID string) int
 }
 
 // Claims custom claims type
@@ -94,11 +103,27 @@ func NewProvider(cfg *JWTConfig, opts ...ProviderOpts) (JWTProvider, error) {
 
 // GenerateToken generate a JWT token using the specified alg, and optionally include the customClaims data
 func (j *jwtProvider) GenerateToken(subject string, data map[string]any) (string, error) {
+	// Check session limit if enabled
+	if j.cfg.TrackUserTokens && j.cfg.MaxUserSessions > 0 {
+		if err := j.enforceSessionLimit(subject); err != nil {
+			return "", err
+		}
+	}
+
+	// Prevent header injection via custom claims
+	for key := range data {
+		if isReservedClaim(key) {
+			return "", fmt.Errorf("cannot use reserved claim: %s", key)
+		}
+	}
 	now := time.Now()
 	expiresAt := now.Add(j.cfg.expiration)
 
 	// Generate a unique JWT ID separate from session ID for security
-	jwtID := session.GenerateSessionID()
+	jwtID, err := GenerateSecureJWTID()
+	if err != nil {
+		return "", err
+	}
 
 	// Create claims
 	claims := &Claims{
@@ -128,17 +153,24 @@ func (j *jwtProvider) GenerateToken(subject string, data map[string]any) (string
 	}
 
 	// sign token
+	var tokenString string
 	switch j.cfg.SigningAlgorithm {
 	case HS256, HS384, HS512:
 		if key, err := j.cfg.signingKey.GetBytes(); err != nil {
 			return "", err
 		} else {
-			return token.SignedString(key)
+			tokenString, err = token.SignedString(key)
+			if err != nil {
+				return "", err
+			}
 		}
 	case RS256, RS384, RS512, ES256, ES384, ES512:
 		if data, err := j.cfg.privateKey.GetBytes(); err == nil {
 			if cert, err := x509.ParsePKCS8PrivateKey(data); err == nil {
-				return token.SignedString(cert)
+				tokenString, err = token.SignedString(cert)
+				if err != nil {
+					return "", err
+				}
 			} else {
 				return "", err
 			}
@@ -150,47 +182,85 @@ func (j *jwtProvider) GenerateToken(subject string, data map[string]any) (string
 		if data, err := j.cfg.privateKey.GetBytes(); err == nil {
 			// data should be raw ed25519.PrivateKey bytes (64 bytes)
 			privKey := ed25519.PrivateKey(data)
-			return token.SignedString(privKey)
+			tokenString, err = token.SignedString(privKey)
+			if err != nil {
+				return "", err
+			}
 		} else {
 			return "", err
 		}
 	default:
 		return "", ErrInvalidSigningAlgorithm
 	}
+
+	// Track the token for the user if tracking is enabled
+	if j.cfg.TrackUserTokens && j.revocationManager != nil {
+		if backend, ok := j.revocationManager.backend.(*MemoryRevocationBackend); ok {
+			backend.TrackUserToken(subject, jwtID, expiresAt)
+		}
+	}
+
+	return tokenString, nil
 }
 
 // ParseToken validates a JWT token and returns the claims
 func (j *jwtProvider) ParseToken(tokenString string) (*Claims, error) {
-	// Parse token
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		// ParseToken signing method
-		if token.Method.Alg() != j.cfg.signingMethod.Alg() {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
+	tokenLen := len(tokenString)
+	if tokenLen < MinJWTLength {
+		return nil, ErrInvalidToken
+	}
+	if tokenLen > j.cfg.MaxTokenSize {
+		return nil, ErrTokenTooLarge
+	}
 
-		// Return the appropriate verification key for the algorithm
-		switch j.cfg.SigningAlgorithm {
-		case HS256, HS384, HS512:
-			return j.cfg.signingKey.GetBytes()
-		case RS256, RS384, RS512, ES256, ES384, ES512:
-			bytes, err := j.cfg.publicKey.GetBytes()
-			if err != nil {
-				return nil, err
+	// Set parsing timeout to prevent DoS
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var token *jwt.Token
+	var err error
+
+	// Parse token
+	go func() {
+		token, err = jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+			// ParseToken signing method
+			if token.Method.Alg() != j.cfg.signingMethod.Alg() {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return x509.ParsePKIXPublicKey(bytes)
-		case EdDSA:
-			// For EdDSA, convert raw bytes back to ed25519.PublicKey
-			if data, err := j.cfg.publicKey.GetBytes(); err == nil {
-				// data should be raw ed25519.PublicKey bytes (32 bytes)
-				pubKey := ed25519.PublicKey(data)
-				return pubKey, nil
-			} else {
-				return nil, err
+
+			// Return the appropriate verification key for the algorithm
+			switch j.cfg.SigningAlgorithm {
+			case HS256, HS384, HS512:
+				return j.cfg.signingKey.GetBytes()
+			case RS256, RS384, RS512, ES256, ES384, ES512:
+				bytes, err := j.cfg.publicKey.GetBytes()
+				if err != nil {
+					return nil, err
+				}
+				return x509.ParsePKIXPublicKey(bytes)
+			case EdDSA:
+				// For EdDSA, convert raw bytes back to ed25519.PublicKey
+				if data, err := j.cfg.publicKey.GetBytes(); err == nil {
+					// data should be raw ed25519.PublicKey bytes (32 bytes)
+					pubKey := ed25519.PublicKey(data)
+					return pubKey, nil
+				} else {
+					return nil, err
+				}
+			default:
+				return nil, ErrInvalidSigningAlgorithm
 			}
-		default:
-			return nil, ErrInvalidSigningAlgorithm
-		}
-	})
+		})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		break
+	case <-ctx.Done():
+		return nil, ErrTokenParsingTimeout
+	}
 
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
@@ -260,6 +330,11 @@ func (j *jwtProvider) Refresh(tokenString string) (string, error) {
 	claims.Data["_rotated_at"] = time.Now().UnixNano()
 	claims.Data["_rotation_count"] = getRotationCount(claims.Data) + 1
 
+	// revoke existing token
+	if err := j.RevokeToken(tokenString); err != nil {
+		return "", err
+	}
+	
 	// Generate new token with same session ID but new JWT ID
 	return j.GenerateToken(claims.Subject, claims.Data)
 }
@@ -324,4 +399,52 @@ func (j *jwtProvider) IsTokenRevoked(tokenID string) bool {
 // GetRevocationManager get revocation manager instance
 func (j *jwtProvider) GetRevocationManager() *RevocationManager {
 	return j.revocationManager
+}
+
+// enforceSessionLimit checks and enforces session limits for a user
+func (j *jwtProvider) enforceSessionLimit(userID string) error {
+	if j.revocationManager == nil {
+		return nil
+	}
+
+	backend, ok := j.revocationManager.backend.(*MemoryRevocationBackend)
+	if !ok {
+		return nil
+	}
+
+	tokens := backend.GetUserTokens(userID)
+	if len(tokens) >= j.cfg.MaxUserSessions {
+		return ErrMaxSessionsExceeded
+	}
+
+	return nil
+}
+
+// GetActiveUserTokens returns all active tokens for a user
+func (j *jwtProvider) GetActiveUserTokens(userID string) ([]string, error) {
+	if j.revocationManager == nil {
+		return nil, ErrNoRevocationManager
+	}
+
+	return j.revocationManager.backend.GetUserTokens(userID), nil
+}
+
+// RevokeAllUserTokens revokes all tokens for a user
+func (j *jwtProvider) RevokeAllUserTokens(userID string) error {
+	if j.revocationManager == nil {
+		return ErrNoRevocationManager
+	}
+
+	// Revoke all tokens issued before now
+	return j.revocationManager.RevokeAllUserTokens(userID, time.Now())
+}
+
+// GetUserSessionCount returns the number of active sessions for a user
+func (j *jwtProvider) GetUserSessionCount(userID string) int {
+	if j.revocationManager == nil {
+		return 0
+	}
+
+	tokens := j.revocationManager.backend.GetUserTokens(userID)
+	return len(tokens)
 }

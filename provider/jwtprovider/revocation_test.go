@@ -11,6 +11,7 @@ import (
 // Mock RevocationBackend for testing
 type mockRevocationBackend struct {
 	revokedTokens      map[string]*RevokedToken
+	userTokens         map[string][]string
 	revokeTokenError   error
 	isTokenRevokedFunc func(tokenID string) bool
 	cleanupError       error
@@ -20,6 +21,7 @@ type mockRevocationBackend struct {
 func newMockRevocationBackend() *mockRevocationBackend {
 	return &mockRevocationBackend{
 		revokedTokens: make(map[string]*RevokedToken),
+		userTokens:    make(map[string][]string),
 	}
 }
 
@@ -75,6 +77,26 @@ func (m *mockRevocationBackend) Close() error {
 		return m.closeError
 	}
 	return nil
+}
+
+func (m *mockRevocationBackend) TrackUserToken(userID, tokenID string, expiresAt time.Time) {
+	if userID == "" || tokenID == "" {
+		return
+	}
+	if tokens, exists := m.userTokens[userID]; exists {
+		m.userTokens[userID] = append(tokens, tokenID)
+	} else {
+		m.userTokens[userID] = []string{tokenID}
+	}
+}
+
+func (m *mockRevocationBackend) GetUserTokens(userID string) []string {
+	if tokens, exists := m.userTokens[userID]; exists {
+		result := make([]string, len(tokens))
+		copy(result, tokens)
+		return result
+	}
+	return []string{}
 }
 
 // Test NewRevocationManager
@@ -424,9 +446,10 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		userID := "user-123"
 		
 		// Track some tokens for the user
-		backend.TrackUserToken(userID, "token1")
-		backend.TrackUserToken(userID, "token2")
-		backend.TrackUserToken(userID, "token3")
+		expiresAt := time.Now().Add(time.Hour)
+		backend.TrackUserToken(userID, "token1", expiresAt)
+		backend.TrackUserToken(userID, "token2", expiresAt)
+		backend.TrackUserToken(userID, "token3", expiresAt)
 		
 		// Revoke some tokens individually first
 		backend.RevokeToken("token1", time.Now().Add(time.Hour))
@@ -531,9 +554,10 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		defer backend.Close()
 		
 		// Track tokens
-		backend.TrackUserToken("user1", "token1")
-		backend.TrackUserToken("user1", "token2")
-		backend.TrackUserToken("user2", "token3")
+		expiresAt := time.Now().Add(time.Hour)
+		backend.TrackUserToken("user1", "token1", expiresAt)
+		backend.TrackUserToken("user1", "token2", expiresAt)
+		backend.TrackUserToken("user2", "token3", expiresAt)
 		
 		// Verify tracking
 		assert.Len(t, backend.userTokens["user1"], 2)
@@ -543,12 +567,12 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		assert.Contains(t, backend.userTokens["user2"], "token3")
 		
 		// Track duplicate token (should not add)
-		backend.TrackUserToken("user1", "token1")
+		backend.TrackUserToken("user1", "token1", expiresAt)
 		assert.Len(t, backend.userTokens["user1"], 2)
 		
 		// Track with empty values (should not add)
-		backend.TrackUserToken("", "token4")
-		backend.TrackUserToken("user3", "")
+		backend.TrackUserToken("", "token4", expiresAt)
+		backend.TrackUserToken("user3", "", expiresAt)
 		assert.NotContains(t, backend.userTokens, "")
 		assert.NotContains(t, backend.userTokens, "user3")
 	})
@@ -557,8 +581,9 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
 		
 		// Add some data
-		backend.RevokeToken("token1", time.Now().Add(time.Hour))
-		backend.TrackUserToken("user1", "token1")
+		expiresAt := time.Now().Add(time.Hour)
+		backend.RevokeToken("token1", expiresAt)
+		backend.TrackUserToken("user1", "token1", expiresAt)
 		
 		err := backend.Close()
 		assert.NoError(t, err)
