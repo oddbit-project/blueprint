@@ -432,7 +432,7 @@ func (l *Logger) Error(err error, msg string, fields ...map[string]interface{}) 
 		event = event.Err(err)
 
 		// Add stack trace if available
-		callStack := debug.GetStackTrace(1)
+		callStack := debug.GetStackTrace(2)
 		if len(callStack) > 0 {
 			event = event.Strs("stack", callStack)
 		}
@@ -458,7 +458,7 @@ func (l *Logger) Errorf(err error, msg string, fields ...any) {
 		event = event.Err(err)
 
 		// Add stack trace if available
-		callStack := debug.GetStackTrace(1)
+		callStack := debug.GetStackTrace(2)
 		if len(callStack) > 0 {
 			event = event.Strs("stack", callStack)
 		}
@@ -481,7 +481,7 @@ func (l *Logger) Fatal(err error, msg string, fields ...map[string]interface{}) 
 		event = event.Err(err)
 
 		// Add stack trace if available
-		callStack := debug.GetStackTrace(1)
+		callStack := debug.GetStackTrace(2)
 		if len(callStack) > 0 {
 			event = event.Strs("stack", callStack)
 		}
@@ -506,7 +506,7 @@ func (l *Logger) Fatalf(err error, msg string, fields ...any) {
 		event = event.Err(err)
 
 		// Add stack trace if available
-		callStack := debug.GetStackTrace(1)
+		callStack := debug.GetStackTrace(2)
 		if len(callStack) > 0 {
 			event = event.Strs("stack", callStack)
 		}

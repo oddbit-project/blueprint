@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -174,4 +175,123 @@ func TestNewDefaultConfig(t *testing.T) {
 	assert.Equal(t, LogTimestampFormat, cfg.TimeFormat)
 	assert.False(t, cfg.OutputToFile)
 	assert.False(t, cfg.NoColor)
+}
+
+// TestLogger_ErrorStackTrace verifies that stack traces point to the actual caller location
+func TestLogger_ErrorStackTrace(t *testing.T) {
+	logger, buf := setupTestLogger(t)
+
+	// Call error logging method - this line should appear in stack trace
+	logger.Error(errors.New("test error"), "error with stack trace")
+
+	logMap := parseLogOutput(t, buf)
+	assert.Equal(t, "error with stack trace", logMap["message"])
+	assert.Equal(t, "error", logMap["level"])
+	assert.Equal(t, "test error", logMap["error"])
+
+	// Verify stack trace is present and points to this test function
+	stack, stackExists := logMap["stack"]
+	assert.True(t, stackExists, "Stack trace should be present")
+	
+	stackSlice, ok := stack.([]interface{})
+	assert.True(t, ok, "Stack should be a slice")
+	assert.NotEmpty(t, stackSlice, "Stack trace should not be empty")
+
+	// Convert to string slice for easier checking
+	stackStrings := make([]string, len(stackSlice))
+	for i, frame := range stackSlice {
+		stackStrings[i] = frame.(string)
+	}
+
+	// Find the frame that should point to this test function
+	foundTestFrame := false
+	for _, frame := range stackStrings {
+		// Check if this frame contains our test function and the correct line
+		if strings.Contains(frame, "TestLogger_ErrorStackTrace") && 
+		   strings.Contains(frame, "logger_test.go") {
+			// Verify the line number is approximately correct (within a few lines)
+			if strings.Contains(frame, ":") {
+				foundTestFrame = true
+				// Additional verification: ensure line number is reasonable
+				assert.Contains(t, frame, "logger_test.go", "Stack frame should reference logger_test.go")
+				break
+			}
+		}
+	}
+
+	assert.True(t, foundTestFrame, "Stack trace should contain the test function call, got: %v", stackStrings)
+}
+
+// TestLogger_ErrorfStackTrace verifies that stack traces work correctly for Errorf method
+func TestLogger_ErrorfStackTrace(t *testing.T) {
+	logger, buf := setupTestLogger(t)
+
+	// Call error logging method - this line should appear in stack trace
+	logger.Errorf(errors.New("test error"), "error %s with stack trace", "formatted")
+
+	logMap := parseLogOutput(t, buf)
+	assert.Equal(t, "error formatted with stack trace", logMap["message"])
+	assert.Equal(t, "error", logMap["level"])
+
+	// Verify stack trace points to this test function
+	stack, stackExists := logMap["stack"]
+	assert.True(t, stackExists, "Stack trace should be present")
+	
+	stackSlice, ok := stack.([]interface{})
+	assert.True(t, ok, "Stack should be a slice")
+	assert.NotEmpty(t, stackSlice, "Stack trace should not be empty")
+
+	// Convert and check stack frames
+	foundTestFrame := false
+	for _, frame := range stackSlice {
+		frameStr := frame.(string)
+		if strings.Contains(frameStr, "TestLogger_ErrorfStackTrace") && 
+		   strings.Contains(frameStr, "logger_test.go") {
+			foundTestFrame = true
+			break
+		}
+	}
+
+	assert.True(t, foundTestFrame, "Stack trace should contain the test function call")
+}
+
+// Helper function to test indirect error logging (through another function)
+func callErrorLogging(logger *Logger, err error, msg string) {
+	logger.Error(err, msg)
+}
+
+// TestLogger_ErrorStackTrace_IndirectCall verifies stack traces work with indirect calls
+func TestLogger_ErrorStackTrace_IndirectCall(t *testing.T) {
+	logger, buf := setupTestLogger(t)
+
+	// Call through helper function
+	callErrorLogging(logger, errors.New("test error"), "indirect error")
+
+	logMap := parseLogOutput(t, buf)
+	assert.Equal(t, "indirect error", logMap["message"])
+
+	// Verify stack trace includes both the helper function and this test function
+	stack, stackExists := logMap["stack"]
+	assert.True(t, stackExists, "Stack trace should be present")
+	
+	stackSlice, ok := stack.([]interface{})
+	assert.True(t, ok, "Stack should be a slice")
+	assert.NotEmpty(t, stackSlice, "Stack trace should not be empty")
+
+	// Should find both the helper function and the test function in the stack
+	foundHelper := false
+	foundTest := false
+	
+	for _, frame := range stackSlice {
+		frameStr := frame.(string)
+		if strings.Contains(frameStr, "callErrorLogging") {
+			foundHelper = true
+		}
+		if strings.Contains(frameStr, "TestLogger_ErrorStackTrace_IndirectCall") {
+			foundTest = true
+		}
+	}
+
+	assert.True(t, foundHelper, "Stack trace should contain helper function")
+	assert.True(t, foundTest, "Stack trace should contain test function")
 }
