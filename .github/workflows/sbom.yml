@@ -37,10 +37,10 @@ jobs:
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Scan SBOM for Vulnerabilities
-        run: trivy sbom --input sbom.json --format table --severity CRITICAL,HIGH
+        run: trivy sbom sbom.json --format table --severity CRITICAL,HIGH
 
       - name: Save Trivy Report
-        run: trivy sbom --input sbom.json --format json --output trivy-report.json
+        run: trivy sbom sbom.json --format json --output trivy-report.json
 
       - name: Upload Trivy Report
         uses: actions/upload-artifact@v4
@@ -50,4 +50,4 @@ jobs:
 
       - name: Enforce Vulnerability Policy
         run: |
-          trivy sbom --input sbom.json --exit-code 1 --severity CRITICAL,HIGH
+          trivy sbom sbom.json --exit-code 1 --severity CRITICAL,HIGH

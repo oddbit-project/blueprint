@@ -26,7 +26,7 @@ type Config struct {
 }
 
 type Client struct {
-	Client  *redis.Client
+	Redis   *redis.Client
 	config  *Config
 	timeout time.Duration
 	ttl     time.Duration
@@ -97,7 +97,7 @@ func NewClient(config *Config) (*Client, error) {
 		config:  config,
 		timeout: time.Duration(config.TimeoutSeconds) * time.Second,
 		ttl:     time.Duration(config.TTL) * time.Second,
-		Client: redis.NewClient(&redis.Options{
+		Redis: redis.NewClient(&redis.Options{
 			Addr:     config.Address,
 			Password: pwd,
 			DB:       config.DB,
@@ -113,12 +113,12 @@ func (c *Client) Connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
-	_, err := c.Client.Ping(ctx).Result()
+	_, err := c.Redis.Ping(ctx).Result()
 	return err
 }
 
 func (c *Client) Close() error {
-	return c.Client.Close()
+	return c.Redis.Close()
 }
 
 // Key assemble key
@@ -131,7 +131,7 @@ func (c *Client) Prune() error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
-	if err := c.Client.FlushDB(ctx).Err(); err != nil {
+	if err := c.Redis.FlushDB(ctx).Err(); err != nil {
 		return err
 	}
 	return nil
@@ -142,8 +142,8 @@ func (c *Client) Get(key string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
-	// Get data from Client
-	data, err := c.Client.Get(ctx, c.Key(key)).Bytes()
+	// Get data from Redis
+	data, err := c.Redis.Get(ctx, c.Key(key)).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			// not found
@@ -157,24 +157,24 @@ func (c *Client) Get(key string) ([]byte, error) {
 func (c *Client) Set(key string, value []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	return c.Client.Set(ctx, c.Key(key), value, c.ttl).Err()
+	return c.Redis.Set(ctx, c.Key(key), value, c.ttl).Err()
 }
 
 // SetTTL sets a value with custom TTL
 func (c *Client) SetTTL(key string, value []byte, ttl time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	return c.Client.Set(ctx, c.Key(key), value, ttl).Err()
+	return c.Redis.Set(ctx, c.Key(key), value, ttl).Err()
 }
 
 // Delete removes a key
 func (c *Client) Delete(key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	return c.Client.Del(ctx, c.Key(key)).Err()
+	return c.Redis.Del(ctx, c.Key(key)).Err()
 }
 
-// Fetch default ttl
+// TTL Fetch default ttl
 func (c *Client) TTL() time.Duration {
 	return c.ttl
 }
