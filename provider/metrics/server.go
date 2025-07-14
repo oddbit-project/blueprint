@@ -73,7 +73,7 @@ func NewServer(cfg *Config) (*Server, error) {
 }
 
 // NewCustomServer creates a new custom server based on the provided config, Prometheus gatherer, and handler options.
-// It validates the config using the Validate method, then creates a new http.ServeMux and registers the Prometheus handler with it.
+// It validates the config using the ParseToken method, then creates a new http.ServeMux and registers the Prometheus handler with it.
 // The server is created with the specified host, port, router, read timeout, write timeout, and TLS config.
 // Finally, it returns a pointer to the created Server instance.
 // Example usage:

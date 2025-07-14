@@ -74,11 +74,14 @@ func (m *SessionManager) Middleware() gin.HandlerFunc {
 
 		// After the request is processed, save any changes to the session
 		modifiedSession, exists := c.Get(ContextSessionKey)
-		if exists {
+		if exists && modifiedSession != nil {
 			// Update the session in the store
 			if s, ok := modifiedSession.(*SessionData); ok {
 				m.store.Set(sessionID, s)
 			}
+		} else {
+			// session does not exist, delete the session
+			_ = m.store.Delete(sessionID)
 		}
 	}
 }

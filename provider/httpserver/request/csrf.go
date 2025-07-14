@@ -22,7 +22,7 @@ func CSRFMiddleware() gin.HandlerFunc {
 			token = c.PostForm("_csrf")
 		}
 
-		// Validate token (in a real implementation, this would validate against a stored token)
+		// ParseToken token (in a real implementation, this would validate against a stored token)
 		expected := c.GetString("csrf-token")
 		if token == "" || token != expected {
 			c.AbortWithStatusJSON(403, gin.H{

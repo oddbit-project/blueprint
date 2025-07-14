@@ -9,22 +9,12 @@ import (
 	"github.com/oddbit-project/blueprint/utils/env"
 	"github.com/oddbit-project/blueprint/utils/fs"
 	"io"
-	"strings"
 	"sync"
 )
 
 type CredentialConfig interface {
-	GetPassword() string
-	GetEnvVar() string
-	GetFileName() string
-}
-
-// DefaultCredentialConfig misc options for credentials
-// if different field names are required, just implement CredentialConfig interface
-type DefaultCredentialConfig struct {
-	Password       string `json:"password"`       // Password plaintext password; if set, is used instead of the rest
-	PasswordEnvVar string `json:"passwordEnvVar"` // PasswordEnvVar name of env var with secret
-	PasswordFile   string `json:"passwordFile"`   // PasswordFile name of secrets file, to be read; if none of the above set, this one is used
+	Fetch() (string, error)
+	IsEmpty() bool
 }
 
 var (
@@ -34,6 +24,10 @@ var (
 	ErrEmptyCredential     = errors.New("empty credential")
 	ErrSecretsFileNotFound = errors.New("secrets file not found")
 )
+
+type Secret interface {
+	GetBytes() ([]byte, error)
+}
 
 // Credential stores sensitive information (like passwords)
 // in encrypted form in memory
@@ -49,8 +43,8 @@ type Credential struct {
 // The encryption key should be unique per application instance
 // You can use env variables, hardware tokens, etc. as the source
 // of the encryption key
-func NewCredential(plaintext string, encryptionKey []byte, allowEmpty bool) (*Credential, error) {
-	if plaintext == "" {
+func NewCredential(data []byte, encryptionKey []byte, allowEmpty bool) (*Credential, error) {
+	if len(data) == 0 {
 		if allowEmpty {
 			return &Credential{
 				empty: true,
@@ -71,7 +65,7 @@ func NewCredential(plaintext string, encryptionKey []byte, allowEmpty bool) (*Cr
 
 	// Encrypt the credential
 	var err error
-	sc.encryptedData, sc.nonce, err = encrypt([]byte(plaintext), sc.key)
+	sc.encryptedData, sc.nonce, err = encrypt(data, sc.key)
 	if err != nil {
 		return nil, err
 	}
@@ -80,29 +74,46 @@ func NewCredential(plaintext string, encryptionKey []byte, allowEmpty bool) (*Cr
 }
 
 // Get decrypts and returns the plaintext credential
-// This should be called only when needed to minimize
-// exposure of the sensitive data in memory
 func (sc *Credential) Get() (string, error) {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-	if sc.empty {
-		return "", nil
-	}
-	if sc.encryptedData == nil || sc.nonce == nil {
-		return "", ErrEmptyCredential
-	}
-
-	plaintext, err := decrypt(sc.encryptedData, sc.nonce, sc.key)
+	buf, err := sc.GetBytes()
 	if err != nil {
 		return "", err
 	}
+	if len(buf) == 0 {
+		return "", nil
+	}
+	return string(buf), nil
+}
 
-	return string(plaintext), nil
+// GetBytes decrypts and returns the raw credential
+// This should be called only when needed to minimize
+// exposure of the sensitive data in memory
+func (sc *Credential) GetBytes() ([]byte, error) {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	if sc.empty {
+		return nil, nil
+	}
+	if sc.encryptedData == nil || sc.nonce == nil {
+		return nil, ErrEmptyCredential
+	}
+
+	buf, err := decrypt(sc.encryptedData, sc.nonce, sc.key)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 // Update updates the credential with a new plaintext value
 func (sc *Credential) Update(plaintext string) error {
-	if plaintext == "" {
+	return sc.UpdateBytes([]byte(plaintext))
+}
+
+// UpdateBytes updates the credential with a new value
+func (sc *Credential) UpdateBytes(data []byte) error {
+	if len(data) == 0 {
 		sc.Clear()
 		return nil
 	}
@@ -111,7 +122,7 @@ func (sc *Credential) Update(plaintext string) error {
 	defer sc.mu.Unlock()
 
 	var err error
-	sc.encryptedData, sc.nonce, err = encrypt([]byte(plaintext), sc.key)
+	sc.encryptedData, sc.nonce, err = encrypt(data, sc.key)
 	return err
 }
 
@@ -199,7 +210,7 @@ func CredentialFromEnv(envName string, encryptionKey []byte, allowEmpty bool) (*
 		return nil, ErrEmptyCredential
 	}
 
-	return NewCredential(value, encryptionKey, allowEmpty)
+	return NewCredential([]byte(value), encryptionKey, allowEmpty)
 }
 
 // CredentialFromFile creates a Credential from a secrets file
@@ -216,7 +227,7 @@ func CredentialFromFile(filename string, encryptionKey []byte, allowEmpty bool) 
 		return nil, ErrEmptyCredential
 	}
 
-	return NewCredential(value, encryptionKey, allowEmpty)
+	return NewCredential([]byte(value), encryptionKey, allowEmpty)
 }
 
 // GenerateKey generates a random 32-byte key for AES-256
@@ -239,50 +250,36 @@ func DecodeKey(encodedKey string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(encodedKey)
 }
 
-// GetPassword fetch password value
-func (c DefaultCredentialConfig) GetPassword() string {
-	return c.Password
-}
-
-// GetEnvVar fetch environment var name holding the password
-func (c DefaultCredentialConfig) GetEnvVar() string {
-	return c.PasswordEnvVar
-}
-
-// GetFileName fetch file name holding the password
-func (c DefaultCredentialConfig) GetFileName() string {
-	return c.PasswordFile
-}
-
 // CredentialFromConfig attempts to parse credentials from a CredentialConfig struct
 // if no valid credentials found, returns error; if environment var is used, it is read only once and
 // then overwritten with an empty value
 func CredentialFromConfig(cfg CredentialConfig, encryptionKey []byte, allowEmpty bool) (*Credential, error) {
-	plainText := strings.Trim(cfg.GetPassword(), " ")
-	if plainText == "" {
-		// attempt to read env var, if set
-		envVar := strings.Trim(cfg.GetEnvVar(), " ")
-		if envVar == "" {
-			// attempt to read secrets file, if set
-			secretsFile := cfg.GetFileName()
-			if secretsFile == "" {
-				plainText = ""
-			} else {
-				// read secrets
-				var err error
-				if plainText, err = fs.ReadString(secretsFile); err != nil {
-					return nil, err
-				}
-			}
-		} else {
-			// read from env var
-			plainText = env.GetEnvVar(envVar)
-			_ = env.SetEnvVar(envVar, "")
-		}
+	cred, err := cfg.Fetch()
+	if err != nil {
+		return nil, err
 	}
-
-	if len(plainText) > 0 || (allowEmpty && len(plainText) == 0) {
-		return NewCredential(plainText, encryptionKey, allowEmpty)
+	if len(cred) > 0 || (allowEmpty && len(cred) == 0) {
+		return NewCredential([]byte(cred), encryptionKey, allowEmpty)
 	}
 	return nil, ErrEmptyCredential
+}
+
+// RandomKey32 generate a random key
+func RandomKey32() []byte {
+	key := make([]byte, 32)
+	_, err := io.ReadFull(rand.Reader, key)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
+// RandomCredential create a secure credential using random bytes
+func RandomCredential(l int) (*Credential, error) {
+	secret := make([]byte, l)
+	_, err := io.ReadFull(rand.Reader, secret)
+	if err != nil {
+		panic(err)
+	}
+	return NewCredential(secret, RandomKey32(), false)
 }

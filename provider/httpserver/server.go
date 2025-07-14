@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/log/writer"
+	"github.com/oddbit-project/blueprint/provider/hmacprovider"
 	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	httplog "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
@@ -20,6 +22,7 @@ const (
 	OptAuthTokenHeader        = "authTokenHeader"
 	OptAuthTokenSecret        = "authTokenSecret"
 	OptDefaultSecurityHeaders = "defaultSecurityHeaders"
+	OptHMACSecret             = "hmacSecret"
 )
 
 type ServerConfig struct {
@@ -175,6 +178,16 @@ func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
 		}
 	}
 
+	// hmac auth
+	if rawSecret, ok := s.Config.Options[OptHMACSecret]; ok {
+		secret, err := secure.NewCredential([]byte(rawSecret), secure.RandomKey32(), false)
+		if err != nil {
+			return err
+		}
+		provider := hmacprovider.NewHmacProvider(secret)
+		s.UseAuth(auth.NewHMACAuthProvider(provider))
+	}
+
 	// auth token
 	if secret, ok := s.Config.Options[OptAuthTokenSecret]; ok {
 		var headerName string
@@ -185,6 +198,7 @@ func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
 		s.UseAuth(authToken)
 	}
 
+	// auth user
 	for _, withOption := range withOptions {
 		if err := withOption(s); err != nil {
 			return err

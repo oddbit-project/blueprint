@@ -1,5 +1,5 @@
 /*
- TLS Client Provider
+ TLS Redis Provider
 
   Adapted from https://github.com/influxdata/telegraf/tree/master/plugins/common/tls
   All changes are made available under the original MIT License:

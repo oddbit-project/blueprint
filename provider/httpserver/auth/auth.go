@@ -13,9 +13,9 @@ func AuthMiddleware(auth Provider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if auth.CanAccess(c) {
 			c.Next()
-		} else {
-			response.Http401(c)
+			return
 		}
-		return
+		response.Http401(c)
+		c.Abort()
 	}
 }

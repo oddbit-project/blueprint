@@ -38,7 +38,7 @@ services:
       - 8883:8883
       
   nats:
-    image: nats:latest
+    image: nats:2.11
     container_name: nats
     ports:
       - 4222:4222

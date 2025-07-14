@@ -5,6 +5,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/oddbit-project/blueprint/db"
+	"github.com/oddbit-project/blueprint/db/qb"
 	"github.com/oddbit-project/blueprint/utils"
 	"time"
 )
@@ -90,4 +91,5 @@ func DialectOptions() *goqu.SQLDialectOptions {
 
 func init() {
 	goqu.RegisterDialect("pgx", DialectOptions())
+	db.RegisterDialect("pgx", qb.PostgreSQLDialect())
 }

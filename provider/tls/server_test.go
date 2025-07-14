@@ -66,9 +66,9 @@ func TestServerConfig_TLSConfig_WithClientAuth(t *testing.T) {
 
 	// Test with client auth
 	config := &ServerConfig{
-		TLSEnable:        true,
-		TLSCert:          certFile,
-		TLSKey:           keyFile,
+		TLSEnable:         true,
+		TLSCert:           certFile,
+		TLSKey:            keyFile,
 		TLSAllowedCACerts: []string{caFile},
 	}
 
@@ -93,9 +93,9 @@ func TestServerConfig_TLSConfig_WithCipherSuites(t *testing.T) {
 
 	// Test with specific cipher suites
 	config := &ServerConfig{
-		TLSEnable:      true,
-		TLSCert:        certFile,
-		TLSKey:         keyFile,
+		TLSEnable:       true,
+		TLSCert:         certFile,
+		TLSKey:          keyFile,
 		TLSCipherSuites: []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"},
 	}
 
@@ -117,9 +117,9 @@ func TestServerConfig_TLSConfig_WithInvalidCipherSuite(t *testing.T) {
 
 	// Test with invalid cipher suite
 	config := &ServerConfig{
-		TLSEnable:      true,
-		TLSCert:        certFile,
-		TLSKey:         keyFile,
+		TLSEnable:       true,
+		TLSCert:         certFile,
+		TLSKey:          keyFile,
 		TLSCipherSuites: []string{"INVALID_CIPHER_SUITE"},
 	}
 
@@ -205,9 +205,9 @@ func TestServerConfig_TLSConfig_WithAllowedDNSNames(t *testing.T) {
 
 	// Test with allowed DNS names
 	config := &ServerConfig{
-		TLSEnable:         true,
-		TLSCert:           certFile,
-		TLSKey:            keyFile,
+		TLSEnable:          true,
+		TLSCert:            certFile,
+		TLSKey:             keyFile,
 		TLSAllowedCACerts:  []string{caFile},
 		TLSAllowedDNSNames: []string{"example.com", "localhost"},
 	}
@@ -241,15 +241,12 @@ func TestServerConfig_TLSConfig_WithPassword(t *testing.T) {
 	}
 
 	// Just verify fields are set correctly
-	if config.TlsKeyCredential.GetPassword() != "test-password" {
-		t.Errorf("Expected Password to be 'test-password', got '%s'", config.TlsKeyCredential.GetPassword())
+	key, err := config.TlsKeyCredential.Fetch()
+	if err != nil {
+		t.Fatalf("Unexpected error with password config: %v", err)
 	}
-	
-	if config.TlsKeyCredential.GetEnvVar() != "TEST_PASSWORD_ENV" {
-		t.Errorf("Expected PasswordEnvVar to be 'TEST_PASSWORD_ENV', got '%s'", config.TlsKeyCredential.GetEnvVar())
+	if key != "test-password" {
+		t.Errorf("Expected Password to be 'test-password', got '%s'", key)
 	}
-	
-	if config.TlsKeyCredential.GetFileName() != "/path/to/password.txt" {
-		t.Errorf("Expected PasswordFile to be '/path/to/password.txt', got '%s'", config.TlsKeyCredential.GetFileName())
-	}
+
 }

@@ -1,6 +1,26 @@
 # db.Repository
 
-Repository pattern implementation with blueprint and goqu
+Repository pattern implementation with blueprint and goqu. The Repository provides a comprehensive interface-driven abstraction for database operations, composed of multiple specialized interfaces for different operation types.
+
+## Overview
+
+The Repository interface is composed of multiple smaller interfaces, following the Interface Segregation Principle:
+
+```go
+type Repository interface {
+    Identifier
+    Builder
+    Reader
+    Executor
+    Writer
+    Deleter
+    Updater
+    Counter
+    GridOps
+    SqlBuilder
+    NewTransaction(opts *sql.TxOptions) (Transaction, error)
+}
+```
 
 ## Usage
  
@@ -84,19 +104,532 @@ func main() {
 }
 ```
 
-## Counter Interface
+## Interface Documentation
 
-The Repository implements a Counter interface that provides methods for counting records:
+### Reader Interface
+
+The Reader interface provides methods for fetching data from the database:
 
 ```go
-type Counter interface {
-	Count() (int64, error)
-	CountWhere(fieldValues map[string]any) (int64, error)
+type Reader interface {
+    FetchOne(qry *goqu.SelectDataset, target any) error
+    FetchRecord(fieldValues map[string]any, target any) error
+    Fetch(qry *goqu.SelectDataset, target any) error
+    FetchWhere(fieldValues map[string]any, target any) error
+    FetchByKey(keyField string, value any, target any) error
+    Exists(fieldName string, fieldValue any, skip ...any) (bool, error)
 }
 ```
 
-- `Count()` - Returns the total number of rows in the table
-- `CountWhere(fieldValues map[string]any)` - Returns the number of rows matching the specified field values
+#### FetchOne
+```go
+func (r *repository) FetchOne(qry *goqu.SelectDataset, target any) error
+```
+
+Fetches a single record using a goqu SelectDataset. The target must be a struct pointer. Automatically adds LIMIT 1 to the query.
+
+**Example:**
+```go
+user := &UserRecord{}
+err := repo.FetchOne(repo.SqlSelect().Where(goqu.C("id").Eq(123)), user)
+if err != nil {
+    if db.EmptyResult(err) {
+        log.Println("User not found")
+    } else {
+        log.Fatal(err)
+    }
+}
+```
+
+#### FetchRecord
+```go
+func (r *repository) FetchRecord(fieldValues map[string]any, target any) error
+```
+
+Fetches a single record with WHERE clauses built from field values. All conditions are combined with AND.
+
+**Example:**
+```go
+user := &UserRecord{}
+err := repo.FetchRecord(map[string]any{
+    "email": "john@example.com",
+    "active": true,
+}, user)
+```
+
+#### Fetch
+```go
+func (r *repository) Fetch(qry *goqu.SelectDataset, target any) error
+```
+
+Fetches multiple records. The target must be a slice pointer.
+
+**Example:**
+```go
+var users []*UserRecord
+err := repo.Fetch(
+    repo.SqlSelect().
+        Where(goqu.C("active").IsTrue()).
+        OrderBy(goqu.C("created_at").Desc()),
+    &users,
+)
+```
+
+#### FetchWhere
+```go
+func (r *repository) FetchWhere(fieldValues map[string]any, target any) error
+```
+
+Fetches multiple records with WHERE clauses from field values map.
+
+**Example:**
+```go
+var users []*UserRecord
+err := repo.FetchWhere(map[string]any{
+    "department": "engineering",
+    "active": true,
+}, &users)
+```
+
+#### FetchByKey
+```go
+func (r *repository) FetchByKey(keyField string, value any, target any) error
+```
+
+Fetches a single record by a specific key field value.
+
+**Example:**
+```go
+user := &UserRecord{}
+err := repo.FetchByKey("id", 123, user)
+```
+
+#### Exists
+```go
+func (r *repository) Exists(fieldName string, fieldValue any, skip ...any) (bool, error)
+```
+
+Checks if records exist matching the given criteria. The optional skip parameter allows excluding specific records (useful for unique constraint validation).
+
+**Example:**
+```go
+// Check if email exists
+exists, err := repo.Exists("email", "john@example.com")
+
+// Check if email exists, excluding user with ID 123
+exists, err = repo.Exists("email", "john@example.com", "id", 123)
+```
+
+### Counter Interface
+
+The Counter interface provides methods for counting records:
+
+```go
+type Counter interface {
+    Count() (int64, error)
+    CountWhere(fieldValues map[string]any) (int64, error)
+}
+```
+
+#### Count
+```go
+func (r *repository) Count() (int64, error)
+```
+
+Returns the total number of rows in the table.
+
+**Example:**
+```go
+total, err := repo.Count()
+if err != nil {
+    log.Fatal(err)
+}
+log.Printf("Total records: %d", total)
+```
+
+#### CountWhere
+```go
+func (r *repository) CountWhere(fieldValues map[string]any) (int64, error)
+```
+
+Returns the number of rows matching the field values map. All conditions are combined with AND.
+
+**Example:**
+```go
+activeCount, err := repo.CountWhere(map[string]any{
+    "status": "active",
+    "verified": true,
+})
+```
+
+### Executor Interface
+
+The Executor interface provides methods for executing queries and raw SQL:
+
+```go
+type Executor interface {
+    Exec(qry *goqu.SelectDataset) error
+    RawExec(sql string, args ...any) error
+    Select(sql string, target any, args ...any) error
+}
+```
+
+#### Exec
+```go
+func (r *repository) Exec(qry *goqu.SelectDataset) error
+```
+
+Executes a query without returning results (useful for complex operations).
+
+**Example:**
+```go
+err := repo.Exec(
+    repo.SqlSelect().
+        From(goqu.L("generate_series(1, 10)")),
+)
+```
+
+#### RawExec
+```go
+func (r *repository) RawExec(sql string, args ...any) error
+```
+
+Executes raw SQL that doesn't return rows (DDL, complex updates, stored procedures).
+
+**Example:**
+```go
+err := repo.RawExec(`
+    CREATE INDEX CONCURRENTLY idx_users_email_active 
+    ON users(email) WHERE active = true
+`)
+
+// With parameters
+err = repo.RawExec(
+    "CALL process_user_batch($1, $2)", 
+    startDate, endDate,
+)
+```
+
+#### Select
+```go
+func (r *repository) Select(sql string, target any, args ...any) error
+```
+
+Executes raw SQL SELECT queries and scans results into target.
+
+**Example:**
+```go
+var stats []struct {
+    Department string `db:"department"`
+    Count      int    `db:"count"`
+}
+
+err := repo.Select(`
+    SELECT department, COUNT(*) as count 
+    FROM users 
+    WHERE active = $1 
+    GROUP BY department
+`, &stats, true)
+```
+
+### Writer Interface
+
+The Writer interface provides methods for inserting records:
+
+```go
+type Writer interface {
+    Insert(records ...any) error
+    InsertReturning(record any, returnFields []string, target ...any) error
+}
+```
+
+#### Insert
+```go
+func (r *repository) Insert(records ...any) error
+```
+
+Inserts one or more records. Supports efficient batch insert operations that generate optimized SQL for multiple records.
+
+**Single Record Example:**
+```go
+user := &UserRecord{
+    Name:  "John Doe",
+    Email: "john@example.com",
+}
+err := repo.Insert(user)
+```
+
+**Batch Insert Examples:**
+
+*Method 1: Direct []any slice*
+```go
+users := []any{
+    &UserRecord{Name: "Alice", Email: "alice@example.com"},
+    &UserRecord{Name: "Bob", Email: "bob@example.com"},
+    &UserRecord{Name: "Charlie", Email: "charlie@example.com"},
+}
+err := repo.Insert(users...)
+```
+
+*Method 2: Using ToAnySlice helper*
+```go
+// With typed slice
+typedUsers := []*UserRecord{
+    {Name: "Alice", Email: "alice@example.com"},
+    {Name: "Bob", Email: "bob@example.com"},
+}
+
+// Convert and insert
+err := repo.Insert(db.ToAnySlice(typedUsers)...)
+```
+
+*Method 3: Large datasets with chunking*
+```go
+func batchInsertLarge(repo db.Repository, users []*UserRecord) error {
+    const chunkSize = 1000
+    
+    for i := 0; i < len(users); i += chunkSize {
+        end := i + chunkSize
+        if end > len(users) {
+            end = len(users)
+        }
+        
+        chunk := users[i:end]
+        records := make([]any, len(chunk))
+        for j, user := range chunk {
+            records[j] = user
+        }
+        
+        if err := repo.Insert(records...); err != nil {
+            return fmt.Errorf("chunk %d-%d failed: %w", i, end-1, err)
+        }
+    }
+    return nil
+}
+```
+
+*Method 4: Batch insert with transaction*
+```go
+func batchInsertWithTransaction(repo db.Repository, users []*UserRecord) error {
+    tx, err := repo.NewTransaction(nil)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+    
+    records := db.ToAnySlice(users)
+    if err := tx.Insert(records...); err != nil {
+        return err
+    }
+    
+    return tx.Commit()
+}
+```
+
+**Performance Notes:**
+- Batch inserts generate a single optimized SQL statement
+- Use chunking for very large datasets (>1000 records)
+- Consider transactions for atomicity
+- Monitor memory usage with large batches
+
+#### InsertReturning
+```go
+func (r *repository) InsertReturning(record any, returnFields []string, target ...any) error
+```
+
+Inserts a record and returns specified fields. Supports three scanning modes:
+
+1. **Struct scanning** - Maps returned fields to struct by name/tag
+2. **Positional scanning** - Maps to multiple variables by position
+3. **Single value** - Returns a single field value
+
+**Examples:**
+```go
+// Struct scanning - returns all fields into struct
+user := &UserRecord{Name: "John", Email: "john@example.com"}
+result := &UserRecord{}
+err := repo.InsertReturning(user, []string{"id", "name", "email", "created_at"}, result)
+
+// Positional scanning - returns to individual variables
+var id int64
+var createdAt time.Time
+err := repo.InsertReturning(user, []string{"id", "created_at"}, &id, &createdAt)
+
+// Single value - returns just the ID
+var newID int64
+err := repo.InsertReturning(user, []string{"id"}, &newID)
+```
+
+### Updater Interface
+
+The Updater interface provides comprehensive update operations:
+
+```go
+type Updater interface {
+    Update(qry *goqu.UpdateDataset) error
+    UpdateReturning(record any, whereFieldsValues map[string]any, returnFields []string, target ...any) error
+    UpdateRecord(record any, whereFieldsValues map[string]any) error
+    UpdateFields(record any, fieldsValues map[string]any, whereFieldsValues map[string]any) error
+    UpdateFieldsReturning(record any, fieldsValues map[string]any, whereFieldsValues map[string]any, returnFields []string, target ...any) error
+    UpdateByKey(record any, keyField string, value any) error
+}
+```
+
+#### Update (Deprecated)
+```go
+func (r *repository) Update(qry *goqu.UpdateDataset) error
+```
+
+Executes an update using goqu UpdateDataset. This method is deprecated due to serialization issues with some data types. Use UpdateRecord instead.
+
+#### UpdateRecord
+```go
+func (r *repository) UpdateRecord(record any, whereFieldsValues map[string]any) error
+```
+
+Updates a record using the modern query builder. WHERE conditions are combined with AND.
+
+**Example:**
+```go
+user := &UserRecord{
+    Name:      "John Updated",
+    Email:     "john.updated@example.com",
+    UpdatedAt: time.Now(),
+}
+
+err := repo.UpdateRecord(user, map[string]any{"id": 123})
+```
+
+#### UpdateFields
+```go
+func (r *repository) UpdateFields(record any, fieldsValues map[string]any, whereFieldsValues map[string]any) error
+```
+
+Updates specific fields only, useful for partial updates.
+
+**Example:**
+```go
+// Update only specific fields
+err := repo.UpdateFields(
+    &UserRecord{}, // empty struct for type info
+    map[string]any{
+        "last_login": time.Now(),
+        "login_count": goqu.L("login_count + 1"),
+    },
+    map[string]any{"id": 123},
+)
+```
+
+#### UpdateReturning
+```go
+func (r *repository) UpdateReturning(record any, whereFieldsValues map[string]any, returnFields []string, target ...any) error
+```
+
+Updates a record and returns specified fields. Supports the same three scanning modes as InsertReturning.
+
+**Example:**
+```go
+user := &UserRecord{Name: "John Updated"}
+result := &UserRecord{}
+
+err := repo.UpdateReturning(
+    user,
+    map[string]any{"id": 123},
+    []string{"id", "name", "updated_at"},
+    result,
+)
+```
+
+#### UpdateFieldsReturning
+```go
+func (r *repository) UpdateFieldsReturning(record any, fieldsValues map[string]any, whereFieldsValues map[string]any, returnFields []string, target ...any) error
+```
+
+Updates specific fields and returns values. Combines UpdateFields with RETURNING support.
+
+**Example:**
+```go
+var updatedAt time.Time
+err := repo.UpdateFieldsReturning(
+    &UserRecord{},
+    map[string]any{"status": "verified"},
+    map[string]any{"id": 123},
+    []string{"updated_at"},
+    &updatedAt,
+)
+```
+
+#### UpdateByKey
+```go
+func (r *repository) UpdateByKey(record any, keyField string, value any) error
+```
+
+Updates a record using a single key field condition.
+
+**Example:**
+```go
+user := &UserRecord{
+    Name:      "Updated Name",
+    UpdatedAt: time.Now(),
+}
+
+err := repo.UpdateByKey(user, "id", 123)
+```
+
+### Deleter Interface
+
+The Deleter interface provides methods for deleting records:
+
+```go
+type Deleter interface {
+    Delete(qry *goqu.DeleteDataset) error
+    DeleteWhere(fieldNameValue map[string]any) error
+    DeleteByKey(keyField string, value any) error
+}
+```
+
+#### Delete
+```go
+func (r *repository) Delete(qry *goqu.DeleteDataset) error
+```
+
+Executes a delete query using goqu DeleteDataset.
+
+**Example:**
+```go
+err := repo.Delete(
+    repo.SqlDelete().Where(
+        goqu.C("created_at").Lt(time.Now().AddDate(-1, 0, 0)),
+    ),
+)
+```
+
+#### DeleteWhere
+```go
+func (r *repository) DeleteWhere(fieldNameValue map[string]any) error
+```
+
+Deletes records matching field values. All conditions are combined with AND.
+
+**Example:**
+```go
+err := repo.DeleteWhere(map[string]any{
+    "status": "inactive",
+    "verified": false,
+})
+```
+
+#### DeleteByKey
+```go
+func (r *repository) DeleteByKey(keyField string, value any) error
+```
+
+Deletes a record by a single key field.
+
+**Example:**
+```go
+err := repo.DeleteByKey("id", 123)
+```
 
 ## GridOps Interface
 
@@ -193,3 +726,560 @@ func main() {
 ```
 
 For more detailed information about grid functionality, see the [Data Grid documentation](dbgrid.md).
+
+### Builder Interface
+
+The Builder interface provides methods for creating SQL query builders:
+
+```go
+type Builder interface {
+    Sql() goqu.DialectWrapper
+    SqlSelect() *goqu.SelectDataset
+    SqlInsert() *goqu.InsertDataset
+    SqlUpdate() *goqu.UpdateDataset
+    SqlDelete() *goqu.DeleteDataset
+}
+```
+
+#### Sql
+```go
+func (r *repository) Sql() goqu.DialectWrapper
+```
+
+Returns the goqu dialect wrapper for building custom queries.
+
+**Example:**
+```go
+dialect := repo.Sql()
+customQuery := dialect.From("users").
+    InnerJoin(goqu.T("departments"), goqu.On(goqu.C("users.dept_id").Eq(goqu.C("departments.id")))).
+    Select("users.*", "departments.name")
+```
+
+#### SqlSelect
+```go
+func (r *repository) SqlSelect() *goqu.SelectDataset
+```
+
+Returns a SELECT query builder for the repository's table.
+
+**Example:**
+```go
+query := repo.SqlSelect().
+    Where(goqu.C("active").IsTrue()).
+    OrderBy(goqu.C("created_at").Desc()).
+    Limit(10)
+
+var users []*UserRecord
+err := repo.Fetch(query, &users)
+```
+
+#### SqlInsert
+```go
+func (r *repository) SqlInsert() *goqu.InsertDataset
+```
+
+Returns an INSERT query builder. Note: goqu prepared statements are not compatible with PostgreSQL extended types; use Insert() method or SqlBuilder() instead.
+
+**Example:**
+```go
+// Not recommended for PostgreSQL extended types
+insertQuery := repo.SqlInsert().Rows(
+    goqu.Record{"name": "John", "email": "john@example.com"},
+)
+```
+
+#### SqlUpdate
+```go
+func (r *repository) SqlUpdate() *goqu.UpdateDataset
+```
+
+Returns an UPDATE query builder. Note: goqu prepared statements are not compatible with PostgreSQL extended types; use UpdateRecord() or SqlBuilder() instead.
+
+#### SqlDelete
+```go
+func (r *repository) SqlDelete() *goqu.DeleteDataset
+```
+
+Returns a DELETE query builder for the repository's table.
+
+**Example:**
+```go
+deleteQuery := repo.SqlDelete().
+    Where(goqu.C("status").Eq("deleted")).
+    Where(goqu.C("deleted_at").Lt(time.Now().AddDate(0, -1, 0)))
+
+err := repo.Delete(deleteQuery)
+```
+
+### SqlBuilder Interface
+
+The SqlBuilder interface provides access to the modern query builder:
+
+```go
+type SqlBuilder interface {
+    SqlDialect() qb.SqlDialect
+    SqlBuilder() *qb.SqlBuilder
+    SqlUpdateX(record any) *qb.UpdateBuilder
+    Do(qry any, target ...any) error
+}
+```
+
+#### SqlDialect
+```go
+func (r *repository) SqlDialect() qb.SqlDialect
+```
+
+Returns the SQL dialect being used by the repository.
+
+**Example:**
+```go
+dialect := repo.SqlDialect()
+log.Printf("Using dialect: %s", dialect.Name())
+```
+
+#### SqlBuilder
+```go
+func (r *repository) SqlBuilder() *qb.SqlBuilder
+```
+
+Returns the query builder instance for advanced SQL construction.
+
+**Example:**
+```go
+builder := repo.SqlBuilder()
+// Use builder for complex operations
+```
+
+#### SqlUpdateX
+```go
+func (r *repository) SqlUpdateX(record any) *qb.UpdateBuilder
+```
+
+Creates an UpdateBuilder for the given record with advanced options.
+
+**Example:**
+```go
+user := &UserRecord{Name: "Updated Name"}
+updateBuilder := repo.SqlUpdateX(user).
+    WithOptions(&qb.UpdateOptions{
+        IncludeFields: []string{"name", "updated_at"},
+        UpdateAutoFields: true,
+    }).
+    Where(qb.Eq("id", 123))
+
+err := repo.Do(updateBuilder)
+```
+
+#### Do
+```go
+func (r *repository) Do(qry any, target ...any) error
+```
+
+Executes various query types (SELECT, UPDATE, INSERT, DELETE) with optional target for results.
+
+**Example:**
+```go
+// Execute UpdateBuilder
+updateBuilder := repo.SqlUpdateX(user).Where(qb.Eq("id", 123))
+err := repo.Do(updateBuilder)
+
+// Execute with RETURNING
+updateBuilder = repo.SqlUpdateX(user).
+    WithOptions(&qb.UpdateOptions{
+        ReturningFields: []string{"id", "updated_at"},
+    }).
+    Where(qb.Eq("id", 123))
+
+result := &UserRecord{}
+err := repo.Do(updateBuilder, result)
+```
+
+## Transaction Support
+
+The Repository supports database transactions through the Transaction interface:
+
+```go
+type Transaction interface {
+    Builder
+    Reader
+    Executor
+    Writer
+    Deleter
+    Updater
+    Counter
+    SqlBuilder
+    Db() *sqlx.Tx
+    Name() string
+    Commit() error
+    Rollback() error
+}
+```
+
+### Creating Transactions
+
+```go
+func (r *repository) NewTransaction(opts *sql.TxOptions) (Transaction, error)
+```
+
+Creates a new transaction with optional transaction options.
+
+**Example:**
+```go
+// Basic transaction
+tx, err := repo.NewTransaction(nil)
+if err != nil {
+    return err
+}
+defer tx.Rollback() // Always defer rollback
+
+// Transaction with options
+opts := &sql.TxOptions{
+    Isolation: sql.LevelSerializable,
+    ReadOnly:  false,
+}
+tx, err := repo.NewTransaction(opts)
+```
+
+### Using Transactions
+
+Transactions implement all the same interfaces as Repository, allowing seamless operation:
+
+```go
+func transferFunds(repo db.Repository, fromID, toID int, amount decimal.Decimal) error {
+    tx, err := repo.NewTransaction(nil)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // Debit source account
+    err = tx.UpdateFields(
+        &AccountRecord{},
+        map[string]any{"balance": goqu.L("balance - ?", amount)},
+        map[string]any{"id": fromID},
+    )
+    if err != nil {
+        return fmt.Errorf("failed to debit account: %w", err)
+    }
+
+    // Credit destination account
+    err = tx.UpdateFields(
+        &AccountRecord{},
+        map[string]any{"balance": goqu.L("balance + ?", amount)},
+        map[string]any{"id": toID},
+    )
+    if err != nil {
+        return fmt.Errorf("failed to credit account: %w", err)
+    }
+
+    // Insert transaction record
+    txRecord := &TransactionRecord{
+        FromAccountID: fromID,
+        ToAccountID:   toID,
+        Amount:        amount,
+        CreatedAt:     time.Now(),
+    }
+    if err := tx.Insert(txRecord); err != nil {
+        return fmt.Errorf("failed to record transaction: %w", err)
+    }
+
+    // Commit the transaction
+    return tx.Commit()
+}
+```
+
+### Transaction Best Practices
+
+1. **Always defer Rollback()**: Even if you plan to commit, deferred rollback is a safety net
+2. **Keep transactions short**: Long-running transactions can cause lock contention
+3. **Handle errors properly**: Any error should trigger a rollback
+4. **Use appropriate isolation levels**: Choose based on your consistency requirements
+
+**Example of complex transaction:**
+```go
+func processOrder(repo db.Repository, orderID int) error {
+    tx, err := repo.NewTransaction(&sql.TxOptions{
+        Isolation: sql.LevelReadCommitted,
+    })
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // Lock order for update
+    var order OrderRecord
+    err = tx.FetchRecord(
+        map[string]any{"id": orderID, "status": "pending"},
+        &order,
+    )
+    if err != nil {
+        if db.EmptyResult(err) {
+            return errors.New("order not found or already processed")
+        }
+        return err
+    }
+
+    // Process order items
+    var items []*OrderItemRecord
+    err = tx.FetchWhere(map[string]any{"order_id": orderID}, &items)
+    if err != nil {
+        return err
+    }
+
+    for _, item := range items {
+        // Update inventory
+        err = tx.UpdateFields(
+            &ProductRecord{},
+            map[string]any{"stock": goqu.L("stock - ?", item.Quantity)},
+            map[string]any{"id": item.ProductID},
+        )
+        if err != nil {
+            return fmt.Errorf("failed to update inventory: %w", err)
+        }
+    }
+
+    // Update order status
+    order.Status = "completed"
+    order.CompletedAt = time.Now()
+    err = tx.UpdateRecord(&order, map[string]any{"id": orderID})
+    if err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+```
+
+## Advanced Usage Patterns
+
+### Custom Query Execution
+
+```go
+func customAggregation(repo db.Repository) error {
+    // Complex aggregation query
+    query := repo.SqlSelect().
+        Select(
+            goqu.C("department"),
+            goqu.COUNT("*").As("count"),
+            goqu.AVG("salary").As("avg_salary"),
+            goqu.MAX("salary").As("max_salary"),
+        ).
+        GroupBy("department").
+        Having(goqu.COUNT("*").Gt(5)).
+        OrderBy(goqu.C("avg_salary").Desc())
+
+    var results []struct {
+        Department string  `db:"department"`
+        Count      int     `db:"count"`
+        AvgSalary  float64 `db:"avg_salary"`
+        MaxSalary  float64 `db:"max_salary"`
+    }
+
+    return repo.Fetch(query, &results)
+}
+```
+
+### Batch Insert Operations
+
+```go
+func batchInsertWithProgress(repo db.Repository, users []*UserRecord) error {
+    const batchSize = 500
+    total := len(users)
+    
+    for i := 0; i < total; i += batchSize {
+        end := i + batchSize
+        if end > total {
+            end = total
+        }
+        
+        batch := users[i:end]
+        records := db.ToAnySlice(batch)
+        
+        err := repo.Insert(records...)
+        if err != nil {
+            return fmt.Errorf("batch %d-%d failed: %w", i, end-1, err)
+        }
+        
+        progress := float64(end) / float64(total) * 100
+        log.Printf("Inserted %d-%d: %.1f%% complete", i, end-1, progress)
+    }
+    
+    return nil
+}
+
+func batchInsertWithErrorRecovery(repo db.Repository, users []*UserRecord) error {
+    var successful []string
+    var failed []struct {
+        User  *UserRecord
+        Error error
+    }
+    
+    // Try batch insert first
+    records := db.ToAnySlice(users)
+    err := repo.Insert(records...)
+    if err == nil {
+        log.Printf("Successfully batch inserted %d users", len(users))
+        return nil
+    }
+    
+    log.Printf("Batch insert failed, trying individual inserts: %v", err)
+    
+    // Fall back to individual inserts
+    for _, user := range users {
+        err := repo.Insert(user)
+        if err != nil {
+            failed = append(failed, struct {
+                User  *UserRecord
+                Error error
+            }{user, err})
+        } else {
+            successful = append(successful, user.Name)
+        }
+    }
+    
+    log.Printf("Individual inserts: %d successful, %d failed", len(successful), len(failed))
+    
+    if len(failed) > 0 {
+        return fmt.Errorf("failed to insert %d records", len(failed))
+    }
+    
+    return nil
+}
+```
+
+### Batch Update Operations
+
+```go
+func batchUpdateWithProgress(repo db.Repository, updates []UserUpdate) error {
+    total := len(updates)
+    completed := 0
+
+    for i := 0; i < total; i += 100 {
+        end := i + 100
+        if end > total {
+            end = total
+        }
+
+        tx, err := repo.NewTransaction(nil)
+        if err != nil {
+            return err
+        }
+
+        for _, update := range updates[i:end] {
+            err := tx.UpdateByKey(&update, "id", update.ID)
+            if err != nil {
+                tx.Rollback()
+                return fmt.Errorf("failed at record %d: %w", update.ID, err)
+            }
+        }
+
+        if err := tx.Commit(); err != nil {
+            return err
+        }
+
+        completed = end
+        log.Printf("Progress: %d/%d (%.1f%%)", completed, total, float64(completed)/float64(total)*100)
+    }
+
+    return nil
+}
+```
+
+### Repository Factory Pattern
+
+```go
+type RepositoryFactory struct {
+    client db.Client
+    ctx    context.Context
+}
+
+func NewRepositoryFactory(client db.Client) *RepositoryFactory {
+    return &RepositoryFactory{
+        client: client,
+        ctx:    context.Background(),
+    }
+}
+
+func (f *RepositoryFactory) Users() db.Repository {
+    return db.NewRepository(f.ctx, f.client, "users")
+}
+
+func (f *RepositoryFactory) Orders() db.Repository {
+    return db.NewRepository(f.ctx, f.client, "orders")
+}
+
+func (f *RepositoryFactory) Products() db.Repository {
+    return db.NewRepository(f.ctx, f.client, "products")
+}
+
+// Usage
+factory := NewRepositoryFactory(client)
+userRepo := factory.Users()
+orderRepo := factory.Orders()
+```
+
+## Performance Considerations
+
+### Connection Pooling
+- Repositories share the client's connection pool
+- Configure pool size based on concurrent operations
+- Monitor pool usage to avoid exhaustion
+
+### Query Optimization
+- Use appropriate indexes for WHERE clauses
+- Batch operations when possible
+- Use RETURNING clauses to avoid extra queries
+- Consider pagination for large result sets
+
+### Caching
+- Repository caches field specifications per struct type
+- Grid specifications are cached after first use
+- Consider application-level caching for frequently accessed data
+
+## Error Handling
+
+The Repository provides consistent error handling:
+
+```go
+// Check for empty results
+user := &UserRecord{}
+err := repo.FetchByKey("id", 123, user)
+if err != nil {
+    if db.EmptyResult(err) {
+        // Handle not found case
+        return nil, ErrUserNotFound
+    }
+    // Handle actual error
+    return nil, fmt.Errorf("database error: %w", err)
+}
+
+// Handle constraint violations
+err = repo.Insert(user)
+if err != nil {
+    if isUniqueViolation(err) {
+        return ErrDuplicateEmail
+    }
+    return fmt.Errorf("insert failed: %w", err)
+}
+```
+
+## Best Practices
+
+1. **Use appropriate interfaces**: Don't pass full Repository when only Reader is needed
+2. **Leverage transactions**: Group related operations in transactions
+3. **Handle errors properly**: Always check for EmptyResult on single record fetches
+4. **Use struct tags**: Properly tag structs for field mapping and grid functionality
+5. **Batch operations**: Use batch methods for bulk operations
+6. **Monitor performance**: Log slow queries and optimize as needed
+
+## See Also
+
+- [Database Package Overview](index.md)
+- [Structs and Tags](structs-and-tags.md)
+- [Client Interface Documentation](client.md)
+- [Query Builder Documentation](query-builder.md)
+- [Database Functions Documentation](functions.md)
+- [Field Specifications](fields.md)
+- [Data Grid System](dbgrid.md)
+- [Migration System](migrations.md)

@@ -6,20 +6,17 @@ import (
 	"testing"
 
 	"github.com/oddbit-project/blueprint/log"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
 // setupTestLogger creates a test logger that writes to a buffer
 func setupTestLogger(t *testing.T) (*log.Logger, *bytes.Buffer) {
 	buf := &bytes.Buffer{}
-	zerolog.TimeFieldFormat = ""
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	
 	// Create a new logger and redirect to buffer
 	logger := log.New("test")
 	logger = logger.WithOutput(buf)
-	
+
 	return logger, buf
 }
 
@@ -40,13 +37,13 @@ func TestProducerLogger(t *testing.T) {
 
 	// Apply producer logger
 	logger = ProducerLogger(logger, subject)
-	
+
 	// Write a log message to capture fields
 	logger.Info("test message")
 
 	// Parse the log output
 	logMap := parseLogOutput(t, buf)
-	
+
 	// Check that the fields were properly set
 	assert.Equal(t, subject, logMap[NatsSubjectKey])
 	assert.Equal(t, "producer", logMap[log.LogComponentKey])
@@ -58,17 +55,17 @@ func TestNewProducerLogger(t *testing.T) {
 
 	// Verify the logger was created
 	assert.NotNil(t, logger)
-	
+
 	// Create a buffer and redirect output
 	buf := &bytes.Buffer{}
 	logger = logger.WithOutput(buf)
-	
+
 	// Write a log message to capture fields
 	logger.Info("test message")
-	
+
 	// Parse the log output
 	logMap := parseLogOutput(t, buf)
-	
+
 	// Check that the fields were properly set
 	assert.Equal(t, subject, logMap[NatsSubjectKey])
 	assert.Equal(t, "producer", logMap[log.LogComponentKey])
@@ -81,13 +78,13 @@ func TestConsumerLogger(t *testing.T) {
 
 	// Apply consumer logger
 	logger = ConsumerLogger(logger, subject, queue)
-	
+
 	// Write a log message to capture fields
 	logger.Info("test message")
-	
+
 	// Parse the log output
 	logMap := parseLogOutput(t, buf)
-	
+
 	// Check that the fields were properly set
 	assert.Equal(t, subject, logMap[NatsSubjectKey])
 	assert.Equal(t, queue, logMap[NatsQueueKey])
@@ -96,13 +93,13 @@ func TestConsumerLogger(t *testing.T) {
 	// Test with empty queue
 	logger, buf = setupTestLogger(t)
 	logger = ConsumerLogger(logger, subject, "")
-	
+
 	// Write a log message to capture fields
 	logger.Info("test message")
-	
+
 	// Parse the log output
 	logMap = parseLogOutput(t, buf)
-	
+
 	// Check that subject is set but queue is not present
 	assert.Equal(t, subject, logMap[NatsSubjectKey])
 	_, hasQueueKey := logMap[NatsQueueKey]
@@ -116,17 +113,17 @@ func TestNewConsumerLogger(t *testing.T) {
 
 	// Verify the logger was created
 	assert.NotNil(t, logger)
-	
+
 	// Create a buffer and redirect output
 	buf := &bytes.Buffer{}
 	logger = logger.WithOutput(buf)
-	
+
 	// Write a log message to capture fields
 	logger.Info("test message")
-	
+
 	// Parse the log output
 	logMap := parseLogOutput(t, buf)
-	
+
 	// Check that the fields were properly set
 	assert.Equal(t, subject, logMap[NatsSubjectKey])
 	assert.Equal(t, queue, logMap[NatsQueueKey])
