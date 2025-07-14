@@ -196,7 +196,7 @@ hmacProvider := hmacprovider.NewContainer(SecretKey, memStore)
 // Middleware Configuration
 auth := middleware.NewAuth(log.Logger)
 protected := router.Group("/api/protected")
-protected.Use(auth.AuthMiddleware(auth.HMACAuth(hmacProvider)))
+protected.Use(auth.AuthMiddleware(auth.NewHMACAuthProvider(hmacProvider)))
 ```
 
 ### Testing with Python Client

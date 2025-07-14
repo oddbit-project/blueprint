@@ -152,7 +152,7 @@ func setupRoutes(router *gin.Engine, hmacProvider *hmacprovider.HMACProvider, lo
 	}
 
 	// Add authentication
-	router.Use(auth.AuthMiddleware(auth.HMACAuth(hmacProvider)))
+	router.Use(auth.AuthMiddleware(auth.NewHMACAuthProvider(hmacProvider)))
 
 	// Protected endpoints (HMAC authentication required)
 	protected := router.Group("/api/protected")

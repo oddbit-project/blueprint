@@ -124,7 +124,7 @@ func setupRoutes(router *gin.Engine, hmacProvider *hmacprovider.HMACProvider, lo
 
 	// Protected endpoints (HMAC authentication required)
 	protected := router.Group("/api/protected")
-	protected.Use(auth.AuthMiddleware(auth.HMACAuth(hmacProvider)))
+	protected.Use(auth.AuthMiddleware(auth.NewHMACAuthProvider(hmacProvider)))
 	{
 		protected.GET("/profile", profileHandler)
 		protected.POST("/data", dataHandler)
@@ -135,7 +135,7 @@ func setupRoutes(router *gin.Engine, hmacProvider *hmacprovider.HMACProvider, lo
 
 	// Test endpoints for Python client validation
 	test := router.Group("/api/test")
-	test.Use(auth.AuthMiddleware(auth.HMACAuth(hmacProvider)))
+	test.Use(auth.AuthMiddleware(auth.NewHMACAuthProvider(hmacProvider)))
 	{
 		test.GET("/simple", simpleTestHandler)
 		test.POST("/json", jsonTestHandler)
@@ -163,13 +163,13 @@ func requestLogger(logger *log.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		
+
 		logger.Info("Request completed", log.KV{
-			"method":     c.Request.Method,
-			"path":       c.Request.URL.Path,
-			"status":     c.Writer.Status(),
-			"latency":    time.Since(start).String(),
-			"client_ip":  c.ClientIP(),
+			"method":    c.Request.Method,
+			"path":      c.Request.URL.Path,
+			"status":    c.Writer.Status(),
+			"latency":   time.Since(start).String(),
+			"client_ip": c.ClientIP(),
 		})
 	}
 }
@@ -310,11 +310,11 @@ func echoHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"echo":       string(body),
-		"size":       len(body),
-		"timestamp":  time.Now().UTC().Format(time.RFC3339),
-		"headers":    c.Request.Header,
-		"message":    "Request echoed successfully from Go server",
+		"echo":      string(body),
+		"size":      len(body),
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"headers":   c.Request.Header,
+		"message":   "Request echoed successfully from Go server",
 	})
 }
 

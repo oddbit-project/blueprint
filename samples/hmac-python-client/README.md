@@ -192,7 +192,7 @@ This client is designed to work with Blueprint framework servers using the HMAC 
 ```go
 // Go server setup
 hmacProvider := hmacprovider.NewContainer("your-secret-key", store)
-router.Use(auth.AuthMiddleware(auth.HMACAuth(hmacProvider)))
+router.Use(auth.AuthMiddleware(auth.NewHMACAuthProvider(hmacProvider)))
 ```
 
 The Python client generates signatures in the exact format expected by the Go server:
