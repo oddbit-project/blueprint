@@ -23,6 +23,7 @@ const (
 	ErrClient          = utils.Error("Failed creating client")
 	ErrSMTPServer      = utils.Error("Failed to dial SMTP server")
 	ErrMessage         = utils.Error("Failed to send email message")
+	ErrInvalidAuthType = utils.Error("Invalid auth type")
 )
 
 type Config struct {
@@ -31,8 +32,9 @@ type Config struct {
 	Username string `json:"username"`
 	secure.DefaultCredentialConfig
 	tlsProvider.ClientConfig
-	From string `json:"from"`
-	Bcc  string `json:"bcc,omitempty"`
+	AuthType string `json:"auth_type"`
+	From     string `json:"from"`
+	Bcc      string `json:"bcc,omitempty"`
 }
 
 type Mailer struct {
@@ -125,7 +127,7 @@ func NewConfig() *Config {
 	}
 }
 
-func NewMailer(cfg *Config) (*Mailer, error) {
+func NewMailer(cfg *Config, customAuth ...gomail.Option) (*Mailer, error) {
 	if cfg == nil {
 		return nil, ErrInvalidConfig
 	}
@@ -156,8 +158,22 @@ func NewMailer(cfg *Config) (*Mailer, error) {
 		clientOpts = append(clientOpts,
 			gomail.WithUsername(cfg.Username),
 			gomail.WithPassword(password),
-			gomail.WithSMTPAuth(gomail.SMTPAuthPlain),
 		)
+	}
+
+	var authType gomail.SMTPAuthType
+
+	if err := authType.UnmarshalString(cfg.AuthType); err != nil {
+		return nil, ErrInvalidAuthType
+	}
+
+	if authType == gomail.SMTPAuthCustom {
+		if len(customAuth) == 0 {
+			return nil, ErrInvalidAuthType
+		}
+		clientOpts = append(clientOpts, customAuth...)
+	} else {
+		clientOpts = append(clientOpts, gomail.WithSMTPAuth(authType))
 	}
 
 	if cfg.TLSEnable {
