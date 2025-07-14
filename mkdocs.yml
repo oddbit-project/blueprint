@@ -99,6 +99,8 @@ nav:
     - NATS: provider/nats.md
     - TLS: provider/tls.md
     - JWT Provider: provider/jwtprovider.md
+    - HMAC Provider: provider/hmacprovider.md
+    - Htpasswd Provider: provider/htpasswd.md
 
   - Logging:
     - Overview: log/logging.md

@@ -1,12 +1,17 @@
 # Query Builder
 
-The Query Builder (qb) package provides a powerful SQL generation system with dialect abstraction, type-safe query construction, and advanced features like RETURNING clauses. It serves as the foundation for Repository operations and can be used directly for complex query construction.
+The Query Builder (qb) package provides a powerful SQL generation system with dialect abstraction, type-safe query construction, 
+and advanced features like RETURNING clauses. It serves as the foundation for Repository operations and can be
+used directly for complex query construction.
+
+> Note: The Query Builder only supports INSERT and UPDATE queries currently; other features will be included in the
+> future
 
 ## Overview
 
 The Query Builder system includes:
 
-- SQL dialect abstraction for database portability
+- SQL dialect abstraction for database portability (currently only INSERT and UPDATE)
 - Type-safe query construction with struct integration
 - Advanced UPDATE operations with flexible options
 - RETURNING clause support for INSERT and UPDATE
@@ -27,7 +32,7 @@ type SqlDialect interface {
 
 The SqlDialect interface abstracts database-specific SQL generation:
 
-- **Name()**: Returns the dialect name (e.g., "postgres", "mysql")
+- **Name()**: Returns the dialect name (e.g., "pgx", "clickhouse")
 - **Quote()**: Quotes identifiers for the target database
 - **Placeholder()**: Generates parameter placeholders ($1, ?, etc.)
 
