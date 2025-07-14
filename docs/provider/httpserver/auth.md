@@ -125,7 +125,7 @@ if err != nil {
 hmacProvider := hmacprovider.NewHmacProvider(credential)
 
 // Create HMAC auth provider
-authProvider := auth.HMACAuth(hmacProvider)
+authProvider := auth.NewHMACAuthProvider(hmacProvider)
 
 // Apply to routes
 router.Use(auth.AuthMiddleware(authProvider))
@@ -187,7 +187,7 @@ func main() {
     
     // Option 3: HMAC authentication
     hmacProvider := setupHMACProvider() // See HMAC setup below
-    hmacAuth := auth.HMACAuth(hmacProvider)
+    hmacAuth := auth.NewHMACAuthProvider(hmacProvider)
     
     // Apply authentication to specific routes
     protected := router.Group("/api")
@@ -562,7 +562,7 @@ func createHMACAuth() auth.Provider {
     }
     
     provider := hmacprovider.NewHmacProvider(credential, opts...)
-    return auth.HMACAuth(provider)
+    return auth.NewHMACAuthProvider(provider)
 }
 ```
 
@@ -573,7 +573,7 @@ func setupMultipleAuth(router *gin.Engine) {
     // Create different auth providers
     apiKeyAuth := auth.NewAuthToken("X-API-Key", "api-secret")
     jwtAuth := auth.NewAuthJWT(jwtProvider)
-    hmacAuth := auth.HMACAuth(hmacProvider)
+    hmacAuth := auth.NewHMACAuthProvider(hmacProvider)
     adminAuth := auth.NewAuthToken("X-Admin-Key", "admin-secret")
     
     // Public endpoints

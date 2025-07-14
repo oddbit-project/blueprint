@@ -23,7 +23,7 @@ type hmacAuthProvider struct {
 	provider *hmacprovider.HMACProvider
 }
 
-func HMACAuth(provider *hmacprovider.HMACProvider) Provider {
+func NewHMACAuthProvider(provider *hmacprovider.HMACProvider) Provider {
 	return &hmacAuthProvider{
 		provider: provider,
 	}
