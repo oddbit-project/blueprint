@@ -53,7 +53,7 @@ func TestNewMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a message with subject, body, and recipient
-	msg, err := mailer.NewMessage("receiver@example.com", "Hello subject",
+	msg, err := mailer.NewMessage([]string{"receiver@example.com"}, "Hello subject",
 		smtp.WithBody("Plain text body", "<b>HTML body</b>"),
 	)
 	require.NoError(t, err)

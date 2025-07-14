@@ -32,7 +32,7 @@ type Config struct {
 	Username string `json:"username"`
 	secure.DefaultCredentialConfig
 	tlsProvider.ClientConfig
-	AuthType string `json:"auth_type"`
+	AuthType string `json:"authType"`
 	From     string `json:"from"`
 	Bcc      string `json:"bcc,omitempty"`
 }
@@ -197,20 +197,19 @@ func NewMailer(cfg *Config, customAuth ...gomail.Option) (*Mailer, error) {
 }
 
 // Creates a new message with support for attachments
-func (m *Mailer) NewMessage(to string, subject string, opts ...MessageOpts) (*gomail.Msg, error) {
+func (m *Mailer) NewMessage(to []string, subject string, opts ...MessageOpts) (*gomail.Msg, error) {
 	msg := gomail.NewMsg()
 
-	if !isValidEmail(to) {
-		return nil, ErrInvalidTo
-	}
+	validTo := make([]string, 0, len(to))
 
-	if m.config.From != "" {
-		if err := msg.From(m.config.From); err != nil {
-			return nil, ErrInvalidFrom
+	for _, addr := range to {
+		addr = strings.TrimSpace(addr)
+		if !isValidEmail(addr) {
+			return nil, ErrInvalidTo
 		}
+		validTo = append(validTo, addr)
 	}
-
-	msg.To(to)
+	msg.To(validTo...)
 	msg.Subject(subject)
 
 	for _, opt := range opts {
