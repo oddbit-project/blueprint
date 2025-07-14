@@ -2599,11 +2599,17 @@
 
 
 <h1 id="query-builder">Query Builder<a class="headerlink" href="#query-builder" title="Permanent link">&para;</a></h1>
-<p>The Query Builder (qb) package provides a powerful SQL generation system with dialect abstraction, type-safe query construction, and advanced features like RETURNING clauses. It serves as the foundation for Repository operations and can be used directly for complex query construction.</p>
+<p>The Query Builder (qb) package provides a powerful SQL generation system with dialect abstraction, type-safe query construction, 
+and advanced features like RETURNING clauses. It serves as the foundation for Repository operations and can be
+used directly for complex query construction.</p>
+<blockquote>
+<p>Note: The Query Builder only supports INSERT and UPDATE queries currently; other features will be included in the
+future</p>
+</blockquote>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>The Query Builder system includes:</p>
 <ul>
-<li>SQL dialect abstraction for database portability</li>
+<li>SQL dialect abstraction for database portability (currently only INSERT and UPDATE)</li>
 <li>Type-safe query construction with struct integration</li>
 <li>Advanced UPDATE operations with flexible options</li>
 <li>RETURNING clause support for INSERT and UPDATE</li>
@@ -2620,7 +2626,7 @@
 </span></code></pre></div>
 <p>The SqlDialect interface abstracts database-specific SQL generation:</p>
 <ul>
-<li><strong>Name()</strong>: Returns the dialect name (e.g., "postgres", "mysql")</li>
+<li><strong>Name()</strong>: Returns the dialect name (e.g., "pgx", "clickhouse")</li>
 <li><strong>Quote()</strong>: Quotes identifiers for the target database</li>
 <li><strong>Placeholder()</strong>: Generates parameter placeholders ($1, ?, etc.)</li>
 </ul>
