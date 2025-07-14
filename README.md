@@ -1,8 +1,8 @@
 # blueprint
 
 ![go-version](https://img.shields.io/github/go-mod/go-version/oddbit-project/blueprint)
-![go-build](https://img.shields.io/github/actions/workflow/status/oddbit-project/blueprint/run-tests.yml)
-![go-reportcard](https://goreportcard.com/badge/github.com/oddbit-project/blueprint)
+[![Build Status](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/oddbit-project/blueprint)](https://goreportcard.com/report/github.com/oddbit-project/blueprint)
 
 ---
 
