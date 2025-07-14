@@ -15,6 +15,10 @@
         <link rel="canonical" href="https://oddbit-project.github.io/blueprint/provider/hmacprovider/">
       
       
+        <link rel="prev" href="../jwtprovider/">
+      
+      
+        <link rel="next" href="../htpasswd/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -317,10 +321,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../clickhouse/" class="md-tabs__link">
           
   
@@ -1210,28 +1216,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
             
   
   
@@ -1244,7 +1253,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             Providers
@@ -1402,6 +1411,526 @@
   
   <span class="md-ellipsis">
     JWT Provider
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    HMAC Provider
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    HMAC Provider
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      Table of Contents
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Features
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Security Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implemented-protections" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implemented Protections
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quick Start
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Reference
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      Constructor
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Constructor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#newhmacprovidercredential-securecredential-opts-hmacprovideroption-hmacprovider" class="md-nav__link">
+    <span class="md-ellipsis">
+      NewHmacProvider(credential *secure.Credential, opts ...HMACProviderOption) *HMACProvider
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simple-hmac-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simple HMAC Methods
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Simple HMAC Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sha256signdata-ioreader-string-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      SHA256Sign(data io.Reader) (string, error)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sha256verifydata-ioreader-hash-string-bool-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      SHA256Verify(data io.Reader, hash string) (bool, error)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secure-hmac-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Secure HMAC Methods
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Secure HMAC Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sign256data-ioreader-hash-timestamp-nonce-string-err-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sign256(data io.Reader) (hash, timestamp, nonce string, err error)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify256data-ioreader-hash-timestamp-nonce-string-bool-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      Verify256(data io.Reader, hash, timestamp, nonce string) (bool, error)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nonce-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nonce Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nonce Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memory-store-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      Memory Store (Default)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kv-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      KV Store
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redis-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      Redis Store
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#withnoncestorestore-noncestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      WithNonceStore(store NonceStore)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#withkeyintervalinterval-timeduration" class="md-nav__link">
+    <span class="md-ellipsis">
+      WithKeyInterval(interval time.Duration)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#withmaxinputsizemaxsize-int" class="md-nav__link">
+    <span class="md-ellipsis">
+      WithMaxInputSize(maxSize int)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best Practices
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best Practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Considerations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Optimization
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web-api-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Web API Authentication
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#message-queue-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message Queue Verification
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Batch Processing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Issues
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invalid-request-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      "invalid request" Error
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#input-too-large-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      "input too large" Error
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nonce-store-capacity-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nonce Store Capacity Issues
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clock-drift-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      Clock Drift Issues
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Monitoring
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-auditing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Auditing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      Constants
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../htpasswd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    htpasswd Authentication
     
   </span>
   
