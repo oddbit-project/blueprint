@@ -39,7 +39,7 @@ func main() {
 	src.Add("sample2.sql", "insert into sample(id) values(1);")
 
 	// create migration manager
-	mgr, err := clickhouse.NewMigrationManager(context.Background(), client, "")
+	mgr, err := clickhouse.NewMigrationManager(context.Background(), client)
 	if err != nil {
 		fmt.Println("Error: ", err)
 		os.Exit(1)

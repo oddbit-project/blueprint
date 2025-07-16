@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/jmoiron/sqlx"
+	"github.com/oddbit-project/blueprint/db"
 )
 
 const (
@@ -24,18 +25,36 @@ func GetServerVersion(db *sqlx.DB, ctx context.Context) (string, error) {
 }
 
 // TableExists returns true if specified table exists
-func TableExists(ctx context.Context, db *sqlx.DB, tableName string, schema string) (bool, error) {
-	return dbObjectExists(ctx, db, TblTypeTable, tableName, schema)
+func TableExists(ctx context.Context, client *db.SqlClient, tableName string, schema string) (bool, error) {
+	return dbObjectExists(ctx, client.Db(), TblTypeTable, tableName, schema)
+}
+
+// ColumnExists check if a column exists
+func ColumnExists(ctx context.Context, client *db.SqlClient, tableName string, columnName string, schema string) (bool, error) {
+	query := `
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3;
+    `
+	var col string
+	err := client.Db().QueryRowContext(ctx, query, schema, tableName, columnName).Scan(&col)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // ViewExists returns true if specified view exists
-func ViewExists(ctx context.Context, db *sqlx.DB, tableName string, schema string) (bool, error) {
-	return dbObjectExists(ctx, db, TblTypeView, tableName, schema)
+func ViewExists(ctx context.Context, client *db.SqlClient, tableName string, schema string) (bool, error) {
+	return dbObjectExists(ctx, client.Db(), TblTypeView, tableName, schema)
 }
 
 // ForeignTableExists returns true if specified foreign table exists
-func ForeignTableExists(ctx context.Context, db *sqlx.DB, tableName string, schema string) (bool, error) {
-	return dbObjectExists(ctx, db, TblTypeForeignTable, tableName, schema)
+func ForeignTableExists(ctx context.Context, client *db.SqlClient, tableName string, schema string) (bool, error) {
+	return dbObjectExists(ctx, client.Db(), TblTypeForeignTable, tableName, schema)
 }
 
 // dbObjectExists checks if given table-like object exists

@@ -1,5 +1,5 @@
-//go:build integration
-// +build integration
+//go:build integration && pgsql
+// +build integration,pgsql
 
 package db
 

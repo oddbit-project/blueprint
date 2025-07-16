@@ -1,3 +1,6 @@
+//go:build integration && pgsql
+// +build integration,pgsql
+
 package pgsql
 
 import (
@@ -17,7 +20,7 @@ const (
 )
 
 type sampleRecord struct {
-	Id        int       `db:"id_sample_table" goqu:"skipinsert"`
+	Id        int       `db:"id_sample_table,auto" goqu:"skipinsert"`
 	CreatedAt time.Time `db:"created_at"`
 	Label     string
 }

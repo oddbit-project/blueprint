@@ -2,80 +2,161 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/oddbit-project/blueprint/db"
 	"github.com/oddbit-project/blueprint/db/migrations"
 	"slices"
 )
 
 const (
 	MigrationTable = "db_migration"
-	sqlCreateTable = `CREATE TABLE IF NOT EXISTS  %s %s(created DateTime, name String, sha2 String, contents String) ENGINE = TinyLog`
+	sqlCreateTable = `CREATE TABLE IF NOT EXISTS  %s %s(created DateTime, module String, name String, sha2 String, contents String) ENGINE = TinyLog`
 )
 
 type chMigrationManager struct {
-	db clickhouse.Conn
+	client  *Client
+	module  string
+	repo    Repository
+	cluster string
 }
 
-func NewMigrationManager(ctx context.Context, client *Client, cluster string) (migrations.Manager, error) {
-	result := &chMigrationManager{
-		db: client.Conn,
+type ChMigrationOption func(s *chMigrationManager) error
+
+func WithModule(module string) ChMigrationOption {
+	return func(s *chMigrationManager) error {
+		s.module = module
+		return nil
 	}
-	if err := result.init(ctx, cluster); err != nil {
+}
+
+func WithCluster(cluster string) ChMigrationOption {
+	return func(s *chMigrationManager) error {
+		s.cluster = cluster
+		return nil
+	}
+}
+
+func NewMigrationManager(ctx context.Context, client *Client, opts ...ChMigrationOption) (migrations.Manager, error) {
+	result := &chMigrationManager{
+		client:  client,
+		module:  migrations.ModuleBase,
+		repo:    NewRepository(ctx, client.Conn, MigrationTable),
+		cluster: "",
+	}
+	for _, opt := range opts {
+		if err := opt(result); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := result.init(ctx); err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+// updateTable updates migration table to latest version
+func (b *chMigrationManager) updateTable(ctx context.Context) error {
+	currentDb, err := CurrentDatabase(ctx, b.client)
+	if err != nil {
+		return err
+	}
+	// check if module column exists
+	// old blueprint versions did not implement the module column
+	exists, err := ColumnExists(ctx, b.client, currentDb, MigrationTable, "module")
+	if err != nil {
+		return err
+	}
+	if !exists {
+		cluster := b.cluster
+		// create new table
+		if cluster != "" {
+			cluster = fmt.Sprintf("ON CLUSTER %s.", cluster)
+		}
+		newTable := fmt.Sprintf("%s_new", MigrationTable)
+		qry := fmt.Sprintf(sqlCreateTable, newTable, cluster)
+		if err := b.client.Conn.Exec(ctx, qry); err != nil {
+			return err
+		}
+
+		// copy from old to new
+		qry = "INSERT INTO %s (created, module, name, sha2, contents) SELECT created, '', name, sha2, contents FROM %s;"
+		qry = fmt.Sprintf(qry, newTable, MigrationTable)
+		if err := b.client.Conn.Exec(ctx, qry); err != nil {
+			return err
+		}
+
+		// drop old
+		qry = fmt.Sprintf("DROP TABLE %s;", MigrationTable)
+		if err := b.client.Conn.Exec(ctx, qry); err != nil {
+			return err
+		}
+		// rename new
+		qry = fmt.Sprintf("RENAME TABLE %s TO %s;", newTable, MigrationTable)
+		if err := b.client.Conn.Exec(ctx, qry); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // init creates the migration table, if it doesnt exist
 // Note: the migration table is created on the current database!
-func (b *chMigrationManager) init(ctx context.Context, cluster string) error {
-	if cluster != "" {
-		cluster = fmt.Sprintf("ON CLUSTER %s.", cluster)
+func (b *chMigrationManager) init(ctx context.Context) error {
+	currentDb, err := CurrentDatabase(ctx, b.client)
+	if err != nil {
+		return err
 	}
-	qry := fmt.Sprintf(sqlCreateTable, MigrationTable, cluster)
-	return b.db.Exec(ctx, qry)
+	exists, err := TableExists(ctx, b.client, currentDb, MigrationTable)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		cluster := b.cluster
+		if cluster != "" {
+			cluster = fmt.Sprintf("ON CLUSTER %s.", cluster)
+		}
+		qry := fmt.Sprintf(sqlCreateTable, MigrationTable, cluster)
+		return b.client.Conn.Exec(ctx, qry)
+	}
+
+	// table exists, perform update if necessary
+	return b.updateTable(ctx)
 }
 
 // registerMigration internal function to register a migration
 func (b *chMigrationManager) registerMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	batch, err := b.db.PrepareBatch(ctx, fmt.Sprintf("INSERT INTO %s", MigrationTable))
-	if err != nil {
-		return err
-	}
-	if err = batch.AppendStruct(m); err != nil {
-		batch.Abort()
-		return err
-	}
-	return batch.Send()
+	m.Module = b.module
+	return b.repo.Insert(m)
 }
 
 func (b *chMigrationManager) List(ctx context.Context) ([]migrations.MigrationRecord, error) {
 	result := make([]migrations.MigrationRecord, 0)
-	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", MigrationTable)
-	if err := b.db.Select(ctx, &result, qry); err != nil {
-		return nil, err
-	}
-	return result, nil
-
+	return result, b.repo.FetchWhere(db.FV{"module": b.module}, &result)
 }
 
 func (b *chMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
-	qry := fmt.Sprintf("SELECT * FROM %s WHERE name=$1 LIMIT 1", MigrationTable)
-	if err := b.db.Select(ctx, qry, name); err != nil {
+	err := b.repo.FetchWhere(db.FV{"module": b.module, "name": name, "sha2": sha2}, result)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
+
 	if result.SHA2 != sha2 {
 		return true, migrations.ErrMigrationNameHashMismatch
 	}
-	return len(result.Name) > 0, nil
+	return true, nil
 }
 
 // runMigration internal function to execute migrations, called by RunMigration() and Run()
 func (b *chMigrationManager) runMigration(ctx context.Context, m *migrations.MigrationRecord) error {
 	// execute migration
-	if err := b.db.Exec(ctx, m.Contents); err != nil {
+	if err := b.client.Conn.Exec(ctx, m.Contents); err != nil {
 		return err
 	}
 	// register migration
@@ -110,7 +191,7 @@ func (b *chMigrationManager) RegisterMigration(ctx context.Context, m *migration
 // Run all migrations from a source, and skip the ones already applied
 // Example:
 //
-//	mm := NewMigrationManager(db)
+//	mm := NewMigrationManager(client)
 //	if err := mm.Run(context.Background(), diskSrc, DefaultProgressFn); err != nil {
 //	   panic(err)
 //	}

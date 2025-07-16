@@ -1,4 +1,5 @@
-// +build integration
+//go:build integration && pgsql
+// +build integration,pgsql
 
 package db
 
@@ -23,10 +24,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 		t.Run("FetchFirstRecord", func(t *testing.T) {
 			var result ExtensiveTestUser
 			query := helper.userRepo.SqlSelect().Where(goqu.C("email").Eq("alice@example.com"))
-			
+
 			err := helper.userRepo.FetchOne(query, &result)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, users[0].ID, result.ID)
 			assert.Equal(t, "Alice Johnson", result.Name)
 			assert.Equal(t, "alice@example.com", result.Email)
@@ -43,10 +44,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 				Where(goqu.C("status").Eq("active")).
 				Where(goqu.C("score").Gt(90)).
 				Order(goqu.C("score").Desc())
-			
+
 			err := helper.userRepo.FetchOne(query, &result)
 			require.NoError(t, err)
-			
+
 			// Should get Alice (highest score among active users)
 			assert.Equal(t, "Alice Johnson", result.Name)
 			assert.Equal(t, 95.5, result.Score)
@@ -55,7 +56,7 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 		t.Run("FetchNonExistentRecord", func(t *testing.T) {
 			var result ExtensiveTestUser
 			query := helper.userRepo.SqlSelect().Where(goqu.C("email").Eq("nonexistent@example.com"))
-			
+
 			err := helper.userRepo.FetchOne(query, &result)
 			assert.True(t, EmptyResult(err), "Should return empty result error")
 		})
@@ -63,10 +64,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 		t.Run("FetchWithNullFields", func(t *testing.T) {
 			var result ExtensiveTestUser
 			query := helper.userRepo.SqlSelect().Where(goqu.C("email").Eq("david@example.com"))
-			
+
 			err := helper.userRepo.FetchOne(query, &result)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, "David Brown", result.Name)
 			assert.Nil(t, result.Age, "Age should be nil for David")
 			assert.Nil(t, result.Bio, "Bio should be nil for David")
@@ -77,11 +78,11 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 		t.Run("FetchAllUsers", func(t *testing.T) {
 			var results []ExtensiveTestUser
 			query := helper.userRepo.SqlSelect().Order(goqu.C("id").Asc())
-			
+
 			err := helper.userRepo.Fetch(query, &results)
 			require.NoError(t, err)
 			require.Len(t, results, 4, "Should fetch all 4 users")
-			
+
 			// Verify order and data
 			assert.Equal(t, "Alice Johnson", results[0].Name)
 			assert.Equal(t, "Bob Smith", results[1].Name)
@@ -94,11 +95,11 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 			query := helper.userRepo.SqlSelect().
 				Where(goqu.C("is_active").IsTrue()).
 				Order(goqu.C("name").Asc())
-			
+
 			err := helper.userRepo.Fetch(query, &results)
 			require.NoError(t, err)
 			require.Len(t, results, 2, "Should fetch 2 active users")
-			
+
 			assert.Equal(t, "Alice Johnson", results[0].Name)
 			assert.Equal(t, "Carol Williams", results[1].Name)
 		})
@@ -109,11 +110,11 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 				Order(goqu.C("id").Asc()).
 				Limit(2).
 				Offset(1)
-			
+
 			err := helper.userRepo.Fetch(query, &results)
 			require.NoError(t, err)
 			require.Len(t, results, 2, "Should fetch 2 users with offset")
-			
+
 			assert.Equal(t, "Bob Smith", results[0].Name)
 			assert.Equal(t, "Carol Williams", results[1].Name)
 		})
@@ -121,7 +122,7 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 		t.Run("FetchEmptyResult", func(t *testing.T) {
 			var results []ExtensiveTestUser
 			query := helper.userRepo.SqlSelect().Where(goqu.C("status").Eq("nonexistent"))
-			
+
 			err := helper.userRepo.Fetch(query, &results)
 			require.NoError(t, err)
 			assert.Len(t, results, 0, "Should return empty slice for no matches")
@@ -134,10 +135,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 			fieldValues := map[string]any{
 				"email": "bob@example.com",
 			}
-			
+
 			err := helper.userRepo.FetchRecord(fieldValues, &result)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, "Bob Smith", result.Name)
 			assert.Equal(t, "bob@example.com", result.Email)
 			assert.Equal(t, "pending", result.Status)
@@ -149,10 +150,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 				"status":    "active",
 				"is_active": true,
 			}
-			
+
 			err := helper.userRepo.FetchRecord(fieldValues, &result)
 			require.NoError(t, err)
-			
+
 			// Should get first active user (Alice or Carol)
 			assert.True(t, result.Name == "Alice Johnson" || result.Name == "Carol Williams")
 			assert.Equal(t, "active", result.Status)
@@ -164,14 +165,14 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 			fieldValues := map[string]any{
 				"email": "notfound@example.com",
 			}
-			
+
 			err := helper.userRepo.FetchRecord(fieldValues, &result)
 			assert.True(t, EmptyResult(err), "Should return empty result error")
 		})
 
 		t.Run("FetchWithNilFieldValues", func(t *testing.T) {
 			var result ExtensiveTestUser
-			
+
 			err := helper.userRepo.FetchRecord(nil, &result)
 			assert.Equal(t, ErrInvalidParameters, err)
 		})
@@ -180,10 +181,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 	t.Run("FetchByKey", func(t *testing.T) {
 		t.Run("FetchByPrimaryKey", func(t *testing.T) {
 			var result ExtensiveTestUser
-			
+
 			err := helper.userRepo.FetchByKey("id", users[1].ID, &result)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, users[1].ID, result.ID)
 			assert.Equal(t, "Bob Smith", result.Name)
 			assert.Equal(t, "bob@example.com", result.Email)
@@ -191,10 +192,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 
 		t.Run("FetchByUniqueKey", func(t *testing.T) {
 			var result ExtensiveTestUser
-			
+
 			err := helper.userRepo.FetchByKey("email", "carol@example.com", &result)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, "Carol Williams", result.Name)
 			assert.Equal(t, "carol@example.com", result.Email)
 			assert.Equal(t, "active", result.Status)
@@ -202,14 +203,14 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 
 		t.Run("FetchByKeyNotFound", func(t *testing.T) {
 			var result ExtensiveTestUser
-			
+
 			err := helper.userRepo.FetchByKey("id", 99999, &result)
 			assert.True(t, EmptyResult(err), "Should return empty result error")
 		})
 
 		t.Run("FetchByNonExistentField", func(t *testing.T) {
 			var result ExtensiveTestUser
-			
+
 			err := helper.userRepo.FetchByKey("nonexistent_field", "value", &result)
 			assert.Error(t, err, "Should return error for non-existent field")
 		})
@@ -221,11 +222,11 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 			fieldValues := map[string]any{
 				"is_active": true,
 			}
-			
+
 			err := helper.userRepo.FetchWhere(fieldValues, &results)
 			require.NoError(t, err)
 			require.Len(t, results, 2, "Should fetch 2 active users")
-			
+
 			for _, user := range results {
 				assert.True(t, user.IsActive, "All users should be active")
 			}
@@ -237,11 +238,11 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 				"status":    "active",
 				"is_active": true,
 			}
-			
+
 			err := helper.userRepo.FetchWhere(fieldValues, &results)
 			require.NoError(t, err)
 			require.Len(t, results, 2, "Should fetch 2 active users with active status")
-			
+
 			for _, user := range results {
 				assert.Equal(t, "active", user.Status)
 				assert.True(t, user.IsActive)
@@ -253,7 +254,7 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 			fieldValues := map[string]any{
 				"status": "nonexistent",
 			}
-			
+
 			err := helper.userRepo.FetchWhere(fieldValues, &results)
 			require.NoError(t, err)
 			assert.Len(t, results, 0, "Should return empty slice for no matches")
@@ -261,7 +262,7 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 
 		t.Run("FetchWhereNilFieldValues", func(t *testing.T) {
 			var results []ExtensiveTestUser
-			
+
 			err := helper.userRepo.FetchWhere(nil, &results)
 			assert.Equal(t, ErrInvalidParameters, err)
 		})
@@ -318,10 +319,10 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 	t.Run("Reader_ProfileRepository", func(t *testing.T) {
 		t.Run("FetchProfileByUserID", func(t *testing.T) {
 			var result TestProfile
-			
+
 			err := helper.profileRepo.FetchByKey("user_id", users[0].ID, &result)
 			require.NoError(t, err)
-			
+
 			assert.Equal(t, users[0].ID, result.UserID)
 			assert.Equal(t, "https://alice.dev", result.Website)
 			assert.Equal(t, "TechCorp", result.Company)
@@ -330,7 +331,7 @@ func TestExtensive_Reader_Interface(t *testing.T) {
 		t.Run("FetchAllProfiles", func(t *testing.T) {
 			var results []TestProfile
 			query := helper.profileRepo.SqlSelect().Order(goqu.C("id").Asc())
-			
+
 			err := helper.profileRepo.Fetch(query, &results)
 			require.NoError(t, err)
 			require.Len(t, results, 3, "Should fetch all 3 profiles")

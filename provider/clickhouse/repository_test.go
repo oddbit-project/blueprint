@@ -22,8 +22,8 @@ func TestRepositorySqlBuilders(t *testing.T) {
 	assert.NotNil(t, repo.Sql())
 	assert.NotNil(t, repo.SqlSelect())
 	assert.NotNil(t, repo.SqlInsert())
-	assert.Nil(t, repo.SqlUpdate()) // not supported
-	assert.Nil(t, repo.SqlDelete()) // not supported
+	assert.Nil(t, repo.SqlUpdate())    // not supported
+	assert.NotNil(t, repo.SqlDelete()) // not supported
 
 	// Verify correct table name for select and insert
 	// Note: Update and Delete need values to be set before generating SQL

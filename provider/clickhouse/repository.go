@@ -91,9 +91,7 @@ func (r *repository) SqlUpdate() *goqu.UpdateDataset {
 
 // SqlDelete returns a Delete query builder
 func (r *repository) SqlDelete() *goqu.DeleteDataset {
-	// Clickhouse does not support Update;
-	// Update queries are performed via Delete
-	return nil
+	return r.dialect.Delete(r.tableName)
 }
 
 // FetchOne fetch a record; target must be a struct

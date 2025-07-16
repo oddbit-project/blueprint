@@ -1,3 +1,6 @@
+//go:build integration && pgsql
+// +build integration,pgsql
+
 package pgsql
 
 import (
@@ -5,7 +8,6 @@ import (
 	"fmt"
 	"github.com/oddbit-project/blueprint/db"
 	"github.com/stretchr/testify/suite"
-	"os"
 	"testing"
 )
 
@@ -28,12 +30,9 @@ func dbClient(t *testing.T) *db.SqlClient {
 }
 
 func resolveDSN() string {
-	user := os.Getenv("POSTGRES_USER")
-	pwd := os.Getenv("POSTGRES_PASSWORD")
-	database := os.Getenv("POSTGRES_DB")
-	port := os.Getenv("POSTGRES_PORT")
-	host := os.Getenv("POSTGRES_HOST")
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, pwd, host, port, database)
+	// Disable prepared statement cache to avoid "cached plan must not change result type" errors
+	// Use default_query_exec_mode=simple_protocol for pgx driver
+	return "postgres://blueprint:password@postgres:5432/blueprint?default_query_exec_mode=simple_protocol"
 }
 
 // SetupSuite prepares the test environment
@@ -55,6 +54,15 @@ func (s *PGIntegrationTestSuite) SetupSuite() {
 }
 
 // Teardown the test suite
+// SetupTest runs before each test to clean up any existing state
+func (s *PGIntegrationTestSuite) SetupTest() {
+	// Clean up migration table to ensure clean state between tests
+	if s.client != nil && s.client.Conn != nil {
+		_, _ = s.client.Conn.ExecContext(s.ctx, "DROP TABLE IF EXISTS blueprint.db_migration")
+		_, _ = s.client.Conn.ExecContext(s.ctx, "DROP SCHEMA IF EXISTS blueprint CASCADE")
+	}
+}
+
 func (s *PGIntegrationTestSuite) TearDownSuite() {
 	// Drop the test table
 	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
