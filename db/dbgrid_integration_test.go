@@ -1,5 +1,5 @@
-//go:build integration
-// +build integration
+//go:build integration && pgsql
+// +build integration,pgsql
 
 package db
 
@@ -247,17 +247,17 @@ func testGridCreation(t *testing.T, helper *DbGridTestHelper, records []DbGridTe
 
 	t.Run("GridCachingBehavior", func(t *testing.T) {
 		var record DbGridTestRecord
-		
+
 		// First call should create grid
 		grid1, err := helper.gridRepo.Grid(&record)
 		require.NoError(t, err)
 		require.NotNil(t, grid1)
-		
+
 		// Second call should return same grid (if caching is implemented)
 		grid2, err := helper.gridRepo.Grid(&record)
 		require.NoError(t, err)
 		require.NotNil(t, grid2)
-		
+
 		// Grids should be functionally equivalent
 		assert.Equal(t, grid1.tableName, grid2.tableName)
 	})
@@ -265,18 +265,18 @@ func testGridCreation(t *testing.T, helper *DbGridTestHelper, records []DbGridTe
 	t.Run("CreateGridFromDifferentRecords", func(t *testing.T) {
 		var gridRecord DbGridTestRecord
 		var userRecord ExtensiveTestUser
-		
+
 		grid1, err := helper.gridRepo.Grid(&gridRecord)
 		require.NoError(t, err)
 		require.NotNil(t, grid1)
-		
+
 		// Different record type should create different grid
 		// Note: This will fail because both use the same repository table name
 		// This test demonstrates that grids are based on the repository table, not the record type
 		grid2, err := helper.gridRepo.Grid(&userRecord)
 		require.NoError(t, err)
 		require.NotNil(t, grid2)
-		
+
 		// Both grids will have the same table name because they use the same repository
 		// This is expected behavior - the repository determines the table name, not the record type
 		assert.Equal(t, grid1.tableName, grid2.tableName)
@@ -286,11 +286,11 @@ func testGridCreation(t *testing.T, helper *DbGridTestHelper, records []DbGridTe
 // testSearchFunctionality tests all search types and scenarios
 func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("SearchNone", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -301,7 +301,7 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query, err := NewGridQuery(SearchStart, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = "Alice"
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -313,7 +313,7 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query, err := NewGridQuery(SearchEnd, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = "son"
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -334,7 +334,7 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query, err := NewGridQuery(SearchAny, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = "developer"
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -355,7 +355,7 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query, err := NewGridQuery(SearchAny, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = "UI/UX"
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -367,7 +367,7 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query, err := NewGridQuery(SearchAny, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = ""
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -378,7 +378,7 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query, err := NewGridQuery(SearchAny, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = "nonexistent"
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -389,19 +389,19 @@ func testSearchFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 // testFilterFunctionality tests filtering with various field types
 func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("FilterByString", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.FilterFields = map[string]any{
 			"category": "developer",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 2)
-		
+
 		// All results should be developers
 		for _, result := range results {
 			assert.Equal(t, "developer", result.Category)
@@ -414,12 +414,12 @@ func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query.FilterFields = map[string]any{
 			"is_active": true,
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 1)
-		
+
 		// All results should be active
 		for _, result := range results {
 			assert.True(t, result.IsActive)
@@ -432,7 +432,7 @@ func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query.FilterFields = map[string]any{
 			"score": 95.5,
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -446,7 +446,7 @@ func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query.FilterFields = map[string]any{
 			"id": records[0].ID,
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -461,12 +461,12 @@ func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 			"category":  "developer",
 			"is_active": true,
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 1)
-		
+
 		// All results should match both filters
 		for _, result := range results {
 			assert.Equal(t, "developer", result.Category)
@@ -480,7 +480,7 @@ func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 		query.FilterFields = map[string]any{
 			"category": "nonexistent",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -491,19 +491,19 @@ func testFilterFunctionality(t *testing.T, helper *DbGridTestHelper, records []D
 // testSortFunctionality tests sorting with various fields and directions
 func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("SortByNameAsc", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.SortFields = map[string]string{
 			"name": "asc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, len(records))
-		
+
 		// Results should be sorted by name ascending
 		for i := 1; i < len(results); i++ {
 			assert.LessOrEqual(t, results[i-1].Name, results[i].Name)
@@ -516,12 +516,12 @@ func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbG
 		query.SortFields = map[string]string{
 			"name": "desc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, len(records))
-		
+
 		// Results should be sorted by name descending
 		for i := 1; i < len(results); i++ {
 			assert.GreaterOrEqual(t, results[i-1].Name, results[i].Name)
@@ -534,12 +534,12 @@ func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbG
 		query.SortFields = map[string]string{
 			"score": "desc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, len(records))
-		
+
 		// Results should be sorted by score descending
 		for i := 1; i < len(results); i++ {
 			assert.GreaterOrEqual(t, results[i-1].Score, results[i].Score)
@@ -552,15 +552,15 @@ func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbG
 		query.SortFields = map[string]string{
 			"created_at": "asc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, len(records))
-		
+
 		// Results should be sorted by created_at ascending
 		for i := 1; i < len(results); i++ {
-			assert.True(t, results[i-1].CreatedAt.Before(results[i].CreatedAt) || 
+			assert.True(t, results[i-1].CreatedAt.Before(results[i].CreatedAt) ||
 				results[i-1].CreatedAt.Equal(results[i].CreatedAt))
 		}
 	})
@@ -572,12 +572,12 @@ func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbG
 			"category": "asc",
 			"score":    "desc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, len(records))
-		
+
 		// Results should be sorted by category first, then by score
 		for i := 1; i < len(results); i++ {
 			if results[i-1].Category == results[i].Category {
@@ -594,12 +594,12 @@ func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbG
 		query.SortFields = map[string]string{
 			"name": "", // Empty sort direction should default to DESC
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, len(records))
-		
+
 		// Results should be sorted by name descending (default)
 		for i := 1; i < len(results); i++ {
 			assert.GreaterOrEqual(t, results[i-1].Name, results[i].Name)
@@ -610,11 +610,11 @@ func testSortFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbG
 // testPaginationFunctionality tests pagination with various scenarios
 func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("LimitWithoutOffset", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 3, 0)
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -624,7 +624,7 @@ func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records
 	t.Run("OffsetWithoutLimit", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 0, 2)
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -634,7 +634,7 @@ func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records
 	t.Run("LimitAndOffset", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 3, 2)
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -645,7 +645,7 @@ func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.Page(2, 3) // Second page, 3 items per page
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -658,12 +658,12 @@ func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records
 		query.SortFields = map[string]string{
 			"name": "asc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, 2)
-		
+
 		// Results should be sorted
 		assert.LessOrEqual(t, results[0].Name, results[1].Name)
 	})
@@ -671,7 +671,7 @@ func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records
 	t.Run("PaginationBeyondResults", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 10, uint(len(records)))
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -682,13 +682,13 @@ func testPaginationFunctionality(t *testing.T, helper *DbGridTestHelper, records
 // testCustomFilterFunctions tests custom filter functions with various data types
 func testCustomFilterFunctions(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("StringTransformationFilter", func(t *testing.T) {
 		// Note: Filter functions are applied per-grid, not per-query
 		// We need to create a grid and add the filter function to it
 		grid, err := NewGrid("db_grid_test_records", &record)
 		require.NoError(t, err)
-		
+
 		// Add filter function to transform status to lowercase
 		grid.AddFilterFunc("status", func(value any) (any, error) {
 			if str, ok := value.(string); ok {
@@ -696,24 +696,24 @@ func testCustomFilterFunctions(t *testing.T, helper *DbGridTestHelper, records [
 			}
 			return value, nil
 		})
-		
+
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.FilterFields = map[string]any{
 			"status": "ACTIVE", // Should be transformed to lowercase
 		}
-		
+
 		// Build the query using our custom grid
 		selectQuery, err := grid.Build(nil, query)
 		require.NoError(t, err)
 		require.NotNil(t, selectQuery)
-		
+
 		// Execute the query directly
 		var results []DbGridTestRecord
 		err = Fetch(context.Background(), helper.gridRepo.(*repository).conn, selectQuery, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 1)
-		
+
 		// All results should have active status
 		for _, result := range results {
 			assert.Equal(t, "active", result.Status)
@@ -723,18 +723,18 @@ func testCustomFilterFunctions(t *testing.T, helper *DbGridTestHelper, records [
 	t.Run("FilterFunctionError", func(t *testing.T) {
 		grid, err := NewGrid("db_grid_test_records", &record)
 		require.NoError(t, err)
-		
+
 		// Add filter function that returns an error
 		grid.AddFilterFunc("category", func(value any) (any, error) {
 			return nil, fmt.Errorf("filter function error")
 		})
-		
+
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.FilterFields = map[string]any{
 			"category": "developer",
 		}
-		
+
 		// Validation should catch the error
 		err = grid.ValidQuery(query)
 		require.Error(t, err)
@@ -744,7 +744,7 @@ func testCustomFilterFunctions(t *testing.T, helper *DbGridTestHelper, records [
 	t.Run("ValidFilterFunction", func(t *testing.T) {
 		grid, err := NewGrid("db_grid_test_records", &record)
 		require.NoError(t, err)
-		
+
 		// Add filter function that works correctly
 		grid.AddFilterFunc("category", func(value any) (any, error) {
 			if str, ok := value.(string); ok {
@@ -752,17 +752,17 @@ func testCustomFilterFunctions(t *testing.T, helper *DbGridTestHelper, records [
 			}
 			return value, nil
 		})
-		
+
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.FilterFields = map[string]any{
 			"category": "DEVELOPER", // Should be transformed to lowercase
 		}
-		
+
 		// Validation should pass
 		err = grid.ValidQuery(query)
 		require.NoError(t, err)
-		
+
 		// Build query should work
 		selectQuery, err := grid.Build(nil, query)
 		require.NoError(t, err)
@@ -773,7 +773,7 @@ func testCustomFilterFunctions(t *testing.T, helper *DbGridTestHelper, records [
 // testErrorHandling tests various error scenarios
 func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("InvalidSearchType", func(t *testing.T) {
 		_, err := NewGridQuery(999, 0, 0) // Invalid search type
 		require.Error(t, err)
@@ -784,7 +784,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
 		query.SearchText = "invalid"
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.Error(t, err)
@@ -797,7 +797,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 		query.FilterFields = map[string]any{
 			"invalid_field": "value",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.Error(t, err)
@@ -810,7 +810,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 		query.FilterFields = map[string]any{
 			"description": "value", // Description is search-only, not filterable
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.Error(t, err)
@@ -823,7 +823,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 		query.SortFields = map[string]string{
 			"invalid_field": "asc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.Error(t, err)
@@ -836,7 +836,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 		query.SortFields = map[string]string{
 			"description": "asc", // Description is search-only, not sortable
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.Error(t, err)
@@ -849,7 +849,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 		query.SortFields = map[string]string{
 			"name": "invalid",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.Error(t, err)
@@ -865,7 +865,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 	t.Run("NilRecord", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(nil, query, &results)
 		require.Error(t, err)
@@ -877,7 +877,7 @@ func testErrorHandling(t *testing.T, helper *DbGridTestHelper, records []DbGridT
 // testComplexQueries tests combinations of search, filter, sort, and pagination
 func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	var record DbGridTestRecord
-	
+
 	t.Run("SearchAndFilter", func(t *testing.T) {
 		query, err := NewGridQuery(SearchAny, 0, 0)
 		require.NoError(t, err)
@@ -885,12 +885,12 @@ func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGrid
 		query.FilterFields = map[string]any{
 			"is_active": true,
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 1)
-		
+
 		// All results should match both search and filter
 		for _, result := range results {
 			assert.True(t, result.IsActive)
@@ -908,12 +908,12 @@ func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGrid
 		query.SortFields = map[string]string{
 			"score": "desc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 1)
-		
+
 		// Results should be sorted by score descending
 		for i := 1; i < len(results); i++ {
 			assert.GreaterOrEqual(t, results[i-1].Score, results[i].Score)
@@ -930,18 +930,18 @@ func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGrid
 		query.SortFields = map[string]string{
 			"score": "desc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.LessOrEqual(t, len(results), 2)
-		
+
 		// All results should match search and filter criteria
 		for _, result := range results {
 			assert.True(t, result.IsActive)
 			assert.Contains(t, strings.ToLower(result.Description), "developer")
 		}
-		
+
 		// Results should be sorted by score descending
 		for i := 1; i < len(results); i++ {
 			assert.GreaterOrEqual(t, results[i-1].Score, results[i].Score)
@@ -951,7 +951,7 @@ func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGrid
 	t.Run("EmptyQuery", func(t *testing.T) {
 		query, err := NewGridQuery(SearchNone, 0, 0)
 		require.NoError(t, err)
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
@@ -969,33 +969,33 @@ func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGrid
 			"score": "desc",
 			"name":  "asc",
 		}
-		
+
 		var results []DbGridTestRecord
 		err = helper.gridRepo.QueryGrid(&record, query, &results)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(results), 1)
-		
+
 		// All results should match filters
 		for _, result := range results {
 			assert.True(t, result.IsActive, "Result should be active: %s", result.Name)
 			assert.Equal(t, "developer", result.Category, "Result should be developer: %s", result.Name)
 		}
-		
+
 		// Log results for debugging
 		t.Logf("Found %d developers:", len(results))
 		for _, result := range results {
-			t.Logf("  %s: score=%.1f, active=%t, category=%s", 
+			t.Logf("  %s: score=%.1f, active=%t, category=%s",
 				result.Name, result.Score, result.IsActive, result.Category)
 		}
-		
+
 		// Results should be sorted by score desc, then name asc
 		if len(results) > 1 {
 			for i := 1; i < len(results); i++ {
 				if results[i-1].Score == results[i].Score {
 					assert.LessOrEqual(t, results[i-1].Name, results[i].Name)
 				} else {
-					assert.GreaterOrEqual(t, results[i-1].Score, results[i].Score, 
-						"Score should be descending: %s(%.1f) should be >= %s(%.1f)", 
+					assert.GreaterOrEqual(t, results[i-1].Score, results[i].Score,
+						"Score should be descending: %s(%.1f) should be >= %s(%.1f)",
 						results[i-1].Name, results[i-1].Score, results[i].Name, results[i].Score)
 				}
 			}
@@ -1007,19 +1007,19 @@ func testComplexQueries(t *testing.T, helper *DbGridTestHelper, records []DbGrid
 func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []DbGridTestRecord) {
 	const numGoroutines = 10
 	const numOperations = 50
-	
+
 	var record DbGridTestRecord
-	
+
 	t.Run("ConcurrentGridCreation", func(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(numGoroutines)
-		
+
 		results := make(chan error, numGoroutines)
-		
+
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer wg.Done()
-				
+
 				for j := 0; j < numOperations; j++ {
 					_, err := helper.gridRepo.Grid(&record)
 					if err != nil {
@@ -1029,10 +1029,10 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 				}
 			}(i)
 		}
-		
+
 		wg.Wait()
 		close(results)
-		
+
 		// Verify no errors occurred
 		for err := range results {
 			require.NoError(t, err)
@@ -1042,29 +1042,29 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 	t.Run("ConcurrentQueryExecution", func(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(numGoroutines)
-		
+
 		results := make(chan error, numGoroutines)
-		
+
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer wg.Done()
-				
+
 				for j := 0; j < numOperations; j++ {
 					query, err := NewGridQuery(SearchAny, 0, 0)
 					if err != nil {
 						results <- fmt.Errorf("goroutine %d, operation %d: %w", id, j, err)
 						return
 					}
-					
+
 					query.SearchText = "developer"
-					
+
 					var queryResults []DbGridTestRecord
 					err = helper.gridRepo.QueryGrid(&record, query, &queryResults)
 					if err != nil {
 						results <- fmt.Errorf("goroutine %d, operation %d: %w", id, j, err)
 						return
 					}
-					
+
 					// Verify results are consistent
 					if len(queryResults) == 0 {
 						results <- fmt.Errorf("goroutine %d, operation %d: no results found", id, j)
@@ -1073,10 +1073,10 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 				}
 			}(i)
 		}
-		
+
 		wg.Wait()
 		close(results)
-		
+
 		// Verify no errors occurred
 		for err := range results {
 			require.NoError(t, err)
@@ -1086,14 +1086,14 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 	t.Run("ConcurrentMixedOperations", func(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(numGoroutines * 3) // 3 types of operations
-		
+
 		results := make(chan error, numGoroutines*3)
-		
+
 		// Grid creation operations
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer wg.Done()
-				
+
 				for j := 0; j < numOperations; j++ {
 					_, err := helper.gridRepo.Grid(&record)
 					if err != nil {
@@ -1103,21 +1103,21 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 				}
 			}(i)
 		}
-		
+
 		// Search operations
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer wg.Done()
-				
+
 				for j := 0; j < numOperations; j++ {
 					query, err := NewGridQuery(SearchAny, 0, 0)
 					if err != nil {
 						results <- fmt.Errorf("search goroutine %d, operation %d: %w", id, j, err)
 						return
 					}
-					
+
 					query.SearchText = "developer"
-					
+
 					var queryResults []DbGridTestRecord
 					err = helper.gridRepo.QueryGrid(&record, query, &queryResults)
 					if err != nil {
@@ -1127,23 +1127,23 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 				}
 			}(i)
 		}
-		
+
 		// Filter operations
 		for i := 0; i < numGoroutines; i++ {
 			go func(id int) {
 				defer wg.Done()
-				
+
 				for j := 0; j < numOperations; j++ {
 					query, err := NewGridQuery(SearchNone, 0, 0)
 					if err != nil {
 						results <- fmt.Errorf("filter goroutine %d, operation %d: %w", id, j, err)
 						return
 					}
-					
+
 					query.FilterFields = map[string]any{
 						"is_active": true,
 					}
-					
+
 					var queryResults []DbGridTestRecord
 					err = helper.gridRepo.QueryGrid(&record, query, &queryResults)
 					if err != nil {
@@ -1153,10 +1153,10 @@ func testConcurrentOperations(t *testing.T, helper *DbGridTestHelper, records []
 				}
 			}(i)
 		}
-		
+
 		wg.Wait()
 		close(results)
-		
+
 		// Verify no errors occurred
 		for err := range results {
 			require.NoError(t, err)

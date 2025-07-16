@@ -1,5 +1,5 @@
-//go:build integration
-// +build integration
+//go:build integration && clickhouse
+// +build integration,clickhouse
 
 package clickhouse
 

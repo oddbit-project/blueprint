@@ -1,11 +1,10 @@
-//go:build integration
-// +build integration
+//go:build integration && pgsql
+// +build integration,pgsql
 
 package db
 
 import (
 	"context"
-	"fmt"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -70,15 +69,7 @@ func (c connOptions) Apply(db *sqlx.DB) error {
 }
 
 func resolveDSN() string {
-	user := os.Getenv("POSTGRES_USER")
-	pwd := os.Getenv("POSTGRES_PASSWORD")
-	database := os.Getenv("POSTGRES_DB")
-	port := os.Getenv("POSTGRES_PORT")
-	host := os.Getenv("POSTGRES_HOST")
-	if host == "" || database == "" {
-		return ""
-	}
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", user, pwd, host, port, database)
+	return "postgres://blueprint:password@postgres:5432/blueprint"
 }
 
 func pgClientFromUrl(url string) *SqlClient {

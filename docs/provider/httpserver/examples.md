@@ -3,15 +3,6 @@
 Comprehensive examples showing how to combine Blueprint's HTTP server components for common use cases including 
 REST APIs, web applications, and microservices.
 
-> **📁 Executable Examples Available!**
-> 
-> Complete, runnable versions of these examples with all helper functions implemented are available in the `/examples/` directory:
-> - [`examples/rest-api-complete/`](../../examples/rest-api-complete/) - Complete REST API server
-> - [`examples/web-app-complete/`](../../examples/web-app-complete/) - Complete web application with templates
-> - [`examples/microservice-complete/`](../../examples/microservice-complete/) - Complete microservice with health checks
-> 
-> Each example includes a README with setup instructions and can be built and run immediately.
-
 ## Example 1: REST API Server
 
 Complete REST API with JWT authentication, rate limiting, and security headers.
@@ -411,9 +402,6 @@ func setupWebAppMiddleware(server *httpserver.Server, logger *log.Logger) {
     
     // 4. CSRF protection
     server.UseCSRFProtection()
-    
-    // 5. Flash message middleware
-    server.AddMiddleware(flashMiddleware())
 }
 
 func setupWebAppRoutes(server *httpserver.Server) {
@@ -623,13 +611,6 @@ func authRequiredMiddleware() gin.HandlerFunc {
             c.Abort()
             return
         }
-        c.Next()
-    }
-}
-
-func flashMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Store session manager in context for flash message access
         c.Next()
     }
 }

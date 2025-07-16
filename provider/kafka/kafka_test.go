@@ -1,3 +1,6 @@
+//go:build integration && kafka
+// +build integration,kafka
+
 package kafka
 
 import (

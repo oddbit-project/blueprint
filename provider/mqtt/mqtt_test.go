@@ -1,3 +1,6 @@
+//go:build integration && mqtt
+// +build integration,mqtt
+
 package mqtt
 
 import (

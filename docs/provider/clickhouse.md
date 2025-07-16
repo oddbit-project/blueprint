@@ -96,6 +96,15 @@ The client provides a Repository interface that implements the following operati
 - Record deletion (Delete, DeleteWhere, DeleteByKey)
 - Record counting (Count, CountWhere)
 
+## Repository Differences between PostgreSQL and ClickHouse
+
+The ClickHouse repository is mostly compatible with the PostgreSQL implementation, but there are some small differences:
+- INSERT...RETURNING is not supported;
+- UPDATE is not supported;
+- Transactions are not supported;
+- DELETE has limitations;
+- When fetching slices, cannot fetch slices of pointers (driver limitation), eg: use []type instead of []*type as a target
+
 ## Compression Options
 
 The client supports the following compression algorithms:
@@ -113,9 +122,3 @@ Two connection strategies are available:
 
 - `sequential` (default) - Try hosts in order
 - `roundRobin` - Distribute connections among hosts
-
-## Notes
-
-- ClickHouse doesn't fully support all SQL operations like traditional RDBMS
-- DELETE operations have limitations in ClickHouse (see documentation)
-- INSERT...RETURNING is not supported

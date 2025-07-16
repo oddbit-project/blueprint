@@ -1,3 +1,6 @@
+//go:build integration && pgsql
+// +build integration,pgsql
+
 package pgsql
 
 import (

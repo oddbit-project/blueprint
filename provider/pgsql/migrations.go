@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	"github.com/jmoiron/sqlx"
 	"github.com/oddbit-project/blueprint/db"
 	"github.com/oddbit-project/blueprint/db/migrations"
 	"slices"
@@ -21,71 +19,94 @@ const (
 )
 
 type pgMigrationManager struct {
-	db *sqlx.DB
+	client *db.SqlClient
+	module string
+	repo   db.Repository
 }
 
-func NewMigrationManager(ctx context.Context, client *db.SqlClient) (migrations.Manager, error) {
-	result := &pgMigrationManager{
-		db: client.Db(),
+type PgMigrationOption func(s *pgMigrationManager) error
+
+func WithModule(module string) PgMigrationOption {
+	return func(s *pgMigrationManager) error {
+		s.module = module
+		return nil
 	}
+}
+
+func NewMigrationManager(ctx context.Context, client *db.SqlClient, opts ...PgMigrationOption) (migrations.Manager, error) {
+	result := &pgMigrationManager{
+		client: client,
+		module: migrations.ModuleBase,
+		repo:   db.NewRepository(ctx, client, EngineMigrationTable),
+	}
+
+	for _, opt := range opts {
+		err := opt(result)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if err := result.init(ctx); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
+// updateTable updates migration table to latest version
+func (b *pgMigrationManager) updateTable(ctx context.Context) error {
+	exists, err := ColumnExists(ctx, b.client, MigrationTable, "module", SchemaDefault)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		// add column "module"
+		// old blueprint versions did not implement the module column
+		qry := fmt.Sprintf(`ALTER TABLE  %s ADD COLUMN module TEXT`, EngineMigrationTable)
+		result := b.client.Db().QueryRowContext(ctx, qry)
+		return result.Err()
+	}
+	return nil
+}
+
 // init checks if migration table exists, and if not, creates
 func (b *pgMigrationManager) init(ctx context.Context) error {
-	exists, err := TableExists(ctx, b.db, MigrationTable, SchemaDefault)
+	exists, err := TableExists(ctx, b.client, MigrationTable, SchemaDefault)
 	if err != nil {
 		return err
 	}
 
 	if exists {
-		return nil
+		// table already exists, migrate to new version if necessary
+		return b.updateTable(ctx)
 	}
+
 	qry := fmt.Sprintf(`CREATE TABLE  %s (
 			created TIMESTAMP WITH TIME ZONE,
+			module TEXT,
 			name TEXT,
 			sha2 TEXT,
 			contents TEXT)`,
 		EngineMigrationTable)
-	_, err = b.db.ExecContext(ctx, qry)
+	_, err = b.client.Db().ExecContext(ctx, qry)
 	return err
 }
 
 // registerMigration internal function to register a migration
 func (b *pgMigrationManager) registerMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	qry := fmt.Sprintf("INSERT INTO %s (created, name, sha2, contents) VALUES ($1, $2, $3, $4)", EngineMigrationTable)
-	tx, err := b.db.Begin()
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, qry, m.Created, m.Name, m.SHA2, m.Contents)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-	return tx.Commit()
+	m.Module = b.module
+	return b.repo.Insert(m)
 }
 
 func (b *pgMigrationManager) List(ctx context.Context) ([]migrations.MigrationRecord, error) {
 	result := make([]migrations.MigrationRecord, 0)
-	qry := fmt.Sprintf("SELECT * FROM %s ORDER BY created", EngineMigrationTable)
-	if err := b.db.SelectContext(ctx, &result, qry); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return result, nil
-		}
-		return nil, err
-	}
-	return result, nil
+	return result, b.repo.FetchWhere(db.FV{"module": b.module}, &result)
 }
 
 func (b *pgMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
-	qry := fmt.Sprintf("SELECT * FROM %s WHERE name=$1 LIMIT 1", EngineMigrationTable)
-
-	if err := b.db.SelectContext(ctx, qry, name); err != nil {
+	err := b.repo.FetchWhere(db.FV{"module": b.module, "name": name, "sha2": sha2}, result)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
@@ -100,7 +121,7 @@ func (b *pgMigrationManager) MigrationExists(ctx context.Context, name string, s
 
 // runMigration internal function to execute migrations, called by RunMigration() and Run()
 func (b *pgMigrationManager) runMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	tx, err := b.db.Begin()
+	tx, err := b.client.Db().Begin()
 	if err != nil {
 		return err
 	}
@@ -121,7 +142,7 @@ func (b *pgMigrationManager) runMigration(ctx context.Context, m *migrations.Mig
 
 // RunMigration applies and registers a single migration
 func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	lock, err := NewAdvisoryLock(ctx, b.db, MigrationLockId)
+	lock, err := NewAdvisoryLock(ctx, b.client.Db(), MigrationLockId)
 	if err != nil {
 		return err
 	}
@@ -143,8 +164,9 @@ func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.Mig
 }
 
 // RegisterMigration registers a single migration but does not apply the contents
+// Note: the field Module is ignored; instead, it uses the module defined in pgMigrationManager
 func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migrations.MigrationRecord) error {
-	lock, err := NewAdvisoryLock(ctx, b.db, MigrationLockId)
+	lock, err := NewAdvisoryLock(ctx, b.client.Db(), MigrationLockId)
 	if err != nil {
 		return err
 	}
@@ -168,7 +190,7 @@ func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migration
 // Run all migrations from a source, and skip the ones already applied
 // Example:
 //
-//	mm := NewMigrationManager(db)
+//	mm := NewMigrationManager(client)
 //	if err := mm.Run(context.Background(), diskSrc, DefaultProgressFn); err != nil {
 //	   panic(err)
 //	}
@@ -177,7 +199,7 @@ func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, con
 		consoleFn = migrations.DefaultProgressFn
 	}
 
-	lock, err := NewAdvisoryLock(ctx, b.db, MigrationLockId)
+	lock, err := NewAdvisoryLock(ctx, b.client.Db(), MigrationLockId)
 	if err != nil {
 		return err
 	}

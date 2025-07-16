@@ -9,6 +9,8 @@ import (
 )
 
 const (
+	ModuleBase = "base"
+
 	MsgSkipMigration = iota + 1
 	MsgRunMigration
 	MsgFinishedMigration
@@ -23,6 +25,7 @@ type ProgressFn func(msgType int, migrationName string, e error)
 
 type MigrationRecord struct {
 	Created  time.Time `db:"created" ch:"created"`
+	Module   string    `db:"module" ch:"module"`
 	Name     string    `db:"name" ch:"name"`
 	SHA2     string    `db:"sha2" ch:"sha2"`
 	Contents string    `db:"contents" ch:"contents"`

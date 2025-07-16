@@ -1,17 +1,28 @@
 # Database Migrations
 
-The migrations package provides a comprehensive database schema migration system with progress tracking, multiple source types, and robust error handling. It supports both file-based and embedded migrations with SHA2-based change detection.
+The migrations package provides a simple database schema migration system with progress tracking and error handling. 
+It supports both file-based and embedded migrations with SHA2-based change detection.
+
+> Note: the migration manager is forward-only; to revert the operations of a given migration, a new migration must be
+> created. Rollback of schema changes is a destructive operation, and by itself a mutation on the current database state;
+> as such, the concept of "rolling back schema changes" is deeply flawed and may result in data loss.
 
 ## Overview
 
 The migration system includes:
 
 - Interface-based migration sources (disk, embedded, memory)
+- Module support
 - Migration execution with progress callbacks
 - SHA2-based change detection and validation
 - Rollback protection through tracking
 - Flexible migration record management
 - Provider-agnostic implementation
+
+## Limitations
+
+- The ClickHouse implementation supports only one statement per file, due to ClickHouse limitations;
+
 
 ## Core Interfaces
 
@@ -54,7 +65,8 @@ The Source interface abstracts migration storage:
 ```go
 type MigrationRecord struct {
     Created  time.Time `db:"created" ch:"created"`
-    Name     string    `db:"name" ch:"name"`
+    Module   string    `db:"module" ch:"module"`
+	Name     string    `db:"name" ch:"name"`
     SHA2     string    `db:"sha2" ch:"sha2"`
     Contents string    `db:"contents" ch:"contents"`
 }
@@ -63,6 +75,7 @@ type MigrationRecord struct {
 Represents a migration with metadata:
 
 - **Created**: When the migration was executed
+- **Module**: The module name (defaults to base)
 - **Name**: Migration identifier
 - **SHA2**: Content hash for change detection
 - **Contents**: The actual migration SQL
@@ -162,6 +175,7 @@ package main
 import (
     "context"
     "github.com/oddbit-project/blueprint/provider/pgsql"
+	"github.com/oddbit-project/blueprint/db/migrations"
     "log"
 )
 
@@ -177,11 +191,17 @@ func runPostgreSQLMigrations() error {
     defer client.Disconnect()
     
     // Create migration manager
-    manager := pgsql.NewMigrationManager(client)
-    
+    manager, err := pgsql.NewMigrationManager(context.Background(), client)
+    if err != nil {
+		return err
+    }
+	
     // Setup migration source
-    source := migrations.NewDiskSource("./migrations")
-    
+    source, err := migrations.NewDiskSource("./migrations")
+	if err != nil {
+		return err
+	}
+	
     // Run migrations with progress reporting
     return manager.Run(context.Background(), source, func(msgType int, migrationName string, err error) {
         switch msgType {
@@ -206,6 +226,7 @@ package main
 import (
     "context"
     "github.com/oddbit-project/blueprint/provider/clickhouse"
+	"github.com/oddbit-project/blueprint/db/migrations"	
     "log"
 )
 
@@ -221,10 +242,16 @@ func runClickHouseMigrations() error {
     defer client.Disconnect()
     
     // Create migration manager
-    manager := clickhouse.NewMigrationManager(client)
-    
-    // Setup embedded migrations
-    source := migrations.NewEmbedSource(migrationFiles, "migrations")
+    manager, err := clickhouse.NewMigrationManager(context.Background(), client)
+	if err != nil {
+		return err
+	}
+
+	// Setup migration source
+	source, err := migrations.NewDiskSource("./migrations")
+	if err != nil {
+		return err
+	}
     
     // Run migrations
     return manager.Run(context.Background(), source, migrations.DefaultProgressFn)
@@ -329,36 +356,6 @@ func validateMigrations(manager migrations.Manager, source migrations.Source) er
 }
 ```
 
-## Advanced Usage Patterns
-
-### Transaction-based Migrations
-
-```go
-func runMigrationsInTransaction(manager migrations.Manager, source migrations.Source) error {
-    ctx := context.Background()
-    
-    // Start transaction (implementation depends on your manager)
-    tx, err := beginMigrationTransaction(manager)
-    if err != nil {
-        return err
-    }
-    defer tx.Rollback()
-    
-    // Run migrations in transaction
-    err = manager.Run(ctx, source, func(msgType int, name string, err error) {
-        if msgType == migrations.MsgError {
-            log.Printf("Migration failed, rolling back: %v", err)
-        }
-    })
-    
-    if err != nil {
-        return err
-    }
-    
-    return tx.Commit()
-}
-```
-
 ### Conditional Migrations
 
 ```go
@@ -401,35 +398,6 @@ func runConditionalMigrations(manager migrations.Manager, source migrations.Sour
     }
     
     return manager.Run(context.Background(), conditionalSource, migrations.DefaultProgressFn)
-}
-```
-
-### Migration Rollback Tracking
-
-```go
-func trackRollbacks(manager migrations.Manager) error {
-    ctx := context.Background()
-    
-    // Get all executed migrations
-    migrations, err := manager.List(ctx)
-    if err != nil {
-        return err
-    }
-    
-    // Sort by execution order (most recent first)
-    sort.Slice(migrations, func(i, j int) bool {
-        return migrations[i].Created.After(migrations[j].Created)
-    })
-    
-    log.Println("Migration history (newest first):")
-    for _, m := range migrations {
-        log.Printf("- %s (executed: %s, hash: %s)", 
-            m.Name, 
-            m.Created.Format("2006-01-02 15:04:05"), 
-            m.SHA2[:8])
-    }
-    
-    return nil
 }
 ```
 
@@ -508,74 +476,10 @@ func recoverFromFailedMigration(manager migrations.Manager, migrationName string
 }
 ```
 
-## Testing Migrations
-
-### Unit Testing
-
-```go
-func TestMigrations(t *testing.T) {
-    // Create in-memory database for testing
-    db := setupTestDatabase(t)
-    defer db.Close()
-    
-    // Create test manager
-    manager := createTestManager(db)
-    
-    // Create memory source with test migrations
-    source := migrations.NewMemorySource()
-    source.AddMigration("001_test", "CREATE TABLE test_table (id INT);")
-    source.AddMigration("002_test", "ALTER TABLE test_table ADD COLUMN name VARCHAR(50);")
-    
-    // Run migrations
-    err := manager.Run(context.Background(), source, nil)
-    assert.NoError(t, err)
-    
-    // Verify migrations were executed
-    executed, err := manager.List(context.Background())
-    assert.NoError(t, err)
-    assert.Len(t, executed, 2)
-    
-    // Verify table structure
-    verifyTableExists(t, db, "test_table")
-    verifyColumnExists(t, db, "test_table", "name")
-}
-```
-
-### Integration Testing
-
-```go
-func TestMigrationIntegration(t *testing.T) {
-    // Setup real database connection
-    config := pgsql.NewClientConfig()
-    config.DSN = os.Getenv("TEST_DATABASE_URL")
-    
-    client, err := pgsql.NewClient(config)
-    require.NoError(t, err)
-    defer client.Disconnect()
-    
-    // Create clean database state
-    setupCleanDatabase(t, client)
-    
-    // Create manager
-    manager := pgsql.NewMigrationManager(client)
-    
-    // Test disk-based migrations
-    source := migrations.NewDiskSource("./testdata/migrations")
-    
-    // Run migrations
-    err = manager.Run(context.Background(), source, nil)
-    assert.NoError(t, err)
-    
-    // Verify final state
-    verifyDatabaseSchema(t, client)
-}
-```
-
 ## Best Practices
 
 ### Migration Design
 1. **One Change Per Migration**: Keep migrations focused on single changes
-2. **Reversible Operations**: Design migrations that can be rolled back
 3. **Data Safety**: Include data migration strategies for schema changes
 4. **Testing**: Test migrations against representative data
 

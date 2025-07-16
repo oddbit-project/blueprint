@@ -1,4 +1,5 @@
-// +build integration
+//go:build integration && pgsql
+// +build integration,pgsql
 
 package db
 
@@ -217,8 +218,8 @@ func TestExtensive_Writer_Interface(t *testing.T) {
 			var isActive bool
 			var createdAt time.Time
 
-			err := helper.userRepo.InsertReturning(&user, 
-				pq.StringArray{"id", "name", "email", "status", "score", "is_active", "created_at"}, 
+			err := helper.userRepo.InsertReturning(&user,
+				pq.StringArray{"id", "name", "email", "status", "score", "is_active", "created_at"},
 				&id, &name, &email, &status, &score, &isActive, &createdAt)
 			require.NoError(t, err)
 
@@ -269,8 +270,8 @@ func TestExtensive_Writer_Interface(t *testing.T) {
 			}
 
 			result := &ExtensiveTestUser{}
-			err := helper.userRepo.InsertReturning(&user, 
-				pq.StringArray{"id", "name", "email", "age", "status", "score", "is_active", "bio", "tags", "created_at", "updated_at"}, 
+			err := helper.userRepo.InsertReturning(&user,
+				pq.StringArray{"id", "name", "email", "age", "status", "score", "is_active", "bio", "tags", "created_at", "updated_at"},
 				result)
 			require.NoError(t, err)
 
@@ -302,8 +303,8 @@ func TestExtensive_Writer_Interface(t *testing.T) {
 			}
 
 			result := &ExtensiveTestUser{}
-			err := helper.userRepo.InsertReturning(&user, 
-				pq.StringArray{"id", "name", "email", "age", "status", "bio", "created_at"}, 
+			err := helper.userRepo.InsertReturning(&user,
+				pq.StringArray{"id", "name", "email", "age", "status", "bio", "created_at"},
 				result)
 			require.NoError(t, err)
 
