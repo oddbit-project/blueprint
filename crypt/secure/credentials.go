@@ -1,8 +1,6 @@
 package secure
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -32,11 +30,10 @@ type Secret interface {
 // Credential stores sensitive information (like passwords)
 // in encrypted form in memory
 type Credential struct {
-	empty         bool
-	encryptedData []byte
-	nonce         []byte
-	key           []byte
-	mu            sync.RWMutex
+	empty bool
+	data  []byte
+	aes   AES256GCM
+	mu    sync.RWMutex
 }
 
 // NewCredential creates a new secure credential container
@@ -44,33 +41,29 @@ type Credential struct {
 // You can use env variables, hardware tokens, etc. as the source
 // of the encryption key
 func NewCredential(data []byte, encryptionKey []byte, allowEmpty bool) (*Credential, error) {
-	if len(data) == 0 {
-		if allowEmpty {
-			return &Credential{
-				empty: true,
-			}, nil
-		}
-		return nil, ErrEmptyCredential
-	}
 	if len(encryptionKey) != 32 {
 		return nil, ErrInvalidKey
 	}
 
-	sc := &Credential{
-		key: make([]byte, len(encryptionKey)),
+	isEmpty := len(data) == 0
+	if isEmpty && !allowEmpty {
+		return nil, ErrEmptyCredential
 	}
 
-	// Copy the key to avoid using the original reference
-	copy(sc.key, encryptionKey)
-
-	// Encrypt the credential
-	var err error
-	sc.encryptedData, sc.nonce, err = encrypt(data, sc.key)
+	gcm, err := NewAES256GCM(encryptionKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return sc, nil
+	encrypted, err := gcm.Encrypt(data)
+	if err != nil {
+		return nil, err
+	}
+	return &Credential{
+		empty: isEmpty,
+		aes:   gcm,
+		data:  encrypted,
+	}, nil
 }
 
 // Get decrypts and returns the plaintext credential
@@ -94,11 +87,12 @@ func (sc *Credential) GetBytes() ([]byte, error) {
 	if sc.empty {
 		return nil, nil
 	}
-	if sc.encryptedData == nil || sc.nonce == nil {
+
+	if sc.data == nil {
 		return nil, ErrEmptyCredential
 	}
 
-	buf, err := decrypt(sc.encryptedData, sc.nonce, sc.key)
+	buf, err := sc.aes.Decrypt(sc.data)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +107,16 @@ func (sc *Credential) Update(plaintext string) error {
 
 // UpdateBytes updates the credential with a new value
 func (sc *Credential) UpdateBytes(data []byte) error {
+	// clear previous data
+	if sc.data != nil {
+		for i := range sc.data {
+			sc.data[i] = 0
+		}
+		sc.data = nil
+	}
+	
 	if len(data) == 0 {
-		sc.Clear()
+		sc.empty = true
 		return nil
 	}
 
@@ -122,7 +124,7 @@ func (sc *Credential) UpdateBytes(data []byte) error {
 	defer sc.mu.Unlock()
 
 	var err error
-	sc.encryptedData, sc.nonce, err = encrypt(data, sc.key)
+	sc.data, err = sc.aes.Encrypt(data)
 	return err
 }
 
@@ -131,26 +133,14 @@ func (sc *Credential) Clear() {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
-	if sc.encryptedData != nil {
-		for i := range sc.encryptedData {
-			sc.encryptedData[i] = 0
+	if sc.data != nil {
+		for i := range sc.data {
+			sc.data[i] = 0
 		}
-		sc.encryptedData = nil
+		sc.data = nil
 	}
-
-	if sc.nonce != nil {
-		for i := range sc.nonce {
-			sc.nonce[i] = 0
-		}
-		sc.nonce = nil
-	}
-
-	if sc.key != nil {
-		for i := range sc.key {
-			sc.key[i] = 0
-		}
-		sc.key = nil
-	}
+	sc.aes.Clear()
+	sc.aes = nil
 	sc.empty = true
 }
 
@@ -159,48 +149,6 @@ func (sc *Credential) IsEmpty() bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	return sc.empty
-}
-
-// encrypt encrypts plaintext using AES-GCM with the provided key
-// and returns the ciphertext and nonce
-func encrypt(plaintext, key []byte) (ciphertext, nonce []byte, err error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, nil, ErrEncryption
-	}
-
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, nil, ErrEncryption
-	}
-
-	nonce = make([]byte, aesGCM.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, nil, ErrEncryption
-	}
-
-	ciphertext = aesGCM.Seal(nil, nonce, plaintext, nil)
-	return ciphertext, nonce, nil
-}
-
-// decrypt decrypts ciphertext using AES-GCM with the provided key and nonce
-func decrypt(ciphertext, nonce, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, ErrDecryption
-	}
-
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, ErrDecryption
-	}
-
-	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return nil, ErrDecryption
-	}
-
-	return plaintext, nil
 }
 
 // CredentialFromEnv creates a Credential from an environment variable

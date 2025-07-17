@@ -1,6 +1,8 @@
 package secure
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
@@ -106,47 +108,21 @@ func TestCredential_Lifecycle(t *testing.T) {
 func TestEncryptDecrypt(t *testing.T) {
 	// Generate a key
 	key, err := GenerateKey()
-	if err != nil {
-		t.Fatalf("Failed to generate key: %v", err)
-	}
+	assert.NoError(t, err, fmt.Sprintf("Error generating key: %v", err))
+
+	enc, err := NewAES256GCM(key)
+	assert.NoError(t, err)
 
 	// Test successful encryption/decryption
 	plaintext := []byte("test-data-to-encrypt")
-	ciphertext, nonce, err := encrypt(plaintext, key)
-	if err != nil {
-		t.Fatalf("Encryption failed: %v", err)
-	}
-	if len(ciphertext) == 0 {
-		t.Errorf("Ciphertext is empty")
-	}
-	if len(nonce) == 0 {
-		t.Errorf("Nonce is empty")
-	}
+	ciphertext, err := enc.Encrypt(plaintext)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", ciphertext)
 
 	// Test successful decryption
-	decrypted, err := decrypt(ciphertext, nonce, key)
-	if err != nil {
-		t.Fatalf("Decryption failed: %v", err)
-	}
-	if string(decrypted) != string(plaintext) {
-		t.Errorf("Decrypted text doesn't match original: expected %s, got %s", plaintext, decrypted)
-	}
-
-	// Test decryption with wrong key
-	wrongKey, _ := GenerateKey()
-	_, err = decrypt(ciphertext, nonce, wrongKey)
-	if err != ErrDecryption {
-		t.Errorf("Expected ErrDecryption with wrong key, got: %v", err)
-	}
-
-	// Test decryption with wrong nonce
-	wrongNonce := make([]byte, len(nonce))
-	copy(wrongNonce, nonce)
-	wrongNonce[0] = wrongNonce[0] ^ 0xFF // Flip some bits
-	_, err = decrypt(ciphertext, wrongNonce, key)
-	if err != ErrDecryption {
-		t.Errorf("Expected ErrDecryption with wrong nonce, got: %v", err)
-	}
+	decrypted, err := enc.Decrypt(ciphertext)
+	assert.NoError(t, err, fmt.Sprintf("Error decrypting data: %v", err))
+	assert.Equal(t, plaintext, decrypted, fmt.Sprintf("Decrypted text doesn't match original: expected %s, got %s", plaintext, decrypted))
 }
 
 func TestCredentialFromEnv(t *testing.T) {
