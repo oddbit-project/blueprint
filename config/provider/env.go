@@ -13,7 +13,7 @@ import (
 const CommaSeparator = ","
 
 type EnvProvider struct {
-	config.ConfigInterface
+	config.ConfigProvider
 	prefix      string
 	configData  map[string]string
 	convertCase bool // if true, key lookups are converted from localDef -> LOCAL_DEF
@@ -22,9 +22,9 @@ type EnvProvider struct {
 
 var DefaultSeparator = CommaSeparator
 
-// NewEnvProvider builds a new config.ConfigInterface object from system Environment variables.
+// NewEnvProvider builds a new config.ConfigProvider object from system Environment variables.
 // The parameter prefix defines the key prefix to use. All existing Environment variables matching the prefix are loaded on creation.
-// If convertCamelCase is enabled, string keys are automatically converted from camelCase format to SNAKE_CASE
+// If convertCamelCase is enabled, field names are automatically parsed from camelCase format to SNAKE_CASE
 func NewEnvProvider(prefix string, convertCamelCase bool) *EnvProvider {
 	provider := &EnvProvider{
 		prefix:      prefix,
@@ -70,34 +70,34 @@ func (e *EnvProvider) convertKey(key string) string {
 //
 // Example usage:
 //
-//	type Config struct {
-//	    Name     string `env:"APP_NAME"`
-//	    Port     int    `env:"APP_PORT"`
-//	    Debug    bool   `env:"APP_DEBUG"`
-//	    Timeout  string `env:"APP_TIMEOUT"`
-//	    Database []string `env:"APP_DB_CONNECTIONS"`
-//	}
+//		type Config struct {
+//		    Name     string `env:"APP_NAME"`
+//		    Port     int    `env:"APP_PORT"`
+//		    Debug    bool   `env:"APP_DEBUG"`
+//		    Timeout  string `env:"APP_TIMEOUT"`
+//		    Database []string `env:"APP_DB_CONNECTIONS"`
+//		}
 //
-//  cfg := &Config{}
-//	e := NewEnvProvider("APP", false)
+//	 cfg := &Config{}
+//		e := NewEnvProvider("APP", false)
 //
-//	err := e.readPrefixedStruct("", &cfg) // in practice, this is publicly called from Get() / GetKey()
-//	if err != nil {
-//	    // handle error
-//	}
+//		err := e.readPrefixedStruct("", &cfg) // in practice, this is publicly called from Get() / GetKey()
+//		if err != nil {
+//		    // handle error
+//		}
 //
-//	fmt.Println(cfg.Name)     // Output: MyApp
-//	fmt.Println(cfg.Port)     // Output: 8080
-//	fmt.Println(cfg.Debug)    // Output: true
-//	fmt.Println(cfg.Timeout)  // Output: 10s
-//	fmt.Println(cfg.Database) // Output: [mysql postgres]
+//		fmt.Println(cfg.Name)     // Output: MyApp
+//		fmt.Println(cfg.Port)     // Output: 8080
+//		fmt.Println(cfg.Debug)    // Output: true
+//		fmt.Println(cfg.Timeout)  // Output: 10s
+//		fmt.Println(cfg.Database) // Output: [mysql postgres]
 //
-//	// Assuming the following environment variables are set:
-//	// APP_NAME=MyApp
-//	// APP_PORT=8080
-//	// APP_DEBUG=true
-//	// APP_TIMEOUT=10s
-//	// APP_DB_CONNECTIONS=mysql,postgres
+//		// Assuming the following environment variables are set:
+//		// APP_NAME=MyApp
+//		// APP_PORT=8080
+//		// APP_DEBUG=true
+//		// APP_TIMEOUT=10s
+//		// APP_DB_CONNECTIONS=mysql,postgres
 func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	// unwrap pointer
@@ -127,7 +127,16 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 			envKey = strings.ToUpper(e.convertKey(fieldName))
 		}
 
-		if val, ok := e.configData[envKey]; ok {
+		val, ok := e.configData[envKey]
+		if !ok {
+			// Check for default value in struct tag
+			if defaultVal := field.Tag.Get("default"); defaultVal != "" {
+				val = defaultVal
+				ok = true
+			}
+		}
+
+		if ok {
 			switch fieldValue.Kind() {
 			case reflect.String:
 				fieldValue.SetString(val)
@@ -321,7 +330,7 @@ func (e *EnvProvider) GetSliceKey(key, separator string) ([]string, error) {
 	return nil, config.ErrNoKey
 }
 
-func (e *EnvProvider) GetConfigNode(key string) (config.ConfigInterface, error) {
+func (e *EnvProvider) GetConfigNode(key string) (config.ConfigProvider, error) {
 	return nil, config.ErrNotImplemented
 }
 
