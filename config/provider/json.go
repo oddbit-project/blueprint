@@ -75,6 +75,15 @@ func (j *JsonProvider) GetKey(key string, dest interface{}) error {
 	return config.ErrNoKey
 }
 
+// Get de-serializes everything to dest
+func (j *JsonProvider) Get(dest interface{}) error {
+	data, err := json.Marshal(j.configData)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, dest)
+}
+
 func (j *JsonProvider) GetStringKey(key string) (string, error) {
 	var result string
 	if v, ok := j.configData[key]; ok {
