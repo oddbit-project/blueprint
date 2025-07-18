@@ -15,6 +15,8 @@ import (
 	"github.com/oddbit-project/blueprint/provider/hmacprovider"
 )
 
+const KeyId = "myKey"
+
 // HMACClient demonstrates how to make authenticated requests to the HMAC server
 type HMACClient struct {
 	baseURL  string
@@ -30,15 +32,18 @@ func NewHMACClient(baseURL string, hmacSecret string) (*HMACClient, error) {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
 
-	// Create credential (must match server secret)
-	credential, err := secure.NewCredential([]byte(hmacSecret), key, false)
+	// Create secret (must match server secret)
+	secret, err := secure.NewCredential([]byte(hmacSecret), key, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create credential: %w", err)
 	}
 
+	// create key provider
+	keyProvider := hmacprovider.NewSingleKeyProvider(KeyId, secret)
+
 	// Create HMAC provider (same config as server)
 	provider := hmacprovider.NewHmacProvider(
-		credential,
+		keyProvider,
 		hmacprovider.WithKeyInterval(5*time.Minute),
 		hmacprovider.WithMaxInputSize(10*1024*1024),
 	)
@@ -79,7 +84,7 @@ func (c *HMACClient) makeRequest(method, path string, body interface{}) (*http.R
 
 	// Generate HMAC signature
 	bodyReader := bytes.NewReader(requestBody)
-	hash, timestamp, nonce, err := c.provider.Sign256(bodyReader)
+	hash, timestamp, nonce, err := c.provider.Sign256(KeyId, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
