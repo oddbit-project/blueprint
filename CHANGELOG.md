@@ -4,6 +4,99 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.5.3]
+
+### Added
+
+- **SMTP Provider** (provider/smtp) - Complete SMTP email functionality
+  - Full SMTP client implementation with TLS support
+  - Template-based email composition with HTML and plain text support
+  - Attachment handling for email messages
+  - Comprehensive test suite with unit tests
+
+- **Session Authentication System** - Complete session-based authentication with multiple providers
+  - New session authentication middleware (provider/httpserver/auth/session.go)
+  - Session data management with enhanced security features
+  - Token list management for session tracking
+  - Integration with existing HMAC and JWT providers
+
+- **Enhanced Configuration System**
+  - Environment variable provider with struct scanning capabilities
+  - Better parsing of configuration keys and default values
+  - Improved JSON configuration provider with enhanced validation
+
+- **AES256-GCM Encryption** - New constant-time encryption implementation
+  - Secure AES256-GCM encryption with constant timing
+  - Comprehensive test suite with benchmark tests
+  - Enhanced cryptographic security for sensitive data
+
+- **Sample Applications**
+  - HTTP server with session authentication (samples/httpserver-session)
+  - Updated HMAC provider examples with improved documentation
+  - Enhanced Python HMAC client examples
+
+### Enhanced
+
+- **HMAC Provider Improvements**
+  - Multiple key support for enhanced security
+  - Renamed userId to keyId for better clarity
+  - Enhanced key provider interface
+  - Improved integration tests and documentation
+
+- **Migration Manager** - Module-aware migration system
+  - Enhanced migration manager with better module support
+  - Improved integration test infrastructure across all providers
+  - Better error handling and validation in migration processes
+  - Expanded test coverage for ClickHouse and PostgreSQL migrations
+
+- **HTTP Server Authentication**
+  - Unified authentication middleware supporting JWT, HMAC, and session providers
+  - Enhanced token management and validation
+  - Improved security response patterns and error handling
+  - Better fingerprinting middleware integration
+
+- **Testing Infrastructure**
+  - New Docker-based test containers for ClickHouse, Kafka, MQTT, NATS, and PostgreSQL
+  - Enhanced Makefile with comprehensive test targets
+  - Improved integration test organization and reliability
+  - Better test isolation and cleanup procedures
+
+- **Documentation**
+  - Comprehensive updates to HMAC provider documentation
+  - Enhanced HTTP server authentication and session documentation
+  - Updated configuration system documentation
+  - Improved sample application documentation
+
+### Fixed
+
+- Integration test stability improvements across all providers
+- Enhanced error handling in database repository operations
+- Better cleanup procedures in test suites
+- Improved migration validation and error reporting
+- Various dependency updates for security and compatibility
+
+### Security
+
+- **AES256-GCM Implementation**
+  - Constant-time encryption to prevent timing attacks
+  - Secure key derivation and nonce generation
+  - Enhanced cryptographic security for credential storage
+
+- **Session Security**
+  - Enhanced session data protection
+  - Improved session token management
+  - Better session expiration and cleanup mechanisms
+
+- **Multi-Provider Authentication**
+  - Unified security model across HMAC, JWT, and session providers
+  - Enhanced validation and error handling
+  - Improved DoS protection and input validation
+
+## [v0.5.2]
+
+### Added
+ - Dummy release to appease goproxy :)
+
 ## [v0.5.1]
 
 ### Added
