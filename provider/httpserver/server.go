@@ -184,7 +184,7 @@ func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
 		if err != nil {
 			return err
 		}
-		provider := hmacprovider.NewHmacProvider(secret)
+		provider := hmacprovider.NewHmacProvider(hmacprovider.NewSingleKeyProvider("", secret))
 		s.UseAuth(auth.NewHMACAuthProvider(provider))
 	}
 

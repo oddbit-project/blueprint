@@ -1,57 +1,90 @@
 # HMAC Provider
 
-The HMAC Provider offers cryptographically secure message authentication and signature verification using HMAC-SHA256. 
-It provides protection against replay attacks, timing attacks, and memory exhaustion DoS attacks.
+The HMAC Provider offers cryptographically secure message authentication and signature verification using HMAC-SHA256. It provides protection against replay attacks, timing attacks, and memory exhaustion DoS attacks.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Architecture](#architecture)
 - [Security Features](#security-features)
 - [Quick Start](#quick-start)
 - [API Reference](#api-reference)
+- [Key Providers](#key-providers)
 - [Nonce Stores](#nonce-stores)
 - [Configuration Options](#configuration-options)
+- [HTTP Authentication](#http-authentication)
 - [Best Practices](#best-practices)
 - [Examples](#examples)
+- [Performance](#performance)
 - [Troubleshooting](#troubleshooting)
 
 ## Overview
 
 The HMAC Provider implements HMAC-SHA256 signatures with two operation modes:
 
-1. **Simple Mode**: Basic HMAC signatures without nonces or timestamps
+1. **Simple Mode**: Basic HMAC signatures without replay protection
 2. **Secure Mode**: HMAC signatures with nonces and timestamps for replay protection
 
 ### Key Features
 
-- **Replay Attack Prevention**: Nonce-based protection against message replay
-- **Timing Attack Resistance**: Constant-time comparisons and early hex validation
-- **DoS Protection**: Configurable input size limits and nonce store capacity
-- **Pluggable Storage**: Memory, KV, and Redis nonce store backends
+- **Replay Attack Prevention**: Nonce-based protection with atomic check-and-set
+- **Timing Attack Resistance**: Constant-time comparisons for security
+- **DoS Protection**: Configurable input size limits (default: 32MB)
+- **Pluggable Storage**: Memory, Redis, and generic KV backends
 - **Clock Drift Tolerance**: Configurable timestamp validation windows
+- **Multi-tenant Support**: Key provider interface for multiple secrets
+
+## Architecture
+
+The HMAC Provider consists of several components working together:
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  HMAC Provider  │────▶│  Key Provider    │     │  Nonce Store    │
+│                 │     │  (Secret Mgmt)   │     │  (Replay Prot)  │
+└────────┬────────┘     └──────────────────┘     └─────────────────┘
+         │                                                  │
+         │              ┌──────────────────┐               │
+         └─────────────▶│  Secure          │◀──────────────┘
+                        │  Credential      │
+                        └──────────────────┘
+```
+
+### Core Components
+
+1. **HMACProvider**: Main orchestrator for signature operations
+2. **HMACKeyProvider**: Interface for secret key management
+3. **NonceStore**: Interface for replay attack prevention
+4. **Secure Credential**: Encrypted secret storage with memory protection
 
 ## Security Features
 
 ### Implemented Protections
-   - Atomic nonce check-and-set operations
-   - Proper operation ordering in verification
-   - Configurable input size limits (default: 32MB)
-   - Nonce store capacity limits with eviction policies
-   - Constant-time HMAC verification
-   - Fail-safe error handling
-   - UUID-based nonces with TTL expiration
-   - Multiple nonce store backends
-   - Atomic nonce consumption (where available)
+
+- **Replay Protection**: UUID-based nonces with TTL expiration
+- **Timing Attack Resistance**: Constant-time HMAC verification
+- **Input Size Limits**: Prevents memory exhaustion attacks
+- **Timestamp Validation**: Configurable time windows for clock drift
+- **Atomic Operations**: Thread-safe nonce consumption
+- **Secure Storage**: Integration with encrypted credential system
+- **Fail-Safe Defaults**: Secure configuration out of the box
+
+### Security Properties
+
+- **Cryptographic Integrity**: HMAC-SHA256 ensures message authenticity
+- **Non-repudiation**: Nonces prevent request replay
+- **Forward Secrecy**: Time-limited validity of signatures
+- **Defense in Depth**: Multiple layers of validation
 
 ## Quick Start
+
+### Basic Usage
 
 ```go
 package main
 
 import (
     "strings"
-    "time"
-    
     "github.com/oddbit-project/blueprint/crypt/secure"
     "github.com/oddbit-project/blueprint/provider/hmacprovider"
 )
@@ -63,62 +96,114 @@ func main() {
         panic(err)
     }
     
-    // Create credential
-    credential, err := secure.NewCredential([]byte("my-secret"), key, false)
+    // Create credential from password
+    secret, err := secure.NewCredential([]byte("my-secret"), key, false)
     if err != nil {
         panic(err)
     }
     
+	// create single key provider
+	keyProvider := hmacprovider.NewSingleKeyProvider("mykey", secret)
     // Create HMAC provider
-    provider := hmacprovider.NewHmacProvider(credential)
+    provider := hmacprovider.NewHmacProvider(keyProvider)
     
-    // Sign data with nonce and timestamp
+    // Sign data with replay protection
     data := "Hello, World!"
-    hash, timestamp, nonce, err := provider.Sign256(strings.NewReader(data))
+    hash, timestamp, nonce, err := provider.Sign256("mykey", strings.NewReader(data))
     if err != nil {
         panic(err)
     }
     
     // Verify signature
-    valid, err := provider.Verify256(strings.NewReader(data), hash, timestamp, nonce)
+    keyId, valid, err := provider.Verify256(strings.NewReader(data), hash, timestamp, nonce)
     if err != nil {
         panic(err)
     }
     
     if valid {
-        println("Signature verified!")
+        println("Signature verified! Key ID:", keyId)
+    }
+}
+```
+
+### HTTP Authentication Integration
+
+```go
+import (
+    "github.com/oddbit-project/blueprint/crypt/secure"	
+    "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+    "github.com/oddbit-project/blueprint/provider/hmacprovider"
+)
+// Generate encryption key
+key, err := secure.GenerateKey()
+if err != nil {
+panic(err)
+}
+
+// Create credential from password
+secret, err := secure.NewCredential([]byte("my-secret"), key, false)
+if err != nil {
+panic(err)
+}
+
+// create single key provider
+keyProvider := hmacprovider.NewSingleKeyProvider("mykey", secret)
+
+// Create HMAC provider
+provider := hmacprovider.NewHmacProvider(keyProvider)
+
+// Create HMAC auth provider
+hmacAuth := auth.NewHMACAuthProvider(provider)
+
+// Apply to routes
+router.Use(auth.AuthMiddleware(hmacAuth))
+
+// Access authentication info in handlers
+func handler(c *gin.Context) {
+    keyId, ok := auth.GetHMACIdentity(c)
+    if ok {
+        // Use keyId for tenant identification
+    }
+    
+    // Get full HMAC details
+    keyId, timestamp, nonce, ok := auth.GetHMACDetails(c)
+    if ok {
+        // Access all HMAC authentication data
     }
 }
 ```
 
 ## API Reference
 
+> Note: keyId **cannot contain dots ('.')** as they are used for keyId+hash concatenation
+
 ### Constructor
 
-#### `NewHmacProvider(credential *secure.Credential, opts ...HMACProviderOption) *HMACProvider`
+#### `NewHmacProvider(keyProvider HMACKeyProvider, opts ...HMACProviderOption) *HMACProvider`
 
-Creates a new HMAC provider with the specified credential and options.
+Creates a new HMAC provider with the specified key provider and options.
 
 **Parameters:**
-- `credential`: Secure credential containing the HMAC secret
+- `keyProvider`: Implementation of HMACKeyProvider interface
 - `opts`: Optional configuration functions
 
 **Returns:** Configured HMAC provider instance
 
 ### Simple HMAC Methods
 
-#### `SHA256Sign(data io.Reader) (string, error)`
+#### `SHA256Sign(keyId string, data io.Reader) (string, error)`
 
-Generates a simple HMAC-SHA256 signature without nonce or timestamp.
+Generates a simple HMAC-SHA256 signature without replay protection.
 
 **Parameters:**
+- `keyId`: Identifier for the key to use
 - `data`: Input data to sign
 
 **Returns:** 
 - `string`: Hex-encoded HMAC signature
 - `error`: Any error that occurred
 
-#### `SHA256Verify(data io.Reader, hash string) (bool, error)`
+#### `SHA256Verify(data io.Reader, hash string) (keyId string, valid bool, error)`
 
 Verifies a simple HMAC-SHA256 signature.
 
@@ -127,25 +212,27 @@ Verifies a simple HMAC-SHA256 signature.
 - `hash`: Hex-encoded HMAC signature to verify
 
 **Returns:**
-- `bool`: True if signature is valid
+- `keyId`: Identifier of the key that validated the signature
+- `valid`: True if signature is valid
 - `error`: Any error that occurred
 
 ### Secure HMAC Methods
 
-#### `Sign256(data io.Reader) (hash, timestamp, nonce string, err error)`
+#### `Sign256(keyId string, data io.Reader) (hash, timestamp, nonce string, err error)`
 
-Generates a secure HMAC-SHA256 signature with nonce and timestamp.
+Generates a secure HMAC-SHA256 signature with replay protection.
 
 **Parameters:**
+- `keyId`: Identifier for the key to use
 - `data`: Input data to sign
 
 **Returns:**
 - `hash`: Hex-encoded HMAC signature
 - `timestamp`: RFC3339 timestamp
-- `nonce`: UUID nonce
+- `nonce`: UUID v4 nonce
 - `err`: Any error that occurred
 
-#### `Verify256(data io.Reader, hash, timestamp, nonce string) (bool, error)`
+#### `Verify256(data io.Reader, hash, timestamp, nonce string) (keyId string, valid bool, error)`
 
 Verifies a secure HMAC-SHA256 signature with replay protection.
 
@@ -156,8 +243,68 @@ Verifies a secure HMAC-SHA256 signature with replay protection.
 - `nonce`: UUID nonce from signing
 
 **Returns:**
-- `bool`: True if signature is valid and not replayed
+- `keyId`: Identifier of the key that validated the signature
+- `valid`: True if signature is valid and not replayed
 - `error`: Any error that occurred
+
+## Key Providers
+
+The HMAC system supports multiple key management strategies through the `HMACKeyProvider` interface:
+
+### Interface Definition
+
+```go
+type HMACKeyProvider interface {
+    GetKey(keyId string) (*secure.Credential, error)
+}
+```
+
+### Single Key Provider
+
+> Note: the keyId can be an empty string
+
+Simple provider for single-key applications:
+
+```go
+// Create single key provider
+provider := hmacprovider.NewSingleKeyProvider("myKeyId", credential)
+
+// Always uses the same key regardless of keyId
+hmac := hmacprovider.NewHmacProvider(provider)
+```
+
+### Multi-Tenant Key Provider
+
+For applications with multiple tenants or key rotation:
+
+```go
+type MultiTenantKeyProvider struct {
+    keys map[string]*secure.Credential
+	m sync.RWMutex
+}
+
+func (m *MultiTenantKeyProvider) GetKey(keyId string) (*secure.Credential, error) {
+    m.m.RLock()
+	defer m.m.RUnlock()
+	
+	key, exists := m.keys[keyId]
+    if !exists {
+        return nil, errors.New("unknown key ID")
+    }
+    return key, nil
+}
+
+func (m *MultiTenantKeyProvider) ListKeyIds() []string {
+    m.m.RLock()
+    defer m.m.RUnlock()
+	
+    ids := make([]string, 0, len(m.keys))
+    for id := range m.keys {
+        ids = append(ids, id)
+    }
+    return ids
+}
+```
 
 ## Nonce Stores
 
@@ -165,11 +312,12 @@ The HMAC provider supports multiple nonce store backends for replay protection:
 
 ### Memory Store (Default)
 
-In-memory nonce storage with TTL and eviction policies.
+In-memory storage with configurable TTL and eviction policies.
 
 ```go
 import "github.com/oddbit-project/blueprint/provider/hmacprovider/store"
 
+// Create with custom options
 memoryStore := store.NewMemoryNonceStore(
     store.WithTTL(1*time.Hour),
     store.WithMaxSize(1000000),
@@ -177,7 +325,7 @@ memoryStore := store.NewMemoryNonceStore(
     store.WithEvictPolicy(store.EvictHalfLife()),
 )
 
-provider := hmacprovider.NewHmacProvider(credential,
+provider := hmacprovider.NewHmacProvider(keyProvider,
     hmacprovider.WithNonceStore(memoryStore),
 )
 ```
@@ -187,28 +335,11 @@ provider := hmacprovider.NewHmacProvider(credential,
 - `EvictAll()`: Remove all nonces when at capacity
 - `EvictHalfLife()`: Remove nonces older than TTL/2
 
-### KV Store
-
-Generic key-value store adapter supporting any KV backend.
-
-```go
-import (
-    "github.com/oddbit-project/blueprint/provider/kv"
-    "github.com/oddbit-project/blueprint/provider/hmacprovider/store"
-)
-
-// Using memory KV (for testing)
-memKV := kv.NewMemoryKV()
-kvStore := store.NewKvStore(memKV, 1*time.Hour)
-
-provider := hmacprovider.NewHmacProvider(credential,
-    hmacprovider.WithNonceStore(kvStore),
-)
-```
+**Best For:** Single-instance applications, development, low-traffic APIs
 
 ### Redis Store
 
-Redis-backed nonce storage with atomic operations.
+Redis-backed storage with atomic operations for distributed systems.
 
 ```go
 import (
@@ -217,20 +348,56 @@ import (
 )
 
 // Configure Redis client
-redisClient, err := redis.NewRedisProvider(&redis.RedisConfig{
-    Host: "localhost:6379",
-    DB:   0,
-})
+config := redis.NewConfig()
+config.Address = "localhost:6379"
+config.Database = 1
+
+redisClient, err := redis.NewClient(config)
 if err != nil {
     panic(err)
 }
 
-redisStore := store.NewRedisStore(redisClient, 1*time.Hour, "hmac:")
+// Create Redis nonce store
+redisStore := store.NewRedisStore(
+    redisClient, 
+    1*time.Hour,     // TTL
+    "hmac:nonce:",   // Key prefix
+)
 
-provider := hmacprovider.NewHmacProvider(credential,
+provider := hmacprovider.NewHmacProvider(keyProvider,
     hmacprovider.WithNonceStore(redisStore),
 )
 ```
+
+**Features:**
+- Atomic SetNX operations
+- Configurable key prefix for namespacing
+- Automatic TTL management
+- Network timeout handling
+
+**Best For:** Multi-instance deployments, high-traffic APIs, production systems
+
+### Generic KV Store
+
+Adapter for any key-value backend implementing the KV interface.
+
+```go
+import (
+    "github.com/oddbit-project/blueprint/provider/kv"
+    "github.com/oddbit-project/blueprint/provider/hmacprovider/store"
+)
+
+// Use any KV implementation
+var kvBackend kv.KV = getYourKVBackend()
+
+kvStore := store.NewKvStore(kvBackend, 1*time.Hour)
+
+provider := hmacprovider.NewHmacProvider(keyProvider,
+    hmacprovider.WithNonceStore(kvStore),
+)
+```
+
+**Best For:** Custom storage requirements, existing KV infrastructure
 
 ## Configuration Options
 
@@ -238,12 +405,18 @@ provider := hmacprovider.NewHmacProvider(credential,
 
 Sets the nonce store backend for replay protection.
 
+```go
+provider := hmacprovider.NewHmacProvider(keyProvider,
+    hmacprovider.WithNonceStore(customStore),
+)
+```
+
 ### `WithKeyInterval(interval time.Duration)`
 
 Sets the allowed timestamp deviation window. Default: 5 minutes.
 
 ```go
-provider := hmacprovider.NewHmacProvider(credential,
+provider := hmacprovider.NewHmacProvider(keyProvider,
     hmacprovider.WithKeyInterval(10*time.Minute), // ±10 minutes
 )
 ```
@@ -253,99 +426,281 @@ provider := hmacprovider.NewHmacProvider(credential,
 Sets the maximum input size to prevent DoS attacks. Default: 32MB.
 
 ```go
-provider := hmacprovider.NewHmacProvider(credential,
+provider := hmacprovider.NewHmacProvider(keyProvider,
     hmacprovider.WithMaxInputSize(1024*1024), // 1MB limit
 )
 ```
 
+## HTTP Authentication
+
+### Required Headers
+
+When using HMAC authentication with HTTP, the following headers are required:
+
+- `X-HMAC-Hash`: The HMAC-SHA256 signature
+- `X-HMAC-Timestamp`: RFC3339 formatted timestamp
+- `X-HMAC-Nonce`: UUID v4 nonce
+
+### Client Implementation
+
+```go
+func makeAuthenticatedRequest(provider *hmacprovider.HMACProvider, url string, body []byte) error {
+    // Generate signature
+    bodyReader := bytes.NewReader(body)
+    hash, timestamp, nonce, err := provider.Sign256("client-key", bodyReader)
+    if err != nil {
+        return err
+    }
+    
+    // Create request
+    req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+    if err != nil {
+        return err
+    }
+    
+    // Add HMAC headers
+    req.Header.Set("X-HMAC-Hash", hash)
+    req.Header.Set("X-HMAC-Timestamp", timestamp)
+    req.Header.Set("X-HMAC-Nonce", nonce)
+    req.Header.Set("Content-Type", "application/json")
+    
+    // Send request
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    
+    return nil
+}
+```
+
+### Server Integration
+
+```go
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+    "github.com/oddbit-project/blueprint/crypt/secure"
+    "github.com/oddbit-project/blueprint/provider/hmacprovider"
+)
+
+func createHMACProvider() *hmacprovider.HMACProvider {
+    // Generate encryption key
+    key, err := secure.GenerateKey()
+    if err != nil {
+        panic(err)
+    }
+
+    // Create credential from password
+    secret, err := secure.NewCredential([]byte("my-secret"), key, false)
+    if err != nil {
+        panic(err)
+    }
+
+	// create single key provider
+    keyProvider := hmacprovider.NewSingleKeyProvider("client-key", secret)
+    
+	// Create HMAC provider
+    return hmacprovider.NewHmacProvider(keyProvider)
+}
+
+func setupServer() {
+    router := gin.Default()
+    
+    // Create HMAC provider
+    hmacProvider := createHMACProvider()
+    
+    // Create auth middleware
+    hmacAuth := auth.NewHMACAuthProvider(hmacProvider)
+    
+    // Protected routes
+    api := router.Group("/api")
+    api.Use(auth.AuthMiddleware(hmacAuth))
+    {
+        api.POST("/data", handleData)
+        api.PUT("/update", handleUpdate)
+    }
+    
+    router.Run(":8080")
+}
+
+func handleData(c *gin.Context) {
+    // Get authenticated key ID
+    keyId, exists := auth.GetHMACIdentity(c)
+    if !exists {
+        c.JSON(500, gin.H{"error": "Authentication info missing"})
+        return
+    }
+    
+    // Get full HMAC details
+    keyId, timestamp, nonce, ok := auth.GetHMACDetails(c)
+    if !ok {
+        c.JSON(500, gin.H{"error": "HMAC details missing"})
+        return
+    }
+    
+    c.JSON(200, gin.H{
+        "message": "Authenticated request",
+        "tenant": keyId,
+        "timestamp": timestamp,
+        "nonce": nonce,
+    })
+}
+```
+
 ## Best Practices
 
-### Security Considerations
+### Security Recommendations
 
-1. **Use Secure Mode**: Always use `Sign256`/`Verify256` for replay protection
-2. **Proper Secret Management**: Use secure credential storage
-3. **Input Validation**: Set appropriate `MaxInputSize` for your use case
-4. **Clock Synchronization**: Ensure server clocks are synchronized
-5. **Nonce Store Scaling**: Use Redis for high-traffic applications
+1. **Always Use Secure Mode**: Use `Sign256`/`Verify256` for replay protection
+2. **Strong Secrets**: Generate cryptographically secure secrets (32+ bytes)
+3. **Key Rotation**: Implement regular key rotation policies
+4. **Secure Storage**: Use encrypted credential storage
+5. **HTTPS Only**: Always use TLS for transport security
+6. **Input Validation**: Set appropriate `MaxInputSize` limits
+7. **Clock Sync**: Ensure server clocks are synchronized (NTP)
+8. **Monitoring**: Log and monitor authentication failures
 
 ### Performance Optimization
 
-1. **Memory Store**: Best for low-traffic applications
-2. **Redis Store**: Recommended for distributed systems
-3. **Cleanup Intervals**: Tune based on traffic patterns
-4. **Eviction Policies**: Choose based on memory constraints
+1. **Choose Appropriate Backend**:
+   - Memory: Single-instance, low-traffic
+   - Redis: Multi-instance, high-traffic
+   - Custom KV: Specific requirements
+
+2. **Tune Configuration**:
+   - Adjust TTL based on security requirements
+   - Set cleanup intervals based on traffic
+   - Choose eviction policy based on memory
+
+3. **Connection Pooling**:
+   - Use connection pools for Redis
+   - Configure appropriate timeouts
 
 ### Error Handling
 
 ```go
-valid, err := provider.Verify256(data, hash, timestamp, nonce)
-if err != nil {
-    // Log security event - potential attack
-    log.Warn("HMAC verification failed", "error", err)
-    return false
-}
-if !valid {
-    // Signature mismatch or replay attack
-    log.Info("Invalid HMAC signature")
-    return false
+func handleHMACError(err error, clientIP string) {
+    if err != nil {
+        switch {
+        case strings.Contains(err.Error(), "invalid request"):
+            // Input validation failure
+            log.Warn("Invalid HMAC request", "ip", clientIP, "error", err)
+        case strings.Contains(err.Error(), "input too large"):
+            // Potential DoS attempt
+            log.Error("HMAC input too large", "ip", clientIP, "error", err)
+        case strings.Contains(err.Error(), "nonce already used"):
+            // Replay attack
+            log.Error("HMAC replay attack detected", "ip", clientIP, "error", err)
+        default:
+            // Other errors
+            log.Error("HMAC verification failed", "ip", clientIP, "error", err)
+        }
+    }
 }
 ```
 
 ## Examples
 
-### Web API Authentication
+### Multi-Tenant API
 
 ```go
-func authenticateRequest(provider *hmacprovider.HMACProvider, r *http.Request) bool {
-    // Extract signature components from headers
-    hash := r.Header.Get("X-Signature")
-    timestamp := r.Header.Get("X-Timestamp")
-    nonce := r.Header.Get("X-Nonce")
+type TenantKeyProvider struct {
+    tenants map[string]*secure.Credential
+    mu      sync.RWMutex
+}
+
+func (t *TenantKeyProvider) GetKey(tenantId string) (*secure.Credential, error) {
+    t.mu.RLock()
+    defer t.mu.RUnlock()
     
-    // Read request body
+    cred, exists := t.tenants[tenantId]
+    if !exists {
+        return nil, fmt.Errorf("unknown tenant: %s", tenantId)
+    }
+    return cred, nil
+}
+
+func (t *TenantKeyProvider) ListKeyIds() []string {
+    t.mu.RLock()
+    defer t.mu.RUnlock()
+    
+    ids := make([]string, 0, len(t.tenants))
+    for id := range t.tenants {
+        ids = append(ids, id)
+    }
+    return ids
+}
+
+// Usage
+tenantProvider := &TenantKeyProvider{
+    tenants: loadTenantKeys(),
+}
+
+hmacProvider := hmacprovider.NewHmacProvider(
+    tenantProvider,
+    hmacprovider.WithNonceStore(redisStore),
+    hmacprovider.WithKeyInterval(10*time.Minute),
+)
+```
+
+### Webhook Verification
+
+```go
+func verifyWebhook(provider *hmacprovider.HMACProvider, r *http.Request) error {
+    // Extract headers
+    hash := r.Header.Get("X-Webhook-Signature")
+    timestamp := r.Header.Get("X-Webhook-Timestamp")
+    nonce := r.Header.Get("X-Webhook-Id")
+    
+    // Read body
     body, err := io.ReadAll(r.Body)
     if err != nil {
-        return false
+        return fmt.Errorf("failed to read body: %w", err)
     }
-    r.Body = io.NopCloser(bytes.NewReader(body)) // Restore body
+    r.Body = io.NopCloser(bytes.NewReader(body))
     
     // Verify signature
-    valid, err := provider.Verify256(bytes.NewReader(body), hash, timestamp, nonce)
-    return err == nil && valid
-}
-```
-
-### Message Queue Verification
-
-```go
-func verifyMessage(provider *hmacprovider.HMACProvider, msg *Message) bool {
-    payload := strings.NewReader(msg.Data)
-    valid, err := provider.Verify256(payload, msg.Hash, msg.Timestamp, msg.Nonce)
-    return err == nil && valid
-}
-```
-
-### Batch Processing
-
-```go
-func processBatch(provider *hmacprovider.HMACProvider, items []Item) {
-    for _, item := range items {
-        data := strings.NewReader(item.Data)
-        hash, timestamp, nonce, err := provider.Sign256(data)
-        if err != nil {
-            log.Error("Failed to sign item", "error", err)
-            continue
-        }
-        
-        // Store signature with item
-        item.Signature = Signature{
-            Hash:      hash,
-            Timestamp: timestamp,
-            Nonce:     nonce,
-        }
+    keyId, valid, err := provider.Verify256(
+        bytes.NewReader(body), 
+        hash, 
+        timestamp, 
+        nonce,
+    )
+    
+    if err != nil {
+        return fmt.Errorf("verification error: %w", err)
     }
+    
+    if !valid {
+        return errors.New("invalid webhook signature")
+    }
+    
+    log.Info("Webhook verified", "source", keyId)
+    return nil
 }
 ```
+
+## Performance
+
+### Benchmarks
+
+Based on internal benchmarks:
+
+- **SHA256Sign**: ~500ns per operation
+- **SHA256Verify**: ~1μs per operation
+- **Sign256** (with nonce): ~5μs per operation
+- **Verify256** (with nonce): ~10μs per operation
+
+### Optimization Tips
+
+1. **Reuse Provider Instances**: Create once, use many times
+2. **Buffer Pool**: Use sync.Pool for byte buffers
+3. **Batch Operations**: Process multiple items in sequence
+4. **Connection Pooling**: Configure Redis connection pools
+5. **Async Processing**: Use goroutines for independent verifications
 
 ## Troubleshooting
 
@@ -353,69 +708,40 @@ func processBatch(provider *hmacprovider.HMACProvider, items []Item) {
 
 #### "invalid request" Error
 
-**Cause**: Input validation failure (empty parameters, invalid timestamp, etc.)
-**Solution**: Check all required parameters and timestamp format
+**Cause**: Input validation failure
+**Solution**: 
+- Check all parameters are provided
+- Verify timestamp format (RFC3339)
+- Ensure nonce is valid UUID
 
 #### "input too large" Error
 
-**Cause**: Input exceeds configured `MaxInputSize`
-**Solution**: Increase limit or reduce input size
+**Cause**: Input exceeds MaxInputSize
+**Solution**:
+- Increase limit with `WithMaxInputSize`
+- Reduce input size
+- Check for erroneous large inputs
 
-#### Nonce Store Capacity Issues
+#### "nonce already used" Error
 
-**Cause**: Memory store at capacity, eviction policy insufficient
-**Solution**: 
-- Increase `MaxSize`
-- Use more aggressive eviction policy
-- Switch to Redis store for high traffic
+**Cause**: Replay attack or duplicate request
+**Solution**:
+- Ensure unique nonce generation
+- Check for request retry logic
+- Verify nonce store is working
 
 #### Clock Drift Issues
 
-**Cause**: Server clocks out of sync beyond `KeyInterval`
+**Symptoms**: Intermittent verification failures
 **Solution**:
-- Synchronize server clocks (NTP)
-- Increase `KeyInterval` if needed
-
-### Performance Monitoring
-
-```go
-// Monitor nonce store performance
-func monitorNonceStore(store store.NonceStore) {
-    start := time.Now()
-    success := store.AddIfNotExists("test-nonce")
-    duration := time.Since(start)
-    
-    log.Info("Nonce store performance",
-        "success", success,
-        "duration", duration,
-    )
-}
-```
-
-### Security Auditing
-
-```go
-// Log security events
-func auditHMACVerification(result bool, err error, clientIP string) {
-    if err != nil {
-        log.Warn("HMAC verification error",
-            "client_ip", clientIP,
-            "error", err,
-            "time", time.Now(),
-        )
-    } else if !result {
-        log.Info("HMAC verification failed",
-            "client_ip", clientIP,
-            "time", time.Now(),
-        )
-    }
-}
-```
+- Sync server clocks with NTP
+- Increase KeyInterval tolerance
+- Monitor timestamp differences
 
 ## Constants
 
-- `DefaultKeyInterval`: 5 minutes
-- `MaxInputSize`: 32MB
-- `DefaultTTL`: 1 hour (nonce stores)
-- `DefaultMaxSize`: 2,000,000 nonces (memory store)
+- `DefaultKeyInterval`: 5 minutes (300 seconds)
+- `DefaultMaxInputSize`: 32MB (33554432 bytes)
+- `DefaultTTL`: 4 hours (nonce stores)
+- `DefaultMaxSize`: 2,000,000 entries (memory store)
 - `DefaultCleanupInterval`: 15 minutes (memory store)
