@@ -687,12 +687,13 @@ func verifyWebhook(provider *hmacprovider.HMACProvider, r *http.Request) error {
 
 ### Benchmarks
 
-Based on internal benchmarks:
+Performance results on Intel Core i5-10400F @ 2.90GHz:
 
-- **SHA256Sign**: ~500ns per operation
-- **SHA256Verify**: ~1μs per operation
-- **Sign256** (with nonce): ~5μs per operation
-- **Verify256** (with nonce): ~10μs per operation
+- **SHA256Sign**: ~2.1μs per operation (2,184 B/op, 18 allocs/op)
+- **SHA256Verify**: ~2.0μs per operation (2,008 B/op, 15 allocs/op)
+- **Sign256** (with nonce): ~3.1μs per operation (2,344 B/op, 25 allocs/op)
+- **Verify256** (with nonce): ~2.9μs per operation (2,213 B/op, 19 allocs/op)
+- **Full Cycle** (Sign256 + Verify256): ~6.1μs per operation (4,557 B/op, 44 allocs/op)
 
 ### Optimization Tips
 
