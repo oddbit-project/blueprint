@@ -15,30 +15,36 @@ import (
 	"github.com/oddbit-project/blueprint/provider/hmacprovider"
 )
 
+const KeyId = "myKey"
+
 // HMACClient demonstrates how to make authenticated requests to the HMAC server
 type HMACClient struct {
 	baseURL  string
 	provider *hmacprovider.HMACProvider
 	client   *http.Client
+	keyId    string
 }
 
 // NewHMACClient creates a new HMAC client
-func NewHMACClient(baseURL string, hmacSecret string) (*HMACClient, error) {
+func NewHMACClient(baseURL string, keyId string, hmacSecret string) (*HMACClient, error) {
 	// Generate encryption key
 	key, err := secure.GenerateKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
 
-	// Create credential (must match server secret)
-	credential, err := secure.NewCredential([]byte(hmacSecret), key, false)
+	// Create secret (must match server secret)
+	secret, err := secure.NewCredential([]byte(hmacSecret), key, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create credential: %w", err)
 	}
 
+	// create key provider
+	keyProvider := hmacprovider.NewSingleKeyProvider(keyId, secret)
+
 	// Create HMAC provider (same config as server)
 	provider := hmacprovider.NewHmacProvider(
-		credential,
+		keyProvider,
 		hmacprovider.WithKeyInterval(5*time.Minute),
 		hmacprovider.WithMaxInputSize(10*1024*1024),
 	)
@@ -49,6 +55,7 @@ func NewHMACClient(baseURL string, hmacSecret string) (*HMACClient, error) {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		keyId: keyId,
 	}, nil
 }
 
@@ -79,7 +86,7 @@ func (c *HMACClient) makeRequest(method, path string, body interface{}) (*http.R
 
 	// Generate HMAC signature
 	bodyReader := bytes.NewReader(requestBody)
-	hash, timestamp, nonce, err := c.provider.Sign256(bodyReader)
+	hash, timestamp, nonce, err := c.provider.Sign256(c.keyId, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -118,7 +125,7 @@ func runClientExamples() {
 	fmt.Println("=== HMAC Client Examples ===")
 
 	// Create client (must use same secret as server)
-	client, err := NewHMACClient("http://localhost:8080", "your-hmac-secret-key-change-this-in-production")
+	client, err := NewHMACClient("http://localhost:8080", KeyId, "your-hmac-secret-key-change-this-in-production")
 	if err != nil {
 		fmt.Printf("Failed to create client: %v\n", err)
 		return
@@ -220,7 +227,7 @@ func runClientExamples() {
 
 	// Example 8: Demonstrate authentication failure with wrong secret
 	fmt.Println("\n8. Testing authentication failure (wrong secret)")
-	wrongClient, err := NewHMACClient("http://localhost:8080", "wrong-secret")
+	wrongClient, err := NewHMACClient("http://localhost:8080", KeyId, "wrong-secret")
 	if err != nil {
 		fmt.Printf("Failed to create client with wrong secret: %v\n", err)
 		return
@@ -253,7 +260,7 @@ func runClientExamples() {
 func runPerformanceTest() {
 	fmt.Println("\n=== Performance Test ===")
 
-	client, err := NewHMACClient("http://localhost:8080", "your-hmac-secret-key-change-this-in-production")
+	client, err := NewHMACClient("http://localhost:8080", KeyId, "your-hmac-secret-key-change-this-in-production")
 	if err != nil {
 		fmt.Printf("Failed to create client: %v\n", err)
 		return
@@ -311,7 +318,7 @@ func main() {
 
 // runSingleRequest makes a single authenticated request
 func runSingleRequest(method, path string, bodyArgs []string) {
-	client, err := NewHMACClient("http://localhost:8080", "your-hmac-secret-key-change-this-in-production")
+	client, err := NewHMACClient("http://localhost:8080", KeyId, "your-hmac-secret-key-change-this-in-production")
 	if err != nil {
 		fmt.Printf("Failed to create client: %v\n", err)
 		return

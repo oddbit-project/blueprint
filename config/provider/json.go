@@ -6,6 +6,9 @@ import (
 	"github.com/oddbit-project/blueprint/utils"
 	"io"
 	"os"
+	"reflect"
+	"strconv"
+	"sync"
 )
 
 const (
@@ -13,11 +16,12 @@ const (
 )
 
 type JsonProvider struct {
-	config.ConfigInterface
+	config.ConfigProvider
 	configData map[string]json.RawMessage
+	m          sync.RWMutex
 }
 
-func NewJsonProvider(src interface{}) (config.ConfigInterface, error) {
+func NewJsonProvider(src interface{}) (config.ConfigProvider, error) {
 	provider := &JsonProvider{
 		configData: make(map[string]json.RawMessage),
 	}
@@ -68,14 +72,80 @@ func (j *JsonProvider) fromFile(fname string) error {
 	return j.fromReader(f)
 }
 
+// applyDefaults applies default values to struct fields that have zero values
+func applyDefaults(dest interface{}) error {
+	v := reflect.ValueOf(dest)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Type().Field(i)
+		fieldValue := v.Field(i)
+
+		// Check if field has a default value and is zero
+		if defaultVal := field.Tag.Get("default"); defaultVal != "" && fieldValue.IsZero() {
+			switch fieldValue.Kind() {
+			case reflect.String:
+				fieldValue.SetString(defaultVal)
+			case reflect.Int:
+				if intVal, err := strconv.Atoi(defaultVal); err == nil {
+					fieldValue.SetInt(int64(intVal))
+				}
+			case reflect.Bool:
+				if boolVal, err := strconv.ParseBool(defaultVal); err == nil {
+					fieldValue.SetBool(boolVal)
+				}
+			case reflect.Float64:
+				if floatVal, err := strconv.ParseFloat(defaultVal, 64); err == nil {
+					fieldValue.SetFloat(floatVal)
+				}
+			}
+		}
+
+		// Recursively apply defaults to nested structs
+		if fieldValue.Kind() == reflect.Struct {
+			if fieldValue.CanAddr() {
+				applyDefaults(fieldValue.Addr().Interface())
+			}
+		}
+	}
+	return nil
+}
+
 func (j *JsonProvider) GetKey(key string, dest interface{}) error {
+	j.m.RLock()
+	defer j.m.RUnlock()
 	if v, ok := j.configData[key]; ok {
-		return json.Unmarshal(v, dest)
+		if err := json.Unmarshal(v, dest); err != nil {
+			return err
+		}
+		return applyDefaults(dest)
 	}
 	return config.ErrNoKey
 }
 
+// Get de-serializes everything to dest
+func (j *JsonProvider) Get(dest interface{}) error {
+	j.m.RLock()
+	defer j.m.RUnlock()
+	data, err := json.Marshal(j.configData)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, dest); err != nil {
+		return err
+	}
+	return applyDefaults(dest)
+}
+
 func (j *JsonProvider) GetStringKey(key string) (string, error) {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	var result string
 	if v, ok := j.configData[key]; ok {
 		if err := json.Unmarshal(v, &result); err != nil {
@@ -87,6 +157,9 @@ func (j *JsonProvider) GetStringKey(key string) (string, error) {
 }
 
 func (j *JsonProvider) GetBoolKey(key string) (bool, error) {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	var result bool
 	var err error
 	if v, ok := j.configData[key]; ok {
@@ -98,6 +171,9 @@ func (j *JsonProvider) GetBoolKey(key string) (bool, error) {
 }
 
 func (j *JsonProvider) GetIntKey(key string) (int, error) {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	var result int
 	var err error
 	if v, ok := j.configData[key]; ok {
@@ -109,6 +185,9 @@ func (j *JsonProvider) GetIntKey(key string) (int, error) {
 }
 
 func (j *JsonProvider) GetFloat64Key(key string) (float64, error) {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	var result float64
 	var err error
 	if v, ok := j.configData[key]; ok {
@@ -121,6 +200,9 @@ func (j *JsonProvider) GetFloat64Key(key string) (float64, error) {
 
 // GetSliceKey note: separator is ignored
 func (j *JsonProvider) GetSliceKey(key, separator string) ([]string, error) {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	buf := make([]string, 0)
 	if v, ok := j.configData[key]; ok {
 		err := json.Unmarshal(v, &buf)
@@ -129,7 +211,10 @@ func (j *JsonProvider) GetSliceKey(key, separator string) ([]string, error) {
 	return nil, config.ErrNoKey
 }
 
-func (j *JsonProvider) GetConfigNode(key string) (config.ConfigInterface, error) {
+func (j *JsonProvider) GetConfigNode(key string) (config.ConfigProvider, error) {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	if v, ok := j.configData[key]; ok {
 		return NewJsonProvider(v)
 	}
@@ -137,6 +222,9 @@ func (j *JsonProvider) GetConfigNode(key string) (config.ConfigInterface, error)
 }
 
 func (j *JsonProvider) KeyExists(key string) bool {
+	j.m.RLock()
+	defer j.m.RUnlock()
+
 	_, ok := j.configData[key]
 	return ok
 }

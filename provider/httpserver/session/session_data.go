@@ -4,6 +4,8 @@ import (
 	"time"
 )
 
+const SessionIdentityKey = "_identity"
+
 // SessionData represents the session data stored in a backend
 type SessionData struct {
 	Values       map[string]any
@@ -21,6 +23,28 @@ func (s *SessionData) Set(key string, value any) {
 func (s *SessionData) Get(key string) (any, bool) {
 	v, ok := s.Values[key]
 	return v, ok
+}
+
+// GetIdentity fetch user identity, if any
+func (s *SessionData) GetIdentity() (any, bool) {
+	v, ok := s.Values[SessionIdentityKey]
+	return v, ok
+}
+
+// SetIdentity set user identity
+func (s *SessionData) SetIdentity(identity any) {
+	s.Values[SessionIdentityKey] = identity
+}
+
+// HasIdentity verify if user has identity
+func (s *SessionData) HasIdentity() bool {
+	_, ok := s.Values[SessionIdentityKey]
+	return ok
+}
+
+// DeleteIdentity delete user identity
+func (s *SessionData) DeleteIdentity() {
+	delete(s.Values, SessionIdentityKey)
 }
 
 // GetString retrieves a string value from the session

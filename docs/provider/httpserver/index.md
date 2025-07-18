@@ -1,17 +1,40 @@
 # HTTP Server Framework
 
-Blueprint provides a comprehensive HTTP server framework built on Gin with integrated security, authentication, session management, and middleware components for building robust web applications and APIs.
+Blueprint provides a comprehensive HTTP server framework built on Gin with integrated security, authentication, 
+session management, and middleware components for building robust web applications and APIs.
 
 ## Architecture Overview
 
 The HTTP server framework consists of several key components:
 
-- **Core Server**: HTTP server setup and lifecycle management (`provider/httpserver/server.go`)
-- **Authentication**: Token-based and JWT authentication ([auth.md](auth.md))
-- **Security**: Headers, CSRF protection, and rate limiting ([security.md](security.md)) 
-- **Session Management**: Cookie-based sessions with multiple storage backends ([session.md](session.md))
-- **Middleware**: Response helpers and utility middleware ([middleware.md](middleware.md))
-- **Response Utilities**: Standardized HTTP response helpers (`provider/httpserver/response/`)
+- **Core Server**: HTTP server setup and lifecycle management with TLS support
+- **Session Management**: Cookie-based sessions with multiple storage backends and encryption
+- **Security**: Comprehensive security headers, CSRF protection, and rate limiting
+- **Authentication**: Token-based, JWT, and session-based authentication providers
+- **Middleware**: Extensible middleware system with security and utility components
+- **Device Fingerprinting**: Multi-factor device identification for enhanced security
+
+## Features
+
+### Core Features
+- **Gin Framework Integration**: High-performance HTTP router with middleware support
+- **Graceful Shutdown**: Proper server lifecycle management with context handling
+- **TLS Configuration**: Built-in HTTPS support with certificate management
+- **Structured Logging**: Integrated logging with configurable levels
+- **Configuration Management**: JSON-based configuration with validation
+
+### Security Features
+- **Session Management**: Secure cookie-based sessions with encryption
+- **CSRF Protection**: Token-based protection against cross-site request forgery
+- **Security Headers**: Comprehensive browser security protections (CSP, HSTS, XSS protection)
+- **Rate Limiting**: Token bucket algorithm with per-IP and per-endpoint controls
+- **Device Fingerprinting**: Multi-factor device identification and change detection
+
+### Authentication & Authorization
+- **Multiple Auth Providers**: JWT, HMAC, token-based, and session-based authentication
+- **Unified Interface**: Consistent authentication API across all providers
+- **Context Integration**: Authentication data available in request context
+- **Flexible Authorization**: Route-based and middleware-based protection
 
 ## Quick Start
 
@@ -30,7 +53,8 @@ func main() {
     
     // Create server configuration
     config := httpserver.NewConfig()
-    config.Address = ":8080"
+    config.Host = "localhost"
+    config.Port = 8080
     
     // Create and start server
     server := httpserver.NewServer(config, logger)
@@ -47,15 +71,16 @@ func main() {
 }
 ```
 
-### Server with Authentication and Security
+### Server with Sessions and Security
 
 ```go
 package main
 
 import (
     "github.com/oddbit-project/blueprint/provider/httpserver"
-    "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+    "github.com/oddbit-project/blueprint/provider/httpserver/session"
     "github.com/oddbit-project/blueprint/provider/httpserver/security"
+    "github.com/oddbit-project/blueprint/provider/kv"
     "github.com/oddbit-project/blueprint/log"
 )
 
@@ -64,34 +89,56 @@ func main() {
     
     // Server configuration
     config := httpserver.NewConfig()
-    config.Address = ":8080"
+    config.Host = "localhost"
+    config.Port = 8080
     
     server := httpserver.NewServer(config, logger)
-    router := server.Router()
+    
+    // Session configuration
+    sessionConfig := session.NewConfig()
+    sessionConfig.Secure = true
+    sessionConfig.HttpOnly = true
+    
+    // Use memory-based session store
+    backend := kv.NewMemoryKV()
+    sessionManager, err := server.UseSession(sessionConfig, backend, logger)
+    if err != nil {
+        logger.Fatal(err, "failed to setup sessions")
+    }
     
     // Apply security headers
     securityConfig := security.DefaultSecurityConfig()
-    router.Use(security.SecurityMiddleware(securityConfig))
+    server.Router().Use(security.SecurityMiddleware(securityConfig))
+    
+    // Apply CSRF protection
+    server.Router().Use(security.CSRFProtection())
     
     // Apply rate limiting
-    router.Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    server.Router().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
     
-    // Public routes
-    router.GET("/health", healthHandler)
-    router.POST("/login", loginHandler)
-    
-    // Protected API routes
-    tokenAuth := auth.NewAuthToken("X-API-Key", "your-api-key")
-    api := router.Group("/api")
-    api.Use(auth.AuthMiddleware(tokenAuth))
-    {
-        api.GET("/users", getUsersHandler)
-        api.POST("/users", createUserHandler)
-    }
+    // Routes
+    setupRoutes(server)
     
     // Start server
     if err := server.Start(); err != nil {
         logger.Fatal(err, "failed to start server")
+    }
+}
+
+func setupRoutes(server *httpserver.Server) {
+    router := server.Router()
+    
+    // Public routes
+    router.GET("/", homeHandler)
+    router.GET("/login", loginFormHandler)
+    router.POST("/login", loginHandler)
+    
+    // Protected routes with session authentication
+    protected := router.Group("/dashboard")
+    protected.Use(auth.AuthMiddleware(auth.NewAuthSession(&UserIdentity{}))) // &UserIdentity{} is the user identity type to be used
+    {
+        protected.GET("/", dashboardHandler)
+        protected.POST("/logout", logoutHandler)
     }
 }
 ```
@@ -104,29 +151,68 @@ func main() {
 - Configuration options and environment variables
 - Router and handler registration
 
-### Authentication & Authorization
-- [Authentication](auth.md) - Token-based and JWT authentication providers
-- Unified authentication interface with multiple implementations
-- Bearer token support and JWT claims context injection
-- Custom authentication provider development
+### Session Management
+- [Session Management](session.md) - Comprehensive session system
+- Multiple storage backends (memory, Redis, custom KV stores)
+- Cookie security configuration (HttpOnly, Secure, SameSite)
+- Session encryption with AES256GCM
+- Flash messages and session regeneration
+- Automatic cleanup and expiration handling
 
 ### Security Features
-- [Security](security.md) - Comprehensive security middleware
-- Security headers (CSP, HSTS, XSS protection, frame options)
+- [Security](security.md) - Complete security middleware
+- Security headers (CSP with nonce support, HSTS, XSS protection, frame options)
 - CSRF protection with token generation and validation
-- Rate limiting with per-IP and per-endpoint controls
+- Rate limiting with token bucket algorithm and per-IP tracking
+- Device fingerprinting for enhanced security
 
-### Session Management
-- [Session Management](session.md) - Cookie-based session system
-- Multiple storage backends (memory, Redis, custom KV stores)
-- Flash messages and session regeneration
-- Configurable expiration and idle timeouts
+### Authentication & Authorization
+- [Authentication](auth.md) - All authentication providers
+- JWT authentication with claims context injection
+- Token-based authentication for APIs
+- Session-based authentication for web applications
+- HMAC authentication for secure service communication
+- Custom authentication provider development
 
 ### Middleware Components
 - [Middleware Guide](middleware.md) - All available middleware
 - Response helpers and standardized error handling
 - Custom middleware development patterns
 - Middleware ordering and best practices
+
+## Configuration
+
+### Server Configuration
+
+```go
+type ServerConfig struct {
+    Host         string            `json:"host"`         // Server host (default: "localhost")
+    Port         int               `json:"port"`         // Server port (default: 8080)
+    CertFile     string            `json:"certFile"`     // TLS certificate file
+    CertKeyFile  string            `json:"certKeyFile"`  // TLS private key file
+    ReadTimeout  int               `json:"readTimeout"`  // Read timeout in seconds
+    WriteTimeout int               `json:"writeTimeout"` // Write timeout in seconds
+    Debug        bool              `json:"debug"`        // Enable debug mode
+    Options      map[string]string `json:"options"`      // Additional options
+}
+```
+
+### Session Configuration
+
+```go
+type SessionConfig struct {
+    CookieName             string                         `json:"cookieName"`             // Cookie name (default: "blueprint_session")
+    ExpirationSeconds      int                            `json:"expirationSeconds"`      // Session lifetime (default: 1800)
+    IdleTimeoutSeconds     int                            `json:"idleTimeoutSeconds"`     // Idle timeout (default: 900)
+    Secure                 bool                           `json:"secure"`                 // HTTPS only (default: true)
+    HttpOnly               bool                           `json:"httpOnly"`               // No JS access (default: true)
+    SameSite               int                            `json:"sameSite"`               // CSRF protection (default: Strict)
+    Domain                 string                         `json:"domain"`                 // Cookie domain
+    Path                   string                         `json:"path"`                   // Cookie path (default: "/")
+    EncryptionKey          secure.DefaultCredentialConfig `json:"encryptionKey"`          // Optional encryption
+    CleanupIntervalSeconds int                            `json:"cleanupIntervalSeconds"` // Cleanup frequency (default: 300)
+}
+```
 
 ## Common Use Cases
 
@@ -141,6 +227,7 @@ func main() {
 - CSRF protection for form submissions
 - Security headers and CSP for XSS prevention
 - Flash messages for user feedback
+- Device fingerprinting for security
 
 ### Microservice
 - Token-based authentication for service-to-service communication
@@ -156,13 +243,35 @@ For comprehensive examples showing how to combine all components:
 - Web application with sessions and CSRF protection
 - Microservice with health checks and monitoring
 
-## Troubleshooting
+## Sample Applications
 
-For debugging and troubleshooting information:
-- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
-- Configuration troubleshooting
-- Middleware debugging techniques
-- Performance issue diagnosis
+### httpserver-session Sample
+The `samples/httpserver-session/` directory contains a complete example demonstrating:
+
+- **Session Management**: Memory-based session store with secure cookies
+- **Authentication**: Session-based authentication with custom identity types
+- **Security**: CSRF protection and security headers
+- **Configuration**: JSON-based configuration with validation
+- **Best Practices**: Proper middleware ordering and error handling
+
+Key features demonstrated:
+```go
+// Session setup with security
+sessionConfig := session.NewConfig()
+sessionConfig.Secure = true
+sessionConfig.HttpOnly = true
+sessionConfig.ExpirationSeconds = 3600
+
+// Authentication with custom identity
+type UserIdentity struct {
+    ID       int    `json:"id"`
+    Username string `json:"username"`
+    Email    string `json:"email"`
+}
+
+// Protected routes
+protected.Use(auth.AuthMiddleware(auth.NewAuthSession(&UserIdentity{})))
+```
 
 ## Performance and Production
 
@@ -172,10 +281,18 @@ For production deployment guidance:
 - Load balancing strategies
 - Monitoring and observability setup
 
+## Troubleshooting
+
+For debugging and troubleshooting information:
+- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
+- Configuration troubleshooting
+- Middleware debugging techniques
+- Performance issue diagnosis
+
 ## Next Steps
 
 1. Start with the [API Reference](api-reference.md) for complete server documentation
-2. Review [Authentication](auth.md) for securing your endpoints
+2. Review [Session Management](session.md) for stateful web applications
 3. Implement [Security](security.md) headers and CSRF protection
-4. Add [Session Management](session.md) for stateful web applications
+4. Add [Authentication](auth.md) for securing your endpoints
 5. Check [Examples](examples.md) for complete integration patterns

@@ -1,8 +1,9 @@
 package provider
 
 import (
-	"errors"
 	"github.com/oddbit-project/blueprint/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"reflect"
 	"strconv"
@@ -20,7 +21,7 @@ const (
 
 var expectedVar5Value = []string{"A", "b", "C", "d"}
 
-type envStructRegular struct {
+type EnvStructRegular struct {
 	String string
 	Bool   bool
 	Int    int
@@ -28,12 +29,25 @@ type envStructRegular struct {
 	List   []string
 }
 
-type envStructCamelCase struct {
+type EnvStructCamelCase struct {
 	CamelCaseString string
 	CamelCaseBool   bool
 	CamelCaseInt    int
 	CamelCaseFloat  float64
 	CamelCaseList   []string
+}
+
+type nestedStruct struct {
+	Regular EnvStructRegular
+	Camel   EnvStructCamelCase
+}
+
+// Test struct with default values
+type ConfigWithDefaults struct {
+	Host    string `env:"HOST" default:"localhost"`
+	Port    int    `env:"PORT" default:"8080"`
+	Debug   bool   `env:"DEBUG" default:"false"`
+	Timeout string `env:"TIMEOUT" default:"30s"`
 }
 
 var envVars = map[string]string{
@@ -47,116 +61,108 @@ var envVars = map[string]string{
 	"TEST_CAMEL_CASE_INT":    envIntValue,
 	"TEST_CAMEL_CASE_FLOAT":  envFloatValue,
 	"TEST_CAMEL_CASE_LIST":   envListValue,
-	"TEST_String":            envStrValue,   // envStructRegular, camelCase=false
-	"TEST_Bool":              envBoolValue,  // envStructRegular, camelCase=false
-	"TEST_Int":               envIntValue,   // envStructRegular, camelCase=false
-	"TEST_Float":             envFloatValue, // envStructRegular, camelCase=false
-	"TEST_List":              envListValue,  // envStructRegular, camelCase=false
+	"TEST_String":            envStrValue,   // EnvStructRegular, camelCase=false
+	"TEST_Bool":              envBoolValue,  // EnvStructRegular, camelCase=false
+	"TEST_Int":               envIntValue,   // EnvStructRegular, camelCase=false
+	"TEST_Float":             envFloatValue, // EnvStructRegular, camelCase=false
+	"TEST_List":              envListValue,  // EnvStructRegular, camelCase=false
 
 }
 
-func setEnvVars(t *testing.T) {
-	for k, v := range envVars {
+var nestedEnvVars = map[string]string{
+	"TEST_REGULAR_STRING":          envStrValue,
+	"TEST_REGULAR_BOOL":            envBoolValue,
+	"TEST_REGULAR_INT":             envIntValue,
+	"TEST_REGULAR_FLOAT":           envFloatValue,
+	"TEST_REGULAR_LIST":            envListValue,
+	"TEST_CAMEL_CAMEL_CASE_STRING": envStrValue,
+	"TEST_CAMEL_CAMEL_CASE_BOOL":   envBoolValue,
+	"TEST_CAMEL_CAMEL_CASE_INT":    envIntValue,
+	"TEST_CAMEL_CAMEL_CASE_FLOAT":  envFloatValue,
+	"TEST_CAMEL_CAMEL_CASE_LIST":   envListValue,
+}
+
+func setEnvVars(t *testing.T, vars map[string]string) {
+	for k, v := range vars {
 		if _, exists := os.LookupEnv(k); exists {
 			t.Fatalf("setEnvVars(): env var '%s' already exists", k)
 		}
-		os.Setenv(k, v)
+		require.NoError(t, os.Setenv(k, v))
 	}
 }
 
-func resetEnvVars() {
-	for k := range envVars {
+func resetEnvVars(vars map[string]string) {
+	for k := range vars {
 		os.Unsetenv(k)
 	}
 }
 
 func TestNewEnvProvider(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	keys := make([]string, 0)
 	for k := range envVars {
 		keys = append(keys, k)
 	}
-	if !cfg.KeyListExists(keys) {
-		t.Error("NewEnvProvider(): failed loading env vars")
-	}
+	assert.True(t, cfg.KeyListExists(keys), "failed loading env vars")
 }
 
 func TestEnvProvider_GetBoolKey(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	b, err := cfg.GetBoolKey("TEST_BOOL")
-	if err != nil {
-		t.Error("EnvProvider_GetBoolKey():", err)
-	}
-	if b != true {
-		t.Error("EnvProvider_GetBoolKey(): value mismatch")
-	}
+	require.NoError(t, err)
+	assert.True(t, b)
 
 	// attempt to read invalid value
 	_, err = cfg.GetBoolKey("TEST_STR")
-	if err == nil {
-		t.Error("EnvProvider_GetBoolKey(): non-bool should return error")
-	}
+	assert.Error(t, err, "non-bool should return error")
 
 	// attempt to read camelcase
 	cfg = NewEnvProvider(envPrefix, true)
 	b, err = cfg.GetBoolKey("testCamelCaseBool")
-	if err != nil {
-		t.Error("EnvProvider_GetBoolKey():", err)
-	}
-	if b != true {
-		t.Error("EnvProvider_GetBoolKey(): value mismatch")
-	}
+	require.NoError(t, err)
+	assert.True(t, b)
 }
 
 func TestEnvProvider_GetConfigNode(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	node, err := cfg.GetConfigNode("TEST_STR")
-	if !errors.Is(err, config.ErrNotImplemented) || node != nil {
-		t.Error("EnvProvider_GetConfigNode(): invalid result")
-	}
+	assert.ErrorIs(t, err, config.ErrNotImplemented)
+	assert.Nil(t, node)
 }
 
 func TestEnvProvider_GetFloat64Key(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	v, err := cfg.GetFloat64Key("TEST_FLOAT")
-	if err != nil {
-		t.Error("EnvProvider_GetFloat64Key():", err)
-	}
+	require.NoError(t, err)
 
 	expected, _ := strconv.ParseFloat(envFloatValue, 64)
-	if v != expected {
-		t.Error("EnvProvider_GetFloat64Key(): value mismatch")
-	}
+	assert.Equal(t, expected, v)
 
 	// attempt to read invalid value
 	_, err = cfg.GetFloat64Key("TEST_STR")
-	if err == nil {
-		t.Error("EnvProvider_GetFloat64Key(): non-float64 should return error")
-	}
+	assert.Error(t, err, "non-float64 should return error")
 
 	// read camelCase key
 	cfg = NewEnvProvider(envPrefix, true)
 	_, err = cfg.GetFloat64Key("testCamelCaseFloat")
-	if err != nil {
-		t.Error("EnvProvider_GetFloat64Key():", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestEnvProvider_GetIntKey(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	v, err := cfg.GetIntKey("TEST_INT")
@@ -184,8 +190,8 @@ func TestEnvProvider_GetIntKey(t *testing.T) {
 }
 
 func TestEnvProvider_GetKey(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 
@@ -259,12 +265,12 @@ func TestEnvProvider_GetKey(t *testing.T) {
 }
 
 func TestEnvProvider_GetKey_Struct(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
-	structRegular := &envStructRegular{}
-	if err := cfg.GetKey("test", structRegular); err != nil {
+	structRegular := &EnvStructRegular{}
+	if err := cfg.GetKey("", structRegular); err != nil {
 		t.Error("TestEnvProvider_GetKey_Struct():", err)
 	}
 	if structRegular.String != envStrValue {
@@ -288,8 +294,8 @@ func TestEnvProvider_GetKey_Struct(t *testing.T) {
 
 	// now with convertCamelCase = true
 	cfg = NewEnvProvider(envPrefix, true)
-	structCamelCase := &envStructCamelCase{}
-	if err := cfg.GetKey("test", structCamelCase); err != nil {
+	structCamelCase := &EnvStructCamelCase{}
+	if err := cfg.GetKey("", structCamelCase); err != nil {
 		t.Error("TestEnvProvider_GetKey_Struct():", err)
 	}
 	if structCamelCase.CamelCaseString != envStrValue {
@@ -310,12 +316,11 @@ func TestEnvProvider_GetKey_Struct(t *testing.T) {
 	if !reflect.DeepEqual(structCamelCase.CamelCaseList, expectedVar5Value) {
 		t.Error("EnvProvider_GetKey_Struct(): string slice value mismatch")
 	}
-
 }
 
 func TestEnvProvider_GetSliceKey(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	v, err := cfg.GetSliceKey("TEST_LIST", ",")
@@ -334,8 +339,8 @@ func TestEnvProvider_GetSliceKey(t *testing.T) {
 }
 
 func TestEnvProvider_GetStringKey(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	v, err := cfg.GetStringKey("TEST_STRING")
@@ -355,8 +360,8 @@ func TestEnvProvider_GetStringKey(t *testing.T) {
 }
 
 func TestEnvProvider_KeyExists(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	for k := range envVars {
@@ -380,8 +385,8 @@ func TestEnvProvider_KeyExists(t *testing.T) {
 }
 
 func TestEnvProvider_KeyListExists(t *testing.T) {
-	setEnvVars(t)
-	defer resetEnvVars()
+	setEnvVars(t, envVars)
+	defer resetEnvVars(envVars)
 
 	cfg := NewEnvProvider(envPrefix, false)
 	keys := make([]string, 0)
@@ -408,4 +413,60 @@ func TestEnvProvider_KeyListExists(t *testing.T) {
 	if cfg.KeyListExists(keys) {
 		t.Error("EnvProvider_KeyListExists(): non-existing keys result mismatch")
 	}
+}
+
+func TestEnvProvider_Get_Struct(t *testing.T) {
+	setEnvVars(t, nestedEnvVars)
+	defer resetEnvVars(envVars)
+
+	cfg := NewEnvProvider(envPrefix, false)
+	nested := &nestedStruct{}
+	if err := cfg.Get(nested); err != nil {
+		t.Error("failed to get nested struct", err)
+	}
+	if nested.Regular.String != envStrValue {
+		t.Error("invalid string value")
+	}
+	value, _ := strconv.ParseBool(envBoolValue)
+	if nested.Regular.Bool != value {
+		t.Error(" invalid bool value")
+	}
+	i, _ := strconv.Atoi(envIntValue)
+	if nested.Regular.Int != i {
+		t.Error("invalid int value")
+	}
+	f, _ := strconv.ParseFloat(envFloatValue, 64)
+	if nested.Regular.Float != f {
+		t.Error("invalid float value")
+	}
+	if !reflect.DeepEqual(nested.Regular.List, expectedVar5Value) {
+		t.Error("string slice value mismatch")
+	}
+}
+
+// Test for default values functionality
+func TestEnvProvider_DefaultValues(t *testing.T) {
+	// Set only some env vars, leaving others to use defaults
+	testVars := map[string]string{
+		"TEST_HOST": "custom.host",
+		"TEST_PORT": "9090",
+		// DEBUG and TIMEOUT will use defaults
+	}
+	
+	setEnvVars(t, testVars)
+	defer resetEnvVars(testVars)
+	
+	cfg := NewEnvProvider("TEST_", false)
+	config := &ConfigWithDefaults{}
+	
+	err := cfg.Get(config)
+	require.NoError(t, err)
+	
+	// Check that env vars were used
+	assert.Equal(t, "custom.host", config.Host)
+	assert.Equal(t, 9090, config.Port)
+	
+	// Check that defaults were applied
+	assert.Equal(t, false, config.Debug)
+	assert.Equal(t, "30s", config.Timeout)
 }

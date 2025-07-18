@@ -43,8 +43,8 @@ func GetJWTToken(c *gin.Context) (string, bool) {
 	return authHeader[7:], true
 }
 
-// GetClaims helper to get claims from gin context
-func GetClaims(c *gin.Context) (*jwtprovider.Claims, bool) {
+// GetJWTClaims helper to get claims from gin context
+func GetJWTClaims(c *gin.Context) (*jwtprovider.Claims, bool) {
 	raw, ok := c.Get(ContextJwtClaims)
 	if !ok {
 		return nil, false

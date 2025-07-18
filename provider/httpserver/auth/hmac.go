@@ -14,9 +14,10 @@ const (
 	HeaderHMACTimestamp = "X-HMAC-Timestamp"
 	HeaderHMACNonce     = "X-HMAC-Nonce"
 
-	AuthFlag      = "Authenticated"
-	AuthTimestamp = "AuthTimestamp"
-	AuthNonce     = "AuthNonce"
+	HMACKeyId     = "HMACKeyId"
+	HMACTimestamp = "HMACTimestamp"
+	HMACNonce     = "HMACNonce"
+	DefaultKeyId  = "authenticated"
 )
 
 type hmacAuthProvider struct {
@@ -40,11 +41,10 @@ func (h *hmacAuthProvider) CanAccess(c *gin.Context) bool {
 
 	// Validate required headers
 	if hash == "" || timestamp == "" || nonce == "" {
-
 		logger.Warn("HMAC authentication failed: missing headers", log.KV{
-			"client_ip": c.ClientIP(),
-			"path":      c.Request.URL.Path,
-			"method":    c.Request.Method,
+			"clientIp": c.ClientIP(),
+			"path":     c.Request.URL.Path,
+			"method":   c.Request.Method,
 		})
 
 		return false
@@ -53,11 +53,9 @@ func (h *hmacAuthProvider) CanAccess(c *gin.Context) bool {
 	// Read request body for verification
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-
 		logger.Error(err, "Failed to read request body", log.KV{
-			"client_ip": c.ClientIP(),
+			"clientIp": c.ClientIP(),
 		})
-
 		return false
 	}
 
@@ -66,13 +64,13 @@ func (h *hmacAuthProvider) CanAccess(c *gin.Context) bool {
 
 	// Verify HMAC signature
 	bodyReader := bytes.NewReader(body)
-	valid, err := h.provider.Verify256(bodyReader, hash, timestamp, nonce)
+	keyId, valid, err := h.provider.Verify256(bodyReader, hash, timestamp, nonce)
 
 	if err != nil {
 
 		logger.Warn("HMAC verification error", log.KV{
 			"error":     err.Error(),
-			"client_ip": c.ClientIP(),
+			"clientIp":  c.ClientIP(),
 			"path":      c.Request.URL.Path,
 			"method":    c.Request.Method,
 			"timestamp": timestamp,
@@ -84,7 +82,7 @@ func (h *hmacAuthProvider) CanAccess(c *gin.Context) bool {
 	if !valid {
 
 		logger.Info("HMAC verification failed - invalid signature", log.KV{
-			"client_ip": c.ClientIP(),
+			"clientIp":  c.ClientIP(),
 			"path":      c.Request.URL.Path,
 			"method":    c.Request.Method,
 			"timestamp": timestamp,
@@ -95,15 +93,46 @@ func (h *hmacAuthProvider) CanAccess(c *gin.Context) bool {
 
 	// Authentication successful
 	logger.Debug("HMAC authentication successful", log.KV{
-		"client_ip": c.ClientIP(),
-		"path":      c.Request.URL.Path,
-		"method":    c.Request.Method,
+		"keyId":    keyId,
+		"clientIp": c.ClientIP(),
+		"path":     c.Request.URL.Path,
+		"method":   c.Request.Method,
 	})
 
 	// Store authentication info in context for downstream handlers
-	c.Set(AuthFlag, true)
-	c.Set(AuthTimestamp, timestamp)
-	c.Set(AuthNonce, nonce)
+	if keyId == "" {
+		keyId = DefaultKeyId
+	}
+	c.Set(HMACKeyId, keyId)
+	c.Set(HMACTimestamp, timestamp)
+	c.Set(HMACNonce, nonce)
 
 	return true
+}
+
+// GetHMACIdentity fetch hmac keyId
+func GetHMACIdentity(c *gin.Context) (string, bool) {
+	keyId, exists := c.Get(HMACKeyId)
+	if !exists {
+		return "", false
+	}
+	return keyId.(string), true
+}
+
+// GetHMACDetails fetch hmac details
+// returns keyId, timestamp, nonce, true if success
+func GetHMACDetails(c *gin.Context) (string, string, string, bool) {
+	keyId, exists := c.Get(HMACKeyId)
+	if !exists {
+		return "", "", "", false
+	}
+	ts, exists := c.Get(HMACTimestamp)
+	if !exists {
+		return "", "", "", false
+	}
+	nonce, exists := c.Get(HMACNonce)
+	if !exists {
+		return "", "", "", false
+	}
+	return keyId.(string), ts.(string), nonce.(string), true
 }

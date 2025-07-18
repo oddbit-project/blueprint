@@ -41,19 +41,28 @@ func (s *Server) UseRateLimiting(ratePerMinute int) {
 	s.AddMiddleware(security.RateLimitMiddleware(r, b))
 }
 
-// UseSessionWithMemoryStore adds session middleware with provided storage
-func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.Logger) *session.SessionManager {
+// UseSession adds session middleware with provided storage
+func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.Logger) (*session.Manager, error) {
 	if config == nil {
 		config = session.NewConfig()
 	}
 	// Create store
-	store := session.NewStore(config, backend, logger)
+	store, err := session.NewStore(config, backend, logger)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create manager
-	manager := session.NewManager(store, config, logger)
+	manager, err := session.NewManager(
+		config,
+		session.ManagerWithStore(store),
+		session.ManagerWithLogger(logger))
+	if err != nil {
+		return nil, err
+	}
 
 	// Add middleware
 	s.AddMiddleware(manager.Middleware())
 
-	return manager
+	return manager, nil
 }

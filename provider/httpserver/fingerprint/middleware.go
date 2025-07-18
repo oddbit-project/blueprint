@@ -1,6 +1,7 @@
 package fingerprint
 
 import (
+	"encoding/gob"
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 	"github.com/oddbit-project/blueprint/provider/httpserver/session"
@@ -41,7 +42,11 @@ func GetFingerprint(c *gin.Context) *DeviceFingerprint {
 }
 
 // UpdateFingerprint stores or updates fingerprint in the session
-// this should be clalled during the login process
+// this should be called during the login process
 func UpdateFingerprint(s *session.SessionData, fp *DeviceFingerprint) {
 	s.Set(FingerprintKey, fp)
+}
+
+func init() {
+	gob.Register(&DeviceFingerprint{})
 }
