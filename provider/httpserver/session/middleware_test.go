@@ -13,8 +13,10 @@ func TestSessionMiddleware(t *testing.T) {
 	// Setup
 	gin.SetMode(gin.TestMode)
 	config := NewConfig()
-	store := NewStore(config, kv.NewMemoryKV(), nil)
-	manager := NewManager(store, config, nil)
+	store, err := NewStore(config, kv.NewMemoryKV(), nil)
+	assert.NoError(t, err)
+	manager, err := NewManager(config, ManagerWithStore(store))
+	assert.NoError(t, err)
 
 	// Create a test router
 	router := gin.New()
@@ -64,8 +66,10 @@ func TestSessionRegenerate(t *testing.T) {
 	// Setup
 	gin.SetMode(gin.TestMode)
 	config := NewConfig()
-	store := NewStore(config, kv.NewMemoryKV(), nil)
-	manager := NewManager(store, config, nil)
+	store, err := NewStore(config, kv.NewMemoryKV(), nil)
+	assert.NoError(t, err)
+	manager, err := NewManager(config, ManagerWithStore(store))
+	assert.NoError(t, err)
 
 	// Create a test router
 	router := gin.New()
@@ -145,8 +149,10 @@ func TestClearSession(t *testing.T) {
 	// Setup
 	gin.SetMode(gin.TestMode)
 	config := NewConfig()
-	store := NewStore(config, kv.NewMemoryKV(), nil)
-	manager := NewManager(store, config, nil)
+	store, err := NewStore(config, kv.NewMemoryKV(), nil)
+	assert.NoError(t, err)
+	manager, err := NewManager(config, ManagerWithStore(store))
+	assert.NoError(t, err)
 
 	// Create a test router
 	router := gin.New()
@@ -225,8 +231,10 @@ func TestFlashMessages(t *testing.T) {
 	// Setup
 	gin.SetMode(gin.TestMode)
 	config := NewConfig()
-	store := NewStore(config, kv.NewMemoryKV(), nil)
-	manager := NewManager(store, config, nil)
+	store, err := NewStore(config, kv.NewMemoryKV(), nil)
+	assert.NoError(t, err)
+	manager, err := NewManager(config, ManagerWithStore(store))
+	assert.NoError(t, err)
 
 	// Create a test router
 	router := gin.New()

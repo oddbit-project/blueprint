@@ -1,6 +1,7 @@
 package session
 
 import (
+	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/utils"
 	"net/http"
 	"slices"
@@ -41,15 +42,16 @@ const (
 
 // Config holds configuration for the session store
 type Config struct {
-	CookieName             string `json:"cookieName"`             // CookieName is the name of the cookie used to store the session ID
-	ExpirationSeconds      int    `json:"expirationSeconds"`      // expiration is the maximum lifetime of a session
-	IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // IdleTimeoutSeconds is the maximum time a session can be inactive
-	Secure                 bool   `json:"secure"`                 // Secure sets the Secure flag on cookies (should be true in production)
-	HttpOnly               bool   `json:"httpOnly"`               // HttpOnly sets the HttpOnly flag on cookies (should be true)
-	SameSite               int    `json:"sameSite"`               // SameSite sets the SameSite policy for cookies
-	Domain                 string `json:"domain"`                 // Domain sets the domain for the cookie
-	Path                   string `json:"path"`                   // Path sets the path for the cookie
-	CleanupIntervalSeconds int    `json:"cleanupIntervalSeconds"` // CleanupIntervalSeconds sets how often the session cleanup runs
+	CookieName             string                         `json:"cookieName"`             // CookieName is the name of the cookie used to store the session ID
+	ExpirationSeconds      int                            `json:"expirationSeconds"`      // expiration is the maximum lifetime of a session
+	IdleTimeoutSeconds     int                            `json:"idleTimeoutSeconds"`     // IdleTimeoutSeconds is the maximum time a session can be inactive
+	Secure                 bool                           `json:"secure"`                 // Secure sets the Secure flag on cookies (should be true in production)
+	HttpOnly               bool                           `json:"httpOnly"`               // HttpOnly sets the HttpOnly flag on cookies (should be true)
+	SameSite               int                            `json:"sameSite"`               // SameSite sets the SameSite policy for cookies
+	Domain                 string                         `json:"domain"`                 // Domain sets the domain for the cookie
+	Path                   string                         `json:"path"`                   // Path sets the path for the cookie
+	EncryptionKey          secure.DefaultCredentialConfig `json:"encryptionKey"`          // Optional encryption key to encrypt cookie data; if defined, cookie data is encrypted
+	CleanupIntervalSeconds int                            `json:"cleanupIntervalSeconds"` // CleanupIntervalSeconds sets how often the session cleanup runs
 }
 
 func (c *Config) Validate() error {
@@ -70,6 +72,7 @@ func (c *Config) Validate() error {
 		return ErrInvalidSameSite
 
 	}
+	
 	return nil
 }
 

@@ -181,10 +181,12 @@ func TestUseCSRFProtection(t *testing.T) {
 	config.CookieName = "nextjs_session"        // Custom cookie name
 	config.ExpirationSeconds = 3600             // 1 hour
 	// Create store
-	store := session.NewStore(config, nil, nil)
+	store, err := session.NewStore(config, nil, nil)
+	assert.NoError(t, err)
 
 	// Create manager
-	manager := session.NewManager(store, config, nil)
+	manager, err := session.NewManager(config, session.ManagerWithStore(store))
+	assert.NoError(t, err)
 
 	// Add session middleware
 	server.AddMiddleware(manager.Middleware())

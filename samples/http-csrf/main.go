@@ -31,7 +31,11 @@ func main() {
 
 	// Set up session management (required for CSRF protection)
 	sessionConfig := session.NewConfig()
-	server.UseSession(sessionConfig, nil, logger)
+	_, err = server.UseSession(sessionConfig, nil, logger)
+	if err != nil {
+		logger.Fatal(err, "could not initialize session provider")
+		os.Exit(1)
+	}
 
 	// Apply CSRF protection to all POST/PUT/DELETE routes
 	server.Route().Use(security.CSRFProtection())
@@ -206,8 +210,8 @@ func main() {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"message": "API call successful!",
+			"success":       true,
+			"message":       "API call successful!",
 			"received_data": requestData,
 		})
 	})

@@ -3,36 +3,71 @@ package session
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/provider/kv"
 	"net/http"
 )
 
-// SessionManager manages sessions and provides middleware for Gin
-type SessionManager struct {
+// Manager manages sessions and provides middleware for Gin
+type Manager struct {
 	store  *Store
 	config *Config
 	logger *log.Logger
 }
 
+type ManagerOpt func(*Manager) error
+
+func ManagerWithStore(store *Store) ManagerOpt {
+	return func(sessionManager *Manager) error {
+		sessionManager.store = store
+		return nil
+	}
+}
+
+func ManagerWithLogger(log *log.Logger) ManagerOpt {
+	return func(sessionManager *Manager) error {
+		sessionManager.logger = log
+		return nil
+	}
+}
+
 // NewManager creates a new session manager
-func NewManager(store *Store, config *Config, logger *log.Logger) *SessionManager {
-	if config == nil {
+func NewManager(config *Config, opts ...ManagerOpt) (*Manager, error) {
+	manager := &Manager{
+		store:  nil,
+		config: config,
+		logger: nil,
+	}
+
+	for _, opt := range opts {
+		if err := opt(manager); err != nil {
+			return nil, err
+		}
+	}
+
+	if manager.config == nil {
 		config = NewConfig()
 	}
 
-	manager := &SessionManager{
-		store:  store,
-		config: config,
-		logger: logger,
+	if manager.logger == nil {
+		manager.logger = log.New("session-manager")
+	}
+
+	if manager.store == nil {
+		var err error
+		manager.store, err = NewStore(config, kv.NewMemoryKV(), manager.logger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Start the cleanup goroutine
-	store.StartCleanup()
+	manager.store.StartCleanup()
 
-	return manager
+	return manager, nil
 }
 
 // Middleware returns a Gin middleware for session management
-func (m *SessionManager) Middleware() gin.HandlerFunc {
+func (m *Manager) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var session *SessionData
 		var sessionID string
@@ -57,9 +92,7 @@ func (m *SessionManager) Middleware() gin.HandlerFunc {
 			err = m.store.Set(sessionID, session)
 			if err != nil {
 				// Log error but proceed
-				if m.logger != nil {
-					m.logger.Error(err, "Failed to save session")
-				}
+				m.logger.Error(err, "Failed to save session")
 			}
 
 			// Set the cookie
@@ -87,7 +120,7 @@ func (m *SessionManager) Middleware() gin.HandlerFunc {
 }
 
 // setSessionCookie sets the session cookie on the response
-func (m *SessionManager) setSessionCookie(c *gin.Context, sessionID string) {
+func (m *Manager) setSessionCookie(c *gin.Context, sessionID string) {
 	c.SetCookie(
 		m.config.CookieName,
 		sessionID,
@@ -127,7 +160,7 @@ func Get(c *gin.Context) *SessionData {
 }
 
 // Regenerate regenerates the session ID to prevent session fixation
-func (m *SessionManager) Regenerate(c *gin.Context) {
+func (m *Manager) Regenerate(c *gin.Context) {
 	// Get the current session
 	oldSession := Get(c)
 	if oldSession == nil {
@@ -155,7 +188,7 @@ func (m *SessionManager) Regenerate(c *gin.Context) {
 }
 
 // Clear removes the session
-func (m *SessionManager) Clear(c *gin.Context) {
+func (m *Manager) Clear(c *gin.Context) {
 	// Delete the session from the store
 	cookie, err := c.Cookie(m.config.CookieName)
 	if err == nil && cookie != "" {
@@ -175,4 +208,9 @@ func (m *SessionManager) Clear(c *gin.Context) {
 
 	// Remove from context
 	c.Set(ContextSessionKey, nil)
+}
+
+// Shutdown gracefully stops the session Manager
+func (m *Manager) Shutdown() {
+	m.store.Close()
 }
