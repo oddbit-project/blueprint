@@ -148,6 +148,9 @@ func (a *ApiServer) login(c *gin.Context) {
 	currentSession := session.Get(c)
 	currentSession.SetIdentity(user)
 
+	// Regenerate session ID for security
+	a.sessionMgr.Regenerate(c)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "logged in successfully",
 	})

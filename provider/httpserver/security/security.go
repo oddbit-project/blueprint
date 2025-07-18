@@ -53,7 +53,7 @@ func DefaultSecurityConfig() *SecurityConfig {
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
 		HSTS:               "max-age=31536000; includeSubDomains",
 		FrameOptions:       "DENY",
-		FeaturePolicy:      "camera 'none'; microphone 'none'; geolocation 'none'",
+		FeaturePolicy:      "camera=(), microphone=(), geolocation=()",
 		CacheControl:       "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
 		UseCSPNonce:        true,
 		EnableRateLimit:    true,
