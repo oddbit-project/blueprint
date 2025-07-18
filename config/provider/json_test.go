@@ -371,3 +371,46 @@ func TestJsonProvider_KeyListExists(t *testing.T) {
 		t.Error("JsonProvider_KeyListExists(): non-existing key detection failed")
 	}
 }
+
+// Test for JSON provider default values
+func TestJsonProvider_DefaultValues(t *testing.T) {
+	// JSON with some missing fields
+	jsonData := `{
+		"host": "custom.host",
+		"port": 9090
+	}`
+	
+	type JsonConfigWithDefaults struct {
+		Host    string `json:"host" default:"localhost"`
+		Port    int    `json:"port" default:"8080"`
+		Debug   bool   `json:"debug" default:"false"`
+		Timeout string `json:"timeout" default:"30s"`
+	}
+	
+	cfg, err := NewJsonProvider([]byte(jsonData))
+	if err != nil {
+		t.Fatal("NewJsonProvider():", err)
+	}
+	
+	config := &JsonConfigWithDefaults{}
+	err = cfg.Get(config)
+	if err != nil {
+		t.Fatal("JsonProvider Get():", err)
+	}
+	
+	// Check that JSON values were used
+	if config.Host != "custom.host" {
+		t.Error("Host should be from JSON")
+	}
+	if config.Port != 9090 {
+		t.Error("Port should be from JSON")
+	}
+	
+	// Check that defaults were applied for missing fields
+	if config.Debug != false {
+		t.Error("Debug should use default value")
+	}
+	if config.Timeout != "30s" {
+		t.Error("Timeout should use default value")
+	}
+}

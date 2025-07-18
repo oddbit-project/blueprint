@@ -43,7 +43,11 @@ func main() {
 	backend := kv.NewMemoryKV()
 
 	// Use session middleware with memory store
-	sessionManager := server.UseSession(sessionConfig, backend, logger)
+	sessionManager, err := server.UseSession(sessionConfig, backend, logger)
+	if err != nil {
+		logger.Fatal(err, "could not initialize session")
+		os.Exit(1)
+	}
 
 	// Define routes
 	// Home page - shows session info

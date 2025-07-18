@@ -1,117 +1,175 @@
-# Cookie-Based Session Management
+# Advanced Session Management
 
-Blueprint provides a flexible cookie-based session management system for HTTP applications with support for multiple storage backends and comprehensive security features.
+Blueprint provides a cookie-based session management system with encryption, multiple storage backends, and security features.
+
+> Note: when using custom types with sessions, **always** register the types for serialization/deserialization with
+> gob.Register()
 
 ## Architecture Overview
 
 The session system consists of four main components:
 
-- **SessionData** (`session_data.go`): Core data structure for storing session values with typed accessors
+- **SessionData** (`session_data.go`): Core data structure with typed accessors and identity management
 - **SessionManager** (`middleware.go`): Gin middleware for automatic session lifecycle management
-- **Store** (`store.go`): Backend storage abstraction with TTL support and automatic cleanup
+- **Store** (`store.go`): Backend storage abstraction with encryption and automatic cleanup
 - **Config** (`config.go`): Comprehensive configuration with security defaults and validation
 
 ## Features
 
 ### Core Session Features
 - **Flexible Storage**: Support for any KV backend (memory, Redis, or custom implementations)
+- **Session Encryption**: Optional AES256GCM encryption for cookie data
 - **Type-safe Access**: Typed getters for common data types (string, int, bool)
+- **Identity Management**: Built-in user identity support with dedicated methods
 - **Flash Messages**: One-time messages that persist across requests
 - **Session Regeneration**: Built-in protection against session fixation attacks
 - **Automatic Cleanup**: Configurable cleanup intervals for expired sessions
 - **Dual Expiration**: Both absolute expiration and idle timeout support
 
-### Cookie Configuration
-- **Security Flags**: HttpOnly, Secure, and SameSite support
-- **Flexible Expiration**: Separate expiration and idle timeout settings
-- **Domain/Path Control**: Fine-grained cookie scope configuration
-- **Automatic Management**: Middleware handles all cookie lifecycle operations
+### Security Features
+- **Cookie Security**: HttpOnly, Secure, and SameSite configuration
+- **Session Fixation Protection**: Regenerate session IDs on authentication
+- **Encryption Support**: Optional AES256GCM encryption for sensitive session data
+- **Secure Defaults**: Production-ready security settings out of the box
 
-## Using Sessions
+## Session Setup
 
 ### Option 1: Memory-based Sessions
 
-For simple applications or development environments:
-
 ```go
-// Configure logger
-logger := log.New("session-sample")
+package main
 
-// Configure session
-sessionConfig := session.NewConfig()
+import (
+    "github.com/oddbit-project/blueprint/provider/httpserver"
+    "github.com/oddbit-project/blueprint/provider/httpserver/session"
+    "github.com/oddbit-project/blueprint/provider/kv"
+    "github.com/oddbit-project/blueprint/log"
+)
 
-// Create memory backend
-backend := kv.NewMemoryKV()
-
-// Use session middleware with memory store
-sessionManager := server.UseSession(sessionConfig, backend, logger)
+func main() {
+    logger := log.New("session-app")
+    
+    // Server setup
+    config := httpserver.NewConfig()
+    server := httpserver.NewServer(config, logger)
+    
+    // Session configuration
+    sessionConfig := session.NewConfig()
+    sessionConfig.CookieName = "my_session"
+    sessionConfig.ExpirationSeconds = 3600 // 1 hour
+    sessionConfig.IdleTimeoutSeconds = 1800 // 30 minutes
+    
+    // Memory backend for development
+    backend := kv.NewMemoryKV()
+    
+    // Setup session middleware
+    sessionManager, err := server.UseSession(sessionConfig, backend, logger)
+    if err != nil {
+        logger.Fatal(err, "failed to setup sessions")
+    }
+    
+    setupRoutes(server)
+    server.Start()
+}
 ```
 
 ### Option 2: Redis-based Sessions
 
-For distributed applications with multiple server instances:
-
 ```go
-// Configure logger
-logger := log.New("session-sample")
-
-// Configure session
-sessionConfig := session.NewConfig()
-
-// Configure Redis
-redisConfig := redis.NewConfig()
-redisConfig.Address = "localhost:6379"
-
-// Create Redis backend
-backend, err := redis.NewClient(redisConfig)
-if err != nil {
-    logger.Fatal(err, "could not connect to Redis")
-    os.Exit(1)
+func setupRedisSession(server *httpserver.Server, logger *log.Logger) {
+    // Redis configuration
+    redisConfig := redis.NewConfig()
+    redisConfig.Address = "redis:6379"
+    redisConfig.Database = 1
+    redisConfig.PoolSize = 10
+    
+    // Create Redis client
+    redisClient, err := redis.NewClient(redisConfig)
+    if err != nil {
+        logger.Fatal(err, "failed to connect to Redis")
+    }
+    
+    // Session configuration with encryption
+    sessionConfig := session.NewConfig()
+    sessionConfig.ExpirationSeconds = 7200 // 2 hours
+    sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
+        PasswordEnvVar: "SESSION_ENCRYPTION_KEY",
+    }
+    
+    // Setup session middleware with Redis
+    sessionManager, err := server.UseSession(sessionConfig, redisClient, logger)
+    if err != nil {
+        logger.Fatal(err, "failed to setup Redis sessions")
+    }
 }
-
-// Use session middleware with Redis store
-sessionManager := server.UseSession(sessionConfig, backend, logger)
 ```
 
-### Option 3: Custom Backend
-
-You can implement your own storage backend by implementing the `kv.KV` interface:
+### Option 3: Manual Session Setup (Advanced)
 
 ```go
-type KV interface {
-    SetTTL(key string, value []byte, ttl time.Duration) error
-    Set(key string, value []byte) error
-    Get(key string) ([]byte, error)
-    Delete(key string) error
-    Prune() error
+func setupAdvancedSession(server *httpserver.Server, logger *log.Logger) {
+    // Custom backend
+    backend := kv.NewMemoryKV()
+    
+    // Session configuration
+    sessionConfig := session.NewConfig()
+    sessionConfig.Secure = true
+    sessionConfig.HttpOnly = true
+    sessionConfig.SameSite = int(http.SameSiteStrictMode)
+    sessionConfig.CleanupIntervalSeconds = 300
+    
+    // Create store manually
+    sessionStore, err := session.NewStore(sessionConfig, backend, logger)
+    if err != nil {
+        logger.Fatal(err, "failed to create session store")
+    }
+    
+    // Create manager manually with options
+    sessionManager, err := session.NewManager(sessionConfig,
+        session.ManagerWithStore(sessionStore),
+        session.ManagerWithLogger(logger))
+    if err != nil {
+        logger.Fatal(err, "failed to create session manager")
+    }
+    
+    // Add middleware
+    server.Router().Use(sessionManager.Middleware())
 }
 ```
 
 ## Session Configuration
 
-The `Config` struct in `provider/httpserver/session/config.go` contains all configuration options:
+### Complete Configuration Reference
 
 ```go
 type Config struct {
-    CookieName             string `json:"cookieName"`             // Cookie name for session ID (default: "blueprint_session")
-    ExpirationSeconds      int    `json:"expirationSeconds"`      // Maximum session lifetime (default: 1800 = 30 min)
-    IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // Maximum idle time (default: 900 = 15 min)
-    Secure                 bool   `json:"secure"`                 // HTTPS-only cookies (default: true)
-    HttpOnly               bool   `json:"httpOnly"`               // No JS access (default: true)
-    SameSite               int    `json:"sameSite"`               // CSRF protection (default: Strict)
+    // Cookie configuration
+    CookieName             string `json:"cookieName"`             // Cookie name (default: "blueprint_session")
     Domain                 string `json:"domain"`                 // Cookie domain scope
     Path                   string `json:"path"`                   // Cookie path scope (default: "/")
-    CleanupIntervalSeconds int    `json:"cleanupIntervalSeconds"` // Cleanup frequency (default: 300 = 5 min)
+    
+    // Security configuration
+    Secure                 bool   `json:"secure"`                 // HTTPS only (default: true)
+    HttpOnly               bool   `json:"httpOnly"`               // No JS access (default: true)
+    SameSite               int    `json:"sameSite"`               // CSRF protection (default: Strict)
+    
+    // Expiration configuration
+    ExpirationSeconds      int    `json:"expirationSeconds"`      // Session lifetime (default: 1800)
+    IdleTimeoutSeconds     int    `json:"idleTimeoutSeconds"`     // Idle timeout (default: 900)
+    CleanupIntervalSeconds int    `json:"cleanupIntervalSeconds"` // Cleanup frequency (default: 300)
+    
+    // Encryption configuration (optional)
+    EncryptionKey          secure.DefaultCredentialConfig `json:"encryptionKey"`
 }
 ```
 
-### Default Configuration
+### Security Defaults
 
 ```go
 const (
     DefaultSessionCookieName  = "blueprint_session"
     DefaultSessionExpiration  = 1800  // 30 minutes
-    DefaultSessionIdleTimeout = 900   // 15 minutes  
+    DefaultSessionIdleTimeout = 900   // 15 minutes
     DefaultSecure             = true  // HTTPS only
     DefaultHttpOnly           = true  // No JS access
     DefaultSameSite           = http.SameSiteStrictMode
@@ -119,15 +177,24 @@ const (
 )
 ```
 
-### Configuration Validation
+### Production Configuration Example
 
-The configuration includes built-in validation:
-
-```go
-func (c *Config) Validate() error {
-    // Validates positive integers for timeouts
-    // Validates SameSite values
-    // Returns specific errors for invalid configurations
+```json
+{
+  "session": {
+    "cookieName": "app_session",
+    "expirationSeconds": 7200,
+    "idleTimeoutSeconds": 3600,
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": 1,
+    "domain": ".example.com",
+    "path": "/",
+    "encryptionKey": {
+      "passwordEnvVar": "SESSION_ENCRYPTION_KEY"
+    },
+    "cleanupIntervalSeconds": 300
+  }
 }
 ```
 
@@ -137,329 +204,635 @@ func (c *Config) Validate() error {
 
 ```go
 type SessionData struct {
-    Values       map[string]any
-    LastAccessed time.Time
-    Created      time.Time
-    ID           string
+    Values       map[string]any `json:"values"`
+    LastAccessed time.Time      `json:"lastAccessed"`
+    Created      time.Time      `json:"created"`
+    ID           string         `json:"id"`
 }
 ```
 
-### Reading and Writing Session Data
+### Basic Session Operations
 
 ```go
-// Get the session from the gin context
-sess := session.Get(c)
-
-// Store a value
-sess.Set("user_id", 123)
-
-// Get a value with type assertion
-userId, ok := sess.GetInt("user_id")
-if ok {
-    // Use userId
-}
-
-// Delete a value
-sess.Delete("user_id")
-
-// Check if a key exists
-if sess.Has("user_id") {
-    // Key exists
+func sessionHandler(c *gin.Context) {
+    // Get session from context
+    sess := session.Get(c)
+    
+    // Store values
+    sess.Set("user_id", 123)
+    sess.Set("username", "john_doe")
+    sess.Set("preferences", map[string]any{
+        "theme": "dark",
+        "language": "en",
+    })
+    
+    // Retrieve values with type safety
+    userID, ok := sess.GetInt("user_id")
+    if ok {
+        logger.Info("User ID", "id", userID)
+    }
+    
+    username, ok := sess.GetString("username")
+    if ok {
+        logger.Info("Username", "username", username)
+    }
+    
+    // Check existence
+    if sess.Has("preferences") {
+        prefs, _ := sess.Get("preferences")
+        logger.Info("User preferences", "prefs", prefs)
+    }
+    
+    // Delete values
+    sess.Delete("temporary_data")
+    
+    c.JSON(200, gin.H{
+        "session_id": sess.ID,
+        "user_id": userID,
+        "username": username,
+    })
 }
 ```
 
-### Typed Getters
-
-The `SessionData` struct provides typed getters for common data types:
+### Identity Management
 
 ```go
-sess := session.Get(c)
+// Custom identity type
+type UserIdentity struct {
+    ID       int    `json:"id"`
+    Username string `json:"username"`
+    Email    string `json:"email"`
+    Roles    []string `json:"roles"`
+}
 
-// Get string
-str, ok := sess.GetString("name")
+// Register with GOB for serialization
+func init() {
+    gob.Register(&UserIdentity{})
+}
 
-// Get int
-num, ok := sess.GetInt("count")
+func loginHandler(c *gin.Context) {
+    var loginReq struct {
+        Username string `json:"username"`
+        Password string `json:"password"`
+    }
+    
+    if err := c.ShouldBindJSON(&loginReq); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request"})
+        return
+    }
+    
+    // Authenticate user (your authentication logic)
+    user, err := authenticateUser(loginReq.Username, loginReq.Password)
+    if err != nil {
+        c.JSON(401, gin.H{"error": "Invalid credentials"})
+        return
+    }
+    
+    // Get session
+    sess := session.Get(c)
+    
+    // Set user identity
+    identity := &UserIdentity{
+        ID:       user.ID,
+        Username: user.Username,
+        Email:    user.Email,
+        Roles:    user.Roles,
+    }
+    sess.SetIdentity(identity)
+    
+    // Regenerate session ID for security
+    sessionManager.Regenerate(c)
+    
+    c.JSON(200, gin.H{"message": "Login successful"})
+}
 
-// Get bool
-val, ok := sess.GetBool("enabled")
+func getCurrentUser(c *gin.Context) *UserIdentity {
+    sess := session.Get(c)
+    identity, ok := sess.GetIdentity()
+    if !ok {
+        return nil
+    }
+    
+    user, ok := identity.(*UserIdentity)
+    if !ok {
+        return nil
+    }
+    
+    return user
+}
 
-// Get any value
-val, ok := sess.Get("complex")
+func protectedHandler(c *gin.Context) {
+    user := getCurrentUser(c)
+    if user == nil {
+        c.JSON(401, gin.H{"error": "Not authenticated"})
+        return
+    }
+    
+    c.JSON(200, gin.H{
+        "user": user,
+        "message": "Access granted",
+    })
+}
+
+func logoutHandler(c *gin.Context) {
+    sess := session.Get(c)
+    sess.DeleteIdentity()
+    
+    // Clear entire session
+    sessionManager.Clear(c)
+    
+    c.JSON(200, gin.H{"message": "Logged out"})
+}
 ```
 
 ### Flash Messages
 
-Flash messages are one-time values that persist only until retrieved:
-
 ```go
-sess := session.Get(c)
-
-// Set a flash message
-sess.FlashString("Operation completed successfully")
-
-// Get a flash message (automatically removes it)
-message, ok := sess.GetFlashString()
-
-// Generic flash for non-string values
-sess.Flash(complexData)
-data, ok := sess.GetFlash()
-```
-
-### Security Operations
-
-#### Session Regeneration
-
-To prevent session fixation attacks, regenerate the session ID while preserving session data:
-
-```go
-// Regenerate the session (typically after login)
-sessionManager.Regenerate(c)
-```
-
-#### Clearing a Session
-
-To completely clear a session (e.g., at logout):
-
-```go
-// Clear the session
-sessionManager.Clear(c)
-```
-
-## Full Example
-
-See `/samples/session/` for a complete example demonstrating:
-- Session creation and management
-- Flash messages
-- Session regeneration
-- CSRF integration
-
-## Session Storage
-
-The session system uses a flexible storage abstraction that works with any KV backend implementing the `kv.KV` interface:
-
-```go
-// Store manages session data with automatic serialization and expiration
-type Store struct {
-    backend        kv.KV
-    config         *Config
-    stopCleanup    chan bool
-    cleanupTicker  *time.Ticker
-    cleanupMutex   sync.Mutex
-    cleanupRunning bool
-    logger         *log.Logger
+func setFlashMessage(c *gin.Context) {
+    sess := session.Get(c)
+    
+    // Set flash message
+    sess.FlashString("Operation completed successfully!")
+	
+    c.Redirect(302, "/dashboard")
 }
 
-// Create a new store with any KV backend
-store := session.NewStore(config, backend, logger)
-
-// Available backends:
-// - kv.NewMemoryKV() - In-memory storage (default)
-// - redis.NewClient(config) - Redis storage
-// - Any implementation of the kv.KV interface
+func displayFlashMessage(c *gin.Context) {
+    sess := session.Get(c)
+    
+    // Get simple flash message
+    message, ok := sess.GetFlashString()
+    if ok {
+        c.HTML(200, "dashboard.html", gin.H{
+            "flash_message": message,
+        })
+        return
+    }
+	
+    // No flash messages
+    c.HTML(200, "dashboard.html", gin.H{})
+}
 ```
 
-### Key Features
+## Security Operations
 
-1. **Automatic Serialization**: Uses `encoding/gob` for efficient binary serialization
-2. **TTL Management**: Automatically sets TTL based on the smaller of expiration or idle timeout
-3. **Concurrent Safety**: Thread-safe operations with mutex protection for cleanup
-4. **Graceful Shutdown**: Proper cleanup goroutine management with `StopCleanup()`
+### Session Regeneration (IMPORTANT)
 
-### Automatic Cleanup
+```go
+func loginHandler(c *gin.Context) {
+    // ... authentication logic ...
+    
+    sess := session.Get(c)
+    sess.SetIdentity(user)
+    
+    // IMPORTANT: Regenerate session ID after authentication
+    // This prevents session fixation attacks
+    sessionManager.Regenerate(c)
+    
+    c.JSON(200, gin.H{"message": "Login successful"})
+}
 
-The store automatically cleans up expired sessions:
-- Runs in a separate goroutine started by `StartCleanup()`
-- Calls `backend.Prune()` to remove expired entries
-- Cleanup interval configured via `CleanupIntervalSeconds` (default: 5 minutes)
-- Safe to start/stop multiple times with mutex protection
+func elevatePrivilegesHandler(c *gin.Context) {
+    // When user gains elevated privileges, regenerate session
+    sess := session.Get(c)
+    
+    // Update user role
+    user := getCurrentUser(c)
+    user.Roles = append(user.Roles, "admin")
+    sess.SetIdentity(user)
+    
+    // Regenerate session for security
+    sessionManager.Regenerate(c)
+    
+    c.JSON(200, gin.H{"message": "Privileges elevated"})
+}
+```
+
+### Session Clearing
+
+```go
+func logoutHandler(c *gin.Context) {
+    // Option 1: Clear entire session
+    sessionManager.Clear(c)
+    
+    c.JSON(200, gin.H{"message": "Logged out"})
+}
+
+func partialLogoutHandler(c *gin.Context) {
+    sess := session.Get(c)
+    
+    // Option 2: Clear only identity but keep other session data
+    sess.DeleteIdentity()
+    
+    // Keep non-sensitive data like preferences
+    c.JSON(200, gin.H{"message": "Logged out, preferences retained"})
+}
+```
+
+## Session Encryption
+
+### Encryption Configuration
+
+```go
+// Environment variable approach
+sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
+    PasswordEnvVar: "SESSION_ENCRYPTION_KEY",
+}
+
+// File-based key
+sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
+    PasswordFile: "/etc/secrets/session-key",
+}
+
+// Direct key (not recommended for production)
+sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
+    Password: "your-32-byte-encryption-key-here",
+}
+```
+
+### Key Generation
+
+```bash
+# Generate a secure 32-byte key
+openssl rand -base64 32
+
+# Set as environment variable
+export SESSION_ENCRYPTION_KEY="generated-key-here"
+```
+
+## Backend Storage Options
+
+### Memory Backend (Development)
+
+```go
+backend := kv.NewMemoryKV()
+// Pros: Fast, simple setup
+// Cons: Not persistent, single instance only
+```
+
+### Redis Backend (Production)
+
+```go
+redisConfig := redis.NewConfig()
+redisConfig.Address = "redis-cluster:6379"
+redisConfig.Password = "redis-password"
+redisConfig.Database = 1
+redisConfig.PoolSize = 20
+
+backend, err := redis.NewClient(redisConfig)
+// Pros: Distributed, persistent, scalable
+// Cons: Network latency, additional infrastructure
+```
+
+### Custom Backend
+
+```go
+type CustomKV struct {
+    // Your implementation
+}
+
+func (c *CustomKV) SetTTL(key string, value []byte, ttl time.Duration) error {
+    // Store with TTL
+    return nil
+}
+
+func (c *CustomKV) Get(key string) ([]byte, error) {
+    // Retrieve value
+    return nil, nil
+}
+
+func (c *CustomKV) Delete(key string) error {
+    // Delete value
+    return nil
+}
+
+func (c *CustomKV) Prune() error {
+    // Clean up expired entries
+    return nil
+}
+```
+
+## Example: Secure Web Application
+
+```go
+package main
+
+import (
+    "encoding/gob"
+    "net/http"
+    "github.com/gin-gonic/gin"
+    "github.com/oddbit-project/blueprint/provider/httpserver"
+    "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+    "github.com/oddbit-project/blueprint/provider/httpserver/session"
+    "github.com/oddbit-project/blueprint/provider/httpserver/security"
+    "github.com/oddbit-project/blueprint/provider/kv"
+    "github.com/oddbit-project/blueprint/log"
+)
+
+type UserIdentity struct {
+    ID       int      `json:"id"`
+    Username string   `json:"username"`
+    Email    string   `json:"email"`
+    Roles    []string `json:"roles"`
+}
+
+func init() {
+    // Register custom types for GOB serialization
+    gob.Register(&UserIdentity{})
+}
+
+func main() {
+    logger := log.New("secure-web-app")
+    
+    // Server configuration
+    serverConfig := httpserver.NewConfig()
+    serverConfig.Host = "localhost"
+    serverConfig.Port = 8443
+    serverConfig.CertFile = "server.crt"
+    serverConfig.CertKeyFile = "server.key"
+    
+    server := httpserver.NewServer(serverConfig, logger)
+    
+    // Session configuration
+    sessionConfig := session.NewConfig()
+    sessionConfig.CookieName = "secure_session"
+    sessionConfig.ExpirationSeconds = 7200 // 2 hours
+    sessionConfig.IdleTimeoutSeconds = 1800 // 30 minutes
+    sessionConfig.Secure = true
+    sessionConfig.HttpOnly = true
+    sessionConfig.SameSite = int(http.SameSiteStrictMode)
+    sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
+        PasswordEnvVar: "SESSION_ENCRYPTION_KEY",
+    }
+    
+    // Setup session store
+    backend := kv.NewMemoryKV() // Use Redis in production
+    sessionManager, err := server.UseSession(sessionConfig, backend, logger)
+    if err != nil {
+        logger.Fatal(err, "failed to setup sessions")
+    }
+    
+    // Security headers
+    securityConfig := security.DefaultSecurityConfig()
+    securityConfig.CSP = "default-src 'self'; script-src 'self' 'nonce-{nonce}'"
+    server.Router().Use(security.SecurityMiddleware(securityConfig))
+    
+    // CSRF protection
+    server.Router().Use(security.CSRFProtection())
+    
+    // Rate limiting
+    server.Router().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    
+    // Routes
+    setupRoutes(server, sessionManager)
+    
+    // Start server
+    if err := server.Start(); err != nil {
+        logger.Fatal(err, "failed to start server")
+    }
+}
+
+func setupRoutes(server *httpserver.Server, sessionManager *session.Manager) {
+    router := server.Router()
+    
+    // Public routes
+    router.GET("/", homeHandler)
+    router.GET("/login", loginFormHandler)
+    router.POST("/login", loginHandler(sessionManager))
+    router.GET("/register", registerFormHandler)
+    router.POST("/register", registerHandler)
+    
+    // Protected routes
+    protected := router.Group("/dashboard")
+    protected.Use(auth.AuthMiddleware(auth.NewAuthSession(&UserIdentity{})))
+    {
+        protected.GET("/", dashboardHandler)
+        protected.GET("/profile", profileHandler)
+        protected.POST("/profile", updateProfileHandler)
+        protected.POST("/logout", logoutHandler(sessionManager))
+    }
+    
+    // Admin routes
+    admin := router.Group("/admin")
+    admin.Use(auth.AuthMiddleware(auth.NewAuthSession(&UserIdentity{})))
+    admin.Use(requireRole("admin"))
+    {
+        admin.GET("/users", listUsersHandler)
+        admin.DELETE("/users/:id", deleteUserHandler)
+    }
+}
+
+func loginHandler(sessionManager *session.Manager) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        var req struct {
+            Username string `json:"username" binding:"required"`
+            Password string `json:"password" binding:"required"`
+        }
+        
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(400, gin.H{"error": "Invalid request"})
+            return
+        }
+        
+        // Authenticate user
+        user, err := authenticateUser(req.Username, req.Password)
+        if err != nil {
+            c.JSON(401, gin.H{"error": "Invalid credentials"})
+            return
+        }
+        
+        // Get session and set identity
+        sess := session.Get(c)
+        identity := &UserIdentity{
+            ID:       user.ID,
+            Username: user.Username,
+            Email:    user.Email,
+            Roles:    user.Roles,
+        }
+        sess.SetIdentity(identity)
+        
+        // Set flash message
+        sess.FlashString("Welcome back, " + user.Username + "!")
+        
+        // Regenerate session ID for security
+        sessionManager.Regenerate(c)
+        
+        c.JSON(200, gin.H{
+            "message": "Login successful",
+            "redirect": "/dashboard",
+        })
+    }
+}
+
+func dashboardHandler(c *gin.Context) {
+    sess := session.Get(c)
+    user := getCurrentUser(c)
+    
+    // Get flash message
+    flashMessage, _ := sess.GetFlashString()
+    
+    c.HTML(200, "dashboard.html", gin.H{
+        "user": user,
+        "flash": flashMessage,
+        "csrf_token": security.GenerateCSRFToken(c),
+    })
+}
+
+func logoutHandler(sessionManager *session.Manager) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Clear session
+        sessionManager.Clear(c)
+        
+        c.JSON(200, gin.H{
+            "message": "Logged out successfully",
+            "redirect": "/",
+        })
+    }
+}
+
+func requireRole(role string) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        user := getCurrentUser(c)
+        if user == nil {
+            c.AbortWithStatusJSON(401, gin.H{"error": "Not authenticated"})
+            return
+        }
+        
+        hasRole := false
+        for _, userRole := range user.Roles {
+            if userRole == role {
+                hasRole = true
+                break
+            }
+        }
+        
+        if !hasRole {
+            c.AbortWithStatusJSON(403, gin.H{"error": "Insufficient privileges"})
+            return
+        }
+        
+        c.Next()
+    }
+}
+
+func getCurrentUser(c *gin.Context) *UserIdentity {
+    sess := session.Get(c)
+    identity, ok := sess.GetIdentity()
+    if !ok {
+        return nil
+    }
+    
+    user, ok := identity.(*UserIdentity)
+    if !ok {
+        return nil
+    }
+    
+    return user
+}
+```
 
 ## Best Practices
 
-### Security Configuration
+### Security Best Practices
 
-1. **Production Settings**
-   - Always use `Secure = true` in production (HTTPS only)
-   - Keep `HttpOnly = true` to prevent XSS attacks
-   - Use `SameSite = Strict` or `Lax` for CSRF protection
-   - Enable additional CSRF protection with `server.UseCSRFProtection()`
-
-2. **Session Management**
-   - Regenerate session ID after authentication
-   - Clear sessions explicitly on logout
-   - Use appropriate expiration and idle timeouts
-   - Configure cleanup intervals based on traffic
-
-3. **Storage Selection**
-   - Use in-memory storage for development/single-instance
-   - Use Redis for distributed/production deployments
-   - Consider custom KV backends for specific requirements
-
-## Session Middleware Integration
-
-The `SessionManager` provides Gin middleware for automatic session handling:
-
+1. **Always use HTTPS in production**
 ```go
-type SessionManager struct {
-    store  *Store
-    config *Config
-    logger *log.Logger
-}
-
-// Middleware automatically:
-// 1. Loads existing sessions from cookies
-// 2. Creates new sessions for new visitors  
-// 3. Updates LastAccessed time on each request
-// 4. Saves session changes after request processing
-// 5. Manages cookie lifecycle and security settings
+sessionConfig.Secure = true
 ```
 
-### Middleware Flow
-
-1. **Session Loading**: Attempts to load session from cookie ID
-2. **Session Creation**: Creates new session if none exists or expired
-3. **Context Storage**: Stores session in Gin context for handler access
-4. **Post-Processing**: Saves any session modifications after handlers complete
-
-### Cookie Security
-
-The middleware properly sets cookie attributes including:
-- **SameSite**: Handled via header manipulation for Gin compatibility
-- **Secure/HttpOnly**: Set according to configuration
-- **Domain/Path**: Scoped according to configuration
-- **Max-Age**: Set to `ExpirationSeconds`
-
-### Helper Functions
-
+2. **Regenerate session ID after authentication**
 ```go
-// Get session from Gin context
-sess := session.Get(c)
-
-// Regenerate session ID (e.g., after login)
-// - Creates new session with same data
-// - Deletes old session
-// - Updates cookie with new ID
-manager.Regenerate(c)
-
-// Clear session and remove cookie
-// - Deletes session from store
-// - Sets cookie with negative Max-Age
-// - Removes from context
-manager.Clear(c)
+sessionManager.Regenerate(c)
 ```
 
-## CSRF Protection Integration
-
-Cookie sessions integrate seamlessly with CSRF protection:
-
+3. **Use encryption for sensitive data**
 ```go
-// 1. Set up session management
-logger := log.New("app")
-backend := kv.NewMemoryKV()
-sessionConfig := session.NewConfig()
-manager := server.UseSession(sessionConfig, backend, logger)
-
-// 2. Enable CSRF protection
-server.UseCSRFProtection()
-
-// 3. Generate CSRF token in handlers
-router.GET("/form", func(c *gin.Context) {
-    csrfToken := security.GenerateCSRFToken(c)
-    c.HTML(http.StatusOK, "form.html", gin.H{
-        "csrfToken": csrfToken,
-    })
-})
-
-// 4. Include token in forms
-// <input type="hidden" name="_csrf" value="{{ .csrfToken }}">
-```
-
-## Technical Implementation Details
-
-### Session ID Generation
-
-Session IDs are generated using cryptographically secure random numbers:
-
-```go
-// utils.go - generateSessionID()
-func generateSessionID() string {
-    buf := make([]byte, 128)  // 128 bytes of random data
-    rand.Read(buf)            // Uses crypto/rand
-    return base64.URLEncoding.EncodeToString(buf)
+sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
+    PasswordEnvVar: "SESSION_ENCRYPTION_KEY",
 }
 ```
 
-### Session Expiration Logic
-
-The store implements dual expiration checking:
-
-1. **Absolute Expiration**: Sessions older than `ExpirationSeconds` are expired
-2. **Idle Timeout**: Sessions not accessed for `IdleTimeoutSeconds` are expired
-3. **TTL Setting**: Uses the smaller of the two timeouts for backend TTL
-
+4. **Set appropriate timeouts**
 ```go
-// From store.go Get() method:
-// Check absolute expiration
-if now.Sub(session.Created) > time.Duration(s.config.ExpirationSeconds)*time.Second {
-    s.backend.Delete(id)
-    return nil, ErrSessionExpired
-}
+sessionConfig.ExpirationSeconds = 7200  // 2 hours max
+sessionConfig.IdleTimeoutSeconds = 1800 // 30 minutes idle
+```
 
-// Check idle timeout
-if now.Sub(session.LastAccessed) > time.Duration(s.config.IdleTimeoutSeconds)*time.Second {
-    s.backend.Delete(id)
-    return nil, ErrSessionExpired
+5. **Use SameSite cookies**
+```go
+sessionConfig.SameSite = int(http.SameSiteStrictMode)
+```
+
+### Performance Best Practices
+
+1. **Choose appropriate backend**
+   - Memory: Development and single-instance applications
+   - Redis: Production and distributed applications
+
+2. **Configure cleanup intervals**
+```go
+sessionConfig.CleanupIntervalSeconds = 300 // 5 minutes
+```
+
+3. **Minimize session data**
+   - Store only essential user information
+   - Use references to database records instead of full objects
+
+4. **Register custom types with GOB**
+```go
+func init() {
+    gob.Register(&UserIdentity{})
+    gob.Register(&CustomType{})
 }
 ```
 
-### Error Handling
-
-The session system defines specific errors for better debugging:
+### Development vs Production
 
 ```go
-const (
-    ErrInvalidExpirationSeconds      = utils.Error("session expiration seconds must be a positive integer")
-    ErrInvalidIdleTimeoutSeconds     = utils.Error("session idle timeout seconds must be a positive integer")
-    ErrInvalidSameSite               = utils.Error("invalid sameSite value")
-    ErrInvalidCleanupIntervalSeconds = utils.Error("session cleanup interval seconds must be a positive integer")
-    ErrSessionNotFound               = utils.Error("session not found")
-    ErrSessionExpired                = utils.Error("session expired")
-)
+func getSessionConfig(env string) *session.Config {
+    config := session.NewConfig()
+    
+    if env == "production" {
+        config.Secure = true
+        config.HttpOnly = true
+        config.SameSite = int(http.SameSiteStrictMode)
+        config.ExpirationSeconds = 7200
+        config.EncryptionKey = secure.DefaultCredentialConfig{
+            PasswordEnvVar: "SESSION_ENCRYPTION_KEY",
+        }
+    } else {
+        config.Secure = false // Allow HTTP in development
+        config.ExpirationSeconds = 86400 // Longer for development
+    }
+    
+    return config
+}
 ```
-
-## Performance Considerations
-
-1. **Serialization**: Gob encoding is used for efficiency, but register custom types with `gob.Register()`
-2. **Cleanup Frequency**: Balance between memory usage and CPU overhead
-3. **Backend Selection**: 
-   - Memory: Fastest but not distributed
-   - Redis: Distributed with network overhead
-   - Custom: Optimize for your specific use case
-4. **Session Size**: Keep session data minimal to reduce serialization overhead
-5. **ID Generation**: 128 bytes provides strong security with minimal performance impact
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Sessions Not Persisting**
-   - Check cookie settings match your environment (Secure flag for HTTPS)
-   - Verify backend is properly configured and accessible
-   - Ensure middleware is added before route handlers
+1. **Sessions not persisting**
+   - Check cookie security settings
+   - Verify backend connectivity
+   - Ensure middleware order
 
-2. **Session Expiration**
-   - Review `ExpirationSeconds` and `IdleTimeoutSeconds` settings
-   - Check system time synchronization in distributed setups
-   - Monitor cleanup logs for errors
+2. **"gob: type not registered" errors**
+   - Register custom types with `gob.Register()`
+   - Register in `init()` function
 
-3. **Cookie Issues**
-   - Verify domain/path settings match your application
-   - Check browser developer tools for cookie errors
-   - Ensure SameSite settings are appropriate for your use case
+3. **Session expiration issues**
+   - Check system time synchronization
+   - Review timeout configurations
+   - Monitor cleanup logs
+
+4. **Performance issues**
+   - Monitor backend latency
+   - Optimize session data size
+   - Adjust cleanup intervals
 
 ### Debug Logging
-
-Enable debug logging to troubleshoot session issues:
 
 ```go
 logger := log.New("session")

@@ -64,6 +64,9 @@ const (
     OptDefaultSecurityHeaders = "defaultSecurityHeaders" // Enable default security headers
 )
 ```
+> Note: 'authTokenHeader' and 'authTokenSecret' will be used to configure automatically 
+> simple token-based auth if ProcessOptions() is called; if no 'authTokenHeader' is specified, a default value is used
+
 
 **Example:**
 ```go
@@ -335,7 +338,7 @@ manager := server.UseSession(sessionConfig, backend, logger)
 
 // Redis-based sessions
 redisBackend, _ := redis.NewClient(redisConfig)
-manager := server.UseSession(nil, redisBackend, logger)
+manager := server.UseSession(sessionConfig, redisBackend, logger)
 ```
 
 ## Response Helper API
@@ -433,131 +436,4 @@ func protectedHandler(c *gin.Context) {
 
 ## Complete Server Setup Example
 
-```go
-package main
-
-import (
-    "context"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
-    
-    "github.com/oddbit-project/blueprint/provider/httpserver"
-    "github.com/oddbit-project/blueprint/provider/httpserver/auth"
-    "github.com/oddbit-project/blueprint/provider/httpserver/response"
-    "github.com/oddbit-project/blueprint/provider/kv"
-    "github.com/oddbit-project/blueprint/log"
-)
-
-func main() {
-    // Create logger
-    logger := log.New("api-server")
-    
-    // Configure server
-    config := httpserver.NewServerConfig()
-    config.Host = "localhost"
-    config.Port = 8080
-    config.Debug = false
-    config.Options["defaultSecurityHeaders"] = "true"
-    
-    // Create server
-    server, err := httpserver.NewServer(config, logger)
-    if err != nil {
-        logger.Fatal(err, "failed to create server")
-    }
-    
-    // Apply middleware
-    setupMiddleware(server, logger)
-    
-    // Setup routes
-    setupRoutes(server)
-    
-    // Process configuration options
-    if err := server.ProcessOptions(); err != nil {
-        logger.Fatal(err, "failed to process options")
-    }
-    
-    // Start server with graceful shutdown
-    startServerWithGracefulShutdown(server, logger)
-}
-
-func setupMiddleware(server *httpserver.Server, logger *log.Logger) {
-    // Rate limiting
-    server.UseRateLimiting(100) // 100 requests per minute
-    
-    // Sessions
-    backend := kv.NewMemoryKV()
-    server.UseSession(nil, backend, logger)
-    
-    // CSRF protection
-    server.UseCSRFProtection()
-    
-    // Authentication for API routes
-    tokenAuth := auth.NewAuthToken("X-API-Key", "your-secret-key")
-    api := server.Group("/api")
-    api.Use(auth.AuthMiddleware(tokenAuth))
-}
-
-func setupRoutes(server *httpserver.Server) {
-    router := server.Route()
-    
-    // Public routes
-    router.GET("/health", func(c *gin.Context) {
-        c.JSON(200, response.JSONResponse{
-            Success: true,
-            Data:    gin.H{"status": "healthy"},
-        })
-    })
-    
-    // Protected API routes
-    api := server.Group("/api")
-    api.GET("/users", getUsersHandler)
-    api.POST("/users", createUserHandler)
-}
-
-func startServerWithGracefulShutdown(server *httpserver.Server, logger *log.Logger) {
-    // Start server in goroutine
-    go func() {
-        logger.Info("starting server", "address", server.Config.Host, "port", server.Config.Port)
-        if err := server.Start(); err != nil {
-            logger.Error(err, "server failed")
-        }
-    }()
-    
-    // Wait for interrupt signal
-    quit := make(chan os.Signal, 1)
-    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-    <-quit
-    
-    logger.Info("shutting down server...")
-    
-    // Graceful shutdown with timeout
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-    
-    if err := server.Shutdown(ctx); err != nil {
-        logger.Error(err, "forced shutdown")
-    }
-    
-    logger.Info("server stopped")
-}
-
-func getUsersHandler(c *gin.Context) {
-    // Implementation here
-    c.JSON(200, response.JSONResponse{
-        Success: true,
-        Data:    []string{"user1", "user2"},
-    })
-}
-
-func createUserHandler(c *gin.Context) {
-    // Implementation here
-    c.JSON(201, response.JSONResponse{
-        Success: true,
-        Data:    gin.H{"id": 123, "created": true},
-    })
-}
-```
-
-This API reference provides complete coverage of the HTTP server framework including configuration, lifecycle management, middleware integration, and response handling.
+check [Blueprint samples](https://github.com/oddbit-project/samples/httpserver-session)

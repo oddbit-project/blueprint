@@ -14,7 +14,7 @@ from hmac_client import HMACClient, HTTPError
 
 class TestIntegration:
     """Integration tests with Go server."""
-    
+    KEY_ID = "client1"
     SERVER_URL = "http://localhost:8080"
     SECRET_KEY = "python-client-demo-secret"
     
@@ -30,7 +30,7 @@ class TestIntegration:
         )
         
         # Wait for server to start
-        time.sleep(3)
+        time.sleep(6)
         
         # Check if server is running
         try:
@@ -51,7 +51,7 @@ class TestIntegration:
     @pytest.fixture
     def client(self):
         """Create authenticated HMAC client."""
-        return HMACClient(self.SERVER_URL, self.SECRET_KEY)
+        return HMACClient(self.SERVER_URL, self.KEY_ID, self.SECRET_KEY)
     
     def test_public_health_endpoint(self):
         """Test public health endpoint (no auth required)."""
@@ -186,7 +186,7 @@ class TestIntegration:
     
     def test_wrong_secret_key(self):
         """Test that wrong secret key results in authentication failure."""
-        wrong_client = HMACClient(self.SERVER_URL, "wrong-secret-key")
+        wrong_client = HMACClient(self.SERVER_URL, self.KEY_ID, "wrong-secret-key")
         
         response = wrong_client.get("/api/protected/profile")
         assert response.status_code == 401
@@ -266,7 +266,8 @@ class TestIntegration:
         
         # Test with custom client having very short tolerance
         short_tolerance_client = HMACClient(
-            self.SERVER_URL, 
+            self.SERVER_URL,
+            self.KEY_ID,
             self.SECRET_KEY,
             key_interval=1  # 1 second tolerance
         )
@@ -291,6 +292,6 @@ class TestIntegration:
     
     def test_context_manager_usage(self):
         """Test using client as context manager."""
-        with HMACClient(self.SERVER_URL, self.SECRET_KEY) as client:
+        with HMACClient(self.SERVER_URL, self.KEY_ID, self.SECRET_KEY) as client:
             response = client.get("/api/test/simple")
             assert response.status_code == 200

@@ -15,7 +15,7 @@ import (
 type RuntimeFn func(app interface{}) error
 
 type Container struct {
-	Config         config.ConfigInterface
+	Config         config.ConfigProvider
 	Context        context.Context
 	CancelCtx      context.CancelFunc
 	services       map[string]interface{}
@@ -24,7 +24,7 @@ type Container struct {
 }
 
 // NewContainer create new container runtime with the specified config provider and a new application context
-func NewContainer(config config.ConfigInterface) *Container {
+func NewContainer(config config.ConfigProvider) *Container {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	return &Container{
 		Config:         config,
@@ -120,7 +120,7 @@ func (c *Container) Terminate(err error) {
 	if err != nil {
 		retCode = -1
 	}
-	
+
 	// cancel application context
 	if c.Context != nil {
 		// cancel context if not canceled yet

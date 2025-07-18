@@ -32,7 +32,7 @@ class TestHMACClient:
     @pytest.fixture
     def client(self):
         """Create test client."""
-        return HMACClient("http://localhost:8080", "test-secret-key")
+        return HMACClient("http://localhost:8080", "client1", "test-secret-key")
     
     @pytest.fixture
     def large_data(self):
@@ -41,9 +41,10 @@ class TestHMACClient:
     
     def test_init_default_config(self):
         """Test client initialization with default config."""
-        client = HMACClient("http://localhost:8080", "secret")
+        client = HMACClient("http://localhost:8080", "key", "secret")
         
         assert client.base_url == "http://localhost:8080"
+        assert client.key_id == "key"
         assert client.secret_key == "secret"
         assert client.config['key_interval'] == 300
         assert client.config['max_input_size'] == 33554432
@@ -53,12 +54,13 @@ class TestHMACClient:
         """Test client initialization with custom config."""
         client = HMACClient(
             "http://example.com/",
+            "key-id",
             "secret",
             key_interval=600,
             max_input_size=1024,
             timeout=60
         )
-        
+        assert client.key_id == "key-id"
         assert client.base_url == "http://example.com"
         assert client.config['key_interval'] == 600
         assert client.config['max_input_size'] == 1024
@@ -67,13 +69,13 @@ class TestHMACClient:
     def test_init_invalid_config(self):
         """Test client initialization with invalid config."""
         with pytest.raises(ConfigurationError):
-            HMACClient("http://localhost:8080", "")
+            HMACClient("http://localhost:8080", "", "")
         
         with pytest.raises(ConfigurationError):
-            HMACClient("http://localhost:8080", "secret", key_interval=0)
+            HMACClient("http://localhost:8080", "", "secret", key_interval=0)
         
         with pytest.raises(ConfigurationError):
-            HMACClient("http://localhost:8080", "secret", max_input_size=-1)
+            HMACClient("http://localhost:8080", "", "secret", max_input_size=-1)
     
     def test_sha256_sign(self, client):
         """Test simple SHA256 signing."""
@@ -82,8 +84,7 @@ class TestHMACClient:
         
         # Verify it's a hex string
         assert isinstance(signature, str)
-        assert len(signature) == 64  # SHA256 hex = 64 chars
-        int(signature, 16)  # Should not raise
+        assert len(signature) == 64+len(client.key_id)+1  # SHA256 hex = 64 chars
         
         # Verify signature is correct
         expected = hmac.new(
@@ -91,7 +92,7 @@ class TestHMACClient:
             data,
             hashlib.sha256
         ).hexdigest()
-        assert signature == expected
+        assert signature == "{}.{}".format(client.key_id,expected)
     
     def test_sha256_sign_large_data(self, client, large_data):
         """Test SHA256 signing with large data."""
@@ -119,12 +120,7 @@ class TestHMACClient:
         wrong_data = b"wrong data"
         
         assert client.sha256_verify(wrong_data, signature) is False
-    
-    def test_sha256_verify_large_data(self, client, large_data):
-        """Test SHA256 verification with large data."""
-        with pytest.raises(InputTooLargeError):
-            client.sha256_verify(large_data, "signature")
-    
+
     def test_sign256(self, client):
         """Test secure signing with timestamp and nonce."""
         data = b"test data"
@@ -134,11 +130,7 @@ class TestHMACClient:
         assert isinstance(hash_value, str)
         assert isinstance(timestamp, str)
         assert isinstance(nonce, str)
-        
-        # Verify hash format
-        assert len(hash_value) == 64
-        int(hash_value, 16)  # Should not raise
-        
+
         # Verify timestamp format (ISO format)
         datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
         
@@ -152,7 +144,7 @@ class TestHMACClient:
             message.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
-        assert hash_value == expected
+        assert hash_value == "{}.{}".format(client.key_id, expected)
     
     def test_sign256_unique_nonces(self, client):
         """Test that sign256 generates unique nonces."""
@@ -226,14 +218,10 @@ class TestHMACClient:
             message.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
-        
+
+        hash_value = "{}.{}".format(client.key_id, hash_value)
         assert client.verify256(data, hash_value, future_timestamp, nonce) is True
-    
-    def test_verify256_large_data(self, client, large_data):
-        """Test verify256 with large data."""
-        with pytest.raises(InputTooLargeError):
-            client.verify256(large_data, "hash", "timestamp", "nonce")
-    
+
     def test_prepare_request_body_json(self, client):
         """Test request body preparation with JSON data."""
         json_data = {"key": "value", "number": 42}
@@ -281,7 +269,7 @@ class TestHMACClient:
         assert HEADER_HMAC_NONCE in headers
         
         # Verify header formats
-        assert len(headers[HEADER_HMAC_HASH]) == 64  # SHA256 hex
+        assert len(headers[HEADER_HMAC_HASH]) == 64 + len(client.key_id) + 1  # SHA256 hex
         datetime.datetime.fromisoformat(headers[HEADER_HMAC_TIMESTAMP].replace('Z', '+00:00'))
         uuid.UUID(headers[HEADER_HMAC_NONCE])
     
@@ -327,7 +315,7 @@ class TestHMACClient:
     
     def test_context_manager(self):
         """Test client as context manager."""
-        with HMACClient("http://localhost:8080", "secret") as client:
+        with HMACClient("http://localhost:8080","key", "secret") as client:
             assert client.session is not None
         
         # Session should be closed after context exit

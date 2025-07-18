@@ -23,6 +23,7 @@ const (
 	ServerPort     = ":8080"
 	HMACSecret     = "your-hmac-secret-key-change-this-in-production"
 	RequestTimeout = 30 * time.Second
+	KeyId          = "myKey"
 
 	// HMAC configuration
 	HMACKeyInterval = 5 * time.Minute  // ±5 minutes for clock drift
@@ -75,17 +76,19 @@ func main() {
 
 // createHMACProvider initializes the HMAC provider with secure configuration
 func createHMACProvider(logger *log.Logger) (*hmacprovider.HMACProvider, error) {
-	// Generate encryption key for credential storage
+	// Generate encryption key for secret storage
 	key, err := secure.GenerateKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
 	}
 
-	// Create secure credential
-	credential, err := secure.NewCredential([]byte(HMACSecret), key, false)
+	// Create secure secret
+	secret, err := secure.NewCredential([]byte(HMACSecret), key, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create credential: %w", err)
+		return nil, fmt.Errorf("failed to create secret: %w", err)
 	}
+
+	keyProvider := hmacprovider.NewSingleKeyProvider(KeyId, secret)
 
 	// Create memory nonce store with eviction policy
 	nonceStore := store.NewMemoryNonceStore(
@@ -97,7 +100,7 @@ func createHMACProvider(logger *log.Logger) (*hmacprovider.HMACProvider, error) 
 
 	// Create HMAC provider with security settings
 	provider := hmacprovider.NewHmacProvider(
-		credential,
+		keyProvider,
 		hmacprovider.WithNonceStore(nonceStore),
 		hmacprovider.WithKeyInterval(HMACKeyInterval),
 		hmacprovider.WithMaxInputSize(HMACMaxInput),
@@ -122,7 +125,6 @@ func createServer(hmacProvider *hmacprovider.HMACProvider, logger *log.Logger) (
 
 	// Add middleware
 	router.Use(ErrorHandler(logger))
-	router.Use(SecurityHeaders())
 	router.Use(HMACRequestLogger(logger))
 
 	// Setup routes
@@ -224,7 +226,7 @@ func signDataHandler(hmacProvider *hmacprovider.HMACProvider, logger *log.Logger
 		}
 
 		// Sign the data
-		hash, timestamp, nonce, err := hmacProvider.Sign256(
+		hash, timestamp, nonce, err := hmacProvider.Sign256(KeyId,
 			bytes.NewReader([]byte(request.Data)),
 		)
 		if err != nil {

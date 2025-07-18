@@ -108,7 +108,7 @@ func main() {
 	// Protected endpoint - requires authentication
 	server.Route().GET("/profile", func(c *gin.Context) {
 		// Get the JWT context
-		claims, ok := auth.GetClaims(c)
+		claims, ok := auth.GetJWTClaims(c)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "No session found",
@@ -134,7 +134,7 @@ func main() {
 	// Endpoint to demonstrate session data persistence
 	server.Route().GET("/visit", func(c *gin.Context) {
 		// Get the JWT context
-		claims, ok := auth.GetClaims(c)
+		claims, ok := auth.GetJWTClaims(c)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "No session found",
@@ -171,7 +171,7 @@ func main() {
 	// Endpoint to refresh the token
 	server.Route().POST("/refresh", func(c *gin.Context) {
 		// Get the JWT context
-		_, logged := auth.GetClaims(c)
+		_, logged := auth.GetJWTClaims(c)
 		if !logged {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "No session found",
@@ -219,7 +219,7 @@ func main() {
 
 	// Health check endpoint (no auth required)
 	server.Route().GET("/health", func(c *gin.Context) {
-		_, logged := auth.GetClaims(c)
+		_, logged := auth.GetJWTClaims(c)
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "healthy",
 			"server":    "jwt-session-example",

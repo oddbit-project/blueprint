@@ -3,6 +3,7 @@ package session
 import (
 	"bytes"
 	"encoding/gob"
+	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/kv"
 	"sync"
@@ -17,11 +18,12 @@ type Store struct {
 	cleanupMutex   sync.Mutex
 	cleanupRunning bool
 	logger         *log.Logger
+	crypt          secure.AES256GCM
 }
 
 // NewStore creates session store
 // if no backend is specified, a memory KV is used
-func NewStore(config *Config, backend kv.KV, logger *log.Logger) *Store {
+func NewStore(config *Config, backend kv.KV, logger *log.Logger) (*Store, error) {
 	if config == nil {
 		config = NewConfig()
 	}
@@ -30,13 +32,32 @@ func NewStore(config *Config, backend kv.KV, logger *log.Logger) *Store {
 		backend = kv.NewMemoryKV()
 	}
 
+	if logger == nil {
+		logger = log.New("session-store")
+	}
+
+	// if key exists, activate encryption
+	var enc secure.AES256GCM
+	if !config.EncryptionKey.IsEmpty() {
+		secret, err := config.EncryptionKey.Fetch()
+		if err != nil {
+			return nil, err
+		}
+
+		enc, err = secure.NewAES256GCM([]byte(secret))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Store{
 		backend:      backend,
 		config:       config,
 		stopCleanup:  make(chan bool),
 		logger:       logger,
 		cleanupMutex: sync.Mutex{},
-	}
+		crypt:        enc,
+	}, nil
 }
 
 // Get retrieves a session from Client
@@ -49,9 +70,13 @@ func (s *Store) Get(id string) (*SessionData, error) {
 		return nil, ErrSessionNotFound
 	}
 
+	// Decrypt the data, if necessary
+	if s.crypt != nil {
+		data, err = s.crypt.Decrypt(data)
+	}
+
 	// Deserialize the session
 	var session *SessionData
-
 	if session, err = unmarshalSession(data); err != nil {
 		return nil, err
 	}
@@ -96,6 +121,11 @@ func (s *Store) Set(id string, session *SessionData) error {
 	expiration := time.Duration(s.config.ExpirationSeconds) * time.Second
 	if time.Duration(s.config.IdleTimeoutSeconds)*time.Second < expiration {
 		expiration = time.Duration(s.config.IdleTimeoutSeconds) * time.Second
+	}
+
+	// encrypt data if crypt is configured
+	if s.crypt != nil {
+		data, err = s.crypt.Encrypt(data)
 	}
 
 	// Save with expiration

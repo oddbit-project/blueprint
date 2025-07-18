@@ -131,7 +131,11 @@ func main() {
 	sessionConfig.SameSite = int(http.SameSiteLaxMode) // Important for cross-origin
 	sessionConfig.CookieName = "nextjs_session"        // Custom cookie name
 	sessionConfig.ExpirationSeconds = 3600             // 1 hour
-	server.UseSession(sessionConfig, nil, logger)
+	_, err = server.UseSession(sessionConfig, nil, logger)
+	if err != nil {
+		logger.Fatal(err, "could not initialize session")
+		os.Exit(1)
+	}
 
 	// CORS middleware for Next.js integration
 	server.Route().Use(func(c *gin.Context) {

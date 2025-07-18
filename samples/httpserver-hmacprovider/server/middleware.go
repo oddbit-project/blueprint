@@ -48,25 +48,6 @@ func HMACRequestLogger(logger *log.Logger) gin.HandlerFunc {
 	}
 }
 
-// SecurityHeaders middleware adds security headers to responses
-func SecurityHeaders() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Security headers
-		c.Header("X-Content-Type-Options", "nosniff")
-		c.Header("X-Frame-Options", "DENY")
-		c.Header("X-XSS-Protection", "1; mode=block")
-		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		c.Header("Content-Security-Policy", "default-src 'self'")
-
-		// API-specific headers
-		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
-		c.Header("Pragma", "no-cache")
-		c.Header("Expires", "0")
-
-		c.Next()
-	}
-}
-
 // ErrorHandler handles panics and returns proper error responses
 func ErrorHandler(logger *log.Logger) gin.HandlerFunc {
 	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
