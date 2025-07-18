@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	ServerPort  = ":8080"
-	HMACSecret  = "python-client-demo-secret"
-	TestMessage = "Hello from Python client!"
+	ServerPort = ":8080"
+	HMACKeyId  = "client1"
+	HMACSecret = "python-client-demo-secret"
 )
 
 func main() {
@@ -73,14 +73,17 @@ func createHMACProvider(logger *log.Logger) (*hmacprovider.HMACProvider, error) 
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
 
-	// Create credential
-	credential, err := secure.NewCredential([]byte(HMACSecret), key, false)
+	// Create secret
+	secret, err := secure.NewCredential([]byte(HMACSecret), key, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create credential: %w", err)
 	}
 
+	// key provider
+	keyProvider := hmacprovider.NewSingleKeyProvider(HMACKeyId, secret)
+
 	// Create HMAC provider with default settings
-	provider := hmacprovider.NewHmacProvider(credential)
+	provider := hmacprovider.NewHmacProvider(keyProvider)
 
 	logger.Info("HMAC provider initialized", log.KV{
 		"secret_preview": HMACSecret[:8] + "...",
@@ -223,7 +226,7 @@ func signHandler(hmacProvider *hmacprovider.HMACProvider, logger *log.Logger) gi
 		}
 
 		// Sign the data
-		hash, timestamp, nonce, err := hmacProvider.Sign256(
+		hash, timestamp, nonce, err := hmacProvider.Sign256(HMACKeyId,
 			strings.NewReader(request.Data),
 		)
 		if err != nil {

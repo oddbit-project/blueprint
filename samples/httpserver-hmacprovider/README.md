@@ -74,7 +74,7 @@ The server implements HMAC-SHA256 signature verification with nonce-based replay
 
 ```bash
 cd /home/jpinheiro/oddbit/blueprint/samples/httpserver-hmacprovider
-go run main.go middleware.go
+cd server && go run main.go middleware.go
 ```
 
 The server will start on port 8080 with the following endpoints:
@@ -155,15 +155,6 @@ const (
 )
 ```
 
-### Environment Variables
-
-For production use, set the HMAC secret via environment variable:
-
-```bash
-export HMAC_SECRET="your-production-secret-key-32-bytes-minimum"
-go run main.go middleware.go
-```
-
 ### Nonce Store Configuration
 
 The example uses an in-memory nonce store with eviction policy:
@@ -200,7 +191,7 @@ kvStore := store.NewKvStore(memKV, 1*time.Hour)
 
 ```go
 // Create authenticated client
-client, err := NewHMACClient("http://localhost:8080", "your-secret-key")
+client, err := NewHMACClient("http://localhost:8080", "key-id", "your-secret-key")
 if err != nil {
     log.Fatal(err)
 }
@@ -265,44 +256,6 @@ The client includes 9 comprehensive test scenarios:
 8. **Authentication Failure**: Test with wrong secret key
 9. **Missing Headers**: Test server response to incomplete requests
 
-## Security Considerations
-
-### Production Deployment
-
-1. **Secret Management**: Use secure secret storage (not hardcoded)
-   ```bash
-   # Use strong, randomly generated secrets
-   openssl rand -base64 32
-   ```
-
-2. **HTTPS Only**: Deploy with TLS/SSL certificates
-   ```go
-   server := &http.Server{
-       Addr:      ":8443",
-       TLSConfig: &tls.Config{...},
-   }
-   ```
-
-3. **Rate Limiting**: Implement rate limiting for API endpoints
-   ```go
-   router.Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
-   ```
-
-4. **Log Security**: Monitor authentication failures and suspicious patterns
-5. **Clock Synchronization**: Ensure server clocks are synchronized (NTP)
-6. **Nonce Store Scaling**: Use Redis for distributed deployments
-
-### Monitoring and Alerting
-
-Monitor these security metrics:
-
-- Authentication failure rates
-- Replay attack attempts (nonce reuse)
-- Timestamp validation failures
-- Excessive request rates from single IPs
-- Nonce store capacity and performance
-- HMAC signature verification latency
-
 ## Performance
 
 ### Benchmarks
@@ -345,7 +298,7 @@ go test -bench=. ./provider/hmacprovider/...
 
 ```bash
 # Start server in background
-go run main.go middleware.go &
+cd server && go run main.go middleware.go &
 SERVER_PID=$!
 
 # Run client tests
@@ -385,8 +338,8 @@ The implementation includes comprehensive error handling:
 
 ## Files
 
-- `main.go` - HTTP server implementation with all endpoints (385 lines)
-- `middleware.go` - Custom middleware for logging and error handling (65 lines)
+- `server/main.go` - HTTP server implementation with all endpoints (385 lines)
+- `server/middleware.go` - Custom middleware for logging and error handling (65 lines)
 - `client.go` - Client implementation with examples and CLI (358 lines)
 - `README.md` - This documentation
 

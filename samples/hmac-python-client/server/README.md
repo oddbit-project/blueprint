@@ -16,16 +16,13 @@ A demonstration Go server built with the Blueprint framework that showcases HMAC
 ### Prerequisites
 
 - Go 1.23 or later
-- Blueprint framework (included via go.mod replace directive)
+- Blueprint framework
 
 ### Running the Server
 
 ```bash
 # Navigate to server directory
 cd server
-
-# Install dependencies
-go mod tidy
 
 # Run the server
 go run main.go
@@ -180,7 +177,6 @@ const (
 ```
 server/
 ├── main.go              # Server implementation
-├── go.mod               # Go module definition
 └── README.md            # This file
 ```
 
@@ -289,19 +285,6 @@ This is a **demonstration server** for testing purposes. For production use:
    - Verify request body encoding (UTF-8)
    - Check message format: `{timestamp}:{nonce}:{body}`
    - Ensure hash is lowercase hexadecimal
-
-### Debug Mode
-
-Enable debug logging for troubleshooting:
-
-```go
-// Add debug logging in main.go
-log.Logger.Debug().
-    Str("method", method).
-    Str("path", path).
-    Str("hash", hash).
-    Msg("HMAC verification details")
-```
 
 ## License
 

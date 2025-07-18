@@ -28,7 +28,7 @@ pip install requests
 from hmac_client import HMACClient
 
 # Create authenticated client
-client = HMACClient("http://localhost:8080", "your-secret-key")
+client = HMACClient("http://localhost:8080", "your-key-id", "your-secret-key")
 
 # Make authenticated requests
 response = client.get("/api/protected/data")
@@ -43,7 +43,7 @@ client.close()
 ```python
 from hmac_client import HMACClient
 
-with HMACClient("http://localhost:8080", "your-secret-key") as client:
+with HMACClient("http://localhost:8080", "your-key-id", "your-secret-key") as client:
     response = client.get("/api/protected/data")
     data = response.json()
     print(data)
@@ -59,6 +59,7 @@ with HMACClient("http://localhost:8080", "your-secret-key") as client:
 ```python
 HMACClient(
     base_url: str,
+    key_id: str,
     secret_key: str,
     key_interval: int = 300,      # Timestamp tolerance in seconds
     max_input_size: int = 33554432,  # Max input size (32MB)
@@ -90,23 +91,12 @@ is_valid = client.verify256(data: bytes, hash_value: str, timestamp: str, nonce:
 
 ## Configuration
 
-### Environment Variables
-
-You can configure the client using environment variables:
-
-```bash
-export HMAC_BASE_URL="http://localhost:8080"
-export HMAC_SECRET_KEY="your-secret-key"
-export HMAC_KEY_INTERVAL="300"
-export HMAC_MAX_INPUT_SIZE="33554432"
-export HMAC_TIMEOUT="30"
-```
-
 ### Custom Configuration
 
 ```python
 client = HMACClient(
     "http://localhost:8080",
+    "your-key-id",
     "your-secret-key",
     key_interval=600,        # 10 minutes tolerance
     max_input_size=1048576,  # 1MB limit
@@ -191,7 +181,7 @@ This client is designed to work with Blueprint framework servers using the HMAC 
 
 ```go
 // Go server setup
-hmacProvider := hmacprovider.NewContainer("your-secret-key", store)
+hmacProvider := hmacprovider.NewContainer(keyProvider, store)
 router.Use(auth.AuthMiddleware(auth.NewHMACAuthProvider(hmacProvider)))
 ```
 
@@ -220,7 +210,6 @@ hmac-python-client/
 │   └── basic_usage.py   # Comprehensive examples
 ├── server/              # Go demonstration server
 │   ├── main.go          # Server implementation
-│   └── go.mod           # Go dependencies
 ├── Pipfile              # Python dependencies
 └── README.md            # This file
 ```

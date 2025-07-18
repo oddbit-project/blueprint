@@ -39,7 +39,7 @@ class HMACClient:
     (with nonce/timestamp) compatible with Blueprint's Go implementation.
     """
     
-    def __init__(self, base_url: str, secret_key: str, **config):
+    def __init__(self, base_url: str, key_id:str, secret_key: str, **config):
         """
         Initialize HMAC client.
         
@@ -49,6 +49,7 @@ class HMACClient:
             **config: Configuration options (key_interval, max_input_size, timeout)
         """
         self.base_url = base_url.rstrip('/')
+        self.key_id = key_id
         self.secret_key = secret_key
         
         # Merge default config with user overrides
@@ -101,7 +102,9 @@ class HMACClient:
             data,
             hashlib.sha256
         )
-        return mac.hexdigest()
+        if self.key_id != "":
+            return "{}.{}".format(self.key_id, mac.hexdigest())
+        return  mac.hexdigest()
     
     def sha256_verify(self, data: bytes, signature: str) -> bool:
         """
@@ -119,10 +122,24 @@ class HMACClient:
         Raises:
             InputTooLargeError: If data exceeds size limit
         """
+        parts = signature.split(".")
+        if len(parts) > 2:
+            return False
+        elif len(parts) == 2:
+            if self.key_id != parts[0]:
+                return False
+            signature = parts[1]
+        else:
+            # keyId is expected
+            if self.key_id != "":
+                return False
         try:
             self._check_input_size(data)
             expected_signature = self.sha256_sign(data)
-            
+            parts = expected_signature.split(".")
+            if len(parts) > 1:
+                expected_signature = parts[1]
+
             # Use constant-time comparison to prevent timing attacks
             return hmac.compare_digest(expected_signature, signature)
         except InputTooLargeError:
@@ -164,7 +181,9 @@ class HMACClient:
             hashlib.sha256
         )
         hash_value = mac.hexdigest()
-        
+        if self.key_id != "":
+            hash_value = "{}.{}".format(self.key_id, hash_value)
+
         return hash_value, timestamp, nonce
     
     def verify256(self, data: bytes, hash_value: str, timestamp: str, nonce: str) -> bool:
@@ -185,6 +204,18 @@ class HMACClient:
         Raises:
             InputTooLargeError: If data exceeds size limit
         """
+        parts = hash_value.split(".")
+        if len(parts) > 2:
+            return False
+        elif len(parts) == 2:
+            if self.key_id != parts[0]:
+                return False
+            hash_value = parts[1]
+        else:
+            # keyId is expected
+            if self.key_id != "":
+                return False
+
         try:
             self._check_input_size(data)
             
@@ -200,7 +231,7 @@ class HMACClient:
                 hashlib.sha256
             )
             expected_hash = expected_mac.hexdigest()
-            
+
             # Use constant-time comparison
             return hmac.compare_digest(expected_hash, hash_value)
         except InputTooLargeError:

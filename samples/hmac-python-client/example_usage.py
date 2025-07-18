@@ -16,6 +16,7 @@ def main():
     """Run basic usage examples."""
     
     # Server configuration
+    key_id = "client1"
     server_url = "http://localhost:8080"
     secret_key = "python-client-demo-secret"
     
@@ -23,8 +24,9 @@ def main():
     
     # Create HMAC client
     print("1. Creating HMAC client...")
-    client = HMACClient(server_url, secret_key)
+    client = HMACClient(server_url, key_id, secret_key)
     print(f"   Client created for: {server_url}")
+    print(f"   Key id: {key_id}\n")
     print(f"   Secret key: {secret_key[:8]}...\n")
     
     try:
@@ -188,7 +190,7 @@ def main():
         
         # Try with wrong secret
         print("    Testing with wrong secret key...")
-        wrong_client = HMACClient(server_url, "wrong-secret-key")
+        wrong_client = HMACClient(server_url, key_id, "wrong-secret-key")
         try:
             response = wrong_client.get("/api/protected/profile")
             if response.status_code == 401:
@@ -233,7 +235,7 @@ def demonstrate_context_manager():
     
     # Using context manager (recommended)
     try:
-        with HMACClient(server_url, secret_key) as client:
+        with HMACClient(server_url, key_id, secret_key) as client:
             response = client.get("/api/test/simple")
             if response.status_code == 200:
                 result = response.json()
@@ -255,6 +257,7 @@ def demonstrate_configuration():
     # Create client with custom configuration
     client = HMACClient(
         "http://localhost:8080",
+        "client1",
         "python-client-demo-secret",
         key_interval=600,        # 10 minutes tolerance
         max_input_size=1024000,  # 1MB limit
@@ -275,12 +278,12 @@ if __name__ == "__main__":
         import requests
         response = requests.get("http://localhost:8080/api/public/health", timeout=5)
         if response.status_code != 200:
-            print("⚠️  Go server not running. Please start the server first:")
-            print("   cd server && go run main.go")
+            print("Go server not running. Please start the server first:")
+            print("> cd server && go run main.go")
             sys.exit(1)
     except Exception:
-        print("⚠️  Go server not accessible. Please start the server first:")
-        print("   cd server && go run main.go")
+        print("Go server not accessible. Please start the server first:")
+        print(">  cd server && go run main.go")
         sys.exit(1)
     
     # Run examples
@@ -288,4 +291,4 @@ if __name__ == "__main__":
     demonstrate_context_manager()
     demonstrate_configuration()
     
-    print("\n🎉 All examples completed! Check the server logs to see the authentication in action.")
+    print("\nAll examples completed! Check the server logs to see the authentication in action.")
