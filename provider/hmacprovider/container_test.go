@@ -45,14 +45,14 @@ func (m *mockNonceStore) Close() {
 }
 
 // Test helper to create a test HMAC provider
-func createTestHMACProvider(t *testing.T, userId string, opts ...HMACProviderOption) *HMACProvider {
+func createTestHMACProvider(t *testing.T, keyId string, opts ...HMACProviderOption) *HMACProvider {
 	key, err := secure.GenerateKey()
 	require.NoError(t, err)
 
 	credential, err := secure.NewCredential([]byte("test-secret"), key, false)
 	require.NoError(t, err)
 
-	keyProvider := NewSingleKeyProvider(userId, credential)
+	keyProvider := NewSingleKeyProvider(keyId, credential)
 	return NewHmacProvider(keyProvider, opts...)
 }
 
@@ -83,21 +83,21 @@ func TestNewHmacProviderWithOptions(t *testing.T) {
 }
 
 func TestSHA256Sign(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "Hello, World!"
 		reader := strings.NewReader(testData)
 
-		hash, err := provider.SHA256Sign(user, reader)
+		hash, err := provider.SHA256Sign(key, reader)
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, hash)
 
-		if user != "" {
+		if key != "" {
 			parts := strings.Split(hash, ".")
 			require.Len(t, parts, 2)
-			assert.Equal(t, user, parts[0])
+			assert.Equal(t, key, parts[0])
 			hash = parts[1]
 		}
 		// Verify it's valid hex
@@ -110,14 +110,14 @@ func TestSHA256Sign(t *testing.T) {
 }
 
 func TestSHA256SignConsistency(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "test data"
 
 		// Sign the same data multiple times
-		hash1, err1 := provider.SHA256Sign(user, strings.NewReader(testData))
-		hash2, err2 := provider.SHA256Sign(user, strings.NewReader(testData))
+		hash1, err1 := provider.SHA256Sign(key, strings.NewReader(testData))
+		hash2, err2 := provider.SHA256Sign(key, strings.NewReader(testData))
 
 		assert.NoError(t, err1)
 		assert.NoError(t, err2)
@@ -126,21 +126,21 @@ func TestSHA256SignConsistency(t *testing.T) {
 }
 
 func TestSHA256Verify(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "Hello, World!"
 		reader := strings.NewReader(testData)
 
 		// Sign the data
-		hash, err := provider.SHA256Sign(user, reader)
+		hash, err := provider.SHA256Sign(key, reader)
 		require.NoError(t, err)
 
 		// Verify with correct data and hash
 		userId, valid, err := provider.SHA256Verify(strings.NewReader(testData), hash)
 		assert.NoError(t, err)
 		assert.True(t, valid)
-		assert.Equal(t, user, userId)
+		assert.Equal(t, key, userId)
 
 		// Verify with wrong data
 		_, valid, err = provider.SHA256Verify(strings.NewReader("Wrong data"), hash)
@@ -149,7 +149,7 @@ func TestSHA256Verify(t *testing.T) {
 
 		// Verify with wrong hash (but valid hex)
 		_, valid, err = provider.SHA256Verify(strings.NewReader(testData), "deadbeef")
-		if user == "" {
+		if key == "" {
 			assert.NoError(t, err) // Valid hex, should decode fine
 			assert.False(t, valid) // But HMAC should not match
 		} else {
@@ -160,8 +160,8 @@ func TestSHA256Verify(t *testing.T) {
 }
 
 func TestSHA256VerifyInvalidHex(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "test"
 
@@ -174,28 +174,28 @@ func TestSHA256VerifyInvalidHex(t *testing.T) {
 }
 
 func TestSHA256SignLargeInput(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user, WithMaxInputSize(1024))
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key, WithMaxInputSize(1024))
 
 		// Create input larger than max size
 		largeData := strings.Repeat("a", 1025)
 		reader := strings.NewReader(largeData)
 
-		_, err := provider.SHA256Sign(user, reader)
+		_, err := provider.SHA256Sign(key, reader)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "input too large")
 	}
 }
 
 func TestSHA256VerifyLargeInput(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user, WithMaxInputSize(1024))
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key, WithMaxInputSize(1024))
 
 		// Create input larger than max size
 		largeData := strings.Repeat("a", 1025)
 		reader := strings.NewReader(largeData)
 
-		_, valid, err := provider.SHA256Verify(reader, fmt.Sprintf("%s.%s", user, "deadbeef"))
+		_, valid, err := provider.SHA256Verify(reader, fmt.Sprintf("%s.%s", key, "deadbeef"))
 		assert.Error(t, err)
 		assert.False(t, valid)
 		assert.Contains(t, err.Error(), "input too large") // Should fail on input size first
@@ -203,13 +203,13 @@ func TestSHA256VerifyLargeInput(t *testing.T) {
 }
 
 func TestSign256(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "test data"
 		reader := strings.NewReader(testData)
 
-		hash, timestamp, nonce, err := provider.Sign256(user, reader)
+		hash, timestamp, nonce, err := provider.Sign256(key, reader)
 
 		assert.NoError(t, err)
 		assert.NotEmpty(t, hash)
@@ -217,10 +217,10 @@ func TestSign256(t *testing.T) {
 		assert.NotEmpty(t, nonce)
 
 		// Verify hash is valid hex
-		if user != "" {
+		if key != "" {
 			parts := strings.Split(hash, ".")
 			require.Len(t, parts, 2)
-			assert.Equal(t, user, parts[0])
+			assert.Equal(t, key, parts[0])
 			hash = parts[1]
 		}
 		_, err = hex.DecodeString(hash)
@@ -236,21 +236,21 @@ func TestSign256(t *testing.T) {
 }
 
 func TestSign256LargeInput(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user, WithMaxInputSize(1024))
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key, WithMaxInputSize(1024))
 
 		largeData := strings.Repeat("a", 1025)
 		reader := strings.NewReader(largeData)
 
-		_, _, _, err := provider.Sign256(user, reader)
+		_, _, _, err := provider.Sign256(key, reader)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "input too large")
 	}
 }
 
 func TestVerifyTimestamp(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user, WithKeyInterval(5*time.Minute))
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key, WithKeyInterval(5*time.Minute))
 
 		now := time.Now().UTC()
 
@@ -301,21 +301,21 @@ func TestVerifyTimestamp(t *testing.T) {
 }
 
 func TestVerify256Success(t *testing.T) {
-	for _, user := range userNames {
+	for _, key := range keyNames {
 		mockStore := newMockNonceStore()
-		provider := createTestHMACProvider(t, user, WithNonceStore(mockStore))
+		provider := createTestHMACProvider(t, key, WithNonceStore(mockStore))
 
 		testData := "test data"
 
 		// Generate signature
-		hash, timestamp, nonce, err := provider.Sign256(user, strings.NewReader(testData))
+		hash, timestamp, nonce, err := provider.Sign256(key, strings.NewReader(testData))
 		require.NoError(t, err)
 
 		// Verify signature
 		userId, valid, err := provider.Verify256(strings.NewReader(testData), hash, timestamp, nonce)
 		assert.NoError(t, err)
 		assert.True(t, valid)
-		assert.Equal(t, user, userId)
+		assert.Equal(t, key, userId)
 
 		// Verify nonce was consumed
 		assert.True(t, mockStore.nonces[nonce])
@@ -323,8 +323,8 @@ func TestVerify256Success(t *testing.T) {
 }
 
 func TestVerify256InvalidParameters(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "test data"
 
@@ -365,13 +365,13 @@ func TestVerify256InvalidTimestamp(t *testing.T) {
 }
 
 func TestVerify256InvalidHash(t *testing.T) {
-	for _, user := range userNames {
-		provider := createTestHMACProvider(t, user)
+	for _, key := range keyNames {
+		provider := createTestHMACProvider(t, key)
 
 		testData := "test data"
 		timestamp := time.Now().Format(time.RFC3339)
 
-		_, valid, err := provider.Verify256(strings.NewReader(testData), fmt.Sprintf("%s.%s", user, "not-hex"), timestamp, "nonce")
+		_, valid, err := provider.Verify256(strings.NewReader(testData), fmt.Sprintf("%s.%s", key, "not-hex"), timestamp, "nonce")
 		assert.Error(t, err)
 		assert.False(t, valid)
 		assert.Contains(t, err.Error(), "invalid request")
@@ -379,14 +379,14 @@ func TestVerify256InvalidHash(t *testing.T) {
 }
 
 func TestVerify256WrongSignature(t *testing.T) {
-	for _, user := range userNames {
+	for _, key := range keyNames {
 		mockStore := newMockNonceStore()
-		provider := createTestHMACProvider(t, user, WithNonceStore(mockStore))
+		provider := createTestHMACProvider(t, key, WithNonceStore(mockStore))
 
 		testData := "test data"
 
 		// Generate signature for different data
-		hash, timestamp, nonce, err := provider.Sign256(user, strings.NewReader("different data"))
+		hash, timestamp, nonce, err := provider.Sign256(key, strings.NewReader("different data"))
 		require.NoError(t, err)
 
 		// Try to verify with original data
@@ -401,20 +401,20 @@ func TestVerify256WrongSignature(t *testing.T) {
 }
 
 func TestVerify256ReplayAttack(t *testing.T) {
-	for _, user := range userNames {
+	for _, key := range keyNames {
 		mockStore := newMockNonceStore()
-		provider := createTestHMACProvider(t, user, WithNonceStore(mockStore))
+		provider := createTestHMACProvider(t, key, WithNonceStore(mockStore))
 
 		testData := "test data"
 
 		// Generate signature
-		hash, timestamp, nonce, err := provider.Sign256(user, strings.NewReader(testData))
+		hash, timestamp, nonce, err := provider.Sign256(key, strings.NewReader(testData))
 		require.NoError(t, err)
 
 		// First verification should succeed
 		userId, valid, err := provider.Verify256(strings.NewReader(testData), hash, timestamp, nonce)
 		assert.NoError(t, err)
-		assert.Equal(t, user, userId)
+		assert.Equal(t, key, userId)
 		assert.True(t, valid)
 
 		// Second verification should fail (replay attack)
@@ -426,16 +426,16 @@ func TestVerify256ReplayAttack(t *testing.T) {
 }
 
 func TestVerify256NonceStoreFailure(t *testing.T) {
-	for _, user := range userNames {
+	for _, key := range keyNames {
 		mockStore := newMockNonceStore()
 		mockStore.setFail(true) // Simulate nonce store failure
-		provider := createTestHMACProvider(t, user, WithNonceStore(mockStore))
+		provider := createTestHMACProvider(t, key, WithNonceStore(mockStore))
 
 		testData := "test data"
 
 		// Generate signature with working store
 		mockStore.setFail(false)
-		hash, timestamp, nonce, err := provider.Sign256(user, strings.NewReader(testData))
+		hash, timestamp, nonce, err := provider.Sign256(key, strings.NewReader(testData))
 		require.NoError(t, err)
 
 		// Fail the store for verification
@@ -461,9 +461,9 @@ func TestVerify256LargeInput(t *testing.T) {
 }
 
 func TestVerify256OperationOrder(t *testing.T) {
-	for _, user := range userNames {
+	for _, key := range keyNames {
 		mockStore := newMockNonceStore()
-		provider := createTestHMACProvider(t, user, WithNonceStore(mockStore), WithKeyInterval(1*time.Minute))
+		provider := createTestHMACProvider(t, key, WithNonceStore(mockStore), WithKeyInterval(1*time.Minute))
 
 		testData := "test data"
 

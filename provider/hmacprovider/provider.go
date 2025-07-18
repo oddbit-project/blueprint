@@ -5,25 +5,25 @@ import "github.com/oddbit-project/blueprint/crypt/secure"
 // HMACKeyProvider interface
 // Note: userIds cannot contain dots!!! (".")
 type HMACKeyProvider interface {
-	FetchSecret(userId string) (*secure.Credential, error)
+	FetchSecret(keyId string) (*secure.Credential, error)
 }
 
 type SingleKeyProvider struct {
-	userId string
+	keyId  string
 	secret *secure.Credential
 }
 
 // NewSingleKeyProvider creates a simple HMACKeyProvider that provides a single key
-func NewSingleKeyProvider(userId string, secret *secure.Credential) *SingleKeyProvider {
+func NewSingleKeyProvider(keyId string, secret *secure.Credential) *SingleKeyProvider {
 	return &SingleKeyProvider{
-		userId: userId,
+		keyId:  keyId,
 		secret: secret,
 	}
 }
 
-// FetchSecret returns the secret if the userId is valid
-func (p *SingleKeyProvider) FetchSecret(userId string) (*secure.Credential, error) {
-	if userId == p.userId {
+// FetchSecret returns the secret if the keyId is valid
+func (p *SingleKeyProvider) FetchSecret(keyId string) (*secure.Credential, error) {
+	if keyId == p.keyId {
 		return p.secret, nil
 	}
 	return nil, nil

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	ErrInvalidUserId     = utils.Error("invalid user id")
+	ErrInvalidKeyId      = utils.Error("invalid key id")
 	ErrInvalidHashFormat = utils.Error("invalid hash format")
 	ErrInvalidRequest    = utils.Error("invalid request")
 
@@ -69,13 +69,13 @@ func NewHmacProvider(secretProvider HMACKeyProvider, opts ...HMACProviderOption)
 }
 
 // SHA256Sign generate a simple SHA256 HMAC, no nounce, no timestamp
-func (h *HMACProvider) SHA256Sign(userId string, data io.Reader) (string, error) {
-	secret, err := h.secretProvider.FetchSecret(userId)
+func (h *HMACProvider) SHA256Sign(keyId string, data io.Reader) (string, error) {
+	secret, err := h.secretProvider.FetchSecret(keyId)
 	if err != nil {
 		return "", err
 	}
 	if secret == nil {
-		return "", ErrInvalidUserId
+		return "", ErrInvalidKeyId
 	}
 
 	// Limit input size to prevent DoS
@@ -100,31 +100,31 @@ func (h *HMACProvider) SHA256Sign(userId string, data io.Reader) (string, error)
 	mac := hmac.New(sha256.New, key)
 	mac.Write(content)
 	hash := hex.EncodeToString(mac.Sum(nil))
-	if userId != "" {
-		return fmt.Sprintf("%s.%s", userId, hash), nil
+	if keyId != "" {
+		return fmt.Sprintf("%s.%s", keyId, hash), nil
 	}
 	return hash, nil
 }
 
 // SHA256Verify verify a simple SHA256 HMAC, no nounce, no timestamp
 // the hash must be a hex-encoded sha256 hash
-// returns the userId (if any), true if is valid, and an optional error status
+// returns the keyId (if any), true if is valid, and an optional error status
 func (h *HMACProvider) SHA256Verify(data io.Reader, hash string) (string, bool, error) {
 	parts := strings.Split(hash, ".")
 	if len(parts) > 2 {
 		return "", false, ErrInvalidHashFormat
 	}
-	userId := ""
+	keyId := ""
 	if len(parts) == 2 {
-		userId = parts[0]
+		keyId = parts[0]
 		hash = parts[1]
 	}
-	secret, err := h.secretProvider.FetchSecret(userId)
+	secret, err := h.secretProvider.FetchSecret(keyId)
 	if err != nil {
 		return "", false, err
 	}
 	if secret == nil {
-		return "", false, ErrInvalidUserId
+		return "", false, ErrInvalidKeyId
 	}
 
 	// Decode hex string first to prevent timing attacks
@@ -158,17 +158,17 @@ func (h *HMACProvider) SHA256Verify(data io.Reader, hash string) (string, bool, 
 	expectedMAC := mac.Sum(nil)
 
 	// Constant-time comparison
-	return userId, hmac.Equal(expectedMAC, providedMAC), nil
+	return keyId, hmac.Equal(expectedMAC, providedMAC), nil
 }
 
 // Sign256 generates a HMAC256 signature using timestamp and nonce
-func (h *HMACProvider) Sign256(userId string, data io.Reader) (hash string, timestamp string, nonce string, err error) {
-	secret, err := h.secretProvider.FetchSecret(userId)
+func (h *HMACProvider) Sign256(keyId string, data io.Reader) (hash string, timestamp string, nonce string, err error) {
+	secret, err := h.secretProvider.FetchSecret(keyId)
 	if err != nil {
 		return "", "", "", err
 	}
 	if secret == nil {
-		return "", "", "", ErrInvalidUserId
+		return "", "", "", ErrInvalidKeyId
 	}
 
 	timestamp = time.Now().UTC().Format(time.RFC3339)
@@ -202,8 +202,8 @@ func (h *HMACProvider) Sign256(userId string, data io.Reader) (hash string, time
 	mac.Write([]byte(":"))
 	mac.Write(content)
 	hash = hex.EncodeToString(mac.Sum(nil))
-	if userId != "" {
-		hash = fmt.Sprintf("%s.%s", userId, hash)
+	if keyId != "" {
+		hash = fmt.Sprintf("%s.%s", keyId, hash)
 	}
 
 	return hash, timestamp, nonce, nil
@@ -220,7 +220,7 @@ func (h *HMACProvider) verifyTimestamp(ts string) bool {
 }
 
 // Verify256 verifies a HMAC256 signature using timestamp and nonce
-// Returns userId(if any), true if success, and an optional error code
+// Returns keyId(if any), true if success, and an optional error code
 func (h *HMACProvider) Verify256(data io.Reader, hash string, timestamp string, nonce string) (string, bool, error) {
 	// Validate inputs first
 	if hash == "" || timestamp == "" || nonce == "" {
@@ -231,17 +231,17 @@ func (h *HMACProvider) Verify256(data io.Reader, hash string, timestamp string, 
 	if len(parts) > 2 {
 		return "", false, ErrInvalidHashFormat
 	}
-	userId := ""
+	keyId := ""
 	if len(parts) == 2 {
-		userId = parts[0]
+		keyId = parts[0]
 		hash = parts[1]
 	}
-	secret, err := h.secretProvider.FetchSecret(userId)
+	secret, err := h.secretProvider.FetchSecret(keyId)
 	if err != nil {
 		return "", false, err
 	}
 	if secret == nil {
-		return "", false, ErrInvalidUserId
+		return "", false, ErrInvalidKeyId
 	}
 
 	// Check timestamp BEFORE consuming nonce
@@ -296,5 +296,5 @@ func (h *HMACProvider) Verify256(data io.Reader, hash string, timestamp string, 
 		}
 	}
 
-	return userId, true, nil
+	return keyId, true, nil
 }
