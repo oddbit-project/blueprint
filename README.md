@@ -54,178 +54,194 @@ Simple API application example using blueprint.Container with JWT authentication
 package main
 
 import (
- "flag"
- "fmt"
- "github.com/gin-gonic/gin"
- "github.com/oddbit-project/blueprint"
- "github.com/oddbit-project/blueprint/config/provider"
- "github.com/oddbit-project/blueprint/log"
- "github.com/oddbit-project/blueprint/provider/httpserver"
- "github.com/oddbit-project/blueprint/provider/httpserver/auth"
- "github.com/oddbit-project/blueprint/provider/jwtprovider"
- "os"
+  "flag"
+  "fmt"
+  "github.com/gin-gonic/gin"
+  "github.com/oddbit-project/blueprint"
+  "github.com/oddbit-project/blueprint/config/provider"
+  "github.com/oddbit-project/blueprint/log"
+  "github.com/oddbit-project/blueprint/provider/httpserver"
+  "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+  "github.com/oddbit-project/blueprint/provider/jwtprovider"
+  "os"
 )
 
 const (
- VERSION = "9.9.0"
+  VERSION = "9.9.0"
 )
 
 // CliArgs Command-line options
 type CliArgs struct {
- ConfigFile  *string
- ShowVersion *bool
+  ConfigFile  *string
+  ShowVersion *bool
 }
 
 // Application sample application container
 type Application struct {
- container   *blueprint.Container      // runnable application container
- args        *CliArgs                  // cli args
- httpServer  *httpserver.Server        // our api server
- logger      *log.Logger
- jwtProvider jwtprovider.JWTProvider   // JWT authentication provider
+  *blueprint.Container                    // runnable application container
+  args                 *CliArgs           // cli args
+  httpServer           *httpserver.Server // our api server
+  logger               *log.Logger
+  jwtProvider          jwtprovider.JWTProvider // JWT authentication provider
 }
 
 // command-line args
 var cliArgs = &CliArgs{
- ConfigFile:  flag.String("c", "config/sample.json", "Config file"),
- ShowVersion: flag.Bool("version", false, "Show version"),
+  ConfigFile:  flag.String("c", "config/config.json", "Config file"),
+  ShowVersion: flag.Bool("version", false, "Show version"),
 }
 
 // NewApplication Sample application factory
 func NewApplication(args *CliArgs, logger *log.Logger) (*Application, error) {
- cfg, err := provider.NewJsonProvider(*args.ConfigFile)
- if err != nil {
-  return nil, err
- }
- if logger == nil {
-  logger = log.New("application")
- }
- return &Application{
-  container:   blueprint.NewContainer(cfg),
-  args:        args,
-  httpServer:  nil,
-  logger:      logger,
-  jwtProvider: nil,
- }, nil
+  cfg, err := provider.NewJsonProvider(*args.ConfigFile)
+  if err != nil {
+    return nil, err
+  }
+  if logger == nil {
+    logger = log.New("application")
+  }
+  return &Application{
+    Container:   blueprint.NewContainer(cfg),
+    args:        args,
+    httpServer:  nil,
+    logger:      logger,
+    jwtProvider: nil,
+  }, nil
 }
 
 func (a *Application) Build() {
- // assemble internal dependencies of application
- // if some error occurs, generate fatal error & abort execution
+  // assemble internal dependencies of application
+  // if some error occurs, generate fatal error & abort execution
+  var err error
 
- // initialize http server
- a.logger.Info("Building Sample Application...")
+  // initialize http server
+  a.logger.Info("Building Sample Application...")
 
- // initialize JWT provider
- jwtConfig := jwtprovider.NewJWTConfig()
- if err := a.container.Config.GetKey("jwt", jwtConfig); err != nil {
-  a.container.AbortFatal(err)
- }
- var err error
- a.jwtProvider, err = jwtprovider.NewProvider(jwtConfig)
- a.container.AbortFatal(err)
+  // initialize JWT provider from configuration
+  jwtConfig := jwtprovider.NewJWTConfig()
+  a.AbortFatal(a.Config.GetKey("jwt", jwtConfig))
 
- // initialize http server config
- httpConfig := httpserver.NewServerConfig()
- // fill parameters from config provider
- if err := a.container.Config.GetKey("server", httpConfig); err != nil {
-  a.container.AbortFatal(err)
- }
- // Create http server from config
- a.httpServer, err = httpConfig.NewServer(a.logger)
- a.container.AbortFatal(err)
+  // optional - create a revocation manager instance for token revocation
+  revocationManager := jwtprovider.NewRevocationManager(jwtprovider.NewMemoryRevocationBackend())
 
- // Apply security middleware
- a.httpServer.UseDefaultSecurityHeaders()
- a.httpServer.UseCSRFProtection()
- a.httpServer.UseRateLimiting(60) // 60 requests per minute
+  // create the JWT provider to use with the API server
+  a.jwtProvider, err = jwtprovider.NewProvider(jwtConfig, jwtprovider.WithRevocationManager(revocationManager))
+  a.AbortFatal(err)
 
- // Create JWT auth middleware
- jwtAuth := auth.NewAuthJWT(a.jwtProvider)
+  a.jwtProvider, err = jwtprovider.NewProvider(jwtConfig)
+  a.AbortFatal(err)
 
- // Add protected routes with JWT authentication
- v1 := a.httpServer.Route().Group("/v1")
- v1.Use(auth.AuthMiddleware(jwtAuth))
- 
- // endpoint: /v1/hello (protected)
- v1.GET("/hello", func(ctx *gin.Context) {
-  claims, _ := auth.GetClaims(ctx)
-  ctx.JSON(200, gin.H{
-   "message": "Hello World",
-   "user":    claims.Subject,
-   "data":    claims.Data,
+  // initialize http server config
+  httpConfig := httpserver.NewServerConfig()
+  // fill parameters from config provider
+  a.AbortFatal(a.Config.GetKey("server", httpConfig))
+
+  // Create http server from config
+  a.httpServer, err = httpConfig.NewServer(a.logger)
+  a.AbortFatal(err)
+
+  // Apply security middleware
+  a.httpServer.UseDefaultSecurityHeaders()
+  a.httpServer.UseCSRFProtection()
+  a.httpServer.UseRateLimiting(60) // 60 requests per minute
+
+  // Create router group
+  v1 := a.httpServer.Route().Group("/v1")
+
+  // Public login endpoint
+  a.httpServer.Route().POST("/login", func(ctx *gin.Context) {
+    // Basic authentication logic (replace with your auth system)
+    var loginData struct {
+      Username string `json:"username" binding:"required"`
+      Password string `json:"password" binding:"required"`
+    }
+
+    // bind request params
+    if !httpserver.ValidateJSON(ctx, &loginData) {
+      // if ValidateJSON() fails, error response was already sent
+      return
+    }
+
+    // Validate credentials (implement your validation logic)
+    if loginData.Username == "demo" && loginData.Password == "password" {
+      token, err := a.jwtProvider.GenerateToken("demo", map[string]interface{}{
+        "role": "user",
+      })
+      if err != nil {
+        ctx.JSON(400, gin.H{"error": "Token generation failed"})
+        return
+      }
+      ctx.JSON(200, gin.H{"token": token})
+      return
+
+    }
+
+    ctx.JSON(401, gin.H{"error": "Invalid credentials"})
   })
- })
 
- // Public login endpoint
- a.httpServer.Route().POST("/login", func(ctx *gin.Context) {
-  // Basic authentication logic (replace with your auth system)
-  var loginData struct {
-   Username string `json:"username"`
-   Password string `json:"password"`
-  }
-  
-  if err := ctx.ShouldBindJSON(&loginData); err != nil {
-   ctx.JSON(400, gin.H{"error": "Invalid request"})
-   return
-  }
-  
-  // Validate credentials (implement your validation logic)
-  if loginData.Username == "demo" && loginData.Password == "password" {
-   token, err := a.jwtProvider.GenerateToken("demo", map[string]interface{}{
-    "role": "user",
-   })
-   if err != nil {
-    ctx.JSON(500, gin.H{"error": "Token generation failed"})
-    return
-   }
-   ctx.JSON(200, gin.H{"token": token})
-  } else {
-   ctx.JSON(401, gin.H{"error": "Invalid credentials"})
-  }
- })
+  // Create JWT auth middleware and enable middleware
+  jwtAuth := auth.NewAuthJWT(a.jwtProvider)
+  v1.Use(auth.AuthMiddleware(jwtAuth))
+
+  // protected endpoint: /v1/hello
+  v1.GET("/hello", func(ctx *gin.Context) {
+    token, _ := auth.GetJWTToken(ctx)
+    claims, err := a.jwtProvider.ParseToken(token)
+    if err != nil {
+      ctx.JSON(400, gin.H{"error": "Token generation failed"})
+      return
+    }
+
+    ctx.JSON(200, gin.H{
+      "id":   claims.ID,
+      "user": claims.Subject,
+      "data": claims.Data,
+    })
+  })
+
 }
 
-func (a *Application) Run() {
- // register http destructor callback
- blueprint.RegisterDestructor(func() error {
-  return a.httpServer.Shutdown(a.container.GetContext())
- })
+func (a *Application) Start() {
 
- // Start  application - http server
- a.container.Run(func(app interface{}) error {
-  go func() {
-   a.logger.Infof("Running Sample Application API at https://%s:%d", a.httpServer.Config.Host, a.httpServer.Config.Port)
-   a.logger.Infof("Login: POST /login (username: demo, password: password)")
-   a.logger.Infof("Protected: GET /v1/hello (requires JWT token)")
-   a.container.AbortFatal(a.httpServer.Start())
-  }()
-  return nil
- })
+  // register http destructor callback
+  blueprint.RegisterDestructor(func() error {
+    return a.httpServer.Shutdown(a.GetContext())
+  })
+
+  // Start  application - http server
+  a.Run(func(app interface{}) error {
+    go func() {
+      a.logger.Infof("Running Sample Application API at https://%s:%d", a.httpServer.Config.Host, a.httpServer.Config.Port)
+      a.logger.Infof("Login: POST /login (username: demo, password: password)")
+      a.logger.Infof("Protected: GET /v1/hello (requires JWT token)")
+      a.AbortFatal(a.httpServer.Start())
+    }()
+    return nil
+  })
 }
 
 func main() {
- // config logger
- log.Configure(log.NewDefaultConfig())
- logger := log.New("sample-application")
+  // config logger
+  log.Configure(log.NewDefaultConfig())
+  logger := log.New("sample-application")
 
- flag.Parse()
+  flag.Parse()
 
- if *cliArgs.ShowVersion {
-  fmt.Printf("Version: %s\n", VERSION)
-  os.Exit(0)
- }
+  if *cliArgs.ShowVersion {
+    fmt.Printf("Version: %s\n", VERSION)
+    os.Exit(0)
+  }
 
- app, err := NewApplication(cliArgs, logger)
- if err != nil {
-  logger.Error(err, "Initialization failed")
-  os.Exit(-1)
- }
+  app, err := NewApplication(cliArgs, logger)
+  if err != nil {
+    logger.Error(err, "Initialization failed")
+    os.Exit(-1)
+  }
 
- // build application
- app.Build()
- // execute application
- app.Run()
+  // build application
+  app.Build()
+  // execute application
+  app.Start()
 }
 ```
 
@@ -238,12 +254,7 @@ Example config file *sample.json*:
     "readTimeout": 30,
     "writeTimeout": 30,
     "debug": true,
-    "tlsEnable": false,
-    "tlsCert": "",
-    "tlsKey": "",
-    "options": {
-      "authTokenSecret": "your-api-secret-key-here"
-    }
+    "tlsEnable": false
   },
   "jwt": {
     "signingKey": {
