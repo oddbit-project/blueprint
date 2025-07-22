@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Filter cuts all chars not in set, and optinally replaces them
+// Filter cuts all chars not in set, and optionally replaces them
 // with the replacement rune
 func Filter(s string, set []rune, replacement ...rune) string {
 	if s == "" {

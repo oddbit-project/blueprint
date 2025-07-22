@@ -1,6 +1,7 @@
 # Secure Credentials
 
-The secure credentials system in Blueprint provides a way to handle sensitive information like passwords securely in memory. It encrypts credentials using AES-256-GCM and provides methods to safely store, retrieve, and clear sensitive data with thread-safe operations.
+The secure credentials system in Blueprint provides a way to handle sensitive information like passwords securely in memory. 
+It encrypts credentials using AES-256-GCM and provides methods to safely store, retrieve, and clear sensitive data with thread-safe operations.
 
 ## Features
 
@@ -370,38 +371,6 @@ func errorHandlingExample() {
     }
 
     log.Printf("Successfully retrieved credential: %s", value)
-}
-```
-
-### Key Management
-
-```go
-func keyManagementExample() {
-    // Generate a new key
-    key := secure.RandomKey32()
-
-    // Encode key for storage (e.g., in config file)
-    encodedKey := secure.EncodeKey(key)
-    log.Printf("Encoded key: %s", encodedKey)
-
-    // Later, decode the key
-    decodedKey, err := secure.DecodeKey(encodedKey)
-    if err != nil {
-        log.Fatalf("Failed to decode key: %v", err)
-    }
-
-    // Verify keys match
-    if len(decodedKey) != 32 {
-        log.Fatal("Decoded key has wrong length")
-    }
-
-    // Use decoded key for credentials
-    credential, err := secure.NewCredential([]byte("secret"), decodedKey, false)
-    if err != nil {
-        log.Fatalf("Failed to create credential with decoded key: %v", err)
-    }
-
-    credential.Clear()
 }
 ```
 
@@ -885,37 +854,11 @@ func (s *ServiceWithCredentials) getAuthToken() (string, error) {
 }
 ```
 
-#### Batch Operations
-```go
-func performBatchOperations(credentials []*secure.Credential) error {
-    // Get all credentials at once to minimize lock contention
-    passwords := make([]string, len(credentials))
-    for i, cred := range credentials {
-        password, err := cred.Get()
-        if err != nil {
-            return fmt.Errorf("failed to get credential %d: %v", i, err)
-        }
-        passwords[i] = password
-    }
-
-    // Perform all operations
-    results := performOperations(passwords)
-
-    // Clear passwords immediately
-    for i := range passwords {
-        passwords[i] = ""
-    }
-
-    return processResults(results)
-}
-```
-
 ### Security Guidelines
 
 #### Key Management
 - Generate unique keys per application instance
 - Store keys in secure key management systems
-- Implement key rotation procedures
 - Never log or expose encryption keys
 - Use hardware security modules when available
 

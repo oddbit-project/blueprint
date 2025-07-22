@@ -148,3 +148,12 @@ func ValidationError(ctx *gin.Context, errors interface{}) {
 	}
 	ctx.AbortWithStatus(http.StatusBadRequest)
 }
+
+// Success generates a JSON success response with an optional payload
+func Success(ctx *gin.Context, data any) {
+	result := &JSONResponse{
+		Success: true,
+		Data:    data,
+	}
+	ctx.JSON(200, result)
+}

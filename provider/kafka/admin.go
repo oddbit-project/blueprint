@@ -5,10 +5,10 @@ import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
+	"slices"
 )
 
 type AdminConfig struct {
@@ -31,7 +31,7 @@ func (c AdminConfig) Validate() error {
 		return ErrMissingAdminBroker
 	}
 
-	if str.Contains(c.AuthType, validAuthTypes) == -1 {
+	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
 	return nil

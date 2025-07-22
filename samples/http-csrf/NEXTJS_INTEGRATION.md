@@ -60,22 +60,13 @@ func main() {
 	server.UseSession(sessionConfig, nil, logger)
 
 	// CORS middleware for Next.js integration
-	server.Route().Use(func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if origin == "http://localhost:3000" { // Next.js default port
-			c.Header("Access-Control-Allow-Origin", origin)
-			c.Header("Access-Control-Allow-Credentials", "true")
-			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token")
-			c.Header("Access-Control-Expose-Headers", "X-CSRF-Token")
-		}
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	corsCfg := security.NewCorsConfig()
+	corsCfg.AllowOrigins = []string{
+		"http://localhost:3000",
+		"http://localhost:3001",
+		"https://your-app.vercel.app", // Add your production domain
+	}
+	server.AddMiddleware(security.CORSMiddleware(corsCfg))
 
 	// Apply CSRF protection to state-changing routes
 	server.Route().Use(security.CSRFProtection())

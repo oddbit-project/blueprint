@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"github.com/oddbit-project/blueprint/utils"
 	"golang.org/x/crypto/argon2"
+	"runtime"
 	"strings"
 )
 
@@ -48,31 +49,63 @@ const (
 	ErrIncompatibleVersion = utils.Error("argon2id: incompatible version of argon2")
 )
 
-// Argon2Config blueprint-style config struct
+// Argon2Config holds the parameters for Argon2id password hashing.
+// These parameters control the computational cost and security level.
 type Argon2Config struct {
-	Memory      uint32 `json:"memory"`
-	Iterations  uint32 `json:"iterations"`
-	Parallelism uint8  `json:"parallelism"`
-	SaltLength  uint32 `json:"saltLength"`
-	KeyLength   uint32 `json:"keyLength"`
+	// Memory is the amount of memory to use in KiB (e.g., 64*1024 = 64MB).
+	// Higher values increase security but also computational cost.
+	Memory uint32 `json:"memory"`
+
+	// Iterations is the number of passes over the memory.
+	// Also known as time cost. Higher values increase security.
+	Iterations uint32 `json:"iterations"`
+
+	// Parallelism is the number of threads to use.
+	// Typically set to the number of available CPU cores.
+	Parallelism uint8 `json:"parallelism"`
+
+	// SaltLength is the length of the random salt in bytes.
+	// Recommended minimum is 16 bytes.
+	SaltLength uint32 `json:"saltLength"`
+
+	// KeyLength is the length of the generated hash in bytes.
+	// Recommended minimum is 32 bytes.
+	KeyLength uint32 `json:"keyLength"`
 }
 
-func NewArgon2IdConfig() Argon2Config {
-	return Argon2Config{
-		Memory:      64 * 1024, // memory in Kb
+// NewArgon2IdConfig returns the default Argon2id configuration with:
+//   - Memory: 64MB (64*1024 KiB)
+//   - Iterations: 4
+//   - Parallelism: Number of CPU cores
+//   - Salt length: 16 bytes
+//   - Key length: 32 bytes
+func NewArgon2IdConfig() *Argon2Config {
+	return &Argon2Config{
+		Memory:      64 * 1024, // 64MB in KiB
 		Iterations:  4,
-		Parallelism: 2,
+		Parallelism: uint8(runtime.NumCPU()),
 		SaltLength:  16,
 		KeyLength:   32,
 	}
 }
 
+// Argon2IdNeedsRehash checks if a hash was created with different
+// parameters than the current default configuration. This is useful
+// for upgrading hashes when security parameters are updated.
+//
+// Returns true if any parameter differs from the current defaults.
 func Argon2IdNeedsRehash(c *Argon2Config) bool {
 	cfg := NewArgon2IdConfig()
 	return c.Memory != cfg.Memory || c.Iterations != cfg.Iterations || c.Parallelism != cfg.Parallelism || c.SaltLength != cfg.SaltLength || c.KeyLength != cfg.KeyLength
 }
 
-func Argon2IdCreateHash(password string, c Argon2Config) (string, error) {
+// Argon2IdCreateHash generates an Argon2id hash from the given password
+// using the provided configuration. The hash is returned in the standard
+// format: $argon2id$v=19$m=65536,t=4,p=8$salt$hash
+//
+// The function generates a cryptographically secure random salt and
+// includes all parameters in the hash for self-contained verification.
+func Argon2IdCreateHash(c *Argon2Config, password string) (string, error) {
 	salt, err := utils.GenerateRandomBytes(c.SaltLength)
 	if err != nil {
 		return "", err
@@ -87,6 +120,16 @@ func Argon2IdCreateHash(password string, c Argon2Config) (string, error) {
 	return result, nil
 }
 
+// Argon2IdDecodeHash parses an Argon2id hash string and extracts the
+// configuration parameters, salt, and hash key.
+//
+// The expected format is: $argon2id$v=19$m=65536,t=4,p=8$salt$hash
+//
+// Returns:
+//   - *Argon2Config: The parameters used to create the hash
+//   - []byte: The salt
+//   - []byte: The hash key
+//   - error: ErrInvalidHash if format is incorrect, ErrIncompatibleVersion if version mismatch
 func Argon2IdDecodeHash(hash string) (*Argon2Config, []byte, []byte, error) {
 	tokens := strings.Split(hash, "$")
 	if len(tokens) != 6 {
@@ -132,8 +175,26 @@ func Argon2IdDecodeHash(hash string) (*Argon2Config, []byte, []byte, error) {
 	return cfg, salt, key, nil
 }
 
-// Argon2IdComparePassword
-// Compares password and hash, and returns the hash configto enable re-hashing if necessary
+// Argon2IdComparePassword verifies that a password matches the given Argon2id hash.
+// It uses constant-time comparison to prevent timing attacks.
+//
+// Returns:
+//   - bool: true if the password matches the hash
+//   - *Argon2Config: the configuration used to create the hash (useful for rehashing)
+//   - error: any error during hash parsing or comparison
+//
+// The configuration is returned even on failed matches to allow checking
+// if rehashing is needed after a successful authentication.
+//
+// Example:
+//
+//	valid, cfg, err := Argon2IdComparePassword(password, hash)
+//	if err != nil {
+//	    return err
+//	}
+//	if valid && Argon2IdNeedsRehash(cfg) {
+//	    // Generate new hash with updated parameters
+//	}
 func Argon2IdComparePassword(password, hash string) (bool, *Argon2Config, error) {
 	cfg, salt, key, err := Argon2IdDecodeHash(hash)
 	if err != nil {

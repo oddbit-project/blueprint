@@ -19,6 +19,7 @@
 
 ## Security
 
+- [Password Hashing](crypt/password-hashing.md)
 - [Secure Credentials](crypt/secure-credentials.md)
 - [HMAC Provider](provider/hmacprovider.md)
 - [htpasswd Authentication](provider/htpasswd.md)

@@ -357,29 +357,6 @@ curl -H "Content-Type: application/json" \
 3. Test form submissions and API calls
 4. Verify CSRF protection in browser dev tools
 
-## Production Deployment
-
-### Backend Configuration
-
-```go
-// Production settings
-sessionConfig.Secure = true  // Require HTTPS
-sessionConfig.SameSite = int(http.SameSiteStrictMode)  // Stricter policy
-sessionConfig.Domain = "yourdomain.com"  // Set cookie domain
-
-// Update CORS for production
-allowedOrigins := []string{
-    "https://yourdomain.com",
-    "https://www.yourdomain.com",
-}
-```
-
-### Frontend Configuration
-
-```env
-# .env.production
-NEXT_PUBLIC_API_BASE_URL=https://api.yourdomain.com
-```
 
 ## Security Considerations
 

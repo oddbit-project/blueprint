@@ -6,10 +6,10 @@ import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
+	"slices"
 	"strings"
 	"time"
 )
@@ -91,7 +91,7 @@ func (c ProducerConfig) Validate() error {
 	if len(c.Topic) == 0 {
 		return ErrMissingProducerTopic
 	}
-	if str.Contains(c.AuthType, validAuthTypes) == -1 {
+	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
 

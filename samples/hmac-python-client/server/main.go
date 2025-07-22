@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/oddbit-project/blueprint/provider/httpserver/security"
 	"net/http"
 	"os"
 	"os/signal"
@@ -101,8 +102,14 @@ func createServer(hmacProvider *hmacprovider.HMACProvider, logger *log.Logger) (
 
 	// Add basic middleware
 	router.Use(gin.Recovery())
-	router.Use(corsMiddleware())
+
+	// Add logging
 	router.Use(requestLogger(logger))
+
+	// Add cors
+	cfg := security.NewCorsConfig()
+	cfg.AllowOrigins = []string{"*"}
+	router.Use(security.CORSMiddleware(cfg))
 
 	// Setup routes
 	setupRoutes(router, hmacProvider, logger)
@@ -143,22 +150,6 @@ func setupRoutes(router *gin.Engine, hmacProvider *hmacprovider.HMACProvider, lo
 		test.GET("/simple", simpleTestHandler)
 		test.POST("/json", jsonTestHandler)
 		test.POST("/large", largeDataTestHandler)
-	}
-}
-
-// Middleware functions
-func corsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, X-HMAC-Hash, X-HMAC-Timestamp, X-HMAC-Nonce")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
 	}
 }
 

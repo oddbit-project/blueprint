@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.6.1]
+
+### Added
+
+- **RateLimiter** (provider/ratelimiter) - Generic rate limiter
+  - Configurable generic rate-limiter with memory backend
+  - Suitable for rate-limiting operations such as login
+
+- **CORS Middleware** (provider/httpserver/security) - Configurable CORS middleware
+  - Development mode with dynamic origin 
+
+- **Text token generation** (secure/token) - Helper to generate a URL-safe, base64-encoded token with configurable entropy
+
+- **Password hasher interface** (secure/hasher/PasswordHasher)
+  - Provides a simple, generic interface for password hashing
+  - Provides an Argon2 implementation using the existing functions;
+
+### Changed
+
+- **Breaking:** removal of str.Contains() - function does not make sense anymore; use slices.Contains() instead
+- **Breaking:** crypt/hashing/Argon2* changes
+    - Argon2Config{}  is now used as a pointer; relevant methods have been updated
+    - Argon2IdCreateHash signature change - cfg now comes first
+
 ## [v0.6.0]
 
 ### Added

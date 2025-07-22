@@ -7,7 +7,7 @@ import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/oddbit-project/blueprint/utils/str"
+	"slices"
 	"time"
 )
 
@@ -57,7 +57,7 @@ func (c ProducerConfig) Validate() error {
 	if len(c.Subject) == 0 {
 		return ErrMissingProducerTopic
 	}
-	if str.Contains(c.AuthType, validAuthTypes) == -1 {
+	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
 
