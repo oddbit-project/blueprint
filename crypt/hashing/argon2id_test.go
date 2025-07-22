@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"regexp"
+	"runtime"
 	"testing"
 )
 
@@ -40,7 +41,7 @@ func TestNewArgon2IdConfig(t *testing.T) {
 	cfg := NewArgon2IdConfig()
 	assert.Equal(t, uint32(64*1024), cfg.Memory)
 	assert.Equal(t, uint32(4), cfg.Iterations)
-	assert.Equal(t, uint8(2), cfg.Parallelism)
+	assert.Equal(t, uint8(runtime.NumCPU()), cfg.Parallelism)
 	assert.Equal(t, uint32(16), cfg.SaltLength)
 	assert.Equal(t, uint32(32), cfg.KeyLength)
 }
