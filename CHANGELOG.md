@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **RateLimiter** (provider/ratelimiter) - Generic rate limiter
+  - Configurable generic rate-limiter with memory backend
+  - Suitable for rate-limiting operations such as login
+
 - **CORS Middleware** (provider/httpserver/security) - Configurable CORS middleware
   - Development mode with dynamic origin 
 
@@ -20,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - **Breaking:** removal of str.Contains() - function does not make sense anymore; use slices.Contains() instead
-- **Breaking:** crypt/hashing/Argon2*
+- **Breaking:** crypt/hashing/Argon2* changes
     - Argon2Config{}  is now used as a pointer; relevant methods have been updated
     - Argon2IdCreateHash signature change - cfg now comes first
 
