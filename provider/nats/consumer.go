@@ -7,7 +7,7 @@ import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/oddbit-project/blueprint/utils/str"
+	"slices"
 	"sync"
 	"time"
 )
@@ -75,7 +75,7 @@ func (c ConsumerConfig) Validate() error {
 	if len(c.Subject) == 0 {
 		return ErrMissingConsumerTopic
 	}
-	if str.Contains(c.AuthType, validAuthTypes) == -1 {
+	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
 

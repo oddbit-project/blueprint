@@ -49,17 +49,17 @@ func TestArgon2IdCreateHash(t *testing.T) {
 	hashRX, err := regexp.Compile(`^\$argon2id\$v=19\$m=65536,t=4,p=[0-9]{1,4}\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{43}$`)
 	assert.NoError(t, err)
 
-	hash1, err := Argon2IdCreateHash("pa$$word", NewArgon2IdConfig())
+	hash1, err := Argon2IdCreateHash(NewArgon2IdConfig(), "pa$$word")
 	assert.NoError(t, err)
 
 	assert.True(t, hashRX.MatchString(hash1), fmt.Sprintf("hash %q not in correct format", hash1))
-	hash2, err := Argon2IdCreateHash("pa$$word", NewArgon2IdConfig())
+	hash2, err := Argon2IdCreateHash(NewArgon2IdConfig(), "pa$$word")
 	assert.NoError(t, err)
 	assert.NotEqual(t, hash1, hash2, "hashes must be unique")
 }
 
 func TestArgon2IdComparePasswordAndHash(t *testing.T) {
-	hash, err := Argon2IdCreateHash("pa$$word", NewArgon2IdConfig())
+	hash, err := Argon2IdCreateHash(NewArgon2IdConfig(), "pa$$word")
 	assert.NoError(t, err)
 
 	match, _, err := Argon2IdComparePassword("pa$$word", hash)
@@ -74,24 +74,24 @@ func TestArgon2IdComparePasswordAndHash(t *testing.T) {
 }
 
 func TestArgon2IdDecodeHash(t *testing.T) {
-	hash, err := Argon2IdCreateHash("pa$$word", NewArgon2IdConfig())
+	hash, err := Argon2IdCreateHash(NewArgon2IdConfig(), "pa$$word")
 	assert.NoError(t, err)
 
 	params, _, _, err := Argon2IdDecodeHash(hash)
 	assert.NoError(t, err)
 
-	assert.EqualExportedValues(t, NewArgon2IdConfig(), *params, fmt.Sprintf("expected %#v got %#v", NewArgon2IdConfig(), *params))
+	assert.EqualExportedValues(t, *NewArgon2IdConfig(), *params, fmt.Sprintf("expected %#v got %#v", NewArgon2IdConfig(), *params))
 }
 
 func TestArgon2IdCheckHash(t *testing.T) {
-	hash, err := Argon2IdCreateHash("pa$$word", NewArgon2IdConfig())
+	hash, err := Argon2IdCreateHash(NewArgon2IdConfig(), "pa$$word")
 	assert.NoError(t, err)
 
 	ok, params, err := Argon2IdComparePassword("pa$$word", hash)
 	assert.NoError(t, err)
 
 	assert.True(t, ok, "expected password to match")
-	assert.EqualExportedValues(t, NewArgon2IdConfig(), *params, fmt.Sprintf("expected %#v got %#v", NewArgon2IdConfig(), *params))
+	assert.EqualExportedValues(t, *NewArgon2IdConfig(), *params, fmt.Sprintf("expected %#v got %#v", NewArgon2IdConfig(), *params))
 }
 
 func TestArgon2IdStrictDecoding(t *testing.T) {

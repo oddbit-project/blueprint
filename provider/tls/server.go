@@ -33,8 +33,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"github.com/oddbit-project/blueprint/utils"
-	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/rs/zerolog/log"
+	"slices"
 	"time"
 )
 
@@ -154,7 +154,7 @@ func (c *ServerConfig) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Cert
 	// Check DNS names
 	if len(c.TLSAllowedDNSNames) > 0 {
 		for _, name := range cert.DNSNames {
-			if str.Contains(name, c.TLSAllowedDNSNames) > -1 {
+			if !slices.Contains(c.TLSAllowedDNSNames, name) {
 				return nil
 			}
 		}

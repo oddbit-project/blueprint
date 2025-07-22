@@ -128,10 +128,8 @@ func (a *ApiServer) login(c *gin.Context) {
 		Password string `json:"password"`
 	}
 
-	if err := c.ShouldBindJSON(&loginRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+	if !httpserver.ValidateJSON(c, &loginRequest) {
+		// response is filled automatically
 		return
 	}
 
@@ -145,8 +143,7 @@ func (a *ApiServer) login(c *gin.Context) {
 	}
 
 	// store the valid login in the current session
-	currentSession := session.Get(c)
-	currentSession.SetIdentity(user)
+	session.Get(c).SetIdentity(user)
 
 	// Regenerate session ID for security
 	a.sessionMgr.Regenerate(c)

@@ -6,11 +6,11 @@ import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/oddbit-project/blueprint/utils/str"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
 	"io"
+	"slices"
 	"strings"
 	"time"
 )
@@ -164,20 +164,20 @@ func (c ConsumerConfig) Validate() error {
 			return ErrMissingConsumerTopic
 		}
 	}
-	if str.Contains(c.AuthType, validAuthTypes) == -1 {
+	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
 
 	if len(c.Topic) > 0 {
 		if len(c.StartOffset) > 0 {
-			if str.Contains(c.StartOffset, []string{"first", "last"}) < 0 {
+			if !slices.Contains([]string{"first", "last"}, c.StartOffset) {
 				return ErrInvalidStartOffset
 			}
 		}
 	}
 
 	if len(c.IsolationLevel) > 0 {
-		if str.Contains(c.StartOffset, []string{"uncommitted", "committed"}) < 0 {
+		if !slices.Contains([]string{"uncommitted", "committed"}, c.StartOffset) {
 			return ErrInvalidIsolationLevel
 		}
 	}
