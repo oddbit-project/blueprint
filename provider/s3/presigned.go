@@ -38,7 +38,7 @@ func (b *Bucket) PresignGetObject(ctx context.Context, objectName string, expiry
 }
 
 // PresignPutObject generates a pre-signed URL for uploading an object
-func (b *Bucket) PresignPutObject(ctx context.Context, bucket, objectName string, expiry time.Duration, opts ...ObjectOptions) (string, error) {
+func (b *Bucket) PresignPutObject(ctx context.Context, objectName string, expiry time.Duration, opts ...ObjectOptions) (string, error) {
 	if !b.IsConnected() {
 		return "", ErrClientNotConnected
 	}
@@ -51,7 +51,7 @@ func (b *Bucket) PresignPutObject(ctx context.Context, bucket, objectName string
 	presignClient := s3.NewPresignClient(b.s3Client)
 
 	input := &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
+		Bucket: aws.String(b.bucketName),
 		Key:    aws.String(objectName),
 	}
 
