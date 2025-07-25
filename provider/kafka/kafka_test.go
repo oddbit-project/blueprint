@@ -1,47 +1,79 @@
-//go:build integration && kafka
-// +build integration,kafka
-
 package kafka
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/oddbit-project/blueprint/crypt/secure"
-	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"github.com/stretchr/testify/assert"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/kafka"
 )
 
-func getConfig() (*ProducerConfig, *ConsumerConfig) {
+// KafkaIntegrationTestSuite manages the Kafka testcontainer and provides configuration
+type KafkaIntegrationTestSuite struct {
+	suite.Suite
+	container     testcontainers.Container
+	kafkaInstance *kafka.KafkaContainer
+	brokers       string
+	ctx           context.Context
+}
+
+// SetupSuite sets up the test suite with a shared Kafka container
+func (k *KafkaIntegrationTestSuite) SetupSuite() {
+	k.ctx = context.Background()
+
+	// Create Kafka container using testcontainers
+	var err error
+	k.kafkaInstance, err = kafka.Run(k.ctx,
+		"confluentinc/confluent-local:7.5.0",
+		kafka.WithClusterID("test-cluster"),
+	)
+	require.NoError(k.T(), err, "Failed to start Kafka container")
+
+	// Get brokers string
+	brokers, err := k.kafkaInstance.Brokers(k.ctx)
+	require.NoError(k.T(), err, "Failed to get Kafka brokers")
+	k.brokers = strings.Join(brokers, ",")
+	k.container = k.kafkaInstance.Container
+
+	k.T().Logf("Kafka container started with brokers: %s", k.brokers)
+}
+
+// TearDownSuite cleans up the test suite by stopping the Kafka container
+func (k *KafkaIntegrationTestSuite) TearDownSuite() {
+	if k.container != nil {
+		err := k.container.Terminate(k.ctx)
+		if err != nil {
+			k.T().Logf("Failed to terminate Kafka container: %v", err)
+		}
+	}
+}
+
+// getConfig returns producer and consumer configurations using the testcontainer brokers
+func (k *KafkaIntegrationTestSuite) getConfig() (*ProducerConfig, *ConsumerConfig) {
 	producerCfg := &ProducerConfig{
-		Brokers:  "kafka:9093",
+		Brokers:  k.brokers,
 		Topic:    "test_topic1",
-		AuthType: "scram256",
-		Username: "adminscram",
-		DefaultCredentialConfig: secure.DefaultCredentialConfig{
-			Password:       "admin-secret-256",
-			PasswordEnvVar: "",
-			PasswordFile:   "",
-		},
+		AuthType: "none", // Testcontainer doesn't require auth
 		ClientConfig: tlsProvider.ClientConfig{
 			TLSEnable: false,
 		},
 		ProducerOptions: ProducerOptions{},
 	}
 	consumerCfg := &ConsumerConfig{
-		Brokers:  "kafka:9093",
+		Brokers:  k.brokers,
 		Topic:    "test_topic1",
 		Group:    "consumer_group_1",
-		AuthType: "scram256",
-		Username: "adminscram",
-		DefaultCredentialConfig: secure.DefaultCredentialConfig{
-			Password:       "admin-secret-256",
-			PasswordEnvVar: "",
-			PasswordFile:   "",
-		},
+		AuthType: "none", // Testcontainer doesn't require auth
 		ClientConfig: tlsProvider.ClientConfig{
 			TLSEnable: false,
 		},
@@ -50,137 +82,90 @@ func getConfig() (*ProducerConfig, *ConsumerConfig) {
 	return producerCfg, consumerCfg
 }
 
-// purgeTopic sets up a clean topic for testing, or skips the test if Kafka is not available
-func purgeTopic(t *testing.T, producerCfg *ProducerConfig) {
+// purgeTopic sets up a clean topic for testing using the testcontainer
+func (k *KafkaIntegrationTestSuite) purgeTopic(producerCfg *ProducerConfig) {
 	cfg := &AdminConfig{
-		Brokers:                 producerCfg.Brokers,
-		AuthType:                producerCfg.AuthType,
-		Username:                producerCfg.Username,
-		DefaultCredentialConfig: producerCfg.DefaultCredentialConfig,
-		ClientConfig:            producerCfg.ClientConfig,
+		Brokers:      producerCfg.Brokers,
+		AuthType:     producerCfg.AuthType,
+		ClientConfig: producerCfg.ClientConfig,
 	}
-	timeout := 20 * time.Second
+	timeout := 10 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	admin, err := NewAdmin(cfg, nil)
-	if err != nil {
-		t.Skipf("Cannot connect to Kafka admin: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to connect to Kafka admin")
 	defer admin.Disconnect()
 
 	// Check if topic exists and delete it if needed
 	exists, err := admin.TopicExists(ctx, producerCfg.Topic)
-	if err != nil {
-		t.Skipf("Cannot check if topic exists: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to check if topic exists")
 
 	if exists {
-		if err := admin.DeleteTopic(ctx, producerCfg.Topic); err != nil {
-			t.Skipf("Cannot delete existing topic: %v", err)
-			return
-		}
+		err := admin.DeleteTopic(ctx, producerCfg.Topic)
+		require.NoError(k.T(), err, "Failed to delete existing topic")
 	}
 
 	// Give Kafka some time to fully delete the topic
 	time.Sleep(3 * time.Second)
 
 	// Create the topic
-	if err := admin.CreateTopic(ctx, producerCfg.Topic, 1, 1); err != nil {
-		t.Skipf("Cannot create topic: %v", err)
-		return
-	}
+	err = admin.CreateTopic(ctx, producerCfg.Topic, 1, 1)
+	require.NoError(k.T(), err, "Failed to create topic")
 }
 
-func TestConsumer(t *testing.T) {
-	// Skip if Kafka is not available (this allows tests to run in CI without Kafka)
-	t.Skip("Skipping Kafka test as no Kafka server is available")
+// TestConsumer tests basic producer/consumer operations
+func (k *KafkaIntegrationTestSuite) TestConsumer() {
+	producerCfg, consumerCfg := k.getConfig()
 
-	ctx := context.Background()
-	producerCfg, consumerCfg := getConfig()
+	// Setup clean topic
+	k.purgeTopic(producerCfg)
 
-	// remove Topic if exists
-	purgeTopic(t, producerCfg)
 	producer, err := NewProducer(producerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create producer")
 	defer producer.Disconnect()
 
-	timeout := 20 * time.Second
-	consumerCtx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	consumer, err := NewConsumer(consumerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create consumer")
 	defer consumer.Disconnect()
 
 	// Plain message
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
-	err = producer.Write(ctx, value1)
-	if err != nil {
-		t.Skipf("Failed to write message: %v", err)
-		return
-	}
+	err = producer.Write(k.ctx, value1)
+	require.NoError(k.T(), err, "Failed to write message")
 
-	msg, err := consumer.ReadMessage(ctx)
-	if err != nil {
-		t.Skipf("Failed to read message: %v", err)
-		return
-	}
-	assert.Equal(t, string(value1), string(msg.Value))
+	msg, err := consumer.ReadMessage(k.ctx)
+	require.NoError(k.T(), err, "Failed to read message")
+	assert.Equal(k.T(), string(value1), string(msg.Value))
 
 	// Json message
-	err = producer.WriteJson(consumerCtx, consumerCfg)
-	if err != nil {
-		t.Skipf("Failed to write JSON message: %v", err)
-		return
-	}
+	err = producer.WriteJson(k.ctx, consumerCfg)
+	require.NoError(k.T(), err, "Failed to write JSON message")
 
-	msg, err = consumer.ReadMessage(ctx)
-	if err != nil {
-		t.Skipf("Failed to read JSON message: %v", err)
-		return
-	}
+	msg, err = consumer.ReadMessage(k.ctx)
+	require.NoError(k.T(), err, "Failed to read JSON message")
 	jsonValue, err := json.Marshal(consumerCfg)
-	if err != nil {
-		t.Skipf("Failed to marshal JSON: %v", err)
-		return
-	}
-	assert.Equal(t, string(jsonValue), string(msg.Value))
+	require.NoError(k.T(), err, "Failed to marshal JSON")
+	assert.Equal(k.T(), string(jsonValue), string(msg.Value))
 }
 
-func TestConsumerChannel(t *testing.T) {
-	// Skip if Kafka is not available (this allows tests to run in CI without Kafka)
-	t.Skip("Skipping Kafka test as no Kafka server is available")
+// TestConsumerChannel tests channel-based message processing
+func (k *KafkaIntegrationTestSuite) TestConsumerChannel() {
+	producerCfg, consumerCfg := k.getConfig()
 
-	ctx := context.Background()
-	producerCfg, consumerCfg := getConfig()
+	// Setup clean topic
+	k.purgeTopic(producerCfg)
 
-	// remove Topic if exists
-	purgeTopic(t, producerCfg)
 	producer, err := NewProducer(producerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create producer")
 	defer producer.Disconnect()
 
-	timeout := 30 * time.Second
+	timeout := 10 * time.Second
 	consumerCtx, cancel := context.WithCancel(context.Background())
 	defer cancel() // This will signal all goroutines to stop
 
 	consumer, err := NewConsumer(consumerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create consumer")
 	defer consumer.Disconnect()
 
 	// consume channel
@@ -199,7 +184,7 @@ func TestConsumerChannel(t *testing.T) {
 		defer consumerWg.Done()
 		err := consumer.ChannelSubscribe(consumerCtx, msgChannel)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			t.Logf("ChannelSubscribe error: %v", err)
+			k.T().Logf("ChannelSubscribe error: %v", err)
 		}
 	}()
 
@@ -214,7 +199,7 @@ func TestConsumerChannel(t *testing.T) {
 				if !ok {
 					return // channel closed
 				}
-				assert.Equal(t, string(value1), string(msg.Value))
+				assert.Equal(k.T(), string(value1), string(msg.Value))
 				wg.Done()
 			case <-done:
 				return // processing done
@@ -223,14 +208,14 @@ func TestConsumerChannel(t *testing.T) {
 	}()
 
 	// now write 3 messages
-	err = producer.WriteMulti(ctx, value1, value1, value1)
+	err = producer.WriteMulti(k.ctx, value1, value1, value1)
 	if err != nil {
 		cancel() // Cancel the context if we can't write messages
 		close(done)
 		close(msgChannel)
 		consumerWg.Wait()
 		processorWg.Wait()
-		t.Skipf("Skipping test due to write error: %v", err)
+		require.NoError(k.T(), err, "Failed to write multiple messages")
 		return
 	}
 
@@ -245,7 +230,7 @@ func TestConsumerChannel(t *testing.T) {
 	case <-waitCh:
 		// Success! All messages processed
 	case <-time.After(timeout):
-		t.Log("Timeout waiting for messages")
+		k.T().Log("Timeout waiting for messages")
 	}
 
 	// Clean shutdown
@@ -258,31 +243,23 @@ func TestConsumerChannel(t *testing.T) {
 	processorWg.Wait()
 }
 
-func TestConsumerSubscribe(t *testing.T) {
-	// Skip if Kafka is not available (this allows tests to run in CI without Kafka)
-	t.Skip("Skipping Kafka test as no Kafka server is available")
+// TestConsumerSubscribe tests subscription-based consumption
+func (k *KafkaIntegrationTestSuite) TestConsumerSubscribe() {
+	producerCfg, consumerCfg := k.getConfig()
 
-	ctx := context.Background()
-	producerCfg, consumerCfg := getConfig()
+	// Setup clean topic
+	k.purgeTopic(producerCfg)
 
-	// remove Topic if exists
-	purgeTopic(t, producerCfg)
 	producer, err := NewProducer(producerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create producer")
 	defer producer.Disconnect()
 
-	timeout := 30 * time.Second
+	timeout := 10 * time.Second
 	consumerCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	consumer, err := NewConsumer(consumerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create consumer")
 	defer consumer.Disconnect()
 
 	// consume channel
@@ -297,23 +274,18 @@ func TestConsumerSubscribe(t *testing.T) {
 		defer consumerWg.Done()
 		err := consumer.Subscribe(consumerCtx,
 			func(ctx context.Context, message Message) error {
-				assert.Equal(t, string(value1), string(message.Value))
+				assert.Equal(k.T(), string(value1), string(message.Value))
 				wg.Done()
 				return nil
 			})
 		if err != nil && !errors.Is(err, context.Canceled) {
-			t.Logf("Subscribe error: %v", err)
+			k.T().Logf("Subscribe error: %v", err)
 		}
 	}()
 
 	// now write 3 messages
-	err = producer.WriteMulti(ctx, value1, value1, value1)
-	if err != nil {
-		cancel() // Cancel context if we can't write messages
-		consumerWg.Wait()
-		t.Skipf("Skipping test due to write error: %v", err)
-		return
-	}
+	err = producer.WriteMulti(k.ctx, value1, value1, value1)
+	require.NoError(k.T(), err, "Failed to write multiple messages")
 
 	// Wait for all messages to be processed or timeout
 	waitCh := make(chan struct{})
@@ -326,7 +298,7 @@ func TestConsumerSubscribe(t *testing.T) {
 	case <-waitCh:
 		// Success! All messages processed
 	case <-time.After(timeout):
-		t.Log("Timeout waiting for messages")
+		k.T().Log("Timeout waiting for messages")
 	}
 
 	// Clean shutdown
@@ -336,31 +308,23 @@ func TestConsumerSubscribe(t *testing.T) {
 	consumerWg.Wait()
 }
 
-func TestConsumerSubscribeOffsets(t *testing.T) {
-	// Skip if Kafka is not available (this allows tests to run in CI without Kafka)
-	t.Skip("Skipping Kafka test as no Kafka server is available")
+// TestConsumerSubscribeOffsets tests offset management
+func (k *KafkaIntegrationTestSuite) TestConsumerSubscribeOffsets() {
+	producerCfg, consumerCfg := k.getConfig()
 
-	ctx := context.Background()
-	producerCfg, consumerCfg := getConfig()
+	// Setup clean topic
+	k.purgeTopic(producerCfg)
 
-	// remove Topic if exists
-	purgeTopic(t, producerCfg)
 	producer, err := NewProducer(producerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create producer")
 	defer producer.Disconnect()
 
-	timeout := 30 * time.Second
+	timeout := 10 * time.Second
 	consumerCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	consumer, err := NewConsumer(consumerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create consumer")
 	defer consumer.Disconnect()
 
 	// consume channel
@@ -376,23 +340,18 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 		err := consumer.SubscribeWithOffsets(
 			consumerCtx,
 			func(ctx context.Context, message Message) error {
-				assert.Equal(t, string(value1), string(message.Value))
+				assert.Equal(k.T(), string(value1), string(message.Value))
 				wg.Done()
 				return nil
 			})
 		if err != nil && !errors.Is(err, context.Canceled) {
-			t.Logf("SubscribeWithOffsets error: %v", err)
+			k.T().Logf("SubscribeWithOffsets error: %v", err)
 		}
 	}()
 
 	// now write 3 messages
-	err = producer.WriteMulti(ctx, value1, value1, value1)
-	if err != nil {
-		cancel() // Cancel context if we can't write messages
-		consumerWg.Wait()
-		t.Skipf("Skipping test due to write error: %v", err)
-		return
-	}
+	err = producer.WriteMulti(k.ctx, value1, value1, value1)
+	require.NoError(k.T(), err, "Failed to write multiple messages")
 
 	// Wait for all messages to be processed or timeout
 	waitCh := make(chan struct{})
@@ -405,7 +364,7 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 	case <-waitCh:
 		// Success! All messages processed
 	case <-time.After(timeout):
-		t.Log("Timeout waiting for messages")
+		k.T().Log("Timeout waiting for messages")
 	}
 
 	// Clean shutdown
@@ -415,82 +374,62 @@ func TestConsumerSubscribeOffsets(t *testing.T) {
 	consumerWg.Wait()
 }
 
-func TestProducer(t *testing.T) {
-	// Skip if Kafka is not available (this allows tests to run in CI without Kafka)
-	t.Skip("Skipping Kafka test as no Kafka server is available")
+// TestProducer tests producer functionality
+func (k *KafkaIntegrationTestSuite) TestProducer() {
+	producerCfg, consumerCfg := k.getConfig()
 
-	ctx := context.Background()
-	producerCfg, consumerCfg := getConfig()
+	// Setup clean topic
+	k.purgeTopic(producerCfg)
 
-	purgeTopic(t, producerCfg)
 	producer, err := NewProducer(producerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create producer")
 	defer producer.Disconnect()
 
-	timeout := 20 * time.Second
+	timeout := 10 * time.Second
 	consumerCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	consumer, err := NewConsumer(consumerCfg, nil)
-	if err != nil {
-		t.Skipf("Skipping test: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to create consumer")
 	defer consumer.Disconnect()
 
 	// Write multiple messages
 	value1 := []byte("the quick brown fox jumps over the lazy dog")
-	err = producer.WriteMulti(ctx, value1, value1, value1)
-	if err != nil {
-		t.Skipf("Failed to write multiple messages: %v", err)
-		return
-	}
+	err = producer.WriteMulti(k.ctx, value1, value1, value1)
+	require.NoError(k.T(), err, "Failed to write multiple messages")
 
 	for i := 0; i < 3; i++ {
 		msg, err := consumer.ReadMessage(consumerCtx)
-		if err != nil {
-			t.Skipf("Failed to read message %d: %v", i, err)
-			return
-		}
-		assert.Equal(t, string(value1), string(msg.Value))
+		require.NoError(k.T(), err, fmt.Sprintf("Failed to read message %d", i))
+		assert.Equal(k.T(), string(value1), string(msg.Value))
 	}
 
 	// write json message
 	jsonValue, err := json.Marshal(consumerCfg)
-	if err != nil {
-		t.Skipf("Failed to marshal JSON: %v", err)
-		return
-	}
+	require.NoError(k.T(), err, "Failed to marshal JSON")
 
-	err = producer.WriteJson(ctx, consumerCfg)
-	if err != nil {
-		t.Skipf("Failed to write JSON message: %v", err)
-		return
-	}
+	err = producer.WriteJson(k.ctx, consumerCfg)
+	require.NoError(k.T(), err, "Failed to write JSON message")
 
 	msg, err := consumer.ReadMessage(consumerCtx)
-	if err != nil {
-		t.Skipf("Failed to read JSON message: %v", err)
-		return
-	}
-	assert.Equal(t, string(jsonValue), string(msg.Value))
+	require.NoError(k.T(), err, "Failed to read JSON message")
+	assert.Equal(k.T(), string(jsonValue), string(msg.Value))
 
 	// write multiple json messages
-	err = producer.WriteMultiJson(ctx, consumerCfg, consumerCfg, consumerCfg)
-	if err != nil {
-		t.Skipf("Failed to write multiple JSON messages: %v", err)
-		return
-	}
+	err = producer.WriteMultiJson(k.ctx, consumerCfg, consumerCfg, consumerCfg)
+	require.NoError(k.T(), err, "Failed to write multiple JSON messages")
 
 	for i := 0; i < 3; i++ {
 		msg, err := consumer.ReadMessage(consumerCtx)
-		if err != nil {
-			t.Skipf("Failed to read JSON message %d: %v", i, err)
-			return
-		}
-		assert.Equal(t, string(jsonValue), string(msg.Value))
+		require.NoError(k.T(), err, fmt.Sprintf("Failed to read JSON message %d", i))
+		assert.Equal(k.T(), string(jsonValue), string(msg.Value))
 	}
+}
+
+// TestKafkaIntegration runs the integration test suite
+func TestKafkaIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	suite.Run(t, new(KafkaIntegrationTestSuite))
 }
