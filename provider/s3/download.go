@@ -13,10 +13,6 @@ func (b *Bucket) GetObjectStream(ctx context.Context, objectName string, writer 
 		return ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
-	}
-
 	// Use upload timeout for large downloads to match upload behavior
 	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
 	defer cancel()
@@ -37,10 +33,6 @@ func (b *Bucket) GetObjectStream(ctx context.Context, objectName string, writer 
 func (b *Bucket) GetObjectRange(ctx context.Context, objectName string, start, end int64) (io.ReadCloser, error) {
 	if !b.IsConnected() {
 		return nil, ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(objectName); err != nil {
-		return nil, err
 	}
 
 	// Don't use getContextWithTimeout here - let the caller manage the context
@@ -73,10 +65,6 @@ func (b *Bucket) GetObjectStreamRange(ctx context.Context, objectName string, wr
 		return ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
-	}
-
 	// Use upload timeout for large downloads to match upload behavior
 	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
 	defer cancel()
@@ -96,10 +84,6 @@ func (b *Bucket) GetObjectStreamRange(ctx context.Context, objectName string, wr
 func (b *Bucket) GetObjectAdvanced(ctx context.Context, objectName string, writer io.Writer, opts DownloadOptions) error {
 	if !b.IsConnected() {
 		return ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
 	}
 
 	// Use upload timeout for large downloads to match upload behavior

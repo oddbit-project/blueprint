@@ -17,10 +17,6 @@ func (b *Bucket) GetObject(ctx context.Context, name string) (io.ReadCloser, err
 		return nil, ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(name); err != nil {
-		return nil, err
-	}
-
 	// Don't use getContextWithTimeout here - let the caller manage the context
 	// This prevents the context from being canceled while the reader is still being used
 	obj, err := b.minioClient.GetObject(ctx, b.bucketName, name, minio.GetObjectOptions{})
@@ -35,10 +31,6 @@ func (b *Bucket) GetObject(ctx context.Context, name string) (io.ReadCloser, err
 func (b *Bucket) DeleteObject(ctx context.Context, name string) error {
 	if !b.IsConnected() {
 		return ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(name); err != nil {
-		return err
 	}
 
 	startTime := logOperationStart(b.logger, "delete_object", name, log.KV{
@@ -94,6 +86,12 @@ func (b *Bucket) ListObjects(ctx context.Context, opts ...ListOptions) ([]Object
 	objectCh := b.minioClient.ListObjects(ctx, b.bucketName, listOpts)
 
 	var objects []ObjectInfo
+	maxKeys := int32(0)
+	if len(opts) > 0 && opts[0].MaxKeys > 0 {
+		maxKeys = opts[0].MaxKeys
+	}
+
+	count := int32(0)
 	for objInfo := range objectCh {
 		if objInfo.Err != nil {
 			return nil, objInfo.Err
@@ -109,6 +107,14 @@ func (b *Bucket) ListObjects(ctx context.Context, opts ...ListOptions) ([]Object
 		}
 
 		objects = append(objects, info)
+
+		// Check if we've reached the maximum number of keys
+		if maxKeys > 0 {
+			count++
+			if count >= maxKeys {
+				break
+			}
+		}
 	}
 
 	return objects, nil
@@ -118,10 +124,6 @@ func (b *Bucket) ListObjects(ctx context.Context, opts ...ListOptions) ([]Object
 func (b *Bucket) ObjectExists(ctx context.Context, name string) (bool, error) {
 	if !b.IsConnected() {
 		return false, ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(name); err != nil {
-		return false, err
 	}
 
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
@@ -143,10 +145,6 @@ func (b *Bucket) ObjectExists(ctx context.Context, name string) (bool, error) {
 func (b *Bucket) HeadObject(ctx context.Context, name string) (*ObjectInfo, error) {
 	if !b.IsConnected() {
 		return nil, ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(name); err != nil {
-		return nil, err
 	}
 
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
@@ -173,16 +171,6 @@ func (b *Bucket) HeadObject(ctx context.Context, name string) (*ObjectInfo, erro
 func (b *Bucket) CopyObject(ctx context.Context, srcName, dstBucket, dstName string, opts ...ObjectOptions) error {
 	if !b.IsConnected() {
 		return ErrClientNotConnected
-	}
-
-	if err := ValidateBucketName(dstBucket); err != nil {
-		return err
-	}
-	if err := ValidateObjectName(srcName); err != nil {
-		return err
-	}
-	if err := ValidateObjectName(dstName); err != nil {
-		return err
 	}
 
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
@@ -242,16 +230,20 @@ func (b *Bucket) applyMinIOPutOptions(opts *minio.PutObjectOptions, objectOpts O
 
 // applyMinIOCopyOptions applies ObjectOptions to MinIO CopyDestOptions
 func (b *Bucket) applyMinIOCopyOptions(dst *minio.CopyDestOptions, objectOpts ObjectOptions) {
+	// Initialize metadata if needed
+	if dst.UserMetadata == nil {
+		dst.UserMetadata = make(map[string]string)
+	}
+
 	if objectOpts.ContentType != "" {
-		// Create metadata map if needed
-		if dst.UserMetadata == nil {
-			dst.UserMetadata = make(map[string]string)
-		}
 		dst.UserMetadata["Content-Type"] = objectOpts.ContentType
 		dst.ReplaceMetadata = true
 	}
 	if len(objectOpts.Metadata) > 0 {
-		dst.UserMetadata = objectOpts.Metadata
+		// Merge metadata
+		for k, v := range objectOpts.Metadata {
+			dst.UserMetadata[k] = v
+		}
 		dst.ReplaceMetadata = true
 	}
 	if len(objectOpts.Tags) > 0 {

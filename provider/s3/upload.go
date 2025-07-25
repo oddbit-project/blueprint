@@ -14,10 +14,6 @@ func (b *Bucket) PutObject(ctx context.Context, objectName string, reader io.Rea
 		return ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
-	}
-
 	startTime := logOperationStart(b.logger, "put_object", objectName, log.KV{
 		"bucket_name": b.bucketName,
 	})
@@ -48,10 +44,6 @@ func (b *Bucket) PutObject(ctx context.Context, objectName string, reader io.Rea
 func (b *Bucket) PutObjectStream(ctx context.Context, objectName string, reader io.Reader, opts ...ObjectOptions) error {
 	if !b.IsConnected() {
 		return ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
 	}
 
 	startTime := logOperationStart(b.logger, "put_object_stream", objectName, log.KV{
@@ -85,10 +77,6 @@ func (b *Bucket) PutObjectMultipart(ctx context.Context, objectName string, read
 		return ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
-	}
-
 	startTime := logOperationStart(b.logger, "put_object_multipart", objectName, log.KV{
 		"bucket_name": b.bucketName,
 	})
@@ -120,10 +108,6 @@ func (b *Bucket) PutObjectMultipart(ctx context.Context, objectName string, read
 func (b *Bucket) PutObjectAdvanced(ctx context.Context, objectName string, reader io.Reader, size int64, opts UploadOptions) error {
 	if !b.IsConnected() {
 		return ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(objectName); err != nil {
-		return err
 	}
 
 	startTime := logOperationStart(b.logger, "put_object_advanced", objectName, log.KV{

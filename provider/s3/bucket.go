@@ -13,9 +13,6 @@ type Bucket struct {
 }
 
 func NewBucket(client *Client, bucketName string) (*Bucket, error) {
-	if err := ValidateBucketName(bucketName); err != nil {
-		return nil, err
-	}
 
 	return &Bucket{
 		Client:     client,
@@ -92,10 +89,6 @@ func (b *Bucket) Delete(ctx context.Context) error {
 		return ErrClientNotConnected
 	}
 
-	if err := ValidateBucketName(b.bucketName); err != nil {
-		return err
-	}
-
 	// Log bucket deletion attempt
 	startTime := logOperationStart(b.logger, "delete_bucket", b.bucketName, log.KV{
 		"bucket_name": b.bucketName,
@@ -125,10 +118,6 @@ func (b *Bucket) Delete(ctx context.Context) error {
 func (b *Bucket) Exists(ctx context.Context) (bool, error) {
 	if !b.IsConnected() {
 		return false, ErrClientNotConnected
-	}
-
-	if err := ValidateBucketName(b.bucketName); err != nil {
-		return false, err
 	}
 
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)

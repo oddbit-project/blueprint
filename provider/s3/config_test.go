@@ -185,3 +185,64 @@ func TestGetEndpointURL(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigCoverage(t *testing.T) {
+	t.Run("Config validation coverage", func(t *testing.T) {
+		// Test default Config
+		config := NewConfig()
+		err := config.Validate()
+		assert.NoError(t, err)
+
+		// Test invalid timeout
+		config.TimeoutSeconds = -1
+		err = config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid timeout")
+
+		// Test invalid part size - too small
+		config = NewConfig()
+		config.PartSize = 1024 // < 5MB minimum
+		err = config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid part size")
+
+		// Test invalid part size - too large
+		config = NewConfig()
+		config.PartSize = 6 * 1024 * 1024 * 1024 // > 5GB maximum
+		err = config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid part size")
+
+		// Test invalid threshold
+		config = NewConfig()
+		config.MultipartThreshold = 1024 // Smaller than part size
+		err = config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid multipart threshold")
+	})
+
+	t.Run("Config endpoint helpers", func(t *testing.T) {
+		config := NewConfig()
+
+		// Test default endpoint
+		assert.False(t, config.IsCustomEndpoint())
+
+		// Test custom endpoint
+		config.Endpoint = "localhost:9000"
+		assert.True(t, config.IsCustomEndpoint())
+
+		// Test endpoint URL generation
+		config.UseSSL = false
+		url := config.GetEndpointURL()
+		assert.Equal(t, "http://localhost:9000", url)
+
+		config.UseSSL = true
+		url = config.GetEndpointURL()
+		assert.Equal(t, "https://localhost:9000", url)
+
+		// Test with protocol already specified
+		config.Endpoint = "https://s3.amazonaws.com"
+		url = config.GetEndpointURL()
+		assert.Equal(t, "https://s3.amazonaws.com", url)
+	})
+}

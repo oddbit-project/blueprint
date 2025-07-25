@@ -14,10 +14,6 @@ func (b *Bucket) PresignGetObject(ctx context.Context, objectName string, expiry
 		return "", ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(objectName); err != nil {
-		return "", err
-	}
-
 	// Generate presigned GET URL using MinIO client
 	presignedURL, err := b.minioClient.PresignedGetObject(ctx, b.bucketName, objectName, expiry, url.Values{})
 	if err != nil {
@@ -31,10 +27,6 @@ func (b *Bucket) PresignGetObject(ctx context.Context, objectName string, expiry
 func (b *Bucket) PresignPutObject(ctx context.Context, objectName string, expiry time.Duration, opts ...ObjectOptions) (string, error) {
 	if !b.IsConnected() {
 		return "", ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(objectName); err != nil {
-		return "", err
 	}
 
 	// Generate presigned PUT URL using MinIO client
@@ -55,10 +47,6 @@ func (b *Bucket) PresignDeleteObject(ctx context.Context, objectName string, exp
 		return "", ErrClientNotConnected
 	}
 
-	if err := ValidateObjectName(objectName); err != nil {
-		return "", err
-	}
-
 	// MinIO-Go does not support presigned DELETE URLs
 	return "", utils.Error("presigned DELETE URLs are not supported by MinIO-Go client")
 }
@@ -67,10 +55,6 @@ func (b *Bucket) PresignDeleteObject(ctx context.Context, objectName string, exp
 func (b *Bucket) PresignHeadObject(ctx context.Context, objectName string, expiry time.Duration) (string, error) {
 	if !b.IsConnected() {
 		return "", ErrClientNotConnected
-	}
-
-	if err := ValidateObjectName(objectName); err != nil {
-		return "", err
 	}
 
 	// Generate presigned HEAD URL using MinIO client
