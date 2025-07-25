@@ -2,10 +2,10 @@ package s3
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"io"
 	"time"
 
+	"github.com/minio/minio-go/v7"
 	"github.com/oddbit-project/blueprint/utils"
 )
 
@@ -34,17 +34,18 @@ const (
 
 // Error constants
 const (
-	ErrNilConfig          = utils.Error("Config is nil")
-	ErrMissingEndpoint    = utils.Error("missing endpoint")
-	ErrMissingRegion      = utils.Error("missing region")
-	ErrInvalidTimeout     = utils.Error("invalid timeout")
-	ErrInvalidPartSize    = utils.Error("invalid part size")
-	ErrInvalidThreshold   = utils.Error("invalid multipart threshold")
-	ErrBucketNotFound     = utils.Error("bucket not found")
-	ErrObjectNotFound     = utils.Error("object not found")
-	ErrInvalidBucketName  = utils.Error("invalid bucket bucketName")
-	ErrInvalidObjectKey   = utils.Error("invalid object key")
-	ErrClientNotConnected = utils.Error("client not connected")
+	ErrNilConfig           = utils.Error("Config is nil")
+	ErrMissingEndpoint     = utils.Error("missing endpoint")
+	ErrMissingRegion       = utils.Error("missing region")
+	ErrInvalidTimeout      = utils.Error("invalid timeout")
+	ErrInvalidPartSize     = utils.Error("invalid part size")
+	ErrInvalidThreshold    = utils.Error("invalid multipart threshold")
+	ErrBucketNotFound      = utils.Error("bucket not found")
+	ErrBucketAlreadyExists = utils.Error("bucket already exists")
+	ErrObjectNotFound      = utils.Error("object not found")
+	ErrInvalidBucketName   = utils.Error("invalid bucket bucketName")
+	ErrInvalidObjectKey    = utils.Error("invalid object key")
+	ErrClientNotConnected  = utils.Error("client not connected")
 )
 
 // BucketInfo represents information about an S3 bucket
@@ -97,17 +98,6 @@ type BucketOptions struct {
 	ACL    string
 }
 
-// UploadProgress represents progress information for uploads
-type UploadProgress struct {
-	BytesUploaded int64
-	TotalBytes    int64
-	PartsUploaded int
-	TotalParts    int
-}
-
-// ProgressCallback is a function called during upload/download progress
-type ProgressCallback func(progress UploadProgress)
-
 // DownloadOptions provides options for download operations
 type DownloadOptions struct {
 	// Range specification
@@ -133,7 +123,7 @@ type UploadOptions struct {
 type ClientInterface interface {
 	// Connection management
 	Connect(ctx context.Context) error
-	S3Client() *s3.Client
+	MinioClient() *minio.Client
 	Close() error
 	IsConnected() bool
 
@@ -164,8 +154,8 @@ type BucketInterface interface {
 	GetObjectAdvanced(ctx context.Context, bucket, key string, writer io.Writer, opts DownloadOptions) error
 
 	// Multipart upload operations
-	PutObjectMultipart(ctx context.Context, bucket, key string, reader io.Reader, size int64, progress ProgressCallback, opts ...ObjectOptions) error
-	PutObjectAdvanced(ctx context.Context, bucket, key string, reader io.Reader, size int64, progress ProgressCallback, opts UploadOptions) error
+	PutObjectMultipart(ctx context.Context, bucket, key string, reader io.Reader, size int64, opts ...ObjectOptions) error
+	PutObjectAdvanced(ctx context.Context, bucket, key string, reader io.Reader, size int64, opts UploadOptions) error
 
 	// Pre-signed URLs
 	PresignGetObject(ctx context.Context, bucket, key string, expiry time.Duration) (string, error)

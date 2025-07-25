@@ -3,21 +3,18 @@ package s3
 import (
 	"context"
 	"crypto/tls"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/oddbit-project/blueprint/log"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/oddbit-project/blueprint/log"
 )
 
 type Client struct {
 	config        *Config
-	s3Client      *s3.Client
-	uploader      *manager.Uploader
-	downloader    *manager.Downloader
+	minioClient   *minio.Client
 	timeout       time.Duration
 	uploadTimeout time.Duration
 	logger        *log.Logger
@@ -100,82 +97,34 @@ func (c *Client) Connect(ctx context.Context) error {
 		}()
 	}
 
-	// Create AWS Config directly without default credential chain
-	awsConfig := aws.Config{
+	// Create MinIO client options
+	opts := &minio.Options{
+		Secure: c.config.UseSSL,
 		Region: c.config.Region,
-	}
-
-	// For MinIO compatibility, ensure we use the correct signing
-	if c.config.IsCustomEndpoint() {
-		awsConfig.RetryMaxAttempts = 1 // Minimize retries for faster feedback
 	}
 
 	// Set credentials if provided
 	if c.config.AccessKeyID != "" && secretKey != "" {
-		awsConfig.Credentials = credentials.NewStaticCredentialsProvider(c.config.AccessKeyID, secretKey, "")
+		opts.Creds = credentials.NewStaticV4(c.config.AccessKeyID, secretKey, "")
 	}
 
-	// Add retry configuration
-	if c.config.MaxRetries > 0 {
-		awsConfig.RetryMaxAttempts = c.config.MaxRetries
-	}
-	if c.config.RetryMode != "" {
-		awsConfig.RetryMode = aws.RetryMode(c.config.RetryMode)
-	}
-
-	// Configure custom HTTP client for MinIO/S3-compatible services
-	if c.config.IsCustomEndpoint() && !c.config.UseSSL {
-		// For HTTP endpoints, use custom HTTP client that forces HTTP
-		// Create a custom transport that converts HTTPS requests to HTTP
-		baseTransport := &http.Transport{
+	// Configure custom HTTP client for non-SSL connections
+	if !c.config.UseSSL {
+		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
-			DisableKeepAlives: false,
 		}
-
-		httpClient := &http.Client{
-			Transport: &httpForceTransport{
-				base: baseTransport,
-			},
-		}
-		awsConfig.HTTPClient = httpClient
+		opts.Transport = transport
 	}
 
-	// Create S3 client options
-	s3Options := []func(*s3.Options){
-		func(o *s3.Options) {
-			o.UsePathStyle = c.config.ForcePathStyle
-			o.UseAccelerate = c.config.UseAccelerate
-		},
+	// Create MinIO client
+	var err error
+	c.minioClient, err = minio.New(c.config.Endpoint, opts)
+	if err != nil {
+		connectionError = err
+		return err
 	}
-
-	// Set S3-specific options for custom endpoints
-	if c.config.IsCustomEndpoint() {
-		endpointURL := c.config.GetEndpointURL()
-
-		// Use BaseEndpoint approach for better MinIO compatibility
-		awsConfig.BaseEndpoint = aws.String(endpointURL)
-
-		s3Options = append(s3Options, func(o *s3.Options) {
-			o.UsePathStyle = true // Force path style for S3-compatible services
-		})
-	}
-
-	// Create S3 client
-	c.s3Client = s3.NewFromConfig(awsConfig, s3Options...)
-
-	// Create uploader with configuration
-	c.uploader = manager.NewUploader(c.s3Client, func(u *manager.Uploader) {
-		u.PartSize = c.config.PartSize
-		u.Concurrency = c.config.Concurrency
-	})
-
-	// Create downloader with configuration
-	c.downloader = manager.NewDownloader(c.s3Client, func(d *manager.Downloader) {
-		d.PartSize = c.config.PartSize
-		d.Concurrency = c.config.Concurrency
-	})
 
 	c.connected = true
 
@@ -193,9 +142,7 @@ func (c *Client) Close() error {
 	defer c.mu.Unlock()
 
 	c.connected = false
-	c.s3Client = nil
-	c.uploader = nil
-	c.downloader = nil
+	c.minioClient = nil
 
 	return nil
 }
@@ -216,18 +163,16 @@ func (c *Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
 	ctx, cancel := getContextWithTimeout(c.timeout, ctx)
 	defer cancel()
 
-	result, err := c.s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	result, err := c.minioClient.ListBuckets(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	buckets := make([]BucketInfo, 0, len(result.Buckets))
-	for _, b := range result.Buckets {
+	buckets := make([]BucketInfo, 0, len(result))
+	for _, b := range result {
 		info := BucketInfo{
-			Name: aws.ToString(b.Name),
-		}
-		if b.CreationDate != nil {
-			info.CreationDate = *b.CreationDate
+			Name:         b.Name,
+			CreationDate: b.CreationDate,
 		}
 		buckets = append(buckets, info)
 	}
@@ -235,7 +180,41 @@ func (c *Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
 	return buckets, nil
 }
 
+// MinioClient returns the underlying MinIO client
+func (c *Client) MinioClient() *minio.Client {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.minioClient
+}
+
+// CreateBucket creates a new bucket
+func (c *Client) CreateBucket(ctx context.Context, bucket string, opts ...BucketOptions) error {
+	b, err := c.Bucket(bucket)
+	if err != nil {
+		return err
+	}
+	return b.Create(ctx, opts...)
+}
+
+// DeleteBucket deletes a bucket
+func (c *Client) DeleteBucket(ctx context.Context, bucket string) error {
+	b, err := c.Bucket(bucket)
+	if err != nil {
+		return err
+	}
+	return b.Delete(ctx)
+}
+
+// BucketExists checks if a bucket exists
+func (c *Client) BucketExists(ctx context.Context, bucket string) (bool, error) {
+	b, err := c.Bucket(bucket)
+	if err != nil {
+		return false, err
+	}
+	return b.Exists(ctx)
+}
+
 // Bucket create bucket object
 func (c *Client) Bucket(bucketName string) (*Bucket, error) {
-	return NewBucket(c, bucketName, c.logger)
+	return NewBucket(c, bucketName)
 }

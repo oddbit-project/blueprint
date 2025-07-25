@@ -2,11 +2,8 @@ package s3
 
 import (
 	"context"
-	"errors"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/smithy-go"
+
+	"github.com/minio/minio-go/v7"
 	"github.com/oddbit-project/blueprint/log"
 )
 
@@ -15,7 +12,7 @@ type Bucket struct {
 	bucketName string
 }
 
-func NewBucket(client *Client, bucketName string, logger *log.Logger) (*Bucket, error) {
+func NewBucket(client *Client, bucketName string) (*Bucket, error) {
 	if err := ValidateBucketName(bucketName); err != nil {
 		return nil, err
 	}
@@ -40,33 +37,42 @@ func (b *Bucket) Create(ctx context.Context, opts ...BucketOptions) error {
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
 	defer cancel()
 
-	input := &s3.CreateBucketInput{
-		Bucket: aws.String(b.bucketName),
+	// Determine region from options
+	region := b.config.Region
+	if len(opts) > 0 && opts[0].Region != "" {
+		region = opts[0].Region
 	}
 
-	// Apply options if provided
-	if len(opts) > 0 {
-		opt := opts[0]
-
-		// Set region-specific configuration
-		if opt.Region != "" && opt.Region != "us-east-1" {
-			input.CreateBucketConfiguration = &types.CreateBucketConfiguration{
-				LocationConstraint: types.BucketLocationConstraint(opt.Region),
-			}
-		}
-
-		// Set ACL if provided
-		if opt.ACL != "" {
-			input.ACL = types.BucketCannedACL(opt.ACL)
-		}
-	}
-
-	_, err := b.s3Client.CreateBucket(ctx, input)
+	// Check if bucket already exists first
+	exists, err := b.minioClient.BucketExists(ctx, b.bucketName)
 	if err != nil {
 		logOperationEnd(b.logger, "create_bucket", b.bucketName, startTime, err, log.KV{
-			"bucket_name":    b.bucketName,
-			"error_type":     "bucket_already_exists",
-			"aws_error_code": err.Error(),
+			"bucket_name": b.bucketName,
+			"error":       err.Error(),
+		})
+		return err
+	}
+
+	if exists {
+		err := ErrBucketAlreadyExists
+		logOperationEnd(b.logger, "create_bucket", b.bucketName, startTime, err, log.KV{
+			"bucket_name": b.bucketName,
+			"exists":      true,
+			"error":       err.Error(),
+		})
+		return err
+	}
+
+	// Create bucket with MinIO client
+	options := minio.MakeBucketOptions{
+		Region: region,
+	}
+
+	err = b.minioClient.MakeBucket(ctx, b.bucketName, options)
+	if err != nil {
+		logOperationEnd(b.logger, "create_bucket", b.bucketName, startTime, err, log.KV{
+			"bucket_name": b.bucketName,
+			"error":       err.Error(),
 		})
 		return err
 	}
@@ -90,7 +96,7 @@ func (b *Bucket) Delete(ctx context.Context) error {
 		return err
 	}
 
-	// Log bucket creation attempt
+	// Log bucket deletion attempt
 	startTime := logOperationStart(b.logger, "delete_bucket", b.bucketName, log.KV{
 		"bucket_name": b.bucketName,
 	})
@@ -98,23 +104,16 @@ func (b *Bucket) Delete(ctx context.Context) error {
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
 	defer cancel()
 
-	_, err := b.s3Client.DeleteBucket(ctx, &s3.DeleteBucketInput{
-		Bucket: aws.String(b.bucketName),
-	})
-
+	err := b.minioClient.RemoveBucket(ctx, b.bucketName)
 	if err != nil {
-		var apiErr smithy.APIError
 		logOperationEnd(b.logger, "delete_bucket", b.bucketName, startTime, err, log.KV{
 			"bucket_name": b.bucketName,
 			"error":       err.Error(),
 		})
-		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchBucket" {
-			return ErrBucketNotFound
-		}
 		return err
 	}
 
-	// Log successful bucket creation
+	// Log successful bucket deletion
 	logOperationEnd(b.logger, "delete_bucket", b.bucketName, startTime, nil, log.KV{
 		"bucket_name":    b.bucketName,
 		"bucket_deleted": true,
@@ -135,19 +134,12 @@ func (b *Bucket) Exists(ctx context.Context) (bool, error) {
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
 	defer cancel()
 
-	_, err := b.s3Client.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(b.bucketName),
-	})
-
+	exists, err := b.minioClient.BucketExists(ctx, b.bucketName)
 	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NotFound" {
-			return false, nil
-		}
 		return false, err
 	}
 
-	return true, nil
+	return exists, nil
 }
 
 func (b *Bucket) Name() string {

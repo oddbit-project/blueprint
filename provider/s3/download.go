@@ -2,12 +2,9 @@ package s3
 
 import (
 	"context"
-	"fmt"
 	"io"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/minio/minio-go/v7"
 )
 
 // GetObjectStream downloads an object and writes it directly to a writer
@@ -20,15 +17,19 @@ func (b *Bucket) GetObjectStream(ctx context.Context, objectName string, writer 
 		return err
 	}
 
-	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
+	// Use upload timeout for large downloads to match upload behavior
+	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
 	defer cancel()
 
-	// Use the downloader for efficient streaming
-	_, err := b.downloader.Download(ctx, &writerAt{writer: writer}, &s3.GetObjectInput{
-		Bucket: aws.String(b.bucketName),
-		Key:    aws.String(objectName),
-	})
+	// Get object using MinIO client
+	obj, err := b.minioClient.GetObject(ctx, b.bucketName, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return err
+	}
+	defer obj.Close()
 
+	// Copy object data to writer
+	_, err = io.Copy(writer, obj)
 	return err
 }
 
@@ -42,33 +43,28 @@ func (b *Bucket) GetObjectRange(ctx context.Context, objectName string, start, e
 		return nil, err
 	}
 
-	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
-	defer cancel()
+	// Don't use getContextWithTimeout here - let the caller manage the context
+	// This prevents the context from being canceled while the reader is still being used
 
-	rangeHeader := ""
-	if start >= 0 || end >= 0 {
-		if end >= 0 {
-			rangeHeader = fmt.Sprintf("bytes=%d-%d", start, end)
-		} else {
-			rangeHeader = fmt.Sprintf("bytes=%d-", start)
-		}
+	// Create MinIO get options with range
+	opts := minio.GetObjectOptions{}
+	if start >= 0 && end >= start {
+		// Range from start to end (inclusive) - MinIO SetRange follows HTTP range spec
+		opts.SetRange(start, end)
+	} else if start >= 0 && end < 0 {
+		// Range from start to end of file
+		opts.SetRange(start, 0)
+	} else if start < 0 && end >= 0 {
+		// Range from beginning of file to end byte (inclusive)
+		opts.SetRange(0, end)
 	}
 
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(b.bucketName),
-		Key:    aws.String(objectName),
-	}
-
-	if rangeHeader != "" {
-		input.Range = aws.String(rangeHeader)
-	}
-
-	result, err := b.s3Client.GetObject(ctx, input)
+	obj, err := b.minioClient.GetObject(ctx, b.bucketName, objectName, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	return result.Body, nil
+	return obj, nil
 }
 
 // GetObjectStreamRange downloads a range of bytes from an object to a writer
@@ -81,7 +77,8 @@ func (b *Bucket) GetObjectStreamRange(ctx context.Context, objectName string, wr
 		return err
 	}
 
-	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
+	// Use upload timeout for large downloads to match upload behavior
+	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
 	defer cancel()
 
 	body, err := b.GetObjectRange(ctx, objectName, start, end)
@@ -94,7 +91,8 @@ func (b *Bucket) GetObjectStreamRange(ctx context.Context, objectName string, wr
 	return err
 }
 
-// GetObjectAdvanced provides advanced download functionality with detailed control
+// GetObjectAdvanced provides advanced download functionality with simplified control
+// Note: Complex download manager removed - uses simple range downloads instead
 func (b *Bucket) GetObjectAdvanced(ctx context.Context, objectName string, writer io.Writer, opts DownloadOptions) error {
 	if !b.IsConnected() {
 		return ErrClientNotConnected
@@ -104,116 +102,22 @@ func (b *Bucket) GetObjectAdvanced(ctx context.Context, objectName string, write
 		return err
 	}
 
-	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
+	// Use upload timeout for large downloads to match upload behavior
+	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
 	defer cancel()
 
-	// Create custom downloader with options
-	downloader := b.downloader
-	if opts.Concurrency > 0 || opts.PartSize > 0 {
-		downloader = manager.NewDownloader(b.s3Client, func(d *manager.Downloader) {
-			if opts.Concurrency > 0 {
-				d.Concurrency = opts.Concurrency
-			}
-			if opts.PartSize > 0 {
-				d.PartSize = opts.PartSize
-			}
-		})
-	}
-
-	input := &s3.GetObjectInput{
-		Bucket: aws.String(b.bucketName),
-		Key:    aws.String(objectName),
-	}
-
-	// Set range if specified
+	// Handle range downloads if specified
 	if opts.StartByte != nil || opts.EndByte != nil {
-		var rangeHeader string
-		if opts.StartByte != nil && opts.EndByte != nil {
-			rangeHeader = fmt.Sprintf("bytes=%d-%d", *opts.StartByte, *opts.EndByte)
-		} else if opts.StartByte != nil {
-			rangeHeader = fmt.Sprintf("bytes=%d-", *opts.StartByte)
-		} else {
-			rangeHeader = fmt.Sprintf("bytes=0-%d", *opts.EndByte)
+		var start, end int64 = -1, -1
+		if opts.StartByte != nil {
+			start = *opts.StartByte
 		}
-		input.Range = aws.String(rangeHeader)
+		if opts.EndByte != nil {
+			end = *opts.EndByte
+		}
+		return b.GetObjectStreamRange(ctx, objectName, writer, start, end)
 	}
 
-	_, err := downloader.Download(ctx, &writerAt{writer: writer}, input)
-	return err
-}
-
-// writerAt wraps an io.Writer to implement io.WriterAt
-// This is needed because the AWS SDK downloader requires io.WriterAt
-type writerAt struct {
-	writer io.Writer
-	pos    int64
-}
-
-// WriteAt implements io.WriterAt by converting to sequential writes
-// Note: This assumes sequential writes, which is how the AWS downloader works
-func (w *writerAt) WriteAt(p []byte, offset int64) (int, error) {
-	// For sequential downloads, we can ignore the offset
-	// and just write to the underlying writer
-	n, err := w.writer.Write(p)
-	w.pos += int64(n)
-	return n, err
-}
-
-// bufferedWriterAt provides a more robust WriterAt implementation
-// that can handle out-of-order writes by buffering
-type bufferedWriterAt struct {
-	writer io.Writer
-	buffer map[int64][]byte
-	pos    int64
-}
-
-// newBufferedWriterAt creates a new buffered writer
-func newBufferedWriterAt(writer io.Writer) *bufferedWriterAt {
-	return &bufferedWriterAt{
-		writer: writer,
-		buffer: make(map[int64][]byte),
-		pos:    0,
-	}
-}
-
-// WriteAt implements io.WriterAt with buffering for out-of-order writes
-func (bw *bufferedWriterAt) WriteAt(p []byte, offset int64) (int, error) {
-	// If this write is at the current position, write directly
-	if offset == bw.pos {
-		n, err := bw.writer.Write(p)
-		if err != nil {
-			return n, err
-		}
-		bw.pos += int64(n)
-
-		// Try to flush any buffered data that's now sequential
-		bw.flushSequential()
-		return n, nil
-	}
-
-	// Otherwise, buffer this write
-	data := make([]byte, len(p))
-	copy(data, p)
-	bw.buffer[offset] = data
-
-	return len(p), nil
-}
-
-// flushSequential writes any buffered data that's now sequential
-func (bw *bufferedWriterAt) flushSequential() {
-	for {
-		data, exists := bw.buffer[bw.pos]
-		if !exists {
-			break
-		}
-
-		n, err := bw.writer.Write(data)
-		if err != nil {
-			// In a real implementation, we'd need to handle this error
-			break
-		}
-
-		bw.pos += int64(n)
-		delete(bw.buffer, bw.pos-int64(n))
-	}
+	// For full downloads, use the regular stream method
+	return b.GetObjectStream(ctx, objectName, writer)
 }

@@ -8,12 +8,50 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+// getTestConfig creates a test configuration for benchmarks
+func getTestConfig() *Config {
+	config := NewConfig()
+	
+	// Use environment variables if available, otherwise use default MinIO settings
+	if endpoint := os.Getenv("S3_ENDPOINT"); endpoint != "" {
+		config.Endpoint = endpoint
+	} else {
+		config.Endpoint = "localhost:9000"
+	}
+	
+	if region := os.Getenv("S3_REGION"); region != "" {
+		config.Region = region
+	} else {
+		config.Region = "us-east-1"
+	}
+	
+	if accessKey := os.Getenv("S3_ACCESS_KEY"); accessKey != "" {
+		config.AccessKeyID = accessKey
+	} else {
+		config.AccessKeyID = "minioadmin"
+	}
+	
+	// Set secret key - check environment first
+	if secretKey := os.Getenv("S3_SECRET_KEY"); secretKey != "" {
+		config.DefaultCredentialConfig.Password = secretKey
+	} else {
+		config.DefaultCredentialConfig.Password = "minioadmin"
+	}
+	
+	// Configure for MinIO/local testing
+	config.UseSSL = false
+	config.ForcePathStyle = true
+	
+	return config
+}
 
 // BenchmarkS3Operations benchmarks various S3 operations to measure transfer speeds
 func BenchmarkS3Operations(b *testing.B) {
