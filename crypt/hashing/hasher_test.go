@@ -8,6 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestArgonHasher(t *testing.T) {
+	hasher, err := NewArgon2Hasher(NewArgon2IdConfig())
+	assert.Nil(t, err)
+	hash, err := hasher.Generate("1231212312")
+	assert.Nil(t, err)
+	valid, _, err := hasher.Verify("1231212312", hash)
+	assert.Nil(t, err)
+	assert.True(t, valid)
+}
+
 func TestNewArgon2Hasher(t *testing.T) {
 	tests := []struct {
 		name string
@@ -125,67 +135,67 @@ func TestPasswordHasher_Verify(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name        string
-		password    string
-		hash        string
-		wantValid   bool
-		wantRehash  bool
-		wantErr     bool
+		name       string
+		password   string
+		hash       string
+		wantValid  bool
+		wantRehash bool
+		wantErr    bool
 	}{
 		{
-			name:        "correct password",
-			password:    password,
-			hash:        correctHash,
-			wantValid:   true,
-			wantRehash:  false,
-			wantErr:     false,
+			name:       "correct password",
+			password:   password,
+			hash:       correctHash,
+			wantValid:  true,
+			wantRehash: false,
+			wantErr:    false,
 		},
 		{
-			name:        "incorrect password",
-			password:    "wrongPassword",
-			hash:        correctHash,
-			wantValid:   false,
-			wantRehash:  false,
-			wantErr:     false,
+			name:       "incorrect password",
+			password:   "wrongPassword",
+			hash:       correctHash,
+			wantValid:  false,
+			wantRehash: false,
+			wantErr:    false,
 		},
 		{
-			name:        "empty password with valid hash",
-			password:    "",
-			hash:        correctHash,
-			wantValid:   false,
-			wantRehash:  false,
-			wantErr:     false,
+			name:       "empty password with valid hash",
+			password:   "",
+			hash:       correctHash,
+			wantValid:  false,
+			wantRehash: false,
+			wantErr:    false,
 		},
 		{
-			name:        "invalid hash format",
-			password:    password,
-			hash:        "invalid$hash$format",
-			wantValid:   false,
-			wantRehash:  false,
-			wantErr:     true,
+			name:       "invalid hash format",
+			password:   password,
+			hash:       "invalid$hash$format",
+			wantValid:  false,
+			wantRehash: false,
+			wantErr:    true,
 		},
 		{
-			name:        "empty hash",
-			password:    password,
-			hash:        "",
-			wantValid:   false,
-			wantRehash:  false,
-			wantErr:     true,
+			name:       "empty hash",
+			password:   password,
+			hash:       "",
+			wantValid:  false,
+			wantRehash: false,
+			wantErr:    true,
 		},
 		{
-			name:        "corrupted base64 in hash",
-			password:    password,
-			hash:        "$argon2id$v=19$m=65536,t=4,p=8$invalid!base64$invalid!base64",
-			wantValid:   false,
-			wantRehash:  false,
-			wantErr:     true,
+			name:       "corrupted base64 in hash",
+			password:   password,
+			hash:       "$argon2id$v=19$m=65536,t=4,p=8$invalid!base64$invalid!base64",
+			wantValid:  false,
+			wantRehash: false,
+			wantErr:    true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			valid, rehashFn, err := hasher.Verify(tt.password, tt.hash)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.False(t, valid)
@@ -195,7 +205,7 @@ func TestPasswordHasher_Verify(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantValid, valid)
-			
+
 			if tt.wantRehash {
 				assert.NotNil(t, rehashFn)
 			} else {
@@ -214,10 +224,10 @@ func TestPasswordHasher_VerifyWithRehash(t *testing.T) {
 		SaltLength:  16,
 		KeyLength:   32,
 	}
-	
+
 	oldHasher, err := NewArgon2Hasher(customConfig)
 	require.NoError(t, err)
-	
+
 	password := "testPassword123!"
 	oldHash, err := oldHasher.Generate(password)
 	require.NoError(t, err)
@@ -267,11 +277,11 @@ func TestPasswordHasher_ConcurrentUse(t *testing.T) {
 		for i := 0; i < iterations; i++ {
 			t.Run("", func(t *testing.T) {
 				t.Parallel()
-				
+
 				// Generate hash
 				hash, err := hasher.Generate(password)
 				require.NoError(t, err)
-				
+
 				// Verify hash
 				valid, _, err := hasher.Verify(password, hash)
 				require.NoError(t, err)
@@ -316,12 +326,12 @@ func TestPasswordHasher_EdgeCases(t *testing.T) {
 			// Generate hash
 			hash, err := hasher.Generate(tt.password)
 			require.NoError(t, err)
-			
+
 			// Verify it
 			valid, _, err := hasher.Verify(tt.password, hash)
 			require.NoError(t, err)
 			assert.True(t, valid)
-			
+
 			// Verify wrong password fails
 			valid, _, err = hasher.Verify(tt.password+"wrong", hash)
 			require.NoError(t, err)
@@ -333,7 +343,7 @@ func TestPasswordHasher_EdgeCases(t *testing.T) {
 func BenchmarkPasswordHasher_Generate(b *testing.B) {
 	hasher, _ := NewArgon2Hasher(nil)
 	password := "benchmarkPassword123!"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := hasher.Generate(password)
@@ -347,7 +357,7 @@ func BenchmarkPasswordHasher_Verify(b *testing.B) {
 	hasher, _ := NewArgon2Hasher(nil)
 	password := "benchmarkPassword123!"
 	hash, _ := hasher.Generate(password)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, err := hasher.Verify(password, hash)
@@ -355,6 +365,40 @@ func BenchmarkPasswordHasher_Verify(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestPasswordHasher_CustomConfigNoRehash(t *testing.T) {
+	// Regression test for bug where custom config hashers would incorrectly
+	// trigger rehashing for their own hashes due to comparison against default config
+	customConfig := &Argon2Config{
+		Memory:      16 * 1024, // Different from default 64MB
+		Iterations:  2,         // Different from default 4
+		Parallelism: 4,         // Different from default
+		SaltLength:  16,        // Same as default
+		KeyLength:   32,        // Same as default
+	}
+
+	hasher, err := NewArgon2Hasher(customConfig)
+	require.NoError(t, err)
+
+	password := "testCustomConfig"
+	hash, err := hasher.Generate(password)
+	require.NoError(t, err)
+
+	// Verify with same hasher - should NOT need rehashing
+	valid, rehashFn, err := hasher.Verify(password, hash)
+	require.NoError(t, err)
+	assert.True(t, valid, "password should be valid")
+	assert.Nil(t, rehashFn, "rehash function should be nil when using same custom config")
+
+	// Verify that a default hasher WOULD trigger rehashing for the same hash
+	defaultHasher, err := NewArgon2Hasher(nil)
+	require.NoError(t, err)
+
+	valid2, rehashFn2, err := defaultHasher.Verify(password, hash)
+	require.NoError(t, err)
+	assert.True(t, valid2, "password should be valid with different hasher")
+	assert.NotNil(t, rehashFn2, "rehash function should be provided when configs differ")
 }
 
 func BenchmarkPasswordHasher_GenerateWithCustomConfig(b *testing.B) {
@@ -368,7 +412,7 @@ func BenchmarkPasswordHasher_GenerateWithCustomConfig(b *testing.B) {
 	}
 	hasher, _ := NewArgon2Hasher(cfg)
 	password := "benchmarkPassword123!"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := hasher.Generate(password)
