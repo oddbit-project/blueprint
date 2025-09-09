@@ -1,0 +1,10 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": 8081,
+    "readTimeout": 30,
+    "writeTimeout": 30,
+    "debug": true,
+    "tlsEnable": false
+  }
+}
