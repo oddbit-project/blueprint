@@ -2,8 +2,8 @@ package etcd
 
 import (
 	"context"
-	"time"
 	"go.etcd.io/etcd/client/v3/concurrency"
+	"time"
 )
 
 // Lock represents a distributed lock backed by etcd.
@@ -14,6 +14,18 @@ type Lock struct {
 	mutex   *concurrency.Mutex
 	name    string
 	locked  bool
+}
+
+type LockOptions struct {
+	TTL time.Duration
+}
+
+type LockOption func(*LockOptions)
+
+func WithTTL(ttl time.Duration) LockOption {
+	return func(o *LockOptions) {
+		o.TTL = ttl
+	}
 }
 
 // NewLock creates a new distributed lock for the given name.
@@ -97,13 +109,18 @@ func (l *Lock) Close() error {
 // TryLock attempts to acquire the lock without blocking.
 // Returns true if the lock was successfully acquired, false if it's held by another process.
 // This is useful for implementing non-blocking lock acquisition patterns.
-func (l *Lock) TryLock(ctx context.Context) (bool, error) {
+func (l *Lock) TryLock(ctx context.Context, lockOptions ...LockOption) (bool, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
+	opts := &LockOptions{TTL: 1 * time.Millisecond}
+	for _, fn := range lockOptions {
+		fn(opts)
+	}
+
 	// Create a context with a very short timeout to make this non-blocking
-	tryCtx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
+	tryCtx, cancel := context.WithTimeout(ctx, opts.TTL)
 	defer cancel()
 
 	err := l.mutex.Lock(tryCtx)
