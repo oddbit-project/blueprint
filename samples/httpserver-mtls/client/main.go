@@ -260,17 +260,17 @@ type AdminStatsResponse struct {
 
 // runClientDemo demonstrates the mTLS client functionality
 func runClientDemo(client *MTLSClient, logger *log.Logger) {
-	fmt.Println("🚀 Blueprint mTLS Client Demo")
+	fmt.Println("Blueprint mTLS Client Demo")
 	fmt.Println("==============================")
 
 	// Test 1: Health check (no client certificate required)
 	fmt.Println("\n1. Testing health endpoint (no client cert required)...")
 	var healthResp HealthResponse
 	if err := client.GetJSON("/health", &healthResp); err != nil {
-		fmt.Printf("   ❌ Health check failed: %v\n", err)
+		fmt.Printf("   Health check failed: %v\n", err)
 		logger.Error(err, "Health check failed")
 	} else {
-		fmt.Printf("   ✅ Health check passed\n")
+		fmt.Printf("   Health check passed\n")
 		fmt.Printf("   Server: %s, Status: %s\n", healthResp.Data.Server, healthResp.Data.Status)
 	}
 
@@ -278,10 +278,10 @@ func runClientDemo(client *MTLSClient, logger *log.Logger) {
 	fmt.Println("\n2. Testing secure endpoint (client cert required)...")
 	var secureResp SecureResponse
 	if err := client.GetJSON("/secure", &secureResp); err != nil {
-		fmt.Printf("   ❌ mTLS authentication failed: %v\n", err)
+		fmt.Printf("   mTLS authentication failed: %v\n", err)
 		logger.Error(err, "Secure endpoint failed")
 	} else {
-		fmt.Printf("   ✅ mTLS authentication successful\n")
+		fmt.Printf("   mTLS authentication successful\n")
 		fmt.Printf("   Message: %s\n", secureResp.Data.Message)
 		if clientInfo := secureResp.Data.ClientInfo; clientInfo != nil {
 			if commonName, ok := clientInfo["common_name"].(string); ok {
@@ -294,10 +294,10 @@ func runClientDemo(client *MTLSClient, logger *log.Logger) {
 	fmt.Println("\n3. Testing user profile API...")
 	var profileResp UserProfileResponse
 	if err := client.GetJSON("/api/v1/user/profile", &profileResp); err != nil {
-		fmt.Printf("   ❌ User profile retrieval failed: %v\n", err)
+		fmt.Printf("   User profile retrieval failed: %v\n", err)
 		logger.Error(err, "User profile API failed")
 	} else {
-		fmt.Printf("   ✅ User profile retrieved successfully\n")
+		fmt.Printf("   User profile retrieved successfully\n")
 		fmt.Printf("   User: %s (%s)\n", profileResp.Data.Username, profileResp.Data.Email)
 		fmt.Printf("   Privileges: %v\n", profileResp.Data.Privileges)
 	}
@@ -321,10 +321,10 @@ func runClientDemo(client *MTLSClient, logger *log.Logger) {
 
 	var dataResp DataResponse
 	if err := client.PostJSON("/api/v1/data", testData, &dataResp); err != nil {
-		fmt.Printf("   ❌ Data submission failed: %v\n", err)
+		fmt.Printf("   Data submission failed: %v\n", err)
 		logger.Error(err, "Data submission failed")
 	} else {
-		fmt.Printf("   ✅ Data submitted successfully\n")
+		fmt.Printf("   Data submitted successfully\n")
 		fmt.Printf("   Data ID: %s\n", dataResp.Data.DataID)
 	}
 
@@ -332,22 +332,22 @@ func runClientDemo(client *MTLSClient, logger *log.Logger) {
 	fmt.Println("\n5. Testing admin stats API...")
 	var adminResp AdminStatsResponse
 	if err := client.GetJSON("/api/v1/admin/stats", &adminResp); err != nil {
-		fmt.Printf("   ❌ Admin stats retrieval failed: %v\n", err)
+		fmt.Printf("   Admin stats retrieval failed: %v\n", err)
 		if strings.Contains(err.Error(), "403") {
-			fmt.Printf("   ⚠️  Admin access denied (expected for demo client)\n")
+			fmt.Printf("   Admin access denied (expected for demo client)\n")
 		}
 	} else {
-		fmt.Printf("   ✅ Admin stats retrieved successfully\n")
+		fmt.Printf("   Admin stats retrieved successfully\n")
 		fmt.Printf("   Active connections: %d, Memory: %d MB\n", 
 			adminResp.Data.ActiveConnections, adminResp.Data.MemoryUsageMB)
 	}
 
-	fmt.Println("\n✅ Blueprint mTLS Client Demo completed!")
+	fmt.Println("\nBlueprint mTLS Client Demo completed!")
 }
 
 // runPerformanceTest demonstrates client performance
 func runPerformanceTest(client *MTLSClient, logger *log.Logger) {
-	fmt.Println("\n🏃 Performance Test")
+	fmt.Println("\nPerformance Test")
 	fmt.Println("==================")
 
 	// Warm up

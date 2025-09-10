@@ -4,29 +4,29 @@
 
 set -e
 
-echo "🧪 Testing mTLS Demo"
+echo "Testing mTLS Demo"
 echo "==================="
 
 # Check if certificates exist
 if [ ! -d "certs" ] || [ ! -f "certs/ca.crt" ]; then
-    echo "📋 Generating certificates..."
+    echo "Generating certificates..."
     ./generate-certs.sh
 fi
 
 echo ""
-echo "📦 Building server..."
+echo "Building server..."
 cd server
 go mod tidy
 go build -o mtls-server main.go
 
 echo ""
-echo "📦 Building client..."
+echo "Building client..."
 cd ../client
 go mod tidy  
 go build -o mtls-client main.go
 
 echo ""
-echo "🚀 Starting mTLS server..."
+echo "Starting mTLS server..."
 cd ../server
 ./mtls-server &
 SERVER_PID=$!
@@ -35,14 +35,14 @@ SERVER_PID=$!
 sleep 3
 
 echo ""
-echo "🔗 Testing with mTLS client..."
+echo "Testing with mTLS client..."
 cd ../client
 ./mtls-client
 
 echo ""
-echo "🧹 Cleaning up..."
+echo "Cleaning up..."
 kill $SERVER_PID 2>/dev/null || true
 wait $SERVER_PID 2>/dev/null || true
 
 echo ""
-echo "✅ mTLS Demo test completed!"
+echo "mTLS Demo test completed!"

@@ -197,35 +197,35 @@ curl -k \
 Expected client output:
 
 ```
-🚀 mTLS Client Demo
+mTLS Client Demo
 ==================
 
 1. Testing health endpoint (no client cert required)...
    Status: 200
    Response: {"data":{"server":"mTLS Demo Server","status":"healthy","timestamp":"2024-01-15T10:30:45Z"},"success":true}
-   ✅ Health check passed
+   Health check passed
 
 2. Testing secure endpoint (client cert required)...
    Status: 200
    Response: {"data":{"client_info":{...},"message":"Access granted to secure endpoint","timestamp":"2024-01-15T10:30:45Z"},"success":true}
-   ✅ mTLS authentication successful
+   mTLS authentication successful
 
 3. Testing user profile API...
    Status: 200
    Response: {"data":{"client_dn":"CN=demo-client.example.com,OU=Client,O=Blueprint Demo","email":"demo@example.com","privileges":["read","write"],"user_id":"demo_user_123","username":"demo_user"},"success":true}
-   ✅ User profile retrieved successfully
+   User profile retrieved successfully
 
 4. Testing data submission API...
    Status: 200
    Response: {"data":{"client_dn":"CN=demo-client.example.com,OU=Client,O=Blueprint Demo","data_id":"data_1642248645","message":"Data processed successfully","received":{...}},"success":true}
-   ✅ Data submitted successfully
+   Data submitted successfully
 
 5. Testing admin stats API...
    Status: 200
    Response: {"data":{"active_connections":42,"admin_client":"CN=demo-client.example.com,OU=Client,O=Blueprint Demo","memory_usage_mb":128,"uptime_seconds":3600},"success":true}
-   ✅ Admin stats retrieved successfully
+   Admin stats retrieved successfully
 
-✅ mTLS Demo completed successfully!
+mTLS Demo completed successfully!
 ```
 
 ## Certificate Details
