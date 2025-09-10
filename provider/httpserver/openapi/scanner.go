@@ -116,6 +116,13 @@ func (s *Scanner) createOperation(route gin.RouteInfo) Operation {
 	// Add tags based on path
 	operation.Tags = s.generateTags(route.Path)
 	
+	// Add security requirements for API endpoints (exclude docs, health, etc.)
+	if s.requiresAuthentication(route.Path) {
+		operation.Security = []SecurityRequirement{
+			{"bearerAuth": []string{}},
+		}
+	}
+	
 	return operation
 }
 
@@ -357,6 +364,31 @@ func (s *Scanner) AddServer(url, description string) *Scanner {
 func (s *Scanner) AddBearerAuth() *Scanner {
 	s.spec.AddBearerAuth()
 	return s
+}
+
+// requiresAuthentication determines if an endpoint requires authentication
+func (s *Scanner) requiresAuthentication(path string) bool {
+	// Define paths that don't require authentication
+	publicPaths := []string{
+		"/health",
+		"/docs",
+		"/swagger", 
+		"/redoc",
+		"/openapi.json",
+		"/login",
+		"/register",
+		"/ping",
+		"/metrics",
+	}
+	
+	for _, publicPath := range publicPaths {
+		if strings.HasPrefix(path, publicPath) {
+			return false
+		}
+	}
+	
+	// API endpoints typically require authentication
+	return strings.HasPrefix(path, "/api/")
 }
 
 // GetSpec returns the generated specification

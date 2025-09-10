@@ -144,6 +144,9 @@ func (a *Application) Build() {
 }
 
 func (a *Application) setupRoutes() {
+	// Public login endpoint for getting demo tokens
+	a.httpServer.Route().POST("/login", a.login)
+	
 	// API routes
 	api := a.httpServer.Route().Group("/api/v1")
 	
@@ -191,7 +194,47 @@ func (a *Application) setupOpenAPIDocumentation() {
 	a.logger.Infof("  OpenAPI Spec: http://localhost:%d/openapi.json", port)
 }
 
+// LoginRequest represents the login request
+type LoginRequest struct {
+	Username string `json:"username" binding:"required" doc:"Username for login" example:"demo"`
+	Password string `json:"password" binding:"required" doc:"Password for login" example:"password"`
+}
+
+// LoginResponse represents the login response
+type LoginResponse struct {
+	Token   string `json:"token" doc:"JWT access token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	Type    string `json:"type" doc:"Token type" example:"Bearer"`
+	ExpiresIn int  `json:"expires_in" doc:"Token expiration time in seconds" example:"3600"`
+}
+
 // Route handlers
+
+func (a *Application) login(ctx *gin.Context) {
+	var req LoginRequest
+	
+	if !httpserver.ValidateJSON(ctx, &req) {
+		return
+	}
+	
+	// Simple demo authentication - in production, use proper password hashing
+	if req.Username == "demo" && req.Password == "password" {
+		// Generate a demo JWT token (in production, use proper JWT generation)
+		token := "demo-jwt-token-12345-" + req.Username
+		
+		response.Success(ctx, LoginResponse{
+			Token:     token,
+			Type:      "Bearer",
+			ExpiresIn: 3600,
+		})
+		return
+	}
+	
+	ctx.JSON(401, ErrorResponse{
+		Error: "Invalid credentials",
+		Code:  "INVALID_CREDENTIALS",
+		Details: "Use username: 'demo' and password: 'password' for testing",
+	})
+}
 
 func (a *Application) listUsers(ctx *gin.Context) {
 	// In a real application, you would fetch from database

@@ -95,9 +95,35 @@ func generateSwaggerHTML(specURL string) string {
         .swagger-ui .topbar .topbar-wrapper .link:hover {
             color: #ffffff;
         }
+        .auth-info {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .auth-info h4 {
+            margin: 0 0 10px 0;
+            color: #1565c0;
+        }
+        .auth-info code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
+    <div class="auth-info">
+        <h4>🔐 Authentication Setup</h4>
+        <p>To test protected endpoints:</p>
+        <ol>
+            <li>Click the <strong>"Authorize"</strong> button below</li>
+            <li>Enter your JWT token in the format: <code>Bearer YOUR_TOKEN_HERE</code></li>
+            <li>Or use this demo token: <code>Bearer demo-jwt-token-12345</code></li>
+        </ol>
+        <p><strong>Note:</strong> Some endpoints are public (health, docs) and don't require authentication.</p>
+    </div>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js" crossorigin></script>
     <script>
@@ -113,8 +139,13 @@ func generateSwaggerHTML(specURL string) string {
                 plugins: [
                     SwaggerUIBundle.plugins.DownloadUrl
                 ],
-                layout: "StandaloneLayout",
                 tryItOutEnabled: true,
+                persistAuthorization: true,
+                initOAuth: {
+                    clientId: "swagger-ui",
+                    realm: "swagger-ui-realm",
+                    appName: "Swagger UI"
+                },
                 requestInterceptor: function(req) {
                     // Add any custom request headers here
                     return req;
