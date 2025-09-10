@@ -21,5 +21,13 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Install rootless Docker
+        run: |
+          curl -fsSL https://get.docker.com/rootless | sh
+          export PATH=$HOME/bin:$PATH
+          dockerd-rootless-setuptool.sh install
+          systemctl --user start docker
+          export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
+
       - name: Test
         run: make test
