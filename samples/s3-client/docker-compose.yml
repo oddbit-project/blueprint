@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio-s3-demo
+    ports:
+      - "9010:9000"   # S3 API
+      - "9011:9001"   # Web Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address :9001
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # Optional: MC (MinIO Client) for administrative tasks
+  mc:
+    image: quay.io/minio/mc:latest
+    container_name: minio-mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb local/demo-bucket --ignore-existing;
+      /usr/bin/mc anonymous set public local/demo-bucket;
+      echo 'MinIO setup complete. Demo bucket created.';
+      tail -f /dev/null
+      "
+    restart: unless-stopped
+
+volumes:
+  minio-data:
+    driver: local

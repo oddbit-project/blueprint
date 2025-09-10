@@ -116,6 +116,11 @@ func main() {
 		verbose       = flag.Bool("verbose", false, "Enable verbose logging")
 		showVersion   = flag.Bool("version", false, "Show version information")
 		uploadTimeout = flag.Int("upload-timeout", 1800, "Upload timeout in seconds (default: 30 minutes)")
+		// Connection pooling options
+		maxIdleConns        = flag.Int("max-idle-conns", 50, "Maximum idle connections in pool")
+		maxIdleConnsPerHost = flag.Int("max-idle-conns-per-host", 10, "Maximum idle connections per host")
+		maxConnsPerHost     = flag.Int("max-conns-per-host", 20, "Maximum connections per host")
+		idleConnTimeout     = flag.Int("idle-conn-timeout", 60, "Idle connection timeout in seconds")
 	)
 
 	flag.Usage = func() {
@@ -123,6 +128,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] <command> [args...]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nConnection Pooling:\n")
+		fmt.Fprintf(os.Stderr, "  Connection pooling improves performance by reusing HTTP connections.\n")
+		fmt.Fprintf(os.Stderr, "  Adjust these settings based on your workload and server capacity.\n")
 		fmt.Fprintf(os.Stderr, "\nCommands:\n")
 		for _, cmd := range commands {
 			fmt.Fprintf(os.Stderr, "  %-15s %s\n", cmd.Name, cmd.Description)
@@ -152,9 +160,13 @@ func main() {
 	logger := log.New("s3-cli")
 	if *verbose {
 		logger.Info("Starting S3 CLI", map[string]interface{}{
-			"endpoint": *endpoint,
-			"region":   *region,
-			"ssl":      *useSSL,
+			"endpoint":                *endpoint,
+			"region":                  *region,
+			"ssl":                     *useSSL,
+			"max_idle_conns":          *maxIdleConns,
+			"max_idle_conns_per_host": *maxIdleConnsPerHost,
+			"max_conns_per_host":      *maxConnsPerHost,
+			"idle_conn_timeout":       fmt.Sprintf("%ds", *idleConnTimeout),
 		})
 	}
 
@@ -166,6 +178,12 @@ func main() {
 	config.UseSSL = *useSSL
 	config.ForcePathStyle = true // Required for MinIO
 	config.UploadTimeoutSeconds = *uploadTimeout
+
+	// Configure connection pooling
+	config.MaxIdleConns = *maxIdleConns
+	config.MaxIdleConnsPerHost = *maxIdleConnsPerHost
+	config.MaxConnsPerHost = *maxConnsPerHost
+	config.IdleConnTimeout = time.Duration(*idleConnTimeout) * time.Second
 
 	// Set secret key using environment variable or flag
 	if envSecret := os.Getenv("S3_SECRET_KEY"); envSecret != "" {
@@ -253,7 +271,7 @@ func (cli *CLI) createBucket(args []string) error {
 		return fmt.Errorf("failed to create bucket: %w", err)
 	}
 
-	fmt.Printf("✓ Bucket '%s' created successfully\n", bucketName)
+	fmt.Printf("Bucket '%s' created successfully\n", bucketName)
 	return nil
 }
 
@@ -306,7 +324,7 @@ func (cli *CLI) deleteBucket(args []string) error {
 		return fmt.Errorf("failed to delete bucket: %w", err)
 	}
 
-	fmt.Printf("✓ Bucket '%s' deleted successfully\n", bucketName)
+	fmt.Printf("Bucket '%s' deleted successfully\n", bucketName)
 	return nil
 }
 
@@ -366,7 +384,7 @@ func (cli *CLI) uploadFile(args []string) error {
 	elapsed := time.Since(startTime)
 	speed := calculateTransferSpeed(info.Size(), elapsed)
 
-	fmt.Printf("✓ File uploaded successfully to 's3://%s/%s' (elapsed: %s, speed: %s/s)\n",
+	fmt.Printf("File uploaded successfully to 's3://%s/%s' (elapsed: %s, speed: %s/s)\n",
 		bucketName, remoteKey, elapsed.Round(time.Millisecond), formatBytes(int64(speed)))
 	return nil
 }
@@ -423,7 +441,7 @@ func (cli *CLI) downloadFile(args []string) error {
 	elapsed := time.Since(startTime)
 	speed := calculateTransferSpeed(written, elapsed)
 
-	fmt.Printf("✓ File downloaded successfully (%s, elapsed: %s, speed: %s/s)\n",
+	fmt.Printf("File downloaded successfully (%s, elapsed: %s, speed: %s/s)\n",
 		formatBytes(written), elapsed.Round(time.Millisecond), formatBytes(int64(speed)))
 	return nil
 }
@@ -497,7 +515,7 @@ func (cli *CLI) deleteObject(args []string) error {
 		return fmt.Errorf("failed to delete object: %w", err)
 	}
 
-	fmt.Printf("✓ Object 's3://%s/%s' deleted successfully\n", bucketName, objectKey)
+	fmt.Printf("Object 's3://%s/%s' deleted successfully\n", bucketName, objectKey)
 	return nil
 }
 
@@ -534,7 +552,7 @@ func (cli *CLI) presignGet(args []string) error {
 		return fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	fmt.Printf("✓ Presigned URL (valid for %v):\n%s\n", expiry, url)
+	fmt.Printf("Presigned URL (valid for %v):\n%s\n", expiry, url)
 	return nil
 }
 
@@ -571,7 +589,7 @@ func (cli *CLI) presignPut(args []string) error {
 		return fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	fmt.Printf("✓ Presigned URL (valid for %v):\n%s\n", expiry, url)
+	fmt.Printf("Presigned URL (valid for %v):\n%s\n", expiry, url)
 	fmt.Println("\nExample usage:")
 	fmt.Printf("curl -X PUT --upload-file <local-file> \"%s\"\n", url)
 	return nil

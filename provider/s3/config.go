@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/provider/tls"
+	"time"
 )
 
 // Config represents the S3 client configuration
@@ -37,6 +38,12 @@ type Config struct {
 	// TLS configuration
 	tls.ClientConfig
 
+	// connection polling
+	MaxIdleConns        int           `json:"maxIdleConns"`        // Total idle connections
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"` // Per-host idle connections
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`     // Max connections per host
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+
 	// Retry settings
 	MaxRetries int    `json:"maxRetries"` // Maximum number of retries
 	RetryMode  string `json:"retryMode"`  // Retry mode: "standard" or "adaptive"
@@ -55,6 +62,10 @@ func NewConfig() *Config {
 		Concurrency:          5,
 		MaxRetries:           DefaultMaxRetries,
 		RetryMode:            "standard",
+		MaxIdleConns:         50,
+		MaxIdleConnsPerHost:  10,
+		MaxConnsPerHost:      20,
+		IdleConnTimeout:      60 * time.Second,
 	}
 }
 
@@ -102,6 +113,31 @@ func (c *Config) Validate() error {
 	// Validate credentials if provided
 	if c.AccessKeyID != "" && c.DefaultCredentialConfig.IsEmpty() {
 		return errors.New("missing secret access key")
+	}
+
+	// Set default connection pooling values if not specified
+	if c.MaxIdleConns == 0 {
+		c.MaxIdleConns = 50
+	}
+	if c.MaxIdleConnsPerHost == 0 {
+		c.MaxIdleConnsPerHost = 10
+	}
+	if c.MaxConnsPerHost == 0 {
+		c.MaxConnsPerHost = 20
+	}
+	if c.IdleConnTimeout == 0 {
+		c.IdleConnTimeout = 60 * time.Second
+	}
+
+	// Validate connection polling parameter
+	if c.MaxIdleConns < 0 {
+		return errors.New("invalid max idle connections")
+	}
+	if c.MaxIdleConnsPerHost < 0 {
+		return errors.New("invalid max idle connections per host")
+	}
+	if c.MaxConnsPerHost < 1 {
+		return errors.New("invalid max connections per host")
 	}
 
 	// Enforce SSL for AWS endpoints (security requirement)

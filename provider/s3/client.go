@@ -2,7 +2,6 @@ package s3
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 	"sync"
 	"time"
@@ -108,15 +107,23 @@ func (c *Client) Connect(ctx context.Context) error {
 		opts.Creds = credentials.NewStaticV4(c.config.AccessKeyID, secretKey, "")
 	}
 
-	// Configure custom HTTP client for non-SSL connections
-	if !c.config.UseSSL {
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		}
-		opts.Transport = transport
+	// connection polling
+	transport := &http.Transport{
+		MaxIdleConns:        50, // Total idle connections
+		MaxIdleConnsPerHost: 10, // Per-host idle connections
+		MaxConnsPerHost:     20, // Max connections per host
+		IdleConnTimeout:     60 * time.Second,
 	}
+
+	// Configure custom HTTP client for non-SSL connections
+	if c.config.UseSSL {
+		tlsConfig, err := c.config.TLSConfig()
+		if err != nil {
+			return err
+		}
+		transport.TLSClientConfig = tlsConfig
+	}
+	opts.Transport = transport
 
 	// Create MinIO client
 	var err error

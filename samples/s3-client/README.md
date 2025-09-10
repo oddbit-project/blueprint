@@ -30,18 +30,32 @@ The CLI tool provides the following functionality:
 
 ### 1. Start MinIO Server
 
+#### Option A: Using Docker Compose (Recommended)
 ```bash
-# Using Docker (recommended)
+# Start MinIO with demo bucket setup
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f minio
+```
+
+#### Option B: Using Docker directly
+```bash
 docker run -p 9000:9000 -p 9001:9001 --name minio \
   -e MINIO_ROOT_USER=minioadmin \
   -e MINIO_ROOT_PASSWORD=minioadmin \
   quay.io/minio/minio server /data --console-address :9001
+```
 
-# Or using MinIO binary
+#### Option C: Using MinIO binary
+```bash
 minio server /tmp/minio-data --console-address :9001
 ```
 
-MinIO Console will be available at: http://localhost:9001
+MinIO Console will be available at: http://localhost:9011 (docker-compose) or http://localhost:9001 (direct docker)
 
 ### 2. Build the CLI Tool
 
@@ -84,7 +98,7 @@ echo "Hello, S3!" > test.txt
 
 ### Command Line Flags
 
-- `--endpoint` - S3 endpoint URL (default: localhost:9000)
+- `--endpoint` - S3 endpoint URL (default: localhost:9000, use localhost:9010 for docker-compose)
 - `--region` - AWS region (default: us-east-1)
 - `--access-key` - S3 access key (default: minioadmin)
 - `--secret-key` - S3 secret key (default: minioadmin)
@@ -92,6 +106,12 @@ echo "Hello, S3!" > test.txt
 - `--verbose` - Enable verbose logging
 - `--upload-timeout` - Upload timeout in seconds (default: 1800 for large files)
 - `--version` - Show version information
+
+#### Connection Pooling Options
+- `--max-idle-conns` - Maximum idle connections in pool (default: 50)
+- `--max-idle-conns-per-host` - Maximum idle connections per host (default: 10)
+- `--max-conns-per-host` - Maximum connections per host (default: 20)
+- `--idle-conn-timeout` - Idle connection timeout in seconds (default: 60)
 
 ### Environment Variables
 
@@ -132,7 +152,7 @@ export S3_SECRET_KEY="your-secret-key"
 #### Upload with Verbose Logging and Timing
 ```bash
 ./s3-cli --verbose upload my-bucket large-file.zip backup/large-file.zip
-# Output: ✓ File uploaded successfully to 's3://my-bucket/backup/large-file.zip' (elapsed: 2.4s, speed: 41.7 MB/s)
+# Output: File uploaded successfully to 's3://my-bucket/backup/large-file.zip' (elapsed: 2.4s, speed: 41.7 MB/s)
 ```
 
 #### Upload Large Files with Custom Timeout
@@ -186,11 +206,33 @@ The CLI provides clear error messages for common issues:
 The underlying S3 provider includes:
 
 - **Multipart Uploads** - Automatic for files > 100MB with 10MB part size
-- **Connection Pooling** - Efficient HTTP connection reuse
+- **Connection Pooling** - Configurable HTTP connection reuse with customizable pool sizes
 - **Retry Logic** - Automatic retry with exponential backoff
 - **Concurrent Operations** - Parallel part uploads for large files
 - **Smart Timeouts** - Configurable timeouts (5 min default, 30 min for large uploads)
 - **Transfer Speed Monitoring** - Real-time speed calculation and display
+
+### Connection Pooling Configuration
+
+Optimize performance by tuning connection pooling parameters:
+
+```bash
+# High-performance configuration for busy workloads
+./s3-cli --max-idle-conns 100 --max-idle-conns-per-host 20 \
+  --max-conns-per-host 50 --idle-conn-timeout 300 \
+  --verbose upload my-bucket large-file.zip
+
+# Conservative configuration for low-resource environments
+./s3-cli --max-idle-conns 10 --max-idle-conns-per-host 2 \
+  --max-conns-per-host 5 --idle-conn-timeout 30 \
+  upload my-bucket small-file.txt
+```
+
+**Connection Pool Guidelines:**
+- `max-idle-conns`: Total connections across all hosts (50-200 for busy workloads)
+- `max-idle-conns-per-host`: Per-host idle connections (5-20 typical)
+- `max-conns-per-host`: Per-host total connections (10-100 typical)
+- `idle-conn-timeout`: How long to keep idle connections (30-300 seconds)
 
 ## Troubleshooting
 
@@ -227,10 +269,30 @@ Use the `--verbose` flag to see detailed operation logs:
 
 This will show:
 - Connection establishment
+- Connection pooling configuration
 - Request/response details
 - Security events
 - Performance metrics
 - Upload/download timing and transfer speeds
+
+### Docker Compose Management
+
+```bash
+# Start MinIO service
+docker-compose up -d
+
+# Stop MinIO service
+docker-compose down
+
+# Stop and remove volumes (deletes all data)
+docker-compose down -v
+
+# View logs
+docker-compose logs -f minio
+
+# Restart MinIO
+docker-compose restart minio
+```
 
 ## Development
 
@@ -249,8 +311,30 @@ To extend this sample:
 This sample can be used for integration testing of the S3 provider:
 
 ```bash
+# Start MinIO using docker-compose
+docker-compose up -d
+
+# Wait for MinIO to be ready
+sleep 10
+
 # Run comprehensive test
 ./test-s3-operations.sh
+
+# Clean up
+docker-compose down
 ```
 
 See the test script for automated validation of all operations.
+
+### Performance Testing with Connection Pooling
+
+```bash
+# Test with default settings
+time ./s3-cli upload demo-bucket large-file.zip
+
+# Test with optimized connection pooling
+time ./s3-cli --max-idle-conns 100 --max-conns-per-host 50 \
+  upload demo-bucket large-file.zip
+
+# Compare upload speeds and connection reuse efficiency
+```
