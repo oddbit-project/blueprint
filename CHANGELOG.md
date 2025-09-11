@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [v0.6.2]
+## [v0.7.0]
 
 ### Added
 
@@ -13,9 +13,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Comprehensive bucket and object operations with automatic multipart uploads
   - Advanced features: range downloads, presigned URLs, metadata management
   - Security features: TLS/SSL encryption, secure credential handling
-  - Performance optimizations: connection pooling, concurrent operations, smart timeouts
+  - Performance optimizations: configurable HTTP connection pooling, concurrent operations, smart timeouts
   - Complete CLI sample application (samples/s3-client) with comprehensive examples
   - Full documentation with integration examples and troubleshooting guide
+  - Docker Compose setup for easy MinIO testing and development
+
+- **ThreadPool FuncRunner** (threadpool/FuncRunner) - Function wrapper utility
+  - Simple wrapper to convert `func(ctx context.Context)` into Job interface
+  - Enables dispatching regular functions to threadpool for concurrent execution
+  - Comprehensive test suite with performance benchmarks and integration tests
+
+- **ETCD Client Provider** (provider/etcd) - Distributed coordination and configuration management
+  - Complete etcd v3 client implementation with TLS support
+  - Distributed locking mechanism with lease management and automatic renewal
+  - Configuration storage and retrieval with watch functionality
+  - Integration tests with testcontainers for reliable testing
+  - Sample application demonstrating etcd usage patterns
+  - Comprehensive documentation with usage examples
 
 - **mTLS Support** - Mutual TLS authentication for enhanced security
   - Complete mTLS implementation for HTTP server with client certificate validation
@@ -36,6 +50,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Improved test isolation and reliability for ClickHouse, Kafka, MQTT, NATS, PostgreSQL
   - Consolidated database integration tests with better organization
   - Enhanced Makefile with streamlined test targets
+
+- **PostgreSQL Migration System** - Improved ALTER TABLE handling
+  - Fixed DEFAULT value separation in ALTER TABLE queries for better compatibility
+  - Enhanced migration reliability with better SQL generation
+  - Improved error handling in schema modification operations
 
 - **Password Hashing Reliability**
   - Improved hasher implementation with better error handling
