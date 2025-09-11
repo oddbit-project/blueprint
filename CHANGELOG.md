@@ -4,6 +4,76 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.6.2]
+
+### Added
+
+- **S3 Provider** (provider/s3) - Complete S3-compatible storage integration
+  - Multi-cloud support for AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2
+  - Comprehensive bucket and object operations with automatic multipart uploads
+  - Advanced features: range downloads, presigned URLs, metadata management
+  - Security features: TLS/SSL encryption, secure credential handling
+  - Performance optimizations: connection pooling, concurrent operations, smart timeouts
+  - Complete CLI sample application (samples/s3-client) with comprehensive examples
+  - Full documentation with integration examples and troubleshooting guide
+
+- **mTLS Support** - Mutual TLS authentication for enhanced security
+  - Complete mTLS implementation for HTTP server with client certificate validation
+  - Certificate generation utilities and sample applications
+  - Comprehensive mTLS documentation with security best practices
+  - Sample applications demonstrating client and server mTLS configurations
+
+- **Testcontainers Integration** - Modern test infrastructure
+  - Migration from Docker Compose to Testcontainers for all integration tests
+  - Enhanced test reliability and isolation across all providers
+  - Simplified test setup and teardown procedures
+  - Better CI/CD integration with containerized testing
+
+### Enhanced
+
+- **Testing Infrastructure Modernization**
+  - Complete migration of integration tests to Testcontainers
+  - Improved test isolation and reliability for ClickHouse, Kafka, MQTT, NATS, PostgreSQL
+  - Consolidated database integration tests with better organization
+  - Enhanced Makefile with streamlined test targets
+
+- **Password Hashing Reliability**
+  - Improved hasher implementation with better error handling
+  - Enhanced test coverage for cryptographic operations
+  - More robust password validation and security checks
+
+- **Documentation Improvements**
+  - Comprehensive S3 provider documentation with multi-cloud examples
+  - Enhanced mTLS security documentation with implementation guides
+  - Updated HTTP server security documentation
+  - Improved sample application documentation and usage examples
+
+### Removed
+
+- **Docker Infrastructure Cleanup**
+  - Removed legacy Dockerfiles and docker-compose.yml
+  - Simplified build process with focus on Testcontainers
+  - Streamlined development environment setup
+
+### Fixed
+
+- **Hash Provider Stability**
+  - Enhanced reliability in cryptographic operations
+  - Better error handling in password hashing functions
+  - Improved test stability and coverage
+
+- **Integration Test Improvements**
+  - Resolved test flakiness through Testcontainers migration
+  - Better resource management and cleanup in tests
+  - Enhanced test isolation and parallel execution
+
+### Security
+
+- **mTLS Implementation**
+  - Mutual TLS authentication for client certificate validation
+  - Enhanced security for service-to-service communication
+  - Certificate-based authentication with comprehensive validation
+
 ## [v0.6.1]
 
 ### Added

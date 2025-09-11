@@ -349,6 +349,819 @@ func setupProtectedRoutes(router *gin.Engine) {
 }
 ```
 
+## Mutual TLS (mTLS) Configuration
+
+Blueprint HTTP server provides comprehensive support for mutual TLS authentication, where both client and server certificates are validated for secure API-to-API communication.
+
+### Working mTLS Server Example
+
+This example is based on the fully tested sample in `samples/httpserver-mtls`:
+
+```go
+package main
+
+import (
+    "context"
+    "crypto/x509"
+    "fmt"
+    "os"
+    "os/signal"
+    "syscall"
+    "time"
+
+    "github.com/gin-gonic/gin"
+    "github.com/oddbit-project/blueprint/log"
+    "github.com/oddbit-project/blueprint/provider/httpserver"
+    "github.com/oddbit-project/blueprint/provider/httpserver/response"
+    tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+)
+
+func main() {
+    // Setup logger
+    logger := log.New("mtls-server")
+    logger.Info("Starting mTLS server demo...")
+
+    // Configure mTLS server
+    serverConfig := &httpserver.ServerConfig{
+        Host: "localhost",
+        Port: 8444,
+        ServerConfig: tlsProvider.ServerConfig{
+            TLSEnable: true,
+            // Server certificate and key
+            TLSCert: "../certs/server.crt",
+            TLSKey:  "../certs/server.key",
+            // CA certificates to validate client certificates
+            TLSAllowedCACerts: []string{
+                "../certs/ca.crt",
+            },
+            // Optional: Restrict allowed client DNS names (commented out for demo)
+            // TLSAllowedDNSNames: []string{
+            //	"demo-client.example.com",
+            //	"client.blueprint.demo",
+            // },
+            // Security settings - use TLS 1.3 for maximum security
+            TLSMinVersion: "TLS13",
+            TLSMaxVersion: "TLS13",
+            // Use strong cipher suites
+            TLSCipherSuites: []string{
+                "TLS_AES_256_GCM_SHA384",
+                "TLS_CHACHA20_POLY1305_SHA256",
+                "TLS_AES_128_GCM_SHA256",
+            },
+        },
+    }
+
+    // Create server with mTLS configuration
+    server, err := serverConfig.NewServer(logger)
+    if err != nil {
+        logger.Fatal(err, "Failed to create server")
+    }
+
+    // Setup routes
+    setupRoutes(server, logger)
+
+    // Setup graceful shutdown
+    setupGracefulShutdown(server, logger)
+
+    // Start server
+    logger.Info("mTLS server starting", log.KV{
+        "host": serverConfig.Host,
+        "port": serverConfig.Port,
+        "tls":  serverConfig.TLSEnable,
+    })
+
+    if err := server.Start(); err != nil {
+        logger.Fatal(err, "Server failed to start")
+    }
+}
+
+func setupRoutes(server *httpserver.Server, logger *log.Logger) {
+    // Add mTLS security logger middleware
+    server.AddMiddleware(mTLSSecurityLogger(logger))
+
+    // Public endpoint (no client certificate validation)
+    server.Route().GET("/health", func(c *gin.Context) {
+        response.Success(c, gin.H{
+            "status":    "healthy",
+            "timestamp": time.Now().Format(time.RFC3339),
+            "server":    "mTLS Demo Server",
+        })
+    })
+
+    // Protected endpoint requiring client certificate
+    server.Route().GET("/secure", mTLSAuthorizationMiddleware(logger), func(c *gin.Context) {
+        // Get client certificate from context
+        clientCert, exists := c.Get("client_cert")
+        if !exists {
+            c.JSON(500, gin.H{"error": "Internal error: client certificate not found in context"})
+            return
+        }
+
+        cert := clientCert.(*x509.Certificate)
+        clientInfo := extractClientInfo(cert)
+
+        response.Success(c, gin.H{
+            "message":     "Access granted to secure endpoint",
+            "client_info": clientInfo,
+            "timestamp":   time.Now().Format(time.RFC3339),
+        })
+    })
+
+    // API endpoints with different authorization levels
+    api := server.Group("/api/v1")
+    api.Use(mTLSAuthorizationMiddleware(logger))
+    {
+        api.GET("/user/profile", func(c *gin.Context) {
+            clientDN, _ := c.Get("client_dn")
+            response.Success(c, gin.H{
+                "user_id":    "demo_user_123",
+                "username":   "demo_user",
+                "email":      "demo@example.com",
+                "client_dn":  clientDN,
+                "privileges": []string{"read", "write"},
+            })
+        })
+
+        api.POST("/data", func(c *gin.Context) {
+            var requestData map[string]interface{}
+            if err := c.ShouldBindJSON(&requestData); err != nil {
+                c.JSON(400, gin.H{"error": "Invalid JSON payload"})
+                return
+            }
+
+            clientDN, _ := c.Get("client_dn")
+            response.Success(c, gin.H{
+                "message":   "Data processed successfully",
+                "data_id":   fmt.Sprintf("data_%d", time.Now().Unix()),
+                "client_dn": clientDN,
+                "received":  requestData,
+            })
+        })
+
+        api.GET("/admin/stats", func(c *gin.Context) {
+            // Only allow specific client organizations for admin endpoints
+            clientCert, _ := c.Get("client_cert")
+            cert := clientCert.(*x509.Certificate)
+
+            if !isAdminClient(cert) {
+                c.JSON(403, gin.H{"error": "Admin access required"})
+                return
+            }
+
+            response.Success(c, gin.H{
+                "active_connections": 42,
+                "uptime_seconds":     3600,
+                "memory_usage_mb":    128,
+                "admin_client":       cert.Subject.String(),
+            })
+        })
+    }
+}
+
+func mTLSSecurityLogger(logger *log.Logger) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        start := time.Now()
+        c.Next()
+        duration := time.Since(start)
+
+        if c.Request.TLS != nil && len(c.Request.TLS.PeerCertificates) > 0 {
+            clientCert := c.Request.TLS.PeerCertificates[0]
+
+            logger.Info("mTLS request", log.KV{
+                "client_dn":      clientCert.Subject.String(),
+                "client_serial":  clientCert.SerialNumber.String(),
+                "path":           c.Request.URL.Path,
+                "method":         c.Request.Method,
+                "status":         c.Writer.Status(),
+                "client_ip":      c.ClientIP(),
+                "duration_ms":    duration.Milliseconds(),
+                "tls_version":    getTLSVersion(c.Request.TLS.Version),
+                "cipher_suite":   getCipherSuite(c.Request.TLS.CipherSuite),
+                "user_agent":     c.Request.UserAgent(),
+            })
+        } else {
+            logger.Info("Non-mTLS request", log.KV{
+                "path":        c.Request.URL.Path,
+                "method":      c.Request.Method,
+                "status":      c.Writer.Status(),
+                "client_ip":   c.ClientIP(),
+                "duration_ms": duration.Milliseconds(),
+                "user_agent":  c.Request.UserAgent(),
+            })
+        }
+    }
+}
+
+func mTLSAuthorizationMiddleware(logger *log.Logger) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        if c.Request.TLS == nil || len(c.Request.TLS.PeerCertificates) == 0 {
+            logger.Warn("Client certificate required but not provided", log.KV{
+                "path":      c.Request.URL.Path,
+                "client_ip": c.ClientIP(),
+            })
+            c.AbortWithStatusJSON(401, gin.H{"error": "Client certificate required for this endpoint"})
+            return
+        }
+
+        clientCert := c.Request.TLS.PeerCertificates[0]
+
+        // Validate certificate is still valid
+        now := time.Now()
+        if now.Before(clientCert.NotBefore) || now.After(clientCert.NotAfter) {
+            logger.Warn("Client certificate expired or not yet valid", log.KV{
+                "client_dn":  clientCert.Subject.String(),
+                "not_before": clientCert.NotBefore,
+                "not_after":  clientCert.NotAfter,
+                "now":        now,
+            })
+            c.AbortWithStatusJSON(401, gin.H{"error": "Client certificate expired or not yet valid"})
+            return
+        }
+
+        // Custom authorization logic based on certificate attributes
+        if !isAuthorizedClient(clientCert) {
+            logger.Warn("Client certificate not authorized", log.KV{
+                "client_dn":     clientCert.Subject.String(),
+                "client_serial": clientCert.SerialNumber.String(),
+                "organizations": clientCert.Subject.Organization,
+            })
+            c.AbortWithStatusJSON(403, gin.H{"error": "Client certificate not authorized"})
+            return
+        }
+
+        // Store client identity in context for downstream handlers
+        c.Set("client_cert", clientCert)
+        c.Set("client_dn", clientCert.Subject.String())
+        c.Set("client_serial", clientCert.SerialNumber.String())
+
+        logger.Debug("mTLS client authorized", log.KV{
+            "client_dn":     clientCert.Subject.String(),
+            "client_serial": clientCert.SerialNumber.String(),
+            "path":          c.Request.URL.Path,
+        })
+
+        c.Next()
+    }
+}
+
+func isAuthorizedClient(cert *x509.Certificate) bool {
+    // Allow clients from specific organizations
+    authorizedOrgs := []string{"Blueprint Demo"}
+
+    for _, org := range cert.Subject.Organization {
+        for _, authorizedOrg := range authorizedOrgs {
+            if org == authorizedOrg {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+func isAdminClient(cert *x509.Certificate) bool {
+    // Admin access requires specific OU
+    for _, ou := range cert.Subject.OrganizationalUnit {
+        if ou == "Admin" || ou == "Client" { // For demo purposes, allow Client OU as admin
+            return true
+        }
+    }
+    return false
+}
+
+func extractClientInfo(cert *x509.Certificate) map[string]interface{} {
+    return map[string]interface{}{
+        "subject":      cert.Subject.String(),
+        "issuer":       cert.Issuer.String(),
+        "serial":       cert.SerialNumber.String(),
+        "not_before":   cert.NotBefore.Format(time.RFC3339),
+        "not_after":    cert.NotAfter.Format(time.RFC3339),
+        "dns_names":    cert.DNSNames,
+        "ip_addresses": cert.IPAddresses,
+        "organizations": cert.Subject.Organization,
+        "organizational_units": cert.Subject.OrganizationalUnit,
+        "common_name":  cert.Subject.CommonName,
+    }
+}
+
+func getTLSVersion(version uint16) string {
+    switch version {
+    case 0x0303:
+        return "TLS 1.2"
+    case 0x0304:
+        return "TLS 1.3"
+    default:
+        return fmt.Sprintf("Unknown (0x%04x)", version)
+    }
+}
+
+func getCipherSuite(suite uint16) string {
+    switch suite {
+    case 0x1301:
+        return "TLS_AES_128_GCM_SHA256"
+    case 0x1302:
+        return "TLS_AES_256_GCM_SHA384"
+    case 0x1303:
+        return "TLS_CHACHA20_POLY1305_SHA256"
+    default:
+        return fmt.Sprintf("Unknown (0x%04x)", suite)
+    }
+}
+
+func setupGracefulShutdown(server *httpserver.Server, logger *log.Logger) {
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+    go func() {
+        <-c
+        logger.Info("Shutting down mTLS server...")
+
+        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := server.Shutdown(ctx); err != nil {
+            logger.Error(err, "Error during server shutdown")
+        } else {
+            logger.Info("mTLS server shutdown complete")
+        }
+        os.Exit(0)
+    }()
+}
+```
+
+### mTLS Configuration Options
+
+**Important configuration notes:**
+- TLS versions must use `"TLS12"` or `"TLS13"` (not `"1.2"` or `"1.3"`)
+- When `TLSAllowedCACerts` is provided, client certificates are required
+- Use `TLSAllowedDNSNames` to restrict which client DNS names are allowed
+
+```go
+serverConfig := tlsProvider.ServerConfig{
+    TLSEnable: true,
+    
+    // Server identity certificate
+    TLSCert: "server.crt",
+    TLSKey:  "server.key",
+    
+    // Client certificate validation
+    TLSAllowedCACerts: []string{
+        "ca.crt",  // CA certificate for client validation
+    },
+    
+    // Optional client certificate restrictions
+    TLSAllowedDNSNames: []string{
+        "demo-client.example.com",
+        "client.blueprint.demo",
+    },
+    
+    // TLS version control (use TLS12 or TLS13)
+    TLSMinVersion: "TLS13",
+    TLSMaxVersion: "TLS13",
+    
+    // Cipher suite restrictions
+    TLSCipherSuites: []string{
+        "TLS_AES_256_GCM_SHA384",
+        "TLS_CHACHA20_POLY1305_SHA256",
+        "TLS_AES_128_GCM_SHA256",
+    },
+}
+```
+
+### Client Certificate Authentication
+
+Access client certificate information in request handlers:
+
+```go
+func protectedHandler(c *gin.Context) {
+    // Access client certificate information
+    if c.Request.TLS != nil && len(c.Request.TLS.PeerCertificates) > 0 {
+        clientCert := c.Request.TLS.PeerCertificates[0]
+        
+        // Extract client identity
+        clientDN := clientCert.Subject.String()
+        clientSerial := clientCert.SerialNumber.String()
+        
+        // Use client identity for authorization
+        if isAuthorizedClient(clientCert) {
+            response.Success(c, gin.H{
+                "message": "Access granted", 
+                "client_dn": clientDN,
+                "client_info": extractClientInfo(clientCert),
+            })
+        } else {
+            c.JSON(403, gin.H{"error": "Client not authorized"})
+        }
+        return
+    }
+    
+    c.JSON(401, gin.H{"error": "Client certificate required"})
+}
+```
+
+### Certificate Generation for mTLS
+
+**Working certificate generation script (from `samples/httpserver-mtls/generate-certs.sh`):**
+
+```bash
+#!/bin/bash
+set -e
+
+CERT_DIR="certs"
+mkdir -p "$CERT_DIR"
+cd "$CERT_DIR"
+
+# 1. Create CA private key
+openssl genrsa -out ca.key 4096
+
+# 2. Create CA certificate
+openssl req -new -x509 -days 3650 -key ca.key -out ca.crt \
+    -subj "/C=US/ST=CA/L=San Francisco/O=Blueprint Demo/OU=Security/CN=Blueprint Demo CA"
+
+# 3. Create server private key
+openssl genrsa -out server.key 4096
+
+# 4. Create server certificate signing request
+openssl req -new -key server.key -out server.csr \
+    -subj "/C=US/ST=CA/L=San Francisco/O=Blueprint Demo/OU=Server/CN=localhost"
+
+# 5. Create server certificate extensions file
+cat > server.ext << EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+DNS.2 = api.example.com
+IP.1 = 127.0.0.1
+IP.2 = ::1
+EOF
+
+# 6. Sign server certificate with CA
+openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key \
+    -CAcreateserial -out server.crt -extfile server.ext
+
+# 7. Create client private key
+openssl genrsa -out client.key 4096
+
+# 8. Create client certificate signing request
+openssl req -new -key client.key -out client.csr \
+    -subj "/C=US/ST=CA/L=San Francisco/O=Blueprint Demo/OU=Client/CN=demo-client.example.com"
+
+# 9. Create client certificate extensions file
+cat > client.ext << EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = clientAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = demo-client.example.com
+DNS.2 = client.blueprint.demo
+EOF
+
+# 10. Sign client certificate with CA
+openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key \
+    -CAcreateserial -out client.crt -extfile client.ext
+
+# 11. Cleanup
+rm -f *.csr *.ext ca.srl
+
+echo "✅ Certificate generation complete!"
+```
+
+This generates:
+- `ca.crt` - CA certificate for validation
+- `ca.key` - CA private key  
+- `server.crt` - Server certificate (localhost, 127.0.0.1)
+- `server.key` - Server private key
+- `client.crt` - Client certificate with proper extensions
+- `client.key` - Client private key
+
+### mTLS Security Features
+
+**Automatic Certificate Validation:**
+- Certificate expiration checking
+- Certificate chain verification
+- DNS name validation (if configured)  
+- CA signature validation
+- Organization-based authorization
+
+### Working mTLS Client Example
+
+**Blueprint-style mTLS client (from `samples/httpserver-mtls/client/main.go`):**
+
+```go
+package main
+
+import (
+    "bytes"
+    "crypto/tls"
+    "crypto/x509"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "strings"
+    "time"
+
+    "github.com/oddbit-project/blueprint/log"
+)
+
+// ClientConfig holds the mTLS client configuration
+type ClientConfig struct {
+    ServerURL  string
+    CACert     string
+    ClientCert string
+    ClientKey  string
+    Timeout    time.Duration
+}
+
+// MTLSClient represents an mTLS-enabled HTTP client following Blueprint patterns
+type MTLSClient struct {
+    baseURL    string
+    httpClient *http.Client
+    logger     *log.Logger
+    config     *ClientConfig
+}
+
+// NewMTLSClient creates a new mTLS client with proper configuration
+func NewMTLSClient(config *ClientConfig, logger *log.Logger) (*MTLSClient, error) {
+    if config == nil {
+        return nil, fmt.Errorf("client config is required")
+    }
+    if logger == nil {
+        logger = log.New("mtls-client")
+    }
+
+    // Set default timeout if not specified
+    if config.Timeout == 0 {
+        config.Timeout = 30 * time.Second
+    }
+
+    // Load client certificate
+    clientCert, err := tls.LoadX509KeyPair(config.ClientCert, config.ClientKey)
+    if err != nil {
+        return nil, fmt.Errorf("failed to load client certificate: %w", err)
+    }
+
+    // Load CA certificate
+    caCertPEM, err := os.ReadFile(config.CACert)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+    }
+
+    caCertPool := x509.NewCertPool()
+    if !caCertPool.AppendCertsFromPEM(caCertPEM) {
+        return nil, fmt.Errorf("failed to parse CA certificate")
+    }
+
+    // Configure TLS with mTLS
+    tlsConfig := &tls.Config{
+        Certificates: []tls.Certificate{clientCert},
+        RootCAs:      caCertPool,
+        MinVersion:   tls.VersionTLS13, // Use TLS 1.3
+        CipherSuites: []uint16{
+            tls.TLS_AES_256_GCM_SHA384,
+            tls.TLS_CHACHA20_POLY1305_SHA256,
+            tls.TLS_AES_128_GCM_SHA256,
+        },
+    }
+
+    // Create HTTP client with mTLS configuration
+    httpClient := &http.Client{
+        Transport: &http.Transport{
+            TLSClientConfig: tlsConfig,
+        },
+        Timeout: config.Timeout,
+    }
+
+    return &MTLSClient{
+        baseURL:    strings.TrimSuffix(config.ServerURL, "/"),
+        httpClient: httpClient,
+        logger:     logger,
+        config:     config,
+    }, nil
+}
+
+// makeRequest creates and sends an mTLS HTTP request with proper logging
+func (c *MTLSClient) makeRequest(method, path string, body interface{}) (*http.Response, error) {
+    // Prepare request body
+    var requestBody []byte
+    var err error
+
+    if body != nil {
+        requestBody, err = json.Marshal(body)
+        if err != nil {
+            return nil, fmt.Errorf("failed to marshal request body: %w", err)
+        }
+    }
+
+    // Create HTTP request
+    url := c.baseURL + path
+    req, err := http.NewRequest(method, url, bytes.NewReader(requestBody))
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+
+    // Set standard headers
+    req.Header.Set("User-Agent", "Blueprint-mTLS-Client/1.0")
+    req.Header.Set("Accept", "application/json")
+    if requestBody != nil {
+        req.Header.Set("Content-Type", "application/json")
+    }
+
+    // Log request details
+    c.logger.Debug("Making mTLS request", log.KV{
+        "method": method,
+        "url":    url,
+        "path":   path,
+    })
+
+    start := time.Now()
+
+    // Make the request
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        c.logger.Error(err, "mTLS request failed", log.KV{
+            "method":      method,
+            "url":         url,
+            "duration_ms": time.Since(start).Milliseconds(),
+        })
+        return nil, fmt.Errorf("request failed: %w", err)
+    }
+
+    // Log response details
+    c.logger.Info("mTLS request completed", log.KV{
+        "method":      method,
+        "url":         url,
+        "status":      resp.StatusCode,
+        "duration_ms": time.Since(start).Milliseconds(),
+    })
+
+    return resp, nil
+}
+
+// Get performs an HTTP GET request
+func (c *MTLSClient) Get(path string) (*http.Response, error) {
+    return c.makeRequest("GET", path, nil)
+}
+
+// Post performs an HTTP POST request with JSON body
+func (c *MTLSClient) Post(path string, body interface{}) (*http.Response, error) {
+    return c.makeRequest("POST", path, body)
+}
+
+// GetJSON performs a GET request and unmarshals the JSON response
+func (c *MTLSClient) GetJSON(path string, result interface{}) error {
+    resp, err := c.Get(path)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        body, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+    }
+
+    return json.NewDecoder(resp.Body).Decode(result)
+}
+
+// PostJSON performs a POST request and unmarshals the JSON response
+func (c *MTLSClient) PostJSON(path string, requestBody interface{}, result interface{}) error {
+    resp, err := c.Post(path, requestBody)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+        body, _ := io.ReadAll(resp.Body)
+        return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+    }
+
+    return json.NewDecoder(resp.Body).Decode(result)
+}
+
+func main() {
+    // Setup logger
+    logger := log.New("mtls-client")
+    logger.Info("Starting Blueprint mTLS client demo...")
+
+    // Create client configuration
+    config := &ClientConfig{
+        ServerURL:  "https://localhost:8444",
+        CACert:     "../certs/ca.crt",
+        ClientCert: "../certs/client.crt",
+        ClientKey:  "../certs/client.key",
+        Timeout:    30 * time.Second,
+    }
+
+    // Create mTLS client
+    client, err := NewMTLSClient(config, logger)
+    if err != nil {
+        logger.Fatal(err, "Failed to create mTLS client")
+    }
+
+    // Test the secure endpoint
+    type SecureResponse struct {
+        Success bool `json:"success"`
+        Data    struct {
+            Message     string                 `json:"message"`
+            ClientInfo  map[string]interface{} `json:"client_info"`
+            Timestamp   string                 `json:"timestamp"`
+        } `json:"data"`
+    }
+
+    var secureResp SecureResponse
+    if err := client.GetJSON("/secure", &secureResp); err != nil {
+        logger.Error(err, "Secure endpoint failed")
+        return
+    }
+
+    logger.Info("mTLS authentication successful", log.KV{
+        "message": secureResp.Data.Message,
+        "client":  secureResp.Data.ClientInfo["common_name"],
+    })
+}
+```
+
+### Testing with curl
+
+You can test the mTLS server with curl:
+
+```bash
+# Health check (no client cert required)
+curl -k https://localhost:8444/health
+
+# Secure endpoint with mTLS
+curl -k \
+  --cert certs/client.crt \
+  --key certs/client.key \
+  --cacert certs/ca.crt \
+  https://localhost:8444/secure
+
+# API endpoint with JSON data
+curl -k \
+  --cert certs/client.crt \
+  --key certs/client.key \
+  --cacert certs/ca.crt \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello from curl!"}' \
+  https://localhost:8444/api/v1/data
+```
+
+### Complete Working Demo
+
+For a complete working example, see `samples/httpserver-mtls/` which includes:
+
+- **Certificate generation script** - Creates CA, server, and client certificates
+- **mTLS server** - Full server implementation with authorization middleware
+- **mTLS client** - Go client demonstrating mTLS authentication
+- **Test script** - Automated testing of the complete demo
+
+Run the demo:
+
+```bash
+cd samples/httpserver-mtls
+./generate-certs.sh    # Generate certificates
+./test-demo.sh         # Run complete test
+```
+
+Expected output:
+```
+🚀 Blueprint mTLS Client Demo
+==============================
+
+1. Testing health endpoint (no client cert required)...
+   ✅ Health check passed
+   Server: mTLS Demo Server, Status: healthy
+
+2. Testing secure endpoint (client cert required)...
+   ✅ mTLS authentication successful
+   Message: Access granted to secure endpoint
+   Client: demo-client.example.com
+
+3. Testing user profile API...
+   ✅ User profile retrieved successfully
+   User: demo_user (demo@example.com)
+   Privileges: [read write]
+
+4. Testing data submission API...
+   ✅ Data submitted successfully
+   Data ID: data_1737722400
+
+5. Testing admin stats API...
+   ✅ Admin stats retrieved successfully
+   Active connections: 42, Memory: 128 MB
+
+✅ Blueprint mTLS Client Demo completed!
+```
+
 ## Security Best Practices
 
 ### Production Security Checklist

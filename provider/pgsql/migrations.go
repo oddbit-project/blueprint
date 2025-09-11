@@ -62,9 +62,17 @@ func (b *pgMigrationManager) updateTable(ctx context.Context) error {
 	if !exists {
 		// add column "module"
 		// old blueprint versions did not implement the module column
-		qry := fmt.Sprintf(`ALTER TABLE  %s ADD COLUMN module TEXT`, EngineMigrationTable)
+		qry := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN module TEXT`, EngineMigrationTable)
 		result := b.client.Db().QueryRowContext(ctx, qry)
-		return result.Err()
+		if result.Err() != nil {
+			return result.Err()
+		}
+
+		// set default value
+		qry = fmt.Sprintf(`UPDATE TABLE %s SET module = ?`, EngineMigrationTable)
+		if _, err = b.client.Db().ExecContext(ctx, qry, migrations.ModuleBase); err != nil {
+			return nil
+		}
 	}
 	return nil
 }

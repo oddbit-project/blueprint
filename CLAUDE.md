@@ -9,6 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run with race detection: `go test -v -race ./...`
 - Run integration tests locally: `go test -v -tags=integration ./...`
 - Docker-based tests: `make test`
+- ClickHouse integration tests (uses testcontainers): `make test-clickhouse`
+- Kafka integration tests (uses testcontainers): `make test-kafka`
 
 ## Code Style Guidelines
 

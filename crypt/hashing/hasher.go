@@ -58,7 +58,8 @@ func (h *a2Hasher) Verify(password, hash string) (bool, RehashFn, error) {
 		return false, nil, err
 	}
 
-	if !Argon2IdNeedsRehash(cfg) {
+	// Check if the stored config differs from the hasher's current config
+	if !h.needsRehash(cfg) {
 		return valid, nil, nil
 	}
 
@@ -67,4 +68,14 @@ func (h *a2Hasher) Verify(password, hash string) (bool, RehashFn, error) {
 		return Argon2IdCreateHash(h.cfg, password)
 	}
 	return true, fn, nil
+}
+
+// needsRehash checks if a hash was created with different parameters
+// than the hasher's current configuration.
+func (h *a2Hasher) needsRehash(storedCfg *Argon2Config) bool {
+	return storedCfg.Memory != h.cfg.Memory ||
+		storedCfg.Iterations != h.cfg.Iterations ||
+		storedCfg.Parallelism != h.cfg.Parallelism ||
+		storedCfg.SaltLength != h.cfg.SaltLength ||
+		storedCfg.KeyLength != h.cfg.KeyLength
 }

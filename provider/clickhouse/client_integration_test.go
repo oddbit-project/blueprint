@@ -1,22 +1,23 @@
-//go:build integration && clickhouse
-// +build integration,clickhouse
-
 package clickhouse
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 // Integration test struct for ClickHouse client
 type ClickhouseIntegrationTestSuite struct {
 	suite.Suite
-	client *Client
-	ctx    context.Context
+	client    *Client
+	ctx       context.Context
+	container testcontainers.Container
 }
 
 // Record type for testing
@@ -33,15 +34,55 @@ func (s *ClickhouseIntegrationTestSuite) SetupSuite() {
 	// Create context
 	s.ctx = context.Background()
 
+	// Setup ClickHouse testcontainer
+	req := testcontainers.ContainerRequest{
+		Image:        "clickhouse/clickhouse-server:latest",
+		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
+		Env: map[string]string{
+			"CLICKHOUSE_USER":                      "default",
+			"CLICKHOUSE_PASSWORD":                  "testpassword",
+			"CLICKHOUSE_DB":                        "default",
+			"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": "1",
+		},
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("9000/tcp"),
+			wait.ForHTTP("/ping").WithPort("8123/tcp").WithStatusCodeMatcher(
+				func(status int) bool {
+					return status == http.StatusOK
+				},
+			),
+		).WithStartupTimeout(60 * time.Second),
+	}
+
+	// Start container
+	var err error
+	s.container, err = testcontainers.GenericContainer(s.ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		s.T().Fatalf("Failed to start ClickHouse container: %v", err)
+	}
+
+	// Get container host and port
+	host, err := s.container.Host(s.ctx)
+	if err != nil {
+		s.T().Fatalf("Failed to get container host: %v", err)
+	}
+
+	mappedPort, err := s.container.MappedPort(s.ctx, "9000")
+	if err != nil {
+		s.T().Fatalf("Failed to get mapped port: %v", err)
+	}
+
 	// Create client config
 	config := NewClientConfig()
-	config.Hosts = []string{"clickhouse:9000"} // Docker-exposed port
+	config.Hosts = []string{host + ":" + mappedPort.Port()}
 	config.Database = "default"
 	config.Username = "default"
-	config.Password = "somePassword" // From docker-compose.yml
+	config.Password = "testpassword"
 
 	// Create client
-	var err error
 	s.client, err = NewClient(config)
 	if err != nil {
 		s.T().Fatalf("Failed to create ClickHouse client: %v", err)
@@ -51,14 +92,21 @@ func (s *ClickhouseIntegrationTestSuite) SetupSuite() {
 // Teardown the test suite
 func (s *ClickhouseIntegrationTestSuite) TearDownSuite() {
 	// Drop the test table
-	err := s.client.Conn.Exec(s.ctx, "DROP TABLE IF EXISTS test_integration")
-	if err != nil {
-		s.T().Logf("Failed to drop test table: %v", err)
+	if s.client != nil {
+		err := s.client.Conn.Exec(s.ctx, "DROP TABLE IF EXISTS test_integration")
+		if err != nil {
+			s.T().Logf("Failed to drop test table: %v", err)
+		}
+		// Close the client
+		s.client.Close()
 	}
 
-	// Close the client
-	if s.client != nil {
-		s.client.Close()
+	// Stop and remove container
+	if s.container != nil {
+		err := s.container.Terminate(s.ctx)
+		if err != nil {
+			s.T().Logf("Failed to terminate container: %v", err)
+		}
 	}
 }
 

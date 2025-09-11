@@ -62,6 +62,7 @@ import (
   "github.com/oddbit-project/blueprint/log"
   "github.com/oddbit-project/blueprint/provider/httpserver"
   "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+  "github.com/oddbit-project/blueprint/provider/httpserver/response"
   "github.com/oddbit-project/blueprint/provider/jwtprovider"
   "os"
 )
@@ -168,15 +169,15 @@ func (a *Application) Build() {
         "role": "user",
       })
       if err != nil {
-        ctx.JSON(400, gin.H{"error": "Token generation failed"})
+        response.Http400(ctx, "Token generation failed")
         return
       }
-      ctx.JSON(200, gin.H{"token": token})
-      return
 
+      response.Success(ctx, gin.H{"token": token})
+      return
     }
 
-    ctx.JSON(401, gin.H{"error": "Invalid credentials"})
+    response.Http401(ctx)
   })
 
   // Create JWT auth middleware and enable middleware
@@ -188,11 +189,11 @@ func (a *Application) Build() {
     token, _ := auth.GetJWTToken(ctx)
     claims, err := a.jwtProvider.ParseToken(token)
     if err != nil {
-      ctx.JSON(400, gin.H{"error": "Token generation failed"})
+      response.Http400(ctx, "Token generation failed")
       return
     }
 
-    ctx.JSON(200, gin.H{
+    response.Success(ctx, gin.H{
       "id":   claims.ID,
       "user": claims.Subject,
       "data": claims.Data,
@@ -211,7 +212,7 @@ func (a *Application) Start() {
   // Start  application - http server
   a.Run(func(app interface{}) error {
     go func() {
-      a.logger.Infof("Running Sample Application API at https://%s:%d", a.httpServer.Config.Host, a.httpServer.Config.Port)
+      a.logger.Infof("Running Sample Application API at http://%s:%d", a.httpServer.Config.Host, a.httpServer.Config.Port)
       a.logger.Infof("Login: POST /login (username: demo, password: password)")
       a.logger.Infof("Protected: GET /v1/hello (requires JWT token)")
       a.AbortFatal(a.httpServer.Start())
