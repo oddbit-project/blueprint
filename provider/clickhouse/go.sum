@@ -1,0 +1,2 @@
+github.com/ClickHouse/ch-go v0.67.0/go.mod h1:2MSAeyVmgt+9a2k2SQPPG1b4qbTPzdGDpf1+bcHh+18=
+github.com/ClickHouse/clickhouse-go/v2 v2.39.0/go.mod h1:m13KylpdcPzpIjznlfXp53IpdgZ7plTxOSCZnKphYZ8=
