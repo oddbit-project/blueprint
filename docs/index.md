@@ -50,11 +50,11 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [ClickHouse](provider/clickhouse.md)
 - [etcd](provider/etcd.md)
 - [PostgreSQL](provider/pgsql.md)
-- [Redis](provider/redis.md) *(documentation pending)*
+- [Redis](provider/redis.md)
 - [S3 Storage](provider/s3.md)
 
 ### Web & HTTP
-- [Metrics](provider/metrics.md) *(documentation pending)*
+- Metrics *(documentation pending)*
 
 ### Authentication & Security
 - [HMAC Provider](provider/hmacprovider.md)
@@ -62,7 +62,7 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [JWT Provider](provider/jwtprovider.md)
 
 ### Utilities
-- [SMTP](provider/smtp.md) *(documentation pending)*
+- [SMTP](provider/smtp.md)
 
 ## Logging
 

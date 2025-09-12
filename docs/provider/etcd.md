@@ -88,10 +88,10 @@ client, err := config.NewClient()
 config := etcd.DefaultConfig().
 WithEndpoints("etcd.example.com:2379").
 WithTLS(
-"/path/to/cert.pem", // Client certificate
-"/path/to/key.pem",  // Client key
-"/path/to/ca.pem", // CA certificate
-false,             // InsecureSkipVerify
+	"/path/to/cert.pem", // Client certificate
+	"/path/to/key.pem",  // Client key
+	"/path/to/ca.pem",   // CA certificate
+	false,               // InsecureSkipVerify
 )
 ```
 
@@ -162,7 +162,7 @@ created, err := client.PutIfNotExists(ctx, "/app/lock", []byte("owner1"))
 
 // Compare and swap
 swapped, err := client.CompareAndSwap(ctx, "/app/version",
-[]byte("v1"), []byte("v2"))
+	[]byte("v1"), []byte("v2"))
 
 // Move key atomically
 err := client.MoveKey(ctx, "/app/old", "/app/new")
@@ -173,9 +173,9 @@ err := client.MoveKey(ctx, "/app/old", "/app/new")
 ```go
 // Bulk put - atomic batch insert
 kvs := map[string][]byte{
-"/app/config1": []byte("value1"),
-"/app/config2": []byte("value2"),
-"/app/config3": []byte("value3"),
+	"/app/config1": []byte("value1"),
+	"/app/config2": []byte("value2"),
+	"/app/config3": []byte("value3"),
 }
 err := client.BulkPut(ctx, kvs)
 
@@ -192,14 +192,14 @@ The provider includes a robust distributed locking mechanism using etcd sessions
 // Create a distributed lock
 lock, err := client.NewLock("/locks/resource1")
 if err != nil {
-log.Fatal(err)
+	log.Fatal(err)
 }
 defer lock.Close()
 
 // Acquire lock (blocking)
 err = lock.Lock(ctx)
 if err != nil {
-log.Fatal(err)
+	log.Fatal(err)
 }
 
 // Do critical section work
@@ -211,8 +211,8 @@ err = lock.Unlock(ctx)
 // Try to acquire lock (non-blocking)
 acquired, err := lock.TryLock(ctx, etcd.WithTTL(100*time.Millisecond))
 if acquired {
-// Got the lock
-defer lock.Unlock(ctx)
+	// Got the lock
+	defer lock.Unlock(ctx)
 }
 ```
 
@@ -231,13 +231,13 @@ Monitor key changes in real-time:
 // Watch single key
 watchChan := client.Watch(ctx, "/app/config")
 
-go func () {
-for wresp := range watchChan {
-for _, event := range wresp.Events {
-fmt.Printf("Event: %s Key: %s Value: %s\n",
-event.Type, event.Kv.Key, event.Kv.Value)
-}
-}
+go func() {
+	for wresp := range watchChan {
+		for _, event := range wresp.Events {
+			fmt.Printf("Event: %s Key: %s Value: %s\n",
+				event.Type, event.Kv.Key, event.Kv.Value)
+		}
+	}
 }()
 
 // Watch with prefix
@@ -254,16 +254,16 @@ leaseID, err := client.Lease(60)
 
 // Store key with lease
 err = client.PutWithLease(ctx, "/temp/session",
-[]byte("session-data"), leaseID)
+	[]byte("session-data"), leaseID)
 
 // Keep lease alive
 keepAliveChan, err := client.KeepAlive(ctx, leaseID)
 
-go func () {
-for ka := range keepAliveChan {
-fmt.Printf("Lease %d renewed, TTL: %d\n",
-ka.ID, ka.TTL)
-}
+go func() {
+	for ka := range keepAliveChan {
+		fmt.Printf("Lease %d renewed, TTL: %d\n",
+			ka.ID, ka.TTL)
+	}
 }()
 
 // Revoke lease (deletes all associated keys)
@@ -279,18 +279,18 @@ txn := client.Transaction(ctx)
 
 // If-Then-Else transaction
 resp, err := txn.
-If(clientv3.Compare(clientv3.Value("/app/version"), "=", "v1")).
-Then(
-clientv3.OpPut("/app/version", "v2"),
-clientv3.OpPut("/app/updated", "true"),
-).
-Else(
-clientv3.OpGet("/app/version"),
-).
-Commit()
+	If(clientv3.Compare(clientv3.Value("/app/version"), "=", "v1")).
+	Then(
+		clientv3.OpPut("/app/version", "v2"),
+		clientv3.OpPut("/app/updated", "true"),
+	).
+	Else(
+		clientv3.OpGet("/app/version"),
+	).
+	Commit()
 
 if resp.Succeeded {
-fmt.Println("Transaction succeeded")
+	fmt.Println("Transaction succeeded")
 }
 ```
 
@@ -316,13 +316,13 @@ value, err := client.GetWithRevision(ctx, "/app/config", revision)
 // Get cluster status
 status, err := client.Status(ctx)
 fmt.Printf("etcd version: %s, DB size: %d\n",
-status.Version, status.DbSize)
+	status.Version, status.DbSize)
 
 // List cluster members
 members, err := client.MemberList(ctx)
 for _, member := range members.Members {
-fmt.Printf("Member: %s, Peer URLs: %v\n",
-member.Name, member.PeerURLs)
+	fmt.Printf("Member: %s, Peer URLs: %v\n",
+		member.Name, member.PeerURLs)
 }
 ```
 
@@ -340,10 +340,10 @@ The provider returns standard Go errors. Common error scenarios:
 ```go
 value, err := client.Get(ctx, "/nonexistent")
 if err != nil {
-if err.Error() == "key not found" {
-// Handle missing key
-}
-// Handle other errors
+	if err.Error() == "key not found" {
+		// Handle missing key
+	}
+	// Handle other errors
 }
 ```
 

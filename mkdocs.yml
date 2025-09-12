@@ -76,6 +76,7 @@ nav:
   
   - Security:
     - Secure Credentials: crypt/secure-credentials.md
+    - Password Hashing: crypt/password-hashing.md
     - htpasswd Authentication: provider/htpasswd.md
     - TLS: provider/tls.md
   
@@ -93,8 +94,12 @@ nav:
   
   - Providers:
     - ClickHouse: provider/clickhouse.md
+    - etcd: provider/etcd.md
     - Kafka: provider/kafka.md
     - PostgreSQL: provider/pgsql.md
+    - Redis: provider/redis.md
+    - S3 Storage: provider/s3.md
+    - SMTP: provider/smtp.md
     - MQTT: provider/mqtt.md
     - NATS: provider/nats.md
     - TLS: provider/tls.md
