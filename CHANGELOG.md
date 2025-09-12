@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.0]
+
+### Breaking Changes
+
+- **Modular Architecture**: Blueprint is now organized as a modular framework using Go modules with rewrite rules
+  - Each provider is now a separate Go module for independent versioning and reduced dependencies
+  - **Backward Compatible**: All existing imports continue to work without changes
+  - **New Installation**: Users can now install only the providers they need
+
+### Added
+
+- **Modular Provider System**: 
+  - 13 independent provider modules: kafka, nats, mqtt, redis, s3, etcd, pgsql, clickhouse, httpserver, metrics, smtp, htpasswd, hmacprovider
+  - Go workspace support with `go.work` for development
+  - Independent semantic versioning for each provider
+  - Selective dependency installation
+
+### Changed
+
+- **Build System**: Updated Makefile with targets for modular builds and testing
+- **CI/CD**: Enhanced GitHub Actions workflows for multi-module SBOM generation
+- **Documentation**: Updated all documentation to reflect modular architecture and installation methods
+
+### Technical Details
+
+- Uses Go module rewrite rules for seamless backward compatibility
+- Zero runtime overhead - redirects happen at build time
+- Each provider can be updated independently
+- Workspace-based development for contributors
+
 ## [v0.7.0]
 
 ### Added

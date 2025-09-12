@@ -1,4 +1,20 @@
-# Blueprint documentation
+# Blueprint Documentation
+
+## Getting Started
+
+Blueprint is a modular Go framework. Starting from v0.8.0, you can import only the components you need:
+
+```bash
+# Install core framework
+go get github.com/oddbit-project/blueprint
+
+# Install specific providers
+go get github.com/oddbit-project/blueprint/provider/httpserver
+go get github.com/oddbit-project/blueprint/provider/kafka
+go get github.com/oddbit-project/blueprint/provider/pgsql
+```
+
+All existing imports continue to work without changes due to Go module rewrite rules.
 
 ## Configuration
 
@@ -21,21 +37,32 @@
 
 - [Password Hashing](crypt/password-hashing.md)
 - [Secure Credentials](crypt/secure-credentials.md)
-- [HMAC Provider](provider/hmacprovider.md)
-- [htpasswd Authentication](provider/htpasswd.md)
 - [TLS](provider/tls.md)
 
 ## Providers
 
-- [Clickhouse](provider/clickhouse.md)
-- [HMAC Provider](provider/hmacprovider.md)
-- [htpasswd](provider/htpasswd.md)
-- [JWT Provider](provider/jwtprovider.md)
+### Message Queues & Communication
 - [Kafka](provider/kafka.md)
 - [MQTT](provider/mqtt.md)
 - [NATS](provider/nats.md)
+
+### Databases & Storage
+- [ClickHouse](provider/clickhouse.md)
+- [etcd](provider/etcd.md)
 - [PostgreSQL](provider/pgsql.md)
-- [TLS](provider/tls.md)
+- [Redis](provider/redis.md) *(documentation pending)*
+- [S3 Storage](provider/s3.md)
+
+### Web & HTTP
+- [Metrics](provider/metrics.md) *(documentation pending)*
+
+### Authentication & Security
+- [HMAC Provider](provider/hmacprovider.md)
+- [htpasswd](provider/htpasswd.md)
+- [JWT Provider](provider/jwtprovider.md)
+
+### Utilities
+- [SMTP](provider/smtp.md) *(documentation pending)*
 
 ## Logging
 
