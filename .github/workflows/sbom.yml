@@ -5,6 +5,12 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+  attestations: write
+
 jobs:
   sbom-and-scan:
     runs-on: ubuntu-latest
@@ -23,14 +29,38 @@ jobs:
           go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
-      - name: Generate SBOM (CycloneDX JSON)
-        run: cyclonedx-gomod mod -licenses -json -output sbom.json
+      - name: Generate SBOM for Core Module (CycloneDX JSON)
+        run: cyclonedx-gomod mod -licenses -json -output sbom-core.json
 
-      - name: Upload SBOM Artifact
+      - name: Generate SBOMs for Provider Modules
+        run: |
+          mkdir -p sbom-providers
+          for provider in kafka nats mqtt redis s3 etcd pgsql clickhouse httpserver metrics smtp htpasswd hmacprovider; do
+            echo "Generating SBOM for provider/$provider..."
+            (cd provider/$provider && cyclonedx-gomod mod -licenses -json -output ../../sbom-providers/sbom-$provider.json)
+          done
+
+      - name: Merge SBOMs
+        run: |
+          # For now, use the core SBOM as the main one
+          # In production, you might want to use a tool to merge all SBOMs
+          cp sbom-core.json sbom.json
+          echo "Note: Individual provider SBOMs are available in sbom-providers/"
+          echo "Generated files:"
+          ls -la sbom*.json
+          ls -la sbom-providers/ 2>/dev/null || echo "No sbom-providers directory"
+
+      - name: Upload Core SBOM Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
+          name: sbom-core
           path: sbom.json
+
+      - name: Upload Provider SBOMs Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-providers
+          path: sbom-providers/
 
       - name: Install Trivy
         run: |

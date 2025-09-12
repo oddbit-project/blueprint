@@ -1,0 +1,18 @@
+go 1.23.0
+
+use (
+	.
+	./provider/kafka
+	./provider/nats
+	./provider/mqtt
+	./provider/redis
+	./provider/s3
+	./provider/etcd
+	./provider/pgsql
+	./provider/clickhouse
+	./provider/httpserver
+	./provider/metrics
+	./provider/smtp
+	./provider/htpasswd
+	./provider/hmacprovider
+)

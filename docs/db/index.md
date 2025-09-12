@@ -300,6 +300,5 @@ if gridErr, ok := err.(db.GridError); ok {
 ## See Also
 
 - [Getting Started Guide](../index.md)
-- [Provider Documentation](../provider/)
-- [Configuration Management](../config/)
+- [Configuration Management](../config/config.md)
 - [Security Best Practices](../provider/httpserver/security.md)

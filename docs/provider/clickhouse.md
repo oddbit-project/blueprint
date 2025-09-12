@@ -18,22 +18,22 @@ The client can be configured with the following options:
 
 ```go
 type ClientConfig struct {
-    Hosts            []string       // List of ClickHouse hosts to connect to
-    Database         string         // Database name
-    Username         string         // Username for authentication
-    Debug            bool           // Enable debug mode
-    Compression      string         // Compression algorithm: lz4, none, zstd, gzip, br, deflate
-    DialTimeout      int            // Connection timeout in seconds
-    MaxOpenConns     int            // Maximum number of open connections
-    MaxIdleConns     int            // Maximum number of idle connections
-    ConnMaxLifetime  int            // Maximum connection lifetime in seconds
-    ConnStrategy     string         // Connection strategy: sequential or roundRobin
-    BlockBufferSize  uint8          // Block buffer size
-    Settings         map[string]any // ClickHouse settings
+	Hosts            []string       // List of ClickHouse hosts to connect to
+	Database         string         // Database name
+	Username         string         // Username for authentication
+	Debug            bool           // Enable debug mode
+	Compression      string         // Compression algorithm: lz4, none, zstd, gzip, br, deflate
+	DialTimeout      int            // Connection timeout in seconds
+	MaxOpenConns     int            // Maximum number of open connections
+	MaxIdleConns     int            // Maximum number of idle connections
+	ConnMaxLifetime  int            // Maximum connection lifetime in seconds
+	ConnStrategy     string         // Connection strategy: sequential or roundRobin
+	BlockBufferSize  uint8          // Block buffer size
+	Settings         map[string]any // ClickHouse settings
     // Secure password configuration
-    DefaultCredentialConfig
+	DefaultCredentialConfig
     // TLS configuration
-    ClientConfig
+	ClientConfig
 }
 ```
 
@@ -51,36 +51,36 @@ import (
 
 func main() {
     // Create a new client configuration
-    config := clickhouse.NewClientConfig()
-    config.Hosts = []string{"localhost:9000"}
-    config.Database = "default"
-    config.Username = "default"
-    config.Password = "password" // Set password via DefaultCredentialConfig
+	config := clickhouse.NewClientConfig()
+	config.Hosts = []string{"localhost:9000"}
+	config.Database = "default"
+	config.Username = "default"
+	config.Password = "password" // Set password via DefaultCredentialConfig
 
     // Connect to ClickHouse
-    client, err := clickhouse.NewClient(config)
-    if err != nil {
+	client, err := clickhouse.NewClient(config)
+	if err != nil {
         log.Fatal(err)
     }
-    defer client.Close()
+	defer client.Close()
 
     // Ping the server
-    ctx := context.Background()
-    if err = client.Ping(ctx); err != nil {
+	ctx := context.Background()
+	if err = client.Ping(ctx); err != nil {
         log.Fatal(err)
     }
 
     // Create a repository for a table
-    repo := client.NewRepository(ctx, "my_table")
+	repo := client.NewRepository(ctx, "my_table")
 
     // Use the repository for database operations
-    var records []MyRecord
-    err = repo.FetchWhere(map[string]any{"active": true}, &records)
-    if err != nil {
+	var records []MyRecord
+	err = repo.FetchWhere(map[string]any{"active": true}, &records)
+	if err != nil {
         log.Fatal(err)
     }
 
-    fmt.Printf("Found %d active records\n", len(records))
+	fmt.Printf("Found %d active records\n", len(records))
 }
 ```
 

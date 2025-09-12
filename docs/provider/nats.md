@@ -19,27 +19,26 @@ The NATS client provides a simple interface for connecting to NATS servers, publ
 
 ```go
 type ProducerConfig struct {
-    URL      string // NATS server URL (e.g., "nats://localhost:4222")
-    Subject  string // Default subject to publish to
-    AuthType string // Authentication type: "none", "basic", "token", "nkey", "jwt"
-    Username string // Username for basic auth
-    Password string // Password for basic auth
-    NKeyPath string // Path to NKey seed file
-    JwtPath  string // Path to JWT file
-    Token    string // Auth token
-    
-    // Connection settings
-    PingInterval uint // PingInterval in seconds, defaults to 2 minutes
-    MaxPingsOut  uint // MaxPingsOut value, defaults to 2
-    Timeout      uint // Connection timeout in milliseconds, defaults to 2000
-    DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
-    
-    // TLS Configuration
-    TLSEnabled            bool   // Enable TLS
-    TLSInsecureSkipVerify bool   // Skip certificate verification
-    TLSCertFile           string // Client certificate file path
-    TLSKeyFile            string // Client key file path
-    TLSCaFile             string // CA certificate file path
+	URL      string // NATS server URL (e.g., "nats://localhost:4222")
+	Subject  string // Default subject to publish to
+	AuthType string // Authentication type: "none", "basic", "token", "nkey", "jwt"
+	Username string // Username for basic auth
+	Password string // Password for basic auth
+	NKeyPath string // Path to NKey seed file
+	JwtPath  string // Path to JWT file
+	Token    string // Auth token
+
+	// Connection settings
+	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
+	MaxPingsOut  uint // MaxPingsOut value, defaults to 2
+	Timeout      uint // Connection timeout in milliseconds, defaults to 2000
+	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
+	// TLS Configuration
+	TLSEnabled            bool   // Enable TLS
+	TLSInsecureSkipVerify bool   // Skip certificate verification
+	TLSCertFile           string // Client certificate file path
+	TLSKeyFile            string // Client key file path
+	TLSCaFile             string // CA certificate file path
 }
 ```
 
@@ -47,28 +46,27 @@ type ProducerConfig struct {
 
 ```go
 type ConsumerConfig struct {
-    URL        string // NATS server URL (e.g., "nats://localhost:4222")
-    Subject    string // Subject pattern to subscribe to
-    AuthType   string // Authentication type: "none", "basic", "token", "nkey", "jwt"
-    Username   string // Username for basic auth
-    Password   string // Password for basic auth
-    NKeyPath   string // Path to NKey seed file
-    JwtPath    string // Path to JWT file
-    Token      string // Auth token
-    QueueGroup string // Queue group for distributing messages among subscribers
-    
-    // Connection settings
-    PingInterval uint // PingInterval in seconds, defaults to 2 minutes
-    MaxPingsOut  uint // MaxPingsOut value, defaults to 2
-    Timeout      uint // Connection timeout in milliseconds, defaults to 2000
-    DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
-    
-    // TLS Configuration
-    TLSEnabled            bool   // Enable TLS
-    TLSInsecureSkipVerify bool   // Skip certificate verification
-    TLSCertFile           string // Client certificate file path
-    TLSKeyFile            string // Client key file path
-    TLSCaFile             string // CA certificate file path
+	URL        string // NATS server URL (e.g., "nats://localhost:4222")
+	Subject    string // Subject pattern to subscribe to
+	AuthType   string // Authentication type: "none", "basic", "token", "nkey", "jwt"
+	Username   string // Username for basic auth
+	Password   string // Password for basic auth
+	NKeyPath   string // Path to NKey seed file
+	JwtPath    string // Path to JWT file
+	Token      string // Auth token
+	QueueGroup string // Queue group for distributing messages among subscribers
+
+	// Connection settings
+	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
+	MaxPingsOut  uint // MaxPingsOut value, defaults to 2
+	Timeout      uint // Connection timeout in milliseconds, defaults to 2000
+	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
+	// TLS Configuration
+	TLSEnabled            bool   // Enable TLS
+	TLSInsecureSkipVerify bool   // Skip certificate verification
+	TLSCertFile           string // Client certificate file path
+	TLSKeyFile            string // Client key file path
+	TLSCaFile             string // CA certificate file path
 }
 ```
 
@@ -85,42 +83,42 @@ import (
 )
 
 func main() {
-    // Create producer configuration
-    config := &nats.ProducerConfig{
-        URL:      "nats://localhost:4222",
-        Subject:  "my.subject",
-        AuthType: nats.AuthTypeNone,
-    }
-    
-    // Create logger
-    logger := log.NewLogger()
-    
-    // Create producer
-    producer, err := nats.NewProducer(config, logger)
-    if err != nil {
-        logger.Fatal(err, "Failed to create NATS producer", nil)
-    }
-    defer producer.Disconnect()
-    
-    // Publish message
-    err = producer.Publish([]byte("Hello, NATS!"))
-    if err != nil {
-        logger.Error(err, "Failed to publish message", nil)
-    }
+	// Create producer configuration
+	config := &nats.ProducerConfig{
+		URL:      "nats://localhost:4222",
+		Subject:  "my.subject",
+		AuthType: nats.AuthTypeNone,
+	}
+
+	// Create logger
+	logger := log.NewLogger()
+
+	// Create producer
+	producer, err := nats.NewProducer(config, logger)
+	if err != nil {
+		logger.Fatal(err, "Failed to create NATS producer", nil)
+	}
+	defer producer.Disconnect()
+
+	// Publish message
+	err = producer.Publish([]byte("Hello, NATS!"))
+	if err != nil {
+		logger.Error(err, "Failed to publish message", nil)
+	}
     
     // Publish JSON message
-    type Person struct {
+	type Person struct {
         Name string `json:"name"`
         Age  int    `json:"age"`
     }
     
-    person := Person{
+	person := Person{
         Name: "John Doe",
         Age:  30,
     }
     
-    err = producer.PublishJSON(person)
-    if err != nil {
+	err = producer.PublishJSON(person)
+	if err != nil {
         logger.Error(err, "Failed to publish JSON message", nil)
     }
 }
@@ -132,8 +130,8 @@ func main() {
 // Send a request and wait for a response
 msg, err := producer.Request("request.subject", []byte("Request data"), time.Second*5)
 if err != nil {
-    logger.Error(err, "Request failed", nil)
-    return
+	logger.Error(err, "Request failed", nil)
+	return
 }
 
 // Process response
@@ -158,7 +156,7 @@ import (
 
 func main() {
     // Create consumer configuration
-    config := &nats.ConsumerConfig{
+	config := &nats.ConsumerConfig{
         URL:      "nats://localhost:4222",
         Subject:  "my.subject",
         AuthType: nats.AuthTypeNone,
@@ -168,21 +166,21 @@ func main() {
     }
     
     // Create logger
-    logger := log.NewLogger()
+	logger := log.NewLogger()
     
     // Create consumer
-    consumer, err := nats.NewConsumer(config, logger)
-    if err != nil {
-        logger.Fatal(err, "Failed to create NATS consumer", nil)
-    }
-    defer consumer.Disconnect()
+	consumer, err := nats.NewConsumer(config, logger)
+	if err != nil {
+		logger.Fatal(err, "Failed to create NATS consumer", nil)
+	}
+	defer consumer.Disconnect()
     
     // Create context with cancellation
-    ctx, cancel := context.WithCancel(context.Background())
-    defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
     
     // Define message handler
-    handler := func(ctx context.Context, msg nats.Message) error {
+	handler := func(ctx context.Context, msg nats.Message) error {
         logger.Info("Received message", log.KV{
             "subject": msg.Subject,
             "data":    string(msg.Data),
@@ -191,14 +189,14 @@ func main() {
     }
     
     // Subscribe to subject
-    err = consumer.Subscribe(ctx, handler)
-    if err != nil {
-        logger.Error(err, "Failed to subscribe", nil)
-        return
-    }
+	err = consumer.Subscribe(ctx, handler)
+	if err != nil {
+		logger.Error(err, "Failed to subscribe", nil)
+		return
+	}
     
     // Keep running for 1 minute
-    time.Sleep(time.Minute)
+	time.Sleep(time.Minute)
 }
 ```
 
@@ -208,19 +206,19 @@ func main() {
 // Subscribe synchronously
 sub, err := consumer.SubscribeSync()
 if err != nil {
-    logger.Error(err, "Failed to subscribe", nil)
-    return
+	logger.Error(err, "Failed to subscribe", nil)
+	return
 }
 
 // Get next message with timeout
 msg, err := consumer.NextMsg(sub, time.Second*5)
 if err != nil {
-    if err == nats.ErrTimeout {
+	if err == nats.ErrTimeout {
         logger.Info("No message received within timeout", nil)
     } else {
         logger.Error(err, "Failed to get next message", nil)
     }
-    return
+	return
 }
 
 // Process message
@@ -239,11 +237,11 @@ consumer.Unsubscribe(sub)
 
 ```go
 config := &nats.ProducerConfig{
-    URL:      "nats://localhost:4222",
-    Subject:  "my.subject",
-    AuthType: nats.AuthTypeBasic,
-    Username: "user",
-    Password: "password",
+	URL:      "nats://localhost:4222",
+	Subject:  "my.subject",
+	AuthType: nats.AuthTypeBasic,
+	Username: "user",
+	Password: "password",
 }
 ```
 
@@ -251,10 +249,10 @@ config := &nats.ProducerConfig{
 
 ```go
 config := &nats.ProducerConfig{
-    URL:      "nats://localhost:4222",
-    Subject:  "my.subject",
-    AuthType: nats.AuthTypeToken,
-    Token:    "my-auth-token",
+	URL:      "nats://localhost:4222",
+	Subject:  "my.subject",
+	AuthType: nats.AuthTypeToken,
+	Token:    "my-auth-token",
 }
 ```
 
@@ -262,10 +260,10 @@ config := &nats.ProducerConfig{
 
 ```go
 config := &nats.ProducerConfig{
-    URL:      "nats://localhost:4222",
-    Subject:  "my.subject",
-    AuthType: nats.AuthTypeNKey,
-    NKeyPath: "/path/to/nkey.seed",
+	URL:      "nats://localhost:4222",
+	Subject:  "my.subject",
+	AuthType: nats.AuthTypeNKey,
+	NKeyPath: "/path/to/nkey.seed",
 }
 ```
 
@@ -273,10 +271,10 @@ config := &nats.ProducerConfig{
 
 ```go
 config := &nats.ProducerConfig{
-    URL:      "nats://localhost:4222",
-    Subject:  "my.subject",
-    AuthType: nats.AuthTypeJWT,
-    JwtPath:  "/path/to/user.jwt",
+	URL:      "nats://localhost:4222",
+	Subject:  "my.subject",
+	AuthType: nats.AuthTypeJWT,
+	JwtPath:  "/path/to/user.jwt",
 }
 ```
 
@@ -284,15 +282,14 @@ config := &nats.ProducerConfig{
 
 ```go
 config := &nats.ProducerConfig{
-    URL:      "nats://localhost:4222",
-    Subject:  "my.subject",
-    AuthType: nats.AuthTypeNone,
-    
-    // TLS Configuration
-    TLSEnabled:            true,
-    TLSInsecureSkipVerify: false,
-    TLSCertFile:           "/path/to/client.crt",
-    TLSKeyFile:            "/path/to/client.key",
-    TLSCaFile:             "/path/to/ca.crt",
+	URL:      "nats://localhost:4222",
+	Subject:  "my.subject",
+	AuthType: nats.AuthTypeNone,
+	// TLS Configuration
+	TLSEnabled:            true,
+	TLSInsecureSkipVerify: false,
+	TLSCertFile:           "/path/to/client.crt",
+	TLSKeyFile:            "/path/to/client.key",
+	TLSCaFile:             "/path/to/ca.crt",
 }
 ```
