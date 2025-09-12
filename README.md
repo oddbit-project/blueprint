@@ -1,6 +1,7 @@
 # blueprint
 
 ![go-version](https://img.shields.io/github/go-mod/go-version/oddbit-project/blueprint)
+[![Release](https://img.shields.io/github/v/release/oddbit-project/blueprint)](https://github.com/oddbit-project/blueprint/releases)
 [![Build Status](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/oddbit-project/blueprint)](https://goreportcard.com/report/github.com/oddbit-project/blueprint)
 
@@ -10,7 +11,45 @@
 
 ---
 
-Go application framework for building web applications and microservices with built-in support for:
+Blueprint is a modular Go application framework for building web applications and microservices. Starting from v0.8.0, Blueprint features a **modular architecture** that allows you to import only the components you need, reducing dependencies and improving build times.
+
+## Table of Contents
+
+- [Features](#features)  
+- [Application Example](#application-example)
+- [Core Framework](#-core-framework)
+- [Available Providers](#-available-providers)
+- [License](#license-information)
+
+
+### Installation
+
+```bash
+# Install core framework
+go get github.com/oddbit-project/blueprint
+
+# Install specific providers as needed
+go get github.com/oddbit-project/blueprint/provider/httpserver
+go get github.com/oddbit-project/blueprint/provider/kafka
+go get github.com/oddbit-project/blueprint/provider/pgsql
+```
+
+### Using Providers
+
+```go
+// Import specific providers
+import "github.com/oddbit-project/blueprint/provider/httpserver"
+import "github.com/oddbit-project/blueprint/provider/kafka" 
+import "github.com/oddbit-project/blueprint/provider/pgsql"
+
+// Core framework imports work as before
+import "github.com/oddbit-project/blueprint"
+import "github.com/oddbit-project/blueprint/log"
+```
+
+## Features
+
+Blueprint provides:
 
 - Container-based application lifecycle management
 - Configuration management
@@ -275,6 +314,96 @@ Example config file *sample.json*:
 }
 ```
 
+
+## Core Framework
+
+Blueprint's base library provides the following components for application development:
+
+### **Application Lifecycle**
+- **[Container](docs/index.md)** - Application lifecycle management with graceful startup/shutdown
+- **[Configuration](docs/config/config.md)** - JSON and environment-based configuration with validation
+- **[Logging](docs/log/logging.md)** - Structured logging with file rotation and levels
+
+### **Database**
+- **[Database Package](docs/db/index.md)** - Database abstraction layer with repository pattern
+- **[Repository Pattern](docs/db/repository.md)** - Clean architecture database access
+- **[Query Builder](docs/db/query-builder.md)** - SQL query building with type safety
+- **[Data Grid](docs/db/dbgrid.md)** - Advanced filtering, sorting, and pagination
+- **[Migrations](docs/db/migrations.md)** - Database schema versioning
+
+### **Security & Cryptography**
+- **[Password Hashing](docs/crypt/password-hashing.md)** - Argon2id password hashing with timing attack protection
+- **[Secure Credentials](docs/crypt/secure-credentials.md)** - In-memory credential encryption and key management
+- **[TLS](docs/provider/tls.md)** - TLS/SSL certificate management
+
+### **Utilities**
+- **[ThreadPool](docs/threadpool/threadpool.md)** - High-performance worker pool with graceful shutdown
+- **[BatchWriter](docs/batchwriter/batchwriter.md)** - Batched operations with time and size-based flushing
+
+```bash
+# Core framework includes all these components
+go get github.com/oddbit-project/blueprint
+```
+
+### Core Usage Example
+
+```go
+package main
+
+import (
+    "github.com/oddbit-project/blueprint"
+    "github.com/oddbit-project/blueprint/config/provider"
+    "github.com/oddbit-project/blueprint/log"
+    "github.com/oddbit-project/blueprint/db"
+)
+
+func main() {
+    // Initialize logging
+    log.Configure(log.NewDefaultConfig())
+    logger := log.New("my-app")
+    
+    // Load configuration
+    cfg, _ := provider.NewJsonProvider("config.json")
+    
+    // Create application container
+    app := blueprint.NewContainer()
+    
+    // Your application logic here
+    logger.Info("Application started")
+    
+    // Run application with graceful shutdown
+    app.Run()
+}
+```
+
+## Available Providers
+
+Blueprint also includes the following modular providers:
+
+### **Message Queues & Communication**
+- **[Kafka](docs/provider/kafka.md)** - Apache Kafka integration with SASL authentication
+- **[NATS](docs/provider/nats.md)** - NATS messaging system integration  
+- **[MQTT](docs/provider/mqtt.md)** - MQTT broker communication
+
+### **Databases & Storage**
+- **[PostgreSQL](docs/provider/pgsql.md)** - PostgreSQL database integration with connection pooling
+- **[ClickHouse](docs/provider/clickhouse.md)** - ClickHouse database for analytics workloads
+- **[S3](docs/provider/s3.md)** - S3-compatible object storage (AWS S3, MinIO, etc.)
+- **[etcd](docs/provider/etcd.md)** - Distributed key-value store integration
+
+### **Web & HTTP**  
+- **[HTTP Server](docs/provider/httpserver/index.md)** - Complete HTTP server with middleware, security, and routing
+- **[Metrics](docs/provider/metrics.md)** - Prometheus metrics endpoint
+
+### **Authentication & Security**
+- **[JWT Provider](docs/provider/jwtprovider.md)** - JWT token authentication and management
+- **[HMAC Provider](docs/provider/hmacprovider.md)** - HMAC-based request authentication
+- **[htpasswd](docs/provider/htpasswd.md)** - Apache htpasswd file authentication
+
+### **Utilities**
+- **[SMTP](docs/provider/smtp.md)** - Email sending functionality
+
+Each provider is independently versioned and can be imported separately. See the [documentation](https://oddbit-project.github.io/blueprint/) for detailed usage examples.
 
 ## License information
 

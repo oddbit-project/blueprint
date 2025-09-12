@@ -39,21 +39,21 @@ Key features:
 
 ```go
 type JWTConfig struct {
-    SigningKey        *secure.DefaultCredentialConfig `json:"signingKey,omitempty"`     // For HMAC algorithms
-    PrivateKey        *secure.KeyConfig               `json:"privateKey,omitempty"`     // For asymmetric algorithms
-    PublicKey         *secure.KeyConfig               `json:"publicKey,omitempty"`      // For asymmetric algorithms
-    SigningAlgorithm  string                          `json:"signingAlgorithm"`         // Algorithm to use
-    ExpirationSeconds int                             `json:"expirationSeconds"`        // Token expiration
-    Issuer            string                          `json:"issuer"`                   // Token issuer
-    Audience          string                          `json:"audience"`                 // Token audience
-    KeyID             string                          `json:"keyID"`                    // Key ID for JWKS
-    MaxTokenSize      int                             `json:"maxTokenSize,omitempty"`   // Maximum token size (bytes)
-    RequireIssuer     bool                            `json:"requireIssuer"`            // Enforce issuer validation
-    RequireAudience   bool                            `json:"requireAudience"`          // Enforce audience validation
+	SigningKey        *secure.DefaultCredentialConfig `json:"signingKey,omitempty"`     // For HMAC algorithms
+	PrivateKey        *secure.KeyConfig               `json:"privateKey,omitempty"`     // For asymmetric algorithms
+	PublicKey         *secure.KeyConfig               `json:"publicKey,omitempty"`      // For asymmetric algorithms
+	SigningAlgorithm  string                          `json:"signingAlgorithm"`         // Algorithm to use
+	ExpirationSeconds int                             `json:"expirationSeconds"`        // Token expiration
+	Issuer            string                          `json:"issuer"`                   // Token issuer
+	Audience          string                          `json:"audience"`                 // Token audience
+	KeyID             string                          `json:"keyID"`                    // Key ID for JWKS
+	MaxTokenSize      int                             `json:"maxTokenSize,omitempty"`   // Maximum token size (bytes)
+	RequireIssuer     bool                            `json:"requireIssuer"`            // Enforce issuer validation
+	RequireAudience   bool                            `json:"requireAudience"`          // Enforce audience validation
     
     // User Token Tracking
-    TrackUserTokens   bool                            `json:"trackUserTokens"`          // Enable user token tracking
-    MaxUserSessions   int                             `json:"maxUserSessions,omitempty"` // Max concurrent sessions per user (0 = unlimited)
+	TrackUserTokens   bool                            `json:"trackUserTokens"`          // Enable user token tracking
+	MaxUserSessions   int                             `json:"maxUserSessions,omitempty"` // Max concurrent sessions per user (0 = unlimited)
 }
 ```
 
@@ -61,9 +61,9 @@ type JWTConfig struct {
 
 ```go
 const (
-    DefaultTTL      = time.Second * 86400 // 1 day
-    DefaultIssuer   = "blueprint"
-    DefaultAudience = "api"
+	DefaultTTL      = time.Second * 86400 // 1 day
+	DefaultIssuer   = "blueprint"
+	DefaultAudience = "api"
 )
 ```
 
@@ -83,51 +83,51 @@ import (
 
 func main() {
     // Create configuration for HMAC signing
-    config := jwtprovider.NewJWTConfig()
-    config.SigningAlgorithm = jwtprovider.HS256
-    config.ExpirationSeconds = 3600 // 1 hour
-    config.Issuer = "my-app"
-    config.Audience = "api"
-    config.RequireIssuer = true
-    config.RequireAudience = true
+	config := jwtprovider.NewJWTConfig()
+	config.SigningAlgorithm = jwtprovider.HS256
+	config.ExpirationSeconds = 3600 // 1 hour
+	config.Issuer = "my-app"
+	config.Audience = "api"
+	config.RequireIssuer = true
+	config.RequireAudience = true
 
     // Set up signing key
-    signingKey, err := secure.GenerateKey()
-    if err != nil {
+	signingKey, err := secure.GenerateKey()
+	if err != nil {
         log.Fatal(err)
     }
     
-    config.SigningKey = &secure.DefaultCredentialConfig{
+	config.SigningKey = &secure.DefaultCredentialConfig{
         Key: signingKey,
     }
 
     // Create JWT provider
-    provider, err := jwtprovider.NewProvider(config)
-    if err != nil {
+	provider, err := jwtprovider.NewProvider(config)
+	if err != nil {
         log.Fatal(err)
     }
 
     // Generate a token
-    customData := map[string]any{
+	customData := map[string]any{
         "role":        "admin",
         "permissions": []string{"read", "write"},
     }
     
-    token, err := provider.GenerateToken("user123", customData)
-    if err != nil {
+	token, err := provider.GenerateToken("user123", customData)
+	if err != nil {
         log.Fatal(err)
     }
     
-    fmt.Printf("Generated token: %s\n", token)
+	fmt.Printf("Generated token: %s\n", token)
 
     // Parse and validate the token
-    claims, err := provider.ParseToken(token)
-    if err != nil {
+	claims, err := provider.ParseToken(token)
+	if err != nil {
         log.Fatal(err)
     }
     
-    fmt.Printf("Subject: %s\n", claims.Subject)
-    fmt.Printf("Custom data: %v\n", claims.Data)
+	fmt.Printf("Subject: %s\n", claims.Subject)
+	fmt.Printf("Custom data: %v\n", claims.Data)
 }
 ```
 
@@ -145,39 +145,39 @@ import (
 
 func main() {
     // Create configuration for RSA signing
-    config := jwtprovider.NewJWTConfig()
-    config.SigningAlgorithm = jwtprovider.RS256
-    config.ExpirationSeconds = 3600
-    config.Issuer = "my-app"
-    config.Audience = "api"
-    config.KeyID = "key-1" // For JWKS support
+	config := jwtprovider.NewJWTConfig()
+	config.SigningAlgorithm = jwtprovider.RS256
+	config.ExpirationSeconds = 3600
+	config.Issuer = "my-app"
+	config.Audience = "api"
+	config.KeyID = "key-1" // For JWKS support
 
     // Set up RSA key pair (PEM encoded PKCS#8)
-    privateKeyPEM := `-----BEGIN PRIVATE KEY-----
+	privateKeyPEM := `-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7...
 -----END PRIVATE KEY-----`
 
-    publicKeyPEM := `-----BEGIN PUBLIC KEY-----
+	publicKeyPEM := `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu8...
 -----END PUBLIC KEY-----`
 
     // Configure private key
-    privateKeyConfig, err := secure.NewKeyConfig([]byte(privateKeyPEM))
-    if err != nil {
+	privateKeyConfig, err := secure.NewKeyConfig([]byte(privateKeyPEM))
+	if err != nil {
         log.Fatal(err)
     }
-    config.PrivateKey = privateKeyConfig
+	config.PrivateKey = privateKeyConfig
 
     // Configure public key  
-    publicKeyConfig, err := secure.NewKeyConfig([]byte(publicKeyPEM))
-    if err != nil {
+	publicKeyConfig, err := secure.NewKeyConfig([]byte(publicKeyPEM))
+	if err != nil {
         log.Fatal(err)
     }
-    config.PublicKey = publicKeyConfig
+	config.PublicKey = publicKeyConfig
 
     // Create provider
-    provider, err := jwtprovider.NewProvider(config)
-    if err != nil {
+	provider, err := jwtprovider.NewProvider(config)
+	if err != nil {
         log.Fatal(err)
     }
 
@@ -198,9 +198,9 @@ revocationManager := jwtprovider.NewRevocationManager(revocationBackend)
 
 // Create provider with revocation support
 provider, err := jwtprovider.NewProvider(config, 
-    jwtprovider.WithRevocationManager(revocationManager))
+	jwtprovider.WithRevocationManager(revocationManager))
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 ```
 
@@ -210,18 +210,18 @@ if err != nil {
 // Revoke a specific token
 err := provider.RevokeToken(tokenString)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 // Revoke by token ID (from claims)
 claims, err := provider.ParseToken(tokenString)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 err = provider.RevokeTokenByID(claims.ID, claims.ExpiresAt.Time)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 // Check if token is revoked
@@ -234,20 +234,20 @@ fmt.Printf("Token revoked: %v\n", isRevoked)
 ```go
 // Implement custom revocation backend
 type DatabaseRevocationBackend struct {
-    db *sql.DB
+	db *sql.DB
 }
 
 func (d *DatabaseRevocationBackend) RevokeToken(tokenID string, expiresAt time.Time) error {
-    _, err := d.db.Exec("INSERT INTO revoked_tokens (token_id, expires_at, revoked_at) VALUES (?, ?, ?)",
+	_, err := d.db.Exec("INSERT INTO revoked_tokens (token_id, expires_at, revoked_at) VALUES (?, ?, ?)",
         tokenID, expiresAt, time.Now())
-    return err
+	return err
 }
 
 func (d *DatabaseRevocationBackend) IsTokenRevoked(tokenID string) bool {
-    var count int
-    err := d.db.QueryRow("SELECT COUNT(*) FROM revoked_tokens WHERE token_id = ? AND expires_at > ?",
+	var count int
+	err := d.db.QueryRow("SELECT COUNT(*) FROM revoked_tokens WHERE token_id = ? AND expires_at > ?",
         tokenID, time.Now()).Scan(&count)
-    return err == nil && count > 0
+	return err == nil && count > 0
 }
 
 // Implement other RevocationBackend methods...
@@ -271,13 +271,13 @@ config.MaxUserSessions = 5       // Limit concurrent sessions (0 = unlimited)
 
 // Create revocation manager (required for tracking)
 revocationMgr := jwtprovider.NewRevocationManager(
-    jwtprovider.NewMemoryRevocationBackend(),
+	jwtprovider.NewMemoryRevocationBackend(),
 )
 
 provider, err := jwtprovider.NewProvider(config,
-    jwtprovider.WithRevocationManager(revocationMgr))
+	jwtprovider.WithRevocationManager(revocationMgr))
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 defer revocationMgr.Close()
 ```
@@ -294,7 +294,7 @@ token, err := provider.GenerateToken(userID, map[string]any{
 
 // Handle session limit exceeded
 if err == jwtprovider.ErrMaxSessionsExceeded {
-    return fmt.Errorf("maximum concurrent sessions reached")
+	return fmt.Errorf("maximum concurrent sessions reached")
 }
 
 // Check active session count
@@ -304,12 +304,12 @@ fmt.Printf("Active sessions: %d\n", sessionCount)
 // Get all active tokens for user
 activeTokens, err := provider.GetActiveUserTokens(userID)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 fmt.Printf("User has %d active tokens\n", len(activeTokens))
 for i, tokenID := range activeTokens {
-    fmt.Printf("  %d. %s\n", i+1, tokenID)
+	fmt.Printf("  %d. %s\n", i+1, tokenID)
 }
 ```
 
@@ -319,7 +319,7 @@ for i, tokenID := range activeTokens {
 // Revoke all tokens for a user (e.g., on password change)
 err := provider.RevokeAllUserTokens(userID)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 // Useful for security events:
@@ -342,34 +342,34 @@ import (
 
 func main() {
     // Setup provider with session tracking
-    config := jwtprovider.NewJWTConfig()
-    config.TrackUserTokens = true
-    config.MaxUserSessions = 3
+	config := jwtprovider.NewJWTConfig()
+	config.TrackUserTokens = true
+	config.MaxUserSessions = 3
     
     // Set up signing key
-    signingKey := []byte("your-secret-key-32-bytes-minimum")
-    config.CfgSigningKey = &secure.DefaultCredentialConfig{
+	signingKey := []byte("your-secret-key-32-bytes-minimum")
+	config.CfgSigningKey = &secure.DefaultCredentialConfig{
         Password: string(signingKey),
     }
     
-    revocationMgr := jwtprovider.NewRevocationManager(
+	revocationMgr := jwtprovider.NewRevocationManager(
         jwtprovider.NewMemoryRevocationBackend(),
     )
     
-    provider, err := jwtprovider.NewProvider(config,
+	provider, err := jwtprovider.NewProvider(config,
         jwtprovider.WithRevocationManager(revocationMgr))
-    if err != nil {
+	if err != nil {
         log.Fatal(err)
     }
-    defer revocationMgr.Close()
+	defer revocationMgr.Close()
 
-    userID := "user123"
+	userID := "user123"
     
     // Generate multiple tokens
-    fmt.Printf("Generating tokens for user %s...\n", userID)
+	fmt.Printf("Generating tokens for user %s...\n", userID)
     
-    var tokens []string
-    for i := 1; i <= 4; i++ {
+	var tokens []string
+	for i := 1; i <= 4; i++ {
         token, err := provider.GenerateToken(userID, map[string]any{
             "session_id": fmt.Sprintf("session_%d", i),
         })
@@ -390,15 +390,15 @@ func main() {
     }
     
     // Security event: revoke all user tokens
-    fmt.Println("\nSecurity event: revoking all user tokens...")
-    err = provider.RevokeAllUserTokens(userID)
-    if err != nil {
+	fmt.Println("\nSecurity event: revoking all user tokens...")
+	err = provider.RevokeAllUserTokens(userID)
+	if err != nil {
         log.Fatal(err)
     }
     
     // Verify all tokens are revoked
-    fmt.Println("Verifying token revocation...")
-    for i, token := range tokens {
+	fmt.Println("Verifying token revocation...")
+	for i, token := range tokens {
         _, err := provider.ParseToken(token)
         if err != nil {
             fmt.Printf("Token %d: REVOKED ✓\n", i+1)
@@ -407,8 +407,8 @@ func main() {
         }
     }
     
-    finalCount := provider.GetUserSessionCount(userID)
-    fmt.Printf("\nFinal session count: %d\n", finalCount)
+	finalCount := provider.GetUserSessionCount(userID)
+	fmt.Printf("\nFinal session count: %d\n", finalCount)
 }
 ```
 
@@ -435,12 +435,12 @@ When tracking is enabled, the provider stores comprehensive metadata:
 
 ```go
 type TokenMetadata struct {
-    TokenID   string    `json:"tokenId"`
-    UserID    string    `json:"userId"`
-    IssuedAt  time.Time `json:"issuedAt"`
-    ExpiresAt time.Time `json:"expiresAt"`
-    ClientIP  string    `json:"clientIP,omitempty"`   // For future use
-    UserAgent string    `json:"userAgent,omitempty"`  // For future use
+	TokenID   string    `json:"tokenId"`
+	UserID    string    `json:"userId"`
+	IssuedAt  time.Time `json:"issuedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	ClientIP  string    `json:"clientIP,omitempty"`   // For future use
+	UserAgent string    `json:"userAgent,omitempty"`  // For future use
 }
 ```
 
@@ -448,20 +448,20 @@ type TokenMetadata struct {
 
 ```go
 const (
-    ErrMaxSessionsExceeded = "maximum concurrent sessions exceeded"
+	ErrMaxSessionsExceeded = "maximum concurrent sessions exceeded"
 )
 
 // Handle session limits
 token, err := provider.GenerateToken(userID, data)
 if err != nil {
-    switch err {
-    case jwtprovider.ErrMaxSessionsExceeded:
+	switch err {
+	case jwtprovider.ErrMaxSessionsExceeded:
         // Inform user about session limit
         return "Too many active sessions. Please log out from other devices."
-    case jwtprovider.ErrNoRevocationManager:
+	case jwtprovider.ErrNoRevocationManager:
         // Tracking requires revocation manager
         log.Error("Token tracking requires revocation manager")
-    default:
+	default:
         log.Errorf("Token generation failed: %v", err)
     }
 }
@@ -490,7 +490,7 @@ if err != nil {
 // Refresh an existing token
 newToken, err := provider.Refresh(oldTokenString)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 fmt.Printf("Refreshed token: %s\n", newToken)
@@ -500,8 +500,8 @@ fmt.Printf("Refreshed token: %s\n", newToken)
 
 ```go
 type Claims struct {
-    jwt.RegisteredClaims              // Standard JWT claims
-    Data map[string]any `json:"data,omitempty"` // Custom data
+	jwt.RegisteredClaims              // Standard JWT claims
+	Data map[string]any `json:"data,omitempty"` // Custom data
 }
 
 // Standard claims include:
@@ -518,31 +518,31 @@ type Claims struct {
 
 ```go
 const (
-    ErrInvalidSigningAlgorithm = "JWT signing algorithm is invalid"
-    ErrInvalidToken            = "invalid token"
-    ErrTokenExpired            = "token has expired"
-    ErrMissingIssuer           = "issuer validation failed"
-    ErrMissingAudience         = "audience validation failed"
-    ErrNoRevocationManager     = "revocation manager not available"
-    ErrTokenAlreadyRevoked     = "token is already revoked"
-    ErrInvalidTokenID          = "invalid token ID"
-    ErrMaxSessionsExceeded     = "maximum concurrent sessions exceeded"
-    ErrTokenTooLarge           = "token too large"
-    ErrTokenParsingTimeout     = "token parsing timeout"
+	ErrInvalidSigningAlgorithm = "JWT signing algorithm is invalid"
+	ErrInvalidToken            = "invalid token"
+	ErrTokenExpired            = "token has expired"
+	ErrMissingIssuer           = "issuer validation failed"
+	ErrMissingAudience         = "audience validation failed"
+	ErrNoRevocationManager     = "revocation manager not available"
+	ErrTokenAlreadyRevoked     = "token is already revoked"
+	ErrInvalidTokenID          = "invalid token ID"
+	ErrMaxSessionsExceeded     = "maximum concurrent sessions exceeded"
+	ErrTokenTooLarge           = "token too large"
+	ErrTokenParsingTimeout     = "token parsing timeout"
 )
 
 // Example error handling
 token, err := provider.GenerateToken("user123", data)
 if err != nil {
-    switch err {
-    case jwtprovider.ErrInvalidSigningAlgorithm:
+	switch err {
+	case jwtprovider.ErrInvalidSigningAlgorithm:
         log.Fatal("Invalid signing algorithm configured")
-    case jwtprovider.ErrMaxSessionsExceeded:
+	case jwtprovider.ErrMaxSessionsExceeded:
         log.Printf("User has too many concurrent sessions")
         // Handle session limit - maybe offer to logout other devices
-    case jwtprovider.ErrTokenTooLarge:
+	case jwtprovider.ErrTokenTooLarge:
         log.Printf("Token payload too large, reduce custom claims")
-    default:
+	default:
         log.Fatalf("Token generation failed: %v", err)
     }
 }
@@ -567,56 +567,56 @@ import (
 
 func main() {
     // Configure logger
-    log.Configure(log.NewDefaultConfig())
-    logger := log.New("jwt-demo")
+	log.Configure(log.NewDefaultConfig())
+	logger := log.New("jwt-demo")
 
     // Create server config
-    serverConfig := httpserver.NewServerConfig()
-    serverConfig.Host = "localhost"
-    serverConfig.Port = 8080
-    serverConfig.Debug = true
+	serverConfig := httpserver.NewServerConfig()
+	serverConfig.Host = "localhost"
+	serverConfig.Port = 8080
+	serverConfig.Debug = true
 
     // Create HTTP server
-    server, err := httpserver.NewServer(serverConfig, logger)
-    if err != nil {
+	server, err := httpserver.NewServer(serverConfig, logger)
+	if err != nil {
         logger.Fatal(err, "could not create server")
         os.Exit(1)
     }
 
     // Set up JWT provider...
-    provider, err := jwtprovider.NewProvider(config)
-    if err != nil {
+	provider, err := jwtprovider.NewProvider(config)
+	if err != nil {
         logger.Fatal(err, "could not create JWT provider")
         os.Exit(1)
     }
 
     // Public route for login
-    server.Route().POST("/login", loginHandler(provider))
+	server.Route().POST("/login", loginHandler(provider))
     
     // Apply JWT authentication to all subsequent routes
-    server.UseAuth(auth.NewAuthJWT(provider))
+	server.UseAuth(auth.NewAuthJWT(provider))
     
     // Protected routes
-    server.Route().GET("/api/profile", profileHandler)
+	server.Route().GET("/api/profile", profileHandler)
     
     // Start server
-    if err := server.Start(); err != nil {
+	if err := server.Start(); err != nil {
         logger.Fatal(err, "failed to start server")
     }
 }
 
 func profileHandler(c *gin.Context) {
     // Get claims using Blueprint auth helper
-    claims, ok := auth.GetClaims(c)
-    if !ok {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
         return
     }
-    c.JSON(http.StatusOK, gin.H{"user": claims})
+	c.JSON(http.StatusOK, gin.H{"user": claims})
 }
 
 func loginHandler(provider jwtprovider.JWTProvider) gin.HandlerFunc {
-    return func(c *gin.Context) {
+	return func(c *gin.Context) {
         // Simple authentication
         var credentials struct {
             Username string `json:"username" binding:"required"`
@@ -735,55 +735,55 @@ import (
 
 func main() {
     // Configure logger
-    log.Configure(log.NewDefaultConfig())
-    logger := log.New("jwt-demo")
+	log.Configure(log.NewDefaultConfig())
+	logger := log.New("jwt-demo")
 
     // Create server config
-    serverConfig := httpserver.NewServerConfig()
-    serverConfig.Host = "localhost"
-    serverConfig.Port = 8080
-    serverConfig.Debug = true
+	serverConfig := httpserver.NewServerConfig()
+	serverConfig.Host = "localhost"
+	serverConfig.Port = 8080
+	serverConfig.Debug = true
 
     // Create HTTP server
-    server, err := httpserver.NewServer(serverConfig, logger)
-    if err != nil {
+	server, err := httpserver.NewServer(serverConfig, logger)
+	if err != nil {
         logger.Fatal(err, "could not create server")
         os.Exit(1)
     }
 
     // Configure JWT provider using proper constructor
-    config := jwtprovider.NewJWTConfig()
-    config.SigningAlgorithm = jwtprovider.HS256
-    config.ExpirationSeconds = 3600
-    config.Issuer = "demo-app"
-    config.Audience = "api"
-    config.RequireIssuer = true
-    config.RequireAudience = true
-    config.TrackUserTokens = true // Enable session tracking
-    config.MaxUserSessions = 3    // Limit concurrent sessions
+	config := jwtprovider.NewJWTConfig()
+	config.SigningAlgorithm = jwtprovider.HS256
+	config.ExpirationSeconds = 3600
+	config.Issuer = "demo-app"
+	config.Audience = "api"
+	config.RequireIssuer = true
+	config.RequireAudience = true
+	config.TrackUserTokens = true // Enable session tracking
+	config.MaxUserSessions = 3    // Limit concurrent sessions
 
     // Generate signing key
-    signingKey, err := secure.GenerateKey()
-    if err != nil {
+	signingKey, err := secure.GenerateKey()
+	if err != nil {
         logger.Fatal(err, "could not generate signing key")
         os.Exit(1)
     }
     
-    config.CfgSigningKey = &secure.DefaultCredentialConfig{Password: string(signingKey)}
+	config.CfgSigningKey = &secure.DefaultCredentialConfig{Password: string(signingKey)}
 
     // Create provider with revocation
-    revocationBackend := jwtprovider.NewMemoryRevocationBackend()
-    revocationManager := jwtprovider.NewRevocationManager(revocationBackend)
+	revocationBackend := jwtprovider.NewMemoryRevocationBackend()
+	revocationManager := jwtprovider.NewRevocationManager(revocationBackend)
     
-    provider, err := jwtprovider.NewProvider(config,
+	provider, err := jwtprovider.NewProvider(config,
         jwtprovider.WithRevocationManager(revocationManager))
-    if err != nil {
+	if err != nil {
         logger.Fatal(err, "could not create JWT provider")
         os.Exit(1)
     }
 
     // Public login route
-    server.Route().POST("/login", func(c *gin.Context) {
+	server.Route().POST("/login", func(c *gin.Context) {
         // Simple authentication (replace with real auth)
         var loginReq struct {
             Username string `json:"username" binding:"required"`
@@ -822,9 +822,9 @@ func main() {
     })
 
     // Apply JWT authentication to protected routes
-    server.UseAuth(auth.NewAuthJWT(provider))
+	server.UseAuth(auth.NewAuthJWT(provider))
     
-    server.Route().POST("/logout", func(c *gin.Context) {
+	server.Route().POST("/logout", func(c *gin.Context) {
         claims, ok := auth.GetClaims(c)
         if !ok {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -840,7 +840,7 @@ func main() {
         c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
     })
     
-    server.Route().GET("/api/profile", func(c *gin.Context) {
+	server.Route().GET("/api/profile", func(c *gin.Context) {
         claims, ok := auth.GetClaims(c)
         if !ok {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -850,7 +850,7 @@ func main() {
     })
         
     // Session management endpoints
-    server.Route().GET("/api/sessions", func(c *gin.Context) {
+	server.Route().GET("/api/sessions", func(c *gin.Context) {
         claims, ok := auth.GetClaims(c)
         if !ok {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -869,7 +869,7 @@ func main() {
         })
     })
         
-    server.Route().DELETE("/api/sessions", func(c *gin.Context) {
+	server.Route().DELETE("/api/sessions", func(c *gin.Context) {
         claims, ok := auth.GetClaims(c)
         if !ok {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -886,15 +886,15 @@ func main() {
     })
 
     // Start server
-    logger.Info("Server starting on http://localhost:8080")
-    logger.Info("Available endpoints:")
-    logger.Info("  POST /login        - Authenticate (public)")
-    logger.Info("  POST /logout       - Logout (protected)")
-    logger.Info("  GET  /api/profile  - User profile (protected)")
-    logger.Info("  GET  /api/sessions - List sessions (protected)")
-    logger.Info("  DELETE /api/sessions - Revoke all sessions (protected)")
+	logger.Info("Server starting on http://localhost:8080")
+	logger.Info("Available endpoints:")
+	logger.Info("  POST /login        - Authenticate (public)")
+	logger.Info("  POST /logout       - Logout (protected)")
+	logger.Info("  GET  /api/profile  - User profile (protected)")
+	logger.Info("  GET  /api/sessions - List sessions (protected)")
+	logger.Info("  DELETE /api/sessions - Revoke all sessions (protected)")
     
-    if err := server.Start(); err != nil {
+	if err := server.Start(); err != nil {
         logger.Fatal(err, "failed to start server")
     }
 }

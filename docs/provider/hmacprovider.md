@@ -91,36 +91,36 @@ import (
 
 func main() {
     // Generate encryption key
-    key, err := secure.GenerateKey()
-    if err != nil {
+	key, err := secure.GenerateKey()
+	if err != nil {
         panic(err)
     }
     
     // Create credential from password
-    secret, err := secure.NewCredential([]byte("my-secret"), key, false)
-    if err != nil {
+	secret, err := secure.NewCredential([]byte("my-secret"), key, false)
+	if err != nil {
         panic(err)
     }
     
 	// create single key provider
 	keyProvider := hmacprovider.NewSingleKeyProvider("mykey", secret)
     // Create HMAC provider
-    provider := hmacprovider.NewHmacProvider(keyProvider)
+	provider := hmacprovider.NewHmacProvider(keyProvider)
     
     // Sign data with replay protection
-    data := "Hello, World!"
-    hash, timestamp, nonce, err := provider.Sign256("mykey", strings.NewReader(data))
-    if err != nil {
+	data := "Hello, World!"
+	hash, timestamp, nonce, err := provider.Sign256("mykey", strings.NewReader(data))
+	if err != nil {
         panic(err)
     }
     
     // Verify signature
-    keyId, valid, err := provider.Verify256(strings.NewReader(data), hash, timestamp, nonce)
-    if err != nil {
+	keyId, valid, err := provider.Verify256(strings.NewReader(data), hash, timestamp, nonce)
+	if err != nil {
         panic(err)
     }
     
-    if valid {
+	if valid {
         println("Signature verified! Key ID:", keyId)
     }
 }
@@ -160,14 +160,14 @@ router.Use(auth.AuthMiddleware(hmacAuth))
 
 // Access authentication info in handlers
 func handler(c *gin.Context) {
-    keyId, ok := auth.GetHMACIdentity(c)
-    if ok {
+	keyId, ok := auth.GetHMACIdentity(c)
+	if ok {
         // Use keyId for tenant identification
     }
     
     // Get full HMAC details
-    keyId, timestamp, nonce, ok := auth.GetHMACDetails(c)
-    if ok {
+	keyId, timestamp, nonce, ok := auth.GetHMACDetails(c)
+	if ok {
         // Access all HMAC authentication data
     }
 }
@@ -255,7 +255,7 @@ The HMAC system supports multiple key management strategies through the `HMACKey
 
 ```go
 type HMACKeyProvider interface {
-    GetKey(keyId string) (*secure.Credential, error)
+	GetKey(keyId string) (*secure.Credential, error)
 }
 ```
 
@@ -279,30 +279,30 @@ For applications with multiple tenants or key rotation:
 
 ```go
 type MultiTenantKeyProvider struct {
-    keys map[string]*secure.Credential
+	keys map[string]*secure.Credential
 	m sync.RWMutex
 }
 
 func (m *MultiTenantKeyProvider) GetKey(keyId string) (*secure.Credential, error) {
-    m.m.RLock()
+	m.m.RLock()
 	defer m.m.RUnlock()
 	
 	key, exists := m.keys[keyId]
-    if !exists {
+	if !exists {
         return nil, errors.New("unknown key ID")
     }
-    return key, nil
+	return key, nil
 }
 
 func (m *MultiTenantKeyProvider) ListKeyIds() []string {
-    m.m.RLock()
-    defer m.m.RUnlock()
+	m.m.RLock()
+	defer m.m.RUnlock()
 	
-    ids := make([]string, 0, len(m.keys))
-    for id := range m.keys {
+	ids := make([]string, 0, len(m.keys))
+	for id := range m.keys {
         ids = append(ids, id)
     }
-    return ids
+	return ids
 }
 ```
 
@@ -319,14 +319,14 @@ import "github.com/oddbit-project/blueprint/provider/hmacprovider/store"
 
 // Create with custom options
 memoryStore := store.NewMemoryNonceStore(
-    store.WithTTL(1*time.Hour),
-    store.WithMaxSize(1000000),
-    store.WithCleanupInterval(15*time.Minute),
-    store.WithEvictPolicy(store.EvictHalfLife()),
+	store.WithTTL(1*time.Hour),
+	store.WithMaxSize(1000000),
+	store.WithCleanupInterval(15*time.Minute),
+	store.WithEvictPolicy(store.EvictHalfLife()),
 )
 
 provider := hmacprovider.NewHmacProvider(keyProvider,
-    hmacprovider.WithNonceStore(memoryStore),
+	hmacprovider.WithNonceStore(memoryStore),
 )
 ```
 
@@ -354,18 +354,18 @@ config.Database = 1
 
 redisClient, err := redis.NewClient(config)
 if err != nil {
-    panic(err)
+	panic(err)
 }
 
 // Create Redis nonce store
 redisStore := store.NewRedisStore(
-    redisClient, 
-    1*time.Hour,     // TTL
+	redisClient, 
+	1*time.Hour,     // TTL
     "hmac:nonce:",   // Key prefix
 )
 
 provider := hmacprovider.NewHmacProvider(keyProvider,
-    hmacprovider.WithNonceStore(redisStore),
+	hmacprovider.WithNonceStore(redisStore),
 )
 ```
 
@@ -393,7 +393,7 @@ var kvBackend kv.KV = getYourKVBackend()
 kvStore := store.NewKvStore(kvBackend, 1*time.Hour)
 
 provider := hmacprovider.NewHmacProvider(keyProvider,
-    hmacprovider.WithNonceStore(kvStore),
+	hmacprovider.WithNonceStore(kvStore),
 )
 ```
 
@@ -407,7 +407,7 @@ Sets the nonce store backend for replay protection.
 
 ```go
 provider := hmacprovider.NewHmacProvider(keyProvider,
-    hmacprovider.WithNonceStore(customStore),
+	hmacprovider.WithNonceStore(customStore),
 )
 ```
 
@@ -417,7 +417,7 @@ Sets the allowed timestamp deviation window. Default: 5 minutes.
 
 ```go
 provider := hmacprovider.NewHmacProvider(keyProvider,
-    hmacprovider.WithKeyInterval(10*time.Minute), // ±10 minutes
+	hmacprovider.WithKeyInterval(10*time.Minute), // ±10 minutes
 )
 ```
 
@@ -427,7 +427,7 @@ Sets the maximum input size to prevent DoS attacks. Default: 32MB.
 
 ```go
 provider := hmacprovider.NewHmacProvider(keyProvider,
-    hmacprovider.WithMaxInputSize(1024*1024), // 1MB limit
+	hmacprovider.WithMaxInputSize(1024*1024), // 1MB limit
 )
 ```
 
@@ -446,33 +446,33 @@ When using HMAC authentication with HTTP, the following headers are required:
 ```go
 func makeAuthenticatedRequest(provider *hmacprovider.HMACProvider, url string, body []byte) error {
     // Generate signature
-    bodyReader := bytes.NewReader(body)
-    hash, timestamp, nonce, err := provider.Sign256("client-key", bodyReader)
-    if err != nil {
+	bodyReader := bytes.NewReader(body)
+	hash, timestamp, nonce, err := provider.Sign256("client-key", bodyReader)
+	if err != nil {
         return err
     }
     
     // Create request
-    req, err := http.NewRequest("POST", url, bytes.NewReader(body))
-    if err != nil {
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
         return err
     }
     
     // Add HMAC headers
-    req.Header.Set("X-HMAC-Hash", hash)
-    req.Header.Set("X-HMAC-Timestamp", timestamp)
-    req.Header.Set("X-HMAC-Nonce", nonce)
-    req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-HMAC-Hash", hash)
+	req.Header.Set("X-HMAC-Timestamp", timestamp)
+	req.Header.Set("X-HMAC-Nonce", nonce)
+	req.Header.Set("Content-Type", "application/json")
     
     // Send request
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
         return err
     }
-    defer resp.Body.Close()
+	defer resp.Body.Close()
     
-    return nil
+	return nil
 }
 ```
 
@@ -488,60 +488,60 @@ import (
 
 func createHMACProvider() *hmacprovider.HMACProvider {
     // Generate encryption key
-    key, err := secure.GenerateKey()
-    if err != nil {
+	key, err := secure.GenerateKey()
+	if err != nil {
         panic(err)
     }
 
     // Create credential from password
-    secret, err := secure.NewCredential([]byte("my-secret"), key, false)
-    if err != nil {
+	secret, err := secure.NewCredential([]byte("my-secret"), key, false)
+	if err != nil {
         panic(err)
     }
 
 	// create single key provider
-    keyProvider := hmacprovider.NewSingleKeyProvider("client-key", secret)
+	keyProvider := hmacprovider.NewSingleKeyProvider("client-key", secret)
     
 	// Create HMAC provider
-    return hmacprovider.NewHmacProvider(keyProvider)
+	return hmacprovider.NewHmacProvider(keyProvider)
 }
 
 func setupServer() {
-    router := gin.Default()
+	router := gin.Default()
     
     // Create HMAC provider
-    hmacProvider := createHMACProvider()
+	hmacProvider := createHMACProvider()
     
     // Create auth middleware
-    hmacAuth := auth.NewHMACAuthProvider(hmacProvider)
+	hmacAuth := auth.NewHMACAuthProvider(hmacProvider)
     
     // Protected routes
-    api := router.Group("/api")
-    api.Use(auth.AuthMiddleware(hmacAuth))
+	api := router.Group("/api")
+	api.Use(auth.AuthMiddleware(hmacAuth))
     {
         api.POST("/data", handleData)
         api.PUT("/update", handleUpdate)
     }
     
-    router.Run(":8080")
+	router.Run(":8080")
 }
 
 func handleData(c *gin.Context) {
     // Get authenticated key ID
-    keyId, exists := auth.GetHMACIdentity(c)
-    if !exists {
+	keyId, exists := auth.GetHMACIdentity(c)
+	if !exists {
         c.JSON(500, gin.H{"error": "Authentication info missing"})
         return
     }
     
     // Get full HMAC details
-    keyId, timestamp, nonce, ok := auth.GetHMACDetails(c)
-    if !ok {
+	keyId, timestamp, nonce, ok := auth.GetHMACDetails(c)
+	if !ok {
         c.JSON(500, gin.H{"error": "HMAC details missing"})
         return
     }
     
-    c.JSON(200, gin.H{
+	c.JSON(200, gin.H{
         "message": "Authenticated request",
         "tenant": keyId,
         "timestamp": timestamp,
@@ -583,7 +583,7 @@ func handleData(c *gin.Context) {
 
 ```go
 func handleHMACError(err error, clientIP string) {
-    if err != nil {
+	if err != nil {
         switch {
         case strings.Contains(err.Error(), "invalid request"):
             // Input validation failure
@@ -608,41 +608,41 @@ func handleHMACError(err error, clientIP string) {
 
 ```go
 type TenantKeyProvider struct {
-    tenants map[string]*secure.Credential
-    mu      sync.RWMutex
+	tenants map[string]*secure.Credential
+	mu      sync.RWMutex
 }
 
 func (t *TenantKeyProvider) GetKey(tenantId string) (*secure.Credential, error) {
-    t.mu.RLock()
-    defer t.mu.RUnlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
     
-    cred, exists := t.tenants[tenantId]
-    if !exists {
+	cred, exists := t.tenants[tenantId]
+	if !exists {
         return nil, fmt.Errorf("unknown tenant: %s", tenantId)
     }
-    return cred, nil
+	return cred, nil
 }
 
 func (t *TenantKeyProvider) ListKeyIds() []string {
-    t.mu.RLock()
-    defer t.mu.RUnlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
     
-    ids := make([]string, 0, len(t.tenants))
-    for id := range t.tenants {
+	ids := make([]string, 0, len(t.tenants))
+	for id := range t.tenants {
         ids = append(ids, id)
     }
-    return ids
+	return ids
 }
 
 // Usage
 tenantProvider := &TenantKeyProvider{
-    tenants: loadTenantKeys(),
+	tenants: loadTenantKeys(),
 }
 
 hmacProvider := hmacprovider.NewHmacProvider(
-    tenantProvider,
-    hmacprovider.WithNonceStore(redisStore),
-    hmacprovider.WithKeyInterval(10*time.Minute),
+	tenantProvider,
+	hmacprovider.WithNonceStore(redisStore),
+	hmacprovider.WithKeyInterval(10*time.Minute),
 )
 ```
 
@@ -651,35 +651,35 @@ hmacProvider := hmacprovider.NewHmacProvider(
 ```go
 func verifyWebhook(provider *hmacprovider.HMACProvider, r *http.Request) error {
     // Extract headers
-    hash := r.Header.Get("X-Webhook-Signature")
-    timestamp := r.Header.Get("X-Webhook-Timestamp")
-    nonce := r.Header.Get("X-Webhook-Id")
+	hash := r.Header.Get("X-Webhook-Signature")
+	timestamp := r.Header.Get("X-Webhook-Timestamp")
+	nonce := r.Header.Get("X-Webhook-Id")
     
     // Read body
-    body, err := io.ReadAll(r.Body)
-    if err != nil {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
         return fmt.Errorf("failed to read body: %w", err)
     }
-    r.Body = io.NopCloser(bytes.NewReader(body))
+	r.Body = io.NopCloser(bytes.NewReader(body))
     
     // Verify signature
-    keyId, valid, err := provider.Verify256(
+	keyId, valid, err := provider.Verify256(
         bytes.NewReader(body), 
         hash, 
         timestamp, 
         nonce,
     )
     
-    if err != nil {
+	if err != nil {
         return fmt.Errorf("verification error: %w", err)
     }
     
-    if !valid {
+	if !valid {
         return errors.New("invalid webhook signature")
     }
     
-    log.Info("Webhook verified", "source", keyId)
-    return nil
+	log.Info("Webhook verified", "source", keyId)
+	return nil
 }
 ```
 
