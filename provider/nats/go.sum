@@ -1,0 +1,3 @@
+github.com/nats-io/nats.go v1.41.1/go.mod h1:mzHiutcAdZrg6WLfYVKXGseqqow2fWmwlTEUOHsI4jY=
+github.com/testcontainers/testcontainers-go v0.38.0/go.mod h1:C52c9MoHpWO+C4aqmgSU+hxlR5jlEayWtgYrb8Pzz1w=
+github.com/testcontainers/testcontainers-go/modules/nats v0.38.0/go.mod h1:zxGn/qHEPcy/lBBKp71JdOCZxauAOV6rdHF5i0zeiik=
