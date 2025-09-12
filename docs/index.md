@@ -16,6 +16,10 @@ go get github.com/oddbit-project/blueprint/provider/pgsql
 
 All existing imports continue to work without changes due to Go module rewrite rules.
 
+## Development & Releases
+
+- [Release Process](release-process.md) - How to create releases and manage independent provider versioning
+
 ## Configuration
 
 - [Config](config/config.md)

@@ -59,6 +59,9 @@ plugins:
 nav:
   - Home: index.md
   
+  - Development:
+    - Release Process: release-process.md
+  
   - Configuration:
     - Config: config/config.md
   
