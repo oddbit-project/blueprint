@@ -27,16 +27,16 @@ import (
     "fmt"
     "github.com/oddbit-project/blueprint/log"
     "github.com/oddbit-project/blueprint/provider/kafka"
-    tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
     "time"
 )
 
 func main() {
-    ctx := context.Background()
-    logger := log.NewLogger("kafka-example")
+	ctx := context.Background()
+	logger := log.NewLogger("kafka-example")
     
     // Configure the producer
-    producerCfg := &kafka.ProducerConfig{
+	producerCfg := &kafka.ProducerConfig{
         Brokers:  "localhost:9093",
         Topic:    "test_topic",
         AuthType: "scram256",
@@ -60,49 +60,49 @@ func main() {
     }
 
     // Create the producer
-    producer, err := kafka.NewProducer(producerCfg, logger)
-    if err != nil {
+	producer, err := kafka.NewProducer(producerCfg, logger)
+	if err != nil {
         logger.Fatal(err, "Failed to create Kafka producer", nil)
     }
-    defer producer.Disconnect()
+	defer producer.Disconnect()
 
     // Write a simple message
-    err = producer.Write(ctx, []byte("Hello, Kafka!"))
-    if err != nil {
+	err = producer.Write(ctx, []byte("Hello, Kafka!"))
+	if err != nil {
         logger.Error(err, "Failed to write message", nil)
     }
     
     // Write with a key
-    err = producer.Write(ctx, []byte("Message with key"), []byte("user-123"))
-    if err != nil {
+	err = producer.Write(ctx, []byte("Message with key"), []byte("user-123"))
+	if err != nil {
         logger.Error(err, "Failed to write message with key", nil)
     }
     
     // Write a JSON message
-    type User struct {
+	type User struct {
         ID   string `json:"id"`
         Name string `json:"name"`
     }
     
-    user := User{
+	user := User{
         ID:   "123",
         Name: "John Doe",
     }
     
-    err = producer.WriteJson(ctx, user)
-    if err != nil {
+	err = producer.WriteJson(ctx, user)
+	if err != nil {
         logger.Error(err, "Failed to write JSON message", nil)
     }
     
     // Write multiple messages
-    messages := [][]byte{
+	messages := [][]byte{
         []byte("Message 1"),
         []byte("Message 2"),
         []byte("Message 3"),
     }
     
-    err = producer.WriteMulti(ctx, messages...)
-    if err != nil {
+	err = producer.WriteMulti(ctx, messages...)
+	if err != nil {
         logger.Error(err, "Failed to write multiple messages", nil)
     }
 }
@@ -118,15 +118,15 @@ import (
     "fmt"
     "github.com/oddbit-project/blueprint/log"
     "github.com/oddbit-project/blueprint/provider/kafka"
-    tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
     "time"
 )
 
 func main() {
-    logger := log.NewLogger("kafka-consumer")
+	logger := log.NewLogger("kafka-consumer")
     
     // Configure the consumer
-    consumerCfg := &kafka.ConsumerConfig{
+	consumerCfg := &kafka.ConsumerConfig{
         Brokers:  "localhost:9093",
         Topic:    "test_topic",
         Group:    "consumer_group_1",
@@ -150,20 +150,20 @@ func main() {
     }
 
     // Create a context with timeout
-    timeout := 30 * time.Second
-    ctx, cancel := context.WithTimeout(context.Background(), timeout)
-    defer cancel()
+	timeout := 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
     // Create the consumer
-    consumer, err := kafka.NewConsumer(consumerCfg, logger)
-    if err != nil {
+	consumer, err := kafka.NewConsumer(consumerCfg, logger)
+	if err != nil {
         logger.Fatal(err, "Failed to create Kafka consumer", nil)
     }
-    defer consumer.Disconnect()
+	defer consumer.Disconnect()
 
     // Read a single message
-    msg, err := consumer.ReadMessage(ctx)
-    if err != nil {
+	msg, err := consumer.ReadMessage(ctx)
+	if err != nil {
         logger.Error(err, "Failed to read message", nil)
     } else {
         logger.Info("Received message", log.KV{
@@ -176,7 +176,7 @@ func main() {
     }
     
     // Process messages in a loop
-    for {
+	for {
         select {
         case <-ctx.Done():
             logger.Info("Context done, stopping consumer", nil)
@@ -213,16 +213,16 @@ The Kafka producer can be tuned for performance using the `ProducerOptions` stru
 
 ```go
 type ProducerOptions struct {
-    MaxAttempts     uint   // Maximum number of retries
-    WriteBackoffMin uint   // Minimum backoff in milliseconds
-    WriteBackoffMax uint   // Maximum backoff in milliseconds
-    BatchSize       uint   // Number of messages in a batch
-    BatchBytes      uint64 // Maximum batch size in bytes
-    BatchTimeout    uint   // Time to wait for batch completion in milliseconds
-    ReadTimeout     uint   // Read timeout in milliseconds
-    WriteTimeout    uint   // Write timeout in milliseconds
-    RequiredAcks    string // Acknowledgment level: "none", "one", "all"
-    Async           bool   // Async mode (non-blocking writes)
+	MaxAttempts     uint   // Maximum number of retries
+	WriteBackoffMin uint   // Minimum backoff in milliseconds
+	WriteBackoffMax uint   // Maximum backoff in milliseconds
+	BatchSize       uint   // Number of messages in a batch
+	BatchBytes      uint64 // Maximum batch size in bytes
+	BatchTimeout    uint   // Time to wait for batch completion in milliseconds
+	ReadTimeout     uint   // Read timeout in milliseconds
+	WriteTimeout    uint   // Write timeout in milliseconds
+	RequiredAcks    string // Acknowledgment level: "none", "one", "all"
+	Async           bool   // Async mode (non-blocking writes)
 }
 ```
 
@@ -230,13 +230,13 @@ Similarly, the consumer can be tuned using the `ConsumerOptions` struct:
 
 ```go
 type ConsumerOptions struct {
-    MinBytes        uint   // Minimum number of bytes to fetch
-    MaxBytes        uint   // Maximum number of bytes to fetch
-    MaxWait         uint   // Maximum time to wait for data in milliseconds
-    ReadLagInterval uint   // Interval to update lag information in milliseconds
-    HeartbeatInterval uint // Heartbeat interval in milliseconds
-    CommitInterval uint    // Auto-commit interval in milliseconds
-    StartOffset     string // Where to start reading: "newest", "oldest"
+	MinBytes        uint   // Minimum number of bytes to fetch
+	MaxBytes        uint   // Maximum number of bytes to fetch
+	MaxWait         uint   // Maximum time to wait for data in milliseconds
+	ReadLagInterval uint   // Interval to update lag information in milliseconds
+	HeartbeatInterval uint // Heartbeat interval in milliseconds
+	CommitInterval uint    // Auto-commit interval in milliseconds
+	StartOffset     string // Where to start reading: "newest", "oldest"
 }
 ```
 

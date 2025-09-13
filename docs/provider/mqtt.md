@@ -45,8 +45,8 @@ import (
 )
 
 func main() {
-    // use zerolog as logger with console writer
-    writer.UseDefaultWriter()
+	// use zerolog as logger with console writer
+	writer.UseDefaultWriter()
 
 	cfg := mqtt.NewConfig()
 	cfg.Username = "testUser"
