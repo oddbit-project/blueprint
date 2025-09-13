@@ -15,17 +15,17 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
-	github.com/oddbit-project/blueprint/provider/clickhouse v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/etcd v0.0.0-00010101000000-000000000000
+	github.com/oddbit-project/blueprint/provider/clickhouse v0.8.0
+	github.com/oddbit-project/blueprint/provider/etcd v0.8.0
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.0
-	github.com/oddbit-project/blueprint/provider/htpasswd v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/httpserver v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/kafka v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/metrics v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/mqtt v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/nats v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/pgsql v0.0.0-00010101000000-000000000000
-	github.com/oddbit-project/blueprint/provider/s3 v0.0.0-00010101000000-000000000000
+	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.0
+	github.com/oddbit-project/blueprint/provider/httpserver v0.8.0
+	github.com/oddbit-project/blueprint/provider/kafka v0.8.0
+	github.com/oddbit-project/blueprint/provider/metrics v0.8.0
+	github.com/oddbit-project/blueprint/provider/mqtt v0.8.0
+	github.com/oddbit-project/blueprint/provider/nats v0.8.0
+	github.com/oddbit-project/blueprint/provider/pgsql v0.8.0
+	github.com/oddbit-project/blueprint/provider/s3 v0.8.0
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.38.0
