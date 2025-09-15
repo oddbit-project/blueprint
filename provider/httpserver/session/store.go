@@ -1,8 +1,6 @@
 package session
 
 import (
-	"bytes"
-	"encoding/gob"
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/kv"
@@ -19,6 +17,7 @@ type Store struct {
 	cleanupRunning bool
 	logger         *log.Logger
 	crypt          secure.AES256GCM
+	marshaller     Marshaller
 }
 
 // NewStore creates session store
@@ -57,7 +56,14 @@ func NewStore(config *Config, backend kv.KV, logger *log.Logger) (*Store, error)
 		logger:       logger,
 		cleanupMutex: sync.Mutex{},
 		crypt:        enc,
+		marshaller:   NewGobMarshaller(), // by default, use gob marshaller
 	}, nil
+}
+
+// WithMarshaller uses a custom marshaller
+func (s *Store) WithMarshaller(marshaller Marshaller) *Store {
+	s.marshaller = marshaller
+	return s
 }
 
 // Get retrieves a session from Client
@@ -77,7 +83,7 @@ func (s *Store) Get(id string) (*SessionData, error) {
 
 	// Deserialize the session
 	var session *SessionData
-	if session, err = unmarshalSession(data); err != nil {
+	if session, err = s.marshaller.UnmarshalSession(data); err != nil {
 		return nil, err
 	}
 
@@ -112,7 +118,7 @@ func (s *Store) Set(id string, session *SessionData) error {
 	session.LastAccessed = time.Now()
 
 	// Serialize the session
-	data, err := marshalSession(session)
+	data, err := s.marshaller.MarshalSession(session)
 	if err != nil {
 		return err
 	}
@@ -199,29 +205,4 @@ func (s *Store) StopCleanup() {
 func (s *Store) Close() {
 	s.StopCleanup()
 	// Note: backend may require manual closing
-}
-
-// marshalSession use gob to marshal session
-func marshalSession(session *SessionData) ([]byte, error) {
-	var b bytes.Buffer
-	enc := gob.NewEncoder(&b)
-	if err := enc.Encode(session); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
-}
-
-// unmarshalSession use gob to unmarshal session
-func unmarshalSession(data []byte) (*SessionData, error) {
-	var session SessionData
-	dec := gob.NewDecoder(bytes.NewBuffer(data))
-	if err := dec.Decode(&session); err != nil {
-		return nil, err
-	}
-	return &session, nil
-}
-
-func init() {
-	// register type to be used with session data
-	gob.Register(&SessionData{})
 }
