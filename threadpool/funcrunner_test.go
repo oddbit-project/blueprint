@@ -98,7 +98,10 @@ func TestFuncRunner_WithThreadPool(t *testing.T) {
 
 		wg.Wait()
 		require.Equal(t, int64(jobCount), atomic.LoadInt64(&counter))
-		require.Equal(t, uint64(jobCount), pool.GetRequestCount())
+		// Use Eventually to handle race condition between job completion and counter increment
+		require.Eventually(t, func() bool {
+			return pool.GetRequestCount() == uint64(jobCount)
+		}, 100*time.Millisecond, 10*time.Millisecond, "expected request count to reach %d", jobCount)
 	})
 
 	t.Run("ConcurrentJobsWithSharedState", func(t *testing.T) {
@@ -312,7 +315,10 @@ func TestFuncRunner_PerformanceAndLoad(t *testing.T) {
 		duration := time.Since(startTime)
 
 		require.Equal(t, int64(jobCount), atomic.LoadInt64(&counter))
-		require.Equal(t, uint64(jobCount), pool.GetRequestCount())
+		// Use Eventually to handle race condition between job completion and counter increment
+		require.Eventually(t, func() bool {
+			return pool.GetRequestCount() == uint64(jobCount)
+		}, 100*time.Millisecond, 10*time.Millisecond, "expected request count to reach %d", jobCount)
 		
 		// Log performance for reference (not a strict requirement)
 		t.Logf("Processed %d jobs in %v (%.2f jobs/sec)", 
@@ -416,7 +422,10 @@ func TestFuncRunner_Integration(t *testing.T) {
 		wg.Wait()
 
 		require.Equal(t, int64(3), atomic.LoadInt64(&finalCount))
-		require.Equal(t, uint64(4), pool.GetRequestCount()) // 1 parent + 3 children
+		// Use Eventually to handle race condition between job completion and counter increment
+		require.Eventually(t, func() bool {
+			return pool.GetRequestCount() == uint64(4) // 1 parent + 3 children
+		}, 100*time.Millisecond, 10*time.Millisecond, "expected request count to reach 4")
 	})
 }
 

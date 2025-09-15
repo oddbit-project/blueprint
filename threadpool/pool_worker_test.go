@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
+	"time"
 )
 
 type testJob struct {
@@ -42,11 +43,13 @@ func runPool(t *testing.T, jobCount int, pool *ThreadPool) {
 		pool.Dispatch(job)
 	}
 	wg.Wait()
-	require.Equal(t, uint64(jobCount), pool.GetRequestCount())
 	require.Equal(t, counter, jobCount)
 	require.Equal(t, pool.GetWorkerCount(), pool.workerCount)
 	require.Equal(t, pool.GetQueueLen(), 0)
-	require.Equal(t, pool.GetRequestCount(), uint64(jobCount))
+	// Use Eventually to handle race condition between job completion and counter increment
+	require.Eventually(t, func() bool {
+		return pool.GetRequestCount() == uint64(jobCount)
+	}, 100*time.Millisecond, 10*time.Millisecond, "expected request count to reach %d", jobCount)
 }
 
 func TestThreadPool_work(t *testing.T) {
