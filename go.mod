@@ -26,6 +26,7 @@ require (
 	github.com/oddbit-project/blueprint/provider/nats v0.8.0
 	github.com/oddbit-project/blueprint/provider/pgsql v0.8.0
 	github.com/oddbit-project/blueprint/provider/s3 v0.8.0
+	github.com/oddbit-project/blueprint/provider/jwtprovider v0.8.0
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.38.0

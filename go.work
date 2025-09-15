@@ -15,4 +15,5 @@ use (
 	./provider/smtp
 	./provider/htpasswd
 	./provider/hmacprovider
+	./provider/jwtprovider
 )
