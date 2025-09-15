@@ -10,6 +10,7 @@ go get github.com/oddbit-project/blueprint
 
 # Install specific providers
 go get github.com/oddbit-project/blueprint/provider/httpserver
+go get github.com/oddbit-project/blueprint/provider/jwtprovider
 go get github.com/oddbit-project/blueprint/provider/kafka
 go get github.com/oddbit-project/blueprint/provider/pgsql
 ```

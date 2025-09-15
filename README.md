@@ -30,6 +30,7 @@ go get github.com/oddbit-project/blueprint
 
 # Install specific providers as needed
 go get github.com/oddbit-project/blueprint/provider/httpserver
+go get github.com/oddbit-project/blueprint/provider/jwtprovider
 go get github.com/oddbit-project/blueprint/provider/kafka
 go get github.com/oddbit-project/blueprint/provider/pgsql
 ```
@@ -39,7 +40,8 @@ go get github.com/oddbit-project/blueprint/provider/pgsql
 ```go
 // Import specific providers
 import "github.com/oddbit-project/blueprint/provider/httpserver"
-import "github.com/oddbit-project/blueprint/provider/kafka" 
+import "github.com/oddbit-project/blueprint/provider/jwtprovider"
+import "github.com/oddbit-project/blueprint/provider/kafka"
 import "github.com/oddbit-project/blueprint/provider/pgsql"
 
 // Core framework imports work as before
