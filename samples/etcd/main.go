@@ -51,7 +51,7 @@ func runSamples(ctx context.Context) error {
 	
 	config := etcd.DefaultConfig().
 		WithEndpoints(endpoints...).
-		WithTimeout(5 * time.Second)
+		WithTimeout(5)
 
 	client, err := etcd.NewClient(config)
 	if err != nil {
@@ -444,7 +444,7 @@ func encryptionDemo(ctx context.Context) error {
 	config := etcd.DefaultConfig().
 		WithEndpoints(endpoints...).
 		WithEncryption(encryptionKey).
-		WithTimeout(5 * time.Second)
+		WithTimeout(5)
 
 	client, err := etcd.NewClient(config)
 	if err != nil {
