@@ -2,18 +2,18 @@ go 1.23.0
 
 use (
 	.
+	./provider/clickhouse
+	./provider/etcd
+	./provider/hmacprovider
+	./provider/htpasswd
+	./provider/httpserver
+	./provider/jwtprovider
 	./provider/kafka
-	./provider/nats
+	./provider/metrics
 	./provider/mqtt
+	./provider/nats
+	./provider/pgsql
 	./provider/redis
 	./provider/s3
-	./provider/etcd
-	./provider/pgsql
-	./provider/clickhouse
-	./provider/httpserver
-	./provider/metrics
 	./provider/smtp
-	./provider/htpasswd
-	./provider/hmacprovider
-	./provider/jwtprovider
 )

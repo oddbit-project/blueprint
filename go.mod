@@ -10,7 +10,6 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/gobeam/stringy v0.0.7
-	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jmoiron/sqlx v1.4.0
@@ -20,13 +19,13 @@ require (
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.0
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.0
 	github.com/oddbit-project/blueprint/provider/httpserver v0.8.1
+	github.com/oddbit-project/blueprint/provider/jwtprovider v0.8.0
 	github.com/oddbit-project/blueprint/provider/kafka v0.8.0
 	github.com/oddbit-project/blueprint/provider/metrics v0.8.0
 	github.com/oddbit-project/blueprint/provider/mqtt v0.8.0
 	github.com/oddbit-project/blueprint/provider/nats v0.8.0
 	github.com/oddbit-project/blueprint/provider/pgsql v0.8.0
 	github.com/oddbit-project/blueprint/provider/s3 v0.8.0
-	github.com/oddbit-project/blueprint/provider/jwtprovider v0.8.0
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.38.0
@@ -89,6 +88,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.3 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
@@ -177,6 +177,7 @@ replace (
 	github.com/oddbit-project/blueprint/provider/hmacprovider => ./provider/hmacprovider
 	github.com/oddbit-project/blueprint/provider/htpasswd => ./provider/htpasswd
 	github.com/oddbit-project/blueprint/provider/httpserver => ./provider/httpserver
+	github.com/oddbit-project/blueprint/provider/jwtprovider => ./provider/jwtprovider
 	github.com/oddbit-project/blueprint/provider/kafka => ./provider/kafka
 	github.com/oddbit-project/blueprint/provider/metrics => ./provider/metrics
 	github.com/oddbit-project/blueprint/provider/mqtt => ./provider/mqtt
