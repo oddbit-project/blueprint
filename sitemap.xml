@@ -2,146 +2,170 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://oddbit-project.github.io/blueprint/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/release-process/</loc>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/batchwriter/batchwriter/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/config/config/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/crypt/password-hashing/</loc>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/crypt/secure-credentials/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/client/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/dbgrid/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/fields/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/functions/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/migrations/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/query-builder/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/repository/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/sql-update-api/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/structs-and-tags/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/log/file_logging/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/log/logging/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/clickhouse/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/etcd/</loc>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/hmacprovider/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/htpasswd/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/jwtprovider/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/kafka/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/mqtt/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/nats/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/pgsql/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/redis/</loc>
+         <lastmod>2025-09-15</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/s3/</loc>
+         <lastmod>2025-09-15</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/smtp/</loc>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/tls/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/api-reference/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/auth/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/examples/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/middleware/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/performance/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/request/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/security/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/session/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/httpserver/troubleshooting/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/threadpool/threadpool/</loc>
-         <lastmod>2025-07-19</lastmod>
+         <lastmod>2025-09-15</lastmod>
     </url>
 </urlset>
