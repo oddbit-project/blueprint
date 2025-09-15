@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"time"
 )
 
 // Config holds the configuration for connecting to etcd.
@@ -18,20 +17,20 @@ type Config struct {
 	secure.DefaultCredentialConfig
 	tlsProvider.ClientConfig
 
-	// DialTimeout is the timeout for connecting to etcd
-	DialTimeout          time.Duration `json:"dialTimeout"`
-	// DialKeepAliveTime is the time interval for keep-alive pings
-	DialKeepAliveTime    time.Duration `json:"dialKeepAliveTime"`
-	// DialKeepAliveTimeout is the timeout for keep-alive pings
-	DialKeepAliveTimeout time.Duration `json:"dialKeepAliveTimeout"`
+	// DialTimeout is the timeout, in seconds, for connecting to etcd
+	DialTimeout int `json:"dialTimeout"`
+	// DialKeepAliveTime is the time interval, in seconds, for keep-alive pings
+	DialKeepAliveTime int `json:"dialKeepAliveTime"`
+	// DialKeepAliveTimeout is the timeout, in seconds, for keep-alive pings
+	DialKeepAliveTimeout int `json:"dialKeepAliveTimeout"`
 
-	// RequestTimeout is the timeout for individual etcd requests
-	RequestTimeout time.Duration `json:"requestTimeout"`
+	// RequestTimeout is the timeout, in seconds, for individual etcd requests
+	RequestTimeout int `json:"requestTimeout"`
 
 	// EnableEncryption enables client-side encryption of values
-	EnableEncryption bool   `json:"enableEncryption"`
+	EnableEncryption bool `json:"enableEncryption"`
 	// EncryptionKey is the key used for client-side encryption (required if EnableEncryption is true)
-	EncryptionKey    []byte `json:"encryptionKey"`
+	EncryptionKey []byte `json:"encryptionKey"`
 
 	// MaxCallSendMsgSize is the maximum size of messages sent to etcd
 	MaxCallSendMsgSize int `json:"maxCallSendMsgSize"`
@@ -41,7 +40,7 @@ type Config struct {
 	// PermitWithoutStream allows RPCs to be sent without streams
 	PermitWithoutStream bool `json:"permitWithoutStream"`
 	// RejectOldCluster rejects connections to etcd clusters with old versions
-	RejectOldCluster    bool `json:"rejectOldCluster"`
+	RejectOldCluster bool `json:"rejectOldCluster"`
 }
 
 // DefaultConfig returns a Config with sensible default values.
@@ -49,10 +48,10 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Endpoints:            []string{"localhost:2379"},
-		DialTimeout:          5 * time.Second,
-		DialKeepAliveTime:    30 * time.Second,
-		DialKeepAliveTimeout: 10 * time.Second,
-		RequestTimeout:       5 * time.Second,
+		DialTimeout:          5,
+		DialKeepAliveTime:    30,
+		DialKeepAliveTimeout: 10,
+		RequestTimeout:       5,
 		EnableEncryption:     false,
 		MaxCallSendMsgSize:   2 * 1024 * 1024,
 		MaxCallRecvMsgSize:   2 * 1024 * 1024,
@@ -94,14 +93,18 @@ func (c *Config) WithEncryption(key []byte) *Config {
 }
 
 // WithTimeout sets the request timeout and returns the config for chaining.
-func (c *Config) WithTimeout(timeout time.Duration) *Config {
-	c.RequestTimeout = timeout
+func (c *Config) WithTimeout(timeoutSeconds int) *Config {
+	if timeoutSeconds > -1 {
+		c.RequestTimeout = timeoutSeconds
+	}
 	return c
 }
 
 // WithDialTimeout sets the connection timeout and returns the config for chaining.
-func (c *Config) WithDialTimeout(timeout time.Duration) *Config {
-	c.DialTimeout = timeout
+func (c *Config) WithDialTimeout(timeoutSeconds int) *Config {
+	if timeoutSeconds > -1 {
+		c.DialTimeout = timeoutSeconds
+	}
 	return c
 }
 
