@@ -16,7 +16,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/oddbit-project/blueprint/provider/clickhouse v0.8.0
-	github.com/oddbit-project/blueprint/provider/etcd v0.8.0
+	github.com/oddbit-project/blueprint/provider/etcd v0.8.1
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.0
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.0
 	github.com/oddbit-project/blueprint/provider/httpserver v0.8.0
