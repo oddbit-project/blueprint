@@ -343,7 +343,11 @@ func TestFuncRunner_PerformanceAndLoad(t *testing.T) {
 		}
 
 		// If we get here without running out of memory, the test passes
-		require.Equal(t, uint64(iterations*10), pool.GetRequestCount())
+		// Wait briefly for counters to be updated after wg.Done()
+		expectedCount := uint64(iterations * 10)
+		require.Eventually(t, func() bool {
+			return pool.GetRequestCount() == expectedCount
+		}, 100*time.Millisecond, 10*time.Millisecond, "expected request count to reach %d", expectedCount)
 	})
 }
 
