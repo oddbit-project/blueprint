@@ -184,7 +184,7 @@ func TestPutAndGet(t *testing.T) {
 			// Get value
 			got, err := client.Get(ctx, tt.key)
 			require.NoError(t, err)
-			
+
 			// Handle empty values - etcd returns nil for empty byte slices
 			if len(tt.value) == 0 && got == nil {
 				got = []byte{}
@@ -1214,7 +1214,6 @@ func TestGetWithRevision(t *testing.T) {
 	// Cleanup
 	_, _ = client.Delete(ctx, key)
 }
-
 
 // TestNewLockBasicOperations tests the new Lock struct basic functionality
 func TestNewLockBasicOperations(t *testing.T) {

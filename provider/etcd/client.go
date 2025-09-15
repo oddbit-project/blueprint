@@ -8,14 +8,16 @@ import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"strings"
+	"time"
 )
 
 // Client is a wrapper around etcd's clientv3.Client that provides additional functionality
 // including automatic encryption/decryption, request timeouts, and simplified APIs.
 type Client struct {
-	client *clientv3.Client
-	config *Config
-	crypto secure.EncryptionProvider
+	client         *clientv3.Client
+	crypto         secure.EncryptionProvider
+	requestTimeout time.Duration
+	endpoints      []string
 }
 
 // NewClient creates a new etcd client with the given configuration.
@@ -33,9 +35,9 @@ func NewClient(cfg *Config) (*Client, error) {
 
 	etcdConfig := clientv3.Config{
 		Endpoints:            cfg.Endpoints,
-		DialTimeout:          cfg.DialTimeout,
-		DialKeepAliveTime:    cfg.DialKeepAliveTime,
-		DialKeepAliveTimeout: cfg.DialKeepAliveTimeout,
+		DialTimeout:          time.Duration(cfg.DialTimeout) * time.Second,
+		DialKeepAliveTime:    time.Duration(cfg.DialKeepAliveTime) * time.Second,
+		DialKeepAliveTimeout: time.Duration(cfg.DialKeepAliveTimeout) * time.Second,
 		Username:             cfg.Username,
 		Password:             password,
 		MaxCallSendMsgSize:   cfg.MaxCallSendMsgSize,
@@ -56,8 +58,9 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 
 	c := &Client{
-		client: client,
-		config: cfg,
+		client:         client,
+		requestTimeout: time.Duration(cfg.RequestTimeout) * time.Second,
+		endpoints:      cfg.Endpoints,
 	}
 
 	if cfg.EnableEncryption && len(cfg.EncryptionKey) > 0 {
@@ -83,9 +86,9 @@ func (c *Client) Put(ctx context.Context, key string, value []byte, opts ...clie
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -108,9 +111,9 @@ func (c *Client) Get(ctx context.Context, key string, opts ...clientv3.OpOption)
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -144,9 +147,9 @@ func (c *Client) GetMultiple(ctx context.Context, key string, opts ...clientv3.O
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -180,9 +183,9 @@ func (c *Client) List(ctx context.Context, prefix string) ([]string, error) {
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -213,9 +216,9 @@ func (c *Client) Delete(ctx context.Context, key string, opts ...clientv3.OpOpti
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -264,9 +267,9 @@ func (c *Client) Transaction(ctx context.Context) clientv3.Txn {
 // Returns a lease ID that can be attached to keys for automatic expiration.
 func (c *Client) Lease(ttl int64) (clientv3.LeaseID, error) {
 	ctx := context.Background()
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -294,9 +297,9 @@ func (c *Client) RevokeLease(ctx context.Context, leaseID clientv3.LeaseID) erro
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -317,9 +320,9 @@ func (c *Client) CompactRevision(ctx context.Context, revision int64) error {
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -334,17 +337,17 @@ func (c *Client) Status(ctx context.Context) (*clientv3.StatusResponse, error) {
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
-	if len(c.config.Endpoints) == 0 {
+	if len(c.endpoints) == 0 {
 		return nil, errors.New("no endpoints configured")
 	}
 
-	return c.client.Status(ctx, c.config.Endpoints[0])
+	return c.client.Status(ctx, c.endpoints[0])
 }
 
 // MemberList returns information about all members in the etcd cluster.
@@ -353,15 +356,14 @@ func (c *Client) MemberList(ctx context.Context) (*clientv3.MemberListResponse, 
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
 	return c.client.MemberList(ctx)
 }
-
 
 // Close closes the etcd client connection and releases all associated resources.
 func (c *Client) Close() error {
@@ -399,9 +401,9 @@ func (c *Client) BulkPut(ctx context.Context, kvs map[string][]byte) error {
 		ops = append(ops, clientv3.OpPut(k, string(value)))
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -421,9 +423,9 @@ func (c *Client) BulkDelete(ctx context.Context, keys []string) (int64, error) {
 		ops = append(ops, clientv3.OpDelete(k))
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -447,9 +449,9 @@ func (c *Client) Exists(ctx context.Context, key string) (bool, error) {
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -468,9 +470,9 @@ func (c *Client) Count(ctx context.Context, prefix string) (int64, error) {
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -489,9 +491,9 @@ func (c *Client) GetWithRevision(ctx context.Context, key string, revision int64
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -524,9 +526,9 @@ func (c *Client) PutIfNotExists(ctx context.Context, key string, value []byte) (
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -557,9 +559,9 @@ func (c *Client) CompareAndSwap(ctx context.Context, key string, oldValue, newVa
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -599,9 +601,9 @@ func (c *Client) GetRange(ctx context.Context, start, end string) (map[string][]
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
@@ -658,9 +660,9 @@ func (c *Client) GetKeysWithPrefix(ctx context.Context, prefix string, limit int
 		ctx = context.Background()
 	}
 
-	if c.config.RequestTimeout > 0 {
+	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.config.RequestTimeout)
+		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
 		defer cancel()
 	}
 
