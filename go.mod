@@ -19,7 +19,7 @@ require (
 	github.com/oddbit-project/blueprint/provider/etcd v0.8.1
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.0
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.0
-	github.com/oddbit-project/blueprint/provider/httpserver v0.8.0
+	github.com/oddbit-project/blueprint/provider/httpserver v0.8.1
 	github.com/oddbit-project/blueprint/provider/kafka v0.8.0
 	github.com/oddbit-project/blueprint/provider/metrics v0.8.0
 	github.com/oddbit-project/blueprint/provider/mqtt v0.8.0
