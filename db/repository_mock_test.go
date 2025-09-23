@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
 	"github.com/oddbit-project/blueprint/db/qb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/doug-martin/goqu/v9"
 )
 
 // TestUser for testing repository methods
@@ -274,7 +274,7 @@ func TestRepository_ErrorHandling(t *testing.T) {
 	err := helper.repo.InsertReturning(&TestUser{}, []string{"id"})
 	assert.Equal(t, ErrInvalidParameters, err)
 
-	// Test UpdateReturning with no targets  
+	// Test UpdateReturning with no targets
 	err = helper.repo.UpdateReturning(&TestUser{}, map[string]any{"id": 1}, []string{"id"})
 	assert.Equal(t, ErrInvalidParameters, err)
 

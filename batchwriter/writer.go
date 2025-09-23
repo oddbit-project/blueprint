@@ -42,7 +42,7 @@ type BatchWriter struct {
 	wmx           sync.Mutex // protects writeBuffer and idx
 	fmx           sync.Mutex // protects flushBuffer
 	capacity      int
-	queueCapacity int        // Capacity of the input channel
+	queueCapacity int // Capacity of the input channel
 	flushInterval time.Duration
 	inputChan     chan any
 	stopChan      chan struct{}
@@ -103,18 +103,18 @@ func NewBatchWriter(ctx context.Context, capacity int, flushInterval time.Durati
 		writeBuffer:   make([]any, capacity),
 		flushBuffer:   make([]any, capacity),
 		capacity:      capacity,
-		queueCapacity: 10,               // Default queue capacity
+		queueCapacity: 10, // Default queue capacity
 		flushInterval: flushInterval,
 		stopChan:      make(chan struct{}),
 		flushFn:       flushFn,
 		clearBuffers:  false, // disabled by default
 	}
-	
+
 	// Apply the functional options
 	for _, opt := range opts {
 		opt(b)
 	}
-	
+
 	// Create the input channel with the configured capacity
 	b.inputChan = make(chan any, b.queueCapacity)
 
@@ -160,7 +160,7 @@ func (b *BatchWriter) AddWithContext(ctx context.Context, record any) error {
 	default:
 		// Context not canceled, continue normally
 	}
-	
+
 	// Try to add with context awareness
 	select {
 	case b.inputChan <- record:
@@ -189,14 +189,14 @@ func (b *BatchWriter) GetMetrics() Metrics {
 	b.wmx.Lock()
 	currentInBuffer := uint64(b.idx)
 	b.wmx.Unlock()
-	
+
 	flushCount := b.flushCount.Load()
 	totalFlushTime := time.Duration(b.totalFlushTime.Load())
 	var avgFlushDuration time.Duration
 	if flushCount > 0 {
 		avgFlushDuration = totalFlushTime / time.Duration(flushCount)
 	}
-	
+
 	return Metrics{
 		RecordsAdded:      b.recordsAdded.Load(),
 		RecordsProcessed:  b.recordsProcessed.Load(),
@@ -263,23 +263,23 @@ func (b *BatchWriter) drainAndStop() {
 // add inserts a record into the buffer and flushes if buffer is full
 func (b *BatchWriter) add(record any) {
 	b.wmx.Lock()
-	
+
 	// Store the record
 	b.writeBuffer[b.idx] = record
 	b.idx++
-	
+
 	// Check if we need to flush
 	needFlush := b.idx >= b.capacity
-	
+
 	// If we don't need to flush, just unlock and return
 	if !needFlush {
 		b.wmx.Unlock()
 		return
 	}
-	
+
 	// We need to flush, do it with the lock still held
 	b.flushLocked()
-	
+
 	// flushLocked will re-acquire write mutex before returning
 }
 
@@ -320,7 +320,7 @@ func (b *BatchWriter) flushLocked() {
 
 	// Record start time for metrics
 	startTime := time.Now()
-	
+
 	// Use a separate goroutine to perform the actual flush
 	// This prevents blocking the main loop but still maintains proper lock handling
 	go func() {
@@ -331,29 +331,29 @@ func (b *BatchWriter) flushLocked() {
 					b.logger.Warnf("Recovered from panic in flush function: %v", r)
 				}
 			}
-			
+
 			// Update metrics
 			flushDuration := time.Since(startTime)
 			b.lastFlushTime.Store(int64(flushDuration))
 			b.totalFlushTime.Add(int64(flushDuration))
 			b.flushCount.Add(1)
 			b.recordsProcessed.Add(uint64(flushLen))
-			
+
 			// Clear buffer slots if enabled
 			if b.clearBuffers {
 				for i := 0; i < flushLen; i++ {
 					b.flushBuffer[i] = nil
 				}
 			}
-			
+
 			// Always unlock the flush mutex at the end
 			b.fmx.Unlock()
 		}()
-		
+
 		if b.logger != nil {
 			b.logger.Infof("Flushing %d records", flushLen)
 		}
-		
+
 		// Execute the flush function with the copied slice
 		b.flushFn(toFlush...)
 	}()

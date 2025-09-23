@@ -168,16 +168,16 @@ func mTLSSecurityLogger(logger *log.Logger) gin.HandlerFunc {
 			clientCert := c.Request.TLS.PeerCertificates[0]
 
 			logger.Info("mTLS request", log.KV{
-				"client_dn":      clientCert.Subject.String(),
-				"client_serial":  clientCert.SerialNumber.String(),
-				"path":           c.Request.URL.Path,
-				"method":         c.Request.Method,
-				"status":         c.Writer.Status(),
-				"client_ip":      c.ClientIP(),
-				"duration_ms":    duration.Milliseconds(),
-				"tls_version":    getTLSVersion(c.Request.TLS.Version),
-				"cipher_suite":   getCipherSuite(c.Request.TLS.CipherSuite),
-				"user_agent":     c.Request.UserAgent(),
+				"client_dn":     clientCert.Subject.String(),
+				"client_serial": clientCert.SerialNumber.String(),
+				"path":          c.Request.URL.Path,
+				"method":        c.Request.Method,
+				"status":        c.Writer.Status(),
+				"client_ip":     c.ClientIP(),
+				"duration_ms":   duration.Milliseconds(),
+				"tls_version":   getTLSVersion(c.Request.TLS.Version),
+				"cipher_suite":  getCipherSuite(c.Request.TLS.CipherSuite),
+				"user_agent":    c.Request.UserAgent(),
 			})
 		} else {
 			logger.Info("Non-mTLS request", log.KV{
@@ -270,16 +270,16 @@ func isAdminClient(cert *x509.Certificate) bool {
 
 func extractClientInfo(cert *x509.Certificate) map[string]interface{} {
 	return map[string]interface{}{
-		"subject":      cert.Subject.String(),
-		"issuer":       cert.Issuer.String(),
-		"serial":       cert.SerialNumber.String(),
-		"not_before":   cert.NotBefore.Format(time.RFC3339),
-		"not_after":    cert.NotAfter.Format(time.RFC3339),
-		"dns_names":    cert.DNSNames,
-		"ip_addresses": cert.IPAddresses,
-		"organizations": cert.Subject.Organization,
+		"subject":              cert.Subject.String(),
+		"issuer":               cert.Issuer.String(),
+		"serial":               cert.SerialNumber.String(),
+		"not_before":           cert.NotBefore.Format(time.RFC3339),
+		"not_after":            cert.NotAfter.Format(time.RFC3339),
+		"dns_names":            cert.DNSNames,
+		"ip_addresses":         cert.IPAddresses,
+		"organizations":        cert.Subject.Organization,
 		"organizational_units": cert.Subject.OrganizationalUnit,
-		"common_name":  cert.Subject.CommonName,
+		"common_name":          cert.Subject.CommonName,
 	}
 }
 

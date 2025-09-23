@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -192,7 +192,7 @@ func TestLogger_ErrorStackTrace(t *testing.T) {
 	// Verify stack trace is present and points to this test function
 	stack, stackExists := logMap["stack"]
 	assert.True(t, stackExists, "Stack trace should be present")
-	
+
 	stackSlice, ok := stack.([]interface{})
 	assert.True(t, ok, "Stack should be a slice")
 	assert.NotEmpty(t, stackSlice, "Stack trace should not be empty")
@@ -207,8 +207,8 @@ func TestLogger_ErrorStackTrace(t *testing.T) {
 	foundTestFrame := false
 	for _, frame := range stackStrings {
 		// Check if this frame contains our test function and the correct line
-		if strings.Contains(frame, "TestLogger_ErrorStackTrace") && 
-		   strings.Contains(frame, "logger_test.go") {
+		if strings.Contains(frame, "TestLogger_ErrorStackTrace") &&
+			strings.Contains(frame, "logger_test.go") {
 			// Verify the line number is approximately correct (within a few lines)
 			if strings.Contains(frame, ":") {
 				foundTestFrame = true
@@ -236,7 +236,7 @@ func TestLogger_ErrorfStackTrace(t *testing.T) {
 	// Verify stack trace points to this test function
 	stack, stackExists := logMap["stack"]
 	assert.True(t, stackExists, "Stack trace should be present")
-	
+
 	stackSlice, ok := stack.([]interface{})
 	assert.True(t, ok, "Stack should be a slice")
 	assert.NotEmpty(t, stackSlice, "Stack trace should not be empty")
@@ -245,8 +245,8 @@ func TestLogger_ErrorfStackTrace(t *testing.T) {
 	foundTestFrame := false
 	for _, frame := range stackSlice {
 		frameStr := frame.(string)
-		if strings.Contains(frameStr, "TestLogger_ErrorfStackTrace") && 
-		   strings.Contains(frameStr, "logger_test.go") {
+		if strings.Contains(frameStr, "TestLogger_ErrorfStackTrace") &&
+			strings.Contains(frameStr, "logger_test.go") {
 			foundTestFrame = true
 			break
 		}
@@ -273,7 +273,7 @@ func TestLogger_ErrorStackTrace_IndirectCall(t *testing.T) {
 	// Verify stack trace includes both the helper function and this test function
 	stack, stackExists := logMap["stack"]
 	assert.True(t, stackExists, "Stack trace should be present")
-	
+
 	stackSlice, ok := stack.([]interface{})
 	assert.True(t, ok, "Stack should be a slice")
 	assert.NotEmpty(t, stackSlice, "Stack trace should not be empty")
@@ -281,7 +281,7 @@ func TestLogger_ErrorStackTrace_IndirectCall(t *testing.T) {
 	// Should find both the helper function and the test function in the stack
 	foundHelper := false
 	foundTest := false
-	
+
 	for _, frame := range stackSlice {
 		frameStr := frame.(string)
 		if strings.Contains(frameStr, "callErrorLogging") {

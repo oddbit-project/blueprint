@@ -21,12 +21,12 @@ func TestAddReservedType(t *testing.T) {
 
 	// Add new type
 	AddReservedType("custom.Type")
-	
+
 	// Verify it was added
 	types := GetReservedTypes()
 	assert.Len(t, types, initialCount+1)
 	assert.Contains(t, types, "custom.Type")
-	
+
 	// Add duplicate - should not increase count
 	AddReservedType("custom.Type")
 	types = GetReservedTypes()
@@ -36,11 +36,11 @@ func TestAddReservedType(t *testing.T) {
 func TestIsReservedType(t *testing.T) {
 	// Test default reserved type
 	assert.True(t, IsReservedType("time.Time"))
-	
+
 	// Test non-reserved type
 	assert.False(t, IsReservedType("string"))
 	assert.False(t, IsReservedType("int"))
-	
+
 	// Add custom type and test
 	AddReservedType("myapp.CustomTime")
 	assert.True(t, IsReservedType("myapp.CustomTime"))
@@ -50,14 +50,14 @@ func TestGetReservedTypes_ReturnsCopy(t *testing.T) {
 	// Get types
 	types1 := GetReservedTypes()
 	types2 := GetReservedTypes()
-	
+
 	// Verify they are different slices (copies)
 	require.NotSame(t, &types1, &types2)
-	
+
 	// Modify one slice
 	if len(types1) > 0 {
 		types1[0] = "modified"
-		
+
 		// Verify original is unchanged
 		types3 := GetReservedTypes()
 		assert.NotEqual(t, types1[0], types3[0])
@@ -67,10 +67,10 @@ func TestGetReservedTypes_ReturnsCopy(t *testing.T) {
 func TestReservedTypes_Concurrent(t *testing.T) {
 	const numGoroutines = 100
 	const numOperations = 100
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines * 3)
-	
+
 	// Concurrent adds
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
@@ -80,7 +80,7 @@ func TestReservedTypes_Concurrent(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	// Concurrent reads
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
@@ -90,7 +90,7 @@ func TestReservedTypes_Concurrent(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	// Concurrent checks
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
@@ -100,13 +100,13 @@ func TestReservedTypes_Concurrent(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify data integrity
 	types := GetReservedTypes()
 	assert.NotEmpty(t, types)
-	
+
 	// Check for duplicates
 	seen := make(map[string]bool)
 	for _, typ := range types {
@@ -127,13 +127,13 @@ func TestAddReservedType_EdgeCases(t *testing.T) {
 		{"unicode", "类型.时间", true},
 		{"very long name", "com.example.very.long.package.name.with.many.dots.CustomType", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			before := len(GetReservedTypes())
 			AddReservedType(tt.typeStr)
 			after := len(GetReservedTypes())
-			
+
 			if tt.expected {
 				assert.Equal(t, before+1, after, "Type should have been added")
 				assert.True(t, IsReservedType(tt.typeStr))
@@ -153,7 +153,7 @@ func BenchmarkIsReservedType(b *testing.B) {
 	for i := 0; i < 10; i++ {
 		AddReservedType(string(rune('A' + i)))
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		IsReservedType("time.Time")
@@ -165,7 +165,7 @@ func BenchmarkGetReservedTypes(b *testing.B) {
 	for i := 0; i < 10; i++ {
 		AddReservedType(string(rune('A' + i)))
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		GetReservedTypes()

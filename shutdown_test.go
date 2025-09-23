@@ -22,7 +22,7 @@ func TestShutdownManager(t *testing.T) {
 	t.Run("GetDestructorManager returns manager", func(t *testing.T) {
 		// Setup a fresh callstack
 		appDestructors = callstack.NewCallStack()
-		
+
 		// Get the manager
 		manager := GetDestructorManager()
 
@@ -34,7 +34,7 @@ func TestShutdownManager(t *testing.T) {
 	t.Run("RegisterDestructor adds function to stack", func(t *testing.T) {
 		// Setup a fresh callstack
 		appDestructors = callstack.NewCallStack()
-		
+
 		executed := false
 		RegisterDestructor(func() error {
 			executed = true
@@ -53,26 +53,26 @@ func TestShutdownManager(t *testing.T) {
 	t.Run("Shutdown executes destructors in reverse order", func(t *testing.T) {
 		// Setup a fresh callstack
 		appDestructors = callstack.NewCallStack()
-		
+
 		executionOrder := []int{}
-		
+
 		RegisterDestructor(func() error {
 			executionOrder = append(executionOrder, 1)
 			return nil
 		})
-		
+
 		RegisterDestructor(func() error {
 			executionOrder = append(executionOrder, 2)
 			return nil
 		})
-		
+
 		RegisterDestructor(func() error {
 			executionOrder = append(executionOrder, 3)
 			return nil
 		})
 
 		Shutdown(nil)
-		
+
 		// Should execute in reverse order: 3, 2, 1
 		assert.Equal(t, []int{3, 2, 1}, executionOrder)
 	})
@@ -83,7 +83,7 @@ func TestShutdownManager(t *testing.T) {
 
 		var counter int
 		var mu sync.Mutex
-		
+
 		// Register a destructor that increments a counter
 		RegisterDestructor(func() error {
 			mu.Lock()
@@ -101,10 +101,10 @@ func TestShutdownManager(t *testing.T) {
 				Shutdown(nil)
 			}()
 		}
-		
+
 		// Wait for all goroutines to complete
 		wg.Wait()
-		
+
 		// The destructor should only execute once since appDestructors gets set to nil
 		assert.Equal(t, 1, counter)
 	})
@@ -112,7 +112,7 @@ func TestShutdownManager(t *testing.T) {
 	t.Run("Shutdown handles nil destructor manager", func(t *testing.T) {
 		// Set callstack to nil
 		appDestructors = nil
-		
+
 		// Shutdown with nil appDestructors should not panic
 		assert.NotPanics(t, func() {
 			Shutdown(nil)
@@ -125,7 +125,7 @@ func TestShutdownManager(t *testing.T) {
 	t.Run("Shutdown with error argument", func(t *testing.T) {
 		// Setup a fresh callstack
 		appDestructors = callstack.NewCallStack()
-		
+
 		// This destructor won't be executed because log.Fatal will exit the program
 		RegisterDestructor(func() error {
 			return nil

@@ -205,7 +205,7 @@ func (t *ThreadPool) DispatchWithTimeout(j Job, timeout time.Duration) bool {
 //	job := MyJob{}
 //	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 //	defer cancel()
-//	
+//
 //	if err := threadPool.DispatchWithContext(ctx, job); err != nil {
 //	  // Handle dispatch error (context canceled or deadline exceeded)
 //	}

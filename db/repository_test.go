@@ -10,10 +10,10 @@ import (
 func TestEmptyResult(t *testing.T) {
 	// Test with sql.ErrNoRows
 	assert.True(t, EmptyResult(sql.ErrNoRows))
-	
+
 	// Test with non-empty result error
 	assert.False(t, EmptyResult(sql.ErrConnDone))
-	
+
 	// Test with nil error
 	assert.False(t, EmptyResult(nil))
 }
@@ -45,7 +45,7 @@ func TestRepositoryInterfaces(t *testing.T) {
 
 	var _ Updater = (*repository)(nil)
 	var _ Updater = (*tx)(nil)
-	
+
 	var _ GridOps = (*repository)(nil)
 }
 
@@ -66,7 +66,7 @@ func TestRepositoryTypes(t *testing.T) {
 	// Check that repository struct types match expectations
 	var r *repository
 	assert.Nil(t, r)
-	
+
 	var transaction *tx
 	assert.Nil(t, transaction)
 }
@@ -82,19 +82,19 @@ type TestGridStruct struct {
 
 // TestRepositoryGrid tests the Grid method of the repository
 func TestRepositoryGrid(t *testing.T) {
-	// Create a repository with a nil database connection 
+	// Create a repository with a nil database connection
 	// (we're only testing the Grid method which doesn't use the database)
 	repo := &repository{
 		tableName: "test_table",
 	}
-	
+
 	// Test creating a grid with a new record type
 	grid, err := repo.Grid(&TestGridStruct{})
 	assert.NoError(t, err)
 	assert.NotNil(t, grid)
 	assert.Equal(t, "test_table", grid.tableName)
 	assert.NotNil(t, grid.spec)
-	
+
 	// Test creating another grid with the same record type
 	grid2, err := repo.Grid(&TestGridStruct{})
 	assert.NoError(t, err)
@@ -110,14 +110,14 @@ func TestRepositoryQueryGrid_InvalidRecord(t *testing.T) {
 	repo := &repository{
 		tableName: "test_users",
 	}
-	
+
 	// Create a grid query
 	query, err := NewGridQuery(SearchAny, 10, 0)
 	assert.NoError(t, err)
-	
+
 	// Create a destination slice
 	var users []*TestGridStruct
-	
+
 	// Test with an invalid record
 	err = repo.QueryGrid(nil, query, &users)
 	assert.Error(t, err)

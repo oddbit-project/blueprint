@@ -26,12 +26,13 @@ const (
 )
 
 type ServerConfig struct {
-	Host         string            `json:"host"`
-	Port         int               `json:"port"`
-	ReadTimeout  int               `json:"readTimeout"`
-	WriteTimeout int               `json:"writeTimeout"`
-	Debug        bool              `json:"debug"`
-	Options      map[string]string `json:"options"`
+	Host           string            `json:"host"`
+	Port           int               `json:"port"`
+	ReadTimeout    int               `json:"readTimeout"`
+	WriteTimeout   int               `json:"writeTimeout"`
+	Debug          bool              `json:"debug"`
+	Options        map[string]string `json:"options"`
+	TrustedProxies []string          `json:"trustedProxies"`
 	tlsProvider.ServerConfig
 }
 
@@ -46,12 +47,13 @@ type OptionsFunc func(*Server) error
 
 func NewServerConfig() *ServerConfig {
 	return &ServerConfig{
-		Host:         "",
-		Port:         ServerDefaultPort,
-		ReadTimeout:  ServerDefaultReadTimeout,
-		WriteTimeout: ServerDefaultWriteTimeout,
-		Debug:        false,
-		Options:      make(map[string]string),
+		Host:           "",
+		Port:           ServerDefaultPort,
+		ReadTimeout:    ServerDefaultReadTimeout,
+		WriteTimeout:   ServerDefaultWriteTimeout,
+		Debug:          false,
+		Options:        make(map[string]string),
+		TrustedProxies: make([]string, 0),
 		ServerConfig: tlsProvider.ServerConfig{
 			TLSCert: "",
 			TLSKey:  "",
@@ -91,6 +93,14 @@ func (c *ServerConfig) GetOption(key string, defaultValue string) string {
 		return v
 	}
 	return defaultValue
+}
+
+// GetUrl build http url from config
+func (c *ServerConfig) GetUrl() string {
+	if c.TLSEnable {
+		return fmt.Sprintf("https://%s:%d", c.Host, c.Port)
+	}
+	return fmt.Sprintf("http://%s:%d", c.Host, c.Port)
 }
 
 func (c *ServerConfig) Validate() error {
@@ -150,6 +160,12 @@ func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 		return nil, err
 	}
 	router := NewRouter(serverName, cfg.Debug, logger)
+
+	if len(cfg.TrustedProxies) > 0 {
+		if err = router.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+			return nil, err
+		}
+	}
 
 	result := &Server{
 		Config: cfg,

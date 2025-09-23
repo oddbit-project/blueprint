@@ -817,7 +817,7 @@ func (s *DBIntegrationTestSuite) TestDbGrid() {
 		err = userRepo.QueryGrid(&ExtensiveTestUser{}, query, &results)
 		require.NoError(t, err)
 		assert.Len(t, results, 4)
-		
+
 		// Should be sorted by score descending
 		for i := 0; i < len(results)-1; i++ {
 			assert.GreaterOrEqual(t, results[i].Score, results[i+1].Score)

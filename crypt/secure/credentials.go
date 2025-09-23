@@ -114,7 +114,7 @@ func (sc *Credential) UpdateBytes(data []byte) error {
 		}
 		sc.data = nil
 	}
-	
+
 	if len(data) == 0 {
 		sc.empty = true
 		return nil

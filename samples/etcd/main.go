@@ -46,9 +46,9 @@ func runSamples(ctx context.Context) error {
 	if envEndpoints := os.Getenv("ETCD_ENDPOINTS"); envEndpoints != "" {
 		endpoints = []string{envEndpoints}
 	}
-	
+
 	fmt.Printf("Using etcd endpoints: %v\n", endpoints)
-	
+
 	config := etcd.DefaultConfig().
 		WithEndpoints(endpoints...).
 		WithTimeout(5)
@@ -130,9 +130,9 @@ func prefixOperations(ctx context.Context, client *etcd.Client) error {
 	fmt.Println("----------------------")
 
 	kvs := map[string][]byte{
-		"/sample/users/alice": []byte(`{"name": "Alice", "email": "alice@example.com"}`),
-		"/sample/users/bob":   []byte(`{"name": "Bob", "email": "bob@example.com"}`),
-		"/sample/users/charlie": []byte(`{"name": "Charlie", "email": "charlie@example.com"}`),
+		"/sample/users/alice":    []byte(`{"name": "Alice", "email": "alice@example.com"}`),
+		"/sample/users/bob":      []byte(`{"name": "Bob", "email": "bob@example.com"}`),
+		"/sample/users/charlie":  []byte(`{"name": "Charlie", "email": "charlie@example.com"}`),
 		"/sample/config/timeout": []byte("30s"),
 		"/sample/config/retries": []byte("3"),
 	}
@@ -180,7 +180,7 @@ func watchDemo(ctx context.Context, client *etcd.Client) error {
 	fmt.Println("-----------")
 
 	watchKey := "/sample/watch/counter"
-	
+
 	watchCtx, watchCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer watchCancel()
 
@@ -196,9 +196,9 @@ func watchDemo(ctx context.Context, client *etcd.Client) error {
 		for watchResp := range watchChan {
 			for _, event := range watchResp.Events {
 				eventCount++
-				fmt.Printf("Event %d: %s %s = %s\n", 
+				fmt.Printf("Event %d: %s %s = %s\n",
 					eventCount, event.Type, string(event.Kv.Key), string(event.Kv.Value))
-				
+
 				if eventCount >= 3 {
 					watchCancel()
 					return
@@ -269,7 +269,7 @@ func distributedLockDemo(ctx context.Context, client *etcd.Client) error {
 	fmt.Println("---------------------")
 
 	lockName := "/sample/locks/demo-lock"
-	
+
 	lock1, err := client.NewLock(lockName)
 	if err != nil {
 		return fmt.Errorf("create lock failed: %w", err)
@@ -280,7 +280,7 @@ func distributedLockDemo(ctx context.Context, client *etcd.Client) error {
 
 	// First, try to acquire the lock in blocking mode to ensure it works
 	fmt.Println("Testing blocking lock acquisition...")
-	
+
 	lockCtx, lockCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer lockCancel()
 
@@ -303,7 +303,7 @@ func distributedLockDemo(ctx context.Context, client *etcd.Client) error {
 		return fmt.Errorf("try lock failed: %w", err)
 	}
 	fmt.Printf("TryLock result: %t\n", acquired)
-	
+
 	if acquired {
 		fmt.Println("TryLock succeeded")
 		time.Sleep(500 * time.Millisecond) // Simulate work
@@ -322,7 +322,7 @@ func distributedLockDemo(ctx context.Context, client *etcd.Client) error {
 		return fmt.Errorf("try lock with short timeout failed: %w", err)
 	}
 	fmt.Printf("TryLock with 1ms timeout result: %t\n", acquired2)
-	
+
 	if acquired2 {
 		if err := lock1.Unlock(ctx); err != nil {
 			return fmt.Errorf("unlock after short trylock failed: %w", err)
@@ -436,7 +436,7 @@ func encryptionDemo(ctx context.Context) error {
 	if envEndpoints := os.Getenv("ETCD_ENDPOINTS"); envEndpoints != "" {
 		endpoints = []string{envEndpoints}
 	}
-	
+
 	fmt.Printf("Using etcd endpoints for encryption demo: %v\n", endpoints)
 
 	encryptionKey := []byte("this-is-a-32-byte-key-for-demo!")

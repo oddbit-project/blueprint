@@ -431,7 +431,7 @@ func TestEdgeCases(t *testing.T) {
 	if !cred2.IsEmpty() {
 		t.Error("Credential should be empty after UpdateBytes with empty slice")
 	}
-	
+
 	// Test GenerateKey error handling (hard to test actual error from crypto/rand)
 	// This would require mocking crypto/rand which is complex
 	key, err = GenerateKey()

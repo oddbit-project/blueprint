@@ -158,7 +158,7 @@ func (r *RateLimiter) ShutdownWithContext(ctx context.Context) error {
 	r.stopOnce.Do(func() {
 		close(r.stopCleanup)
 	})
-	
+
 	select {
 	case <-r.done:
 		return nil

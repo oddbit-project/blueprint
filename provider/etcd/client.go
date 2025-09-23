@@ -78,6 +78,30 @@ func NewClient(cfg *Config) (*Client, error) {
 	return c, nil
 }
 
+// PrepareValue prepares a value for writing
+func (c *Client) PrepareValue(value []byte) ([]byte, error) {
+	if c.crypto != nil {
+		encryptedValue, err := c.crypto.Encrypt(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt value: %w", err)
+		}
+		return encryptedValue, nil
+	}
+	return value, nil
+}
+
+// DecodeValue decodes a value for reading
+func (c *Client) DecodeValue(value []byte) ([]byte, error) {
+	if c.crypto != nil {
+		decryptedValue, err := c.crypto.Decrypt(value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt value: %w", err)
+		}
+		return decryptedValue, nil
+	}
+	return value, nil
+}
+
 // Put stores a key-value pair in etcd.
 // The value is automatically encrypted if encryption is enabled on the client.
 // Additional etcd options can be passed through opts (e.g., clientv3.WithLease).
@@ -92,14 +116,12 @@ func (c *Client) Put(ctx context.Context, key string, value []byte, opts ...clie
 		defer cancel()
 	}
 
-	if c.crypto != nil {
-		encryptedValue, err := c.crypto.Encrypt(value)
-		if err != nil {
-			return fmt.Errorf("failed to encrypt value: %w", err)
-		}
-		value = encryptedValue
+	var err error
+	value, err = c.PrepareValue(value)
+	if err != nil {
+		return err
 	}
-	_, err := c.client.Put(ctx, key, string(value), opts...)
+	_, err = c.client.Put(ctx, key, string(value), opts...)
 	return err
 }
 
@@ -126,17 +148,7 @@ func (c *Client) Get(ctx context.Context, key string, opts ...clientv3.OpOption)
 		return nil, errors.New("key not found")
 	}
 
-	value := resp.Kvs[0].Value
-
-	if c.crypto != nil {
-		decryptedValue, err := c.crypto.Decrypt(value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decrypt value: %w", err)
-		}
-		value = decryptedValue
-	}
-
-	return value, nil
+	return c.DecodeValue(resp.Kvs[0].Value)
 }
 
 // GetMultiple retrieves multiple key-value pairs matching the given key pattern.
@@ -160,17 +172,10 @@ func (c *Client) GetMultiple(ctx context.Context, key string, opts ...clientv3.O
 
 	result := make(map[string][]byte)
 	for _, kv := range resp.Kvs {
-		value := kv.Value
-
-		if c.crypto != nil {
-			decryptedValue, err := c.crypto.Decrypt(value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt value for key %s: %w", string(kv.Key), err)
-			}
-			value = decryptedValue
+		result[string(kv.Key)], err = c.DecodeValue(kv.Value)
+		if err != nil {
+			return nil, err
 		}
-
-		result[string(kv.Key)] = value
 	}
 
 	return result, nil
@@ -390,13 +395,9 @@ func (c *Client) BulkPut(ctx context.Context, kvs map[string][]byte) error {
 
 	ops := make([]clientv3.Op, 0, len(kvs))
 	for k, v := range kvs {
-		value := v
-		if c.crypto != nil {
-			encryptedValue, err := c.crypto.Encrypt(value)
-			if err != nil {
-				return fmt.Errorf("failed to encrypt value for key %s: %w", k, err)
-			}
-			value = encryptedValue
+		value, err := c.PrepareValue(v)
+		if err != nil {
+			return err
 		}
 		ops = append(ops, clientv3.OpPut(k, string(value)))
 	}
@@ -506,17 +507,7 @@ func (c *Client) GetWithRevision(ctx context.Context, key string, revision int64
 		return nil, errors.New("key not found")
 	}
 
-	value := resp.Kvs[0].Value
-
-	if c.crypto != nil {
-		decryptedValue, err := c.crypto.Decrypt(value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decrypt value: %w", err)
-		}
-		value = decryptedValue
-	}
-
-	return value, nil
+	return c.DecodeValue(resp.Kvs[0].Value)
 }
 
 // PutIfNotExists stores a key-value pair only if the key does not already exist.
@@ -532,12 +523,10 @@ func (c *Client) PutIfNotExists(ctx context.Context, key string, value []byte) (
 		defer cancel()
 	}
 
-	if c.crypto != nil {
-		encryptedValue, err := c.crypto.Encrypt(value)
-		if err != nil {
-			return false, fmt.Errorf("failed to encrypt value: %w", err)
-		}
-		value = encryptedValue
+	var err error
+	value, err = c.PrepareValue(value)
+	if err != nil {
+		return false, err
 	}
 
 	resp, err := c.client.Txn(ctx).
@@ -565,26 +554,18 @@ func (c *Client) CompareAndSwap(ctx context.Context, key string, oldValue, newVa
 		defer cancel()
 	}
 
-	compareValue := oldValue
-	putValue := newValue
-
-	if c.crypto != nil {
-		encryptedOldValue, err := c.crypto.Encrypt(oldValue)
-		if err != nil {
-			return false, fmt.Errorf("failed to encrypt old value: %w", err)
-		}
-		compareValue = encryptedOldValue
-
-		encryptedNewValue, err := c.crypto.Encrypt(newValue)
-		if err != nil {
-			return false, fmt.Errorf("failed to encrypt new value: %w", err)
-		}
-		putValue = encryptedNewValue
+	oldValue, err := c.PrepareValue(oldValue)
+	if err != nil {
+		return false, err
+	}
+	newValue, err = c.PrepareValue(newValue)
+	if err != nil {
+		return false, err
 	}
 
 	resp, err := c.client.Txn(ctx).
-		If(clientv3.Compare(clientv3.Value(key), "=", string(compareValue))).
-		Then(clientv3.OpPut(key, string(putValue))).
+		If(clientv3.Compare(clientv3.Value(key), "=", string(oldValue))).
+		Then(clientv3.OpPut(key, string(newValue))).
 		Commit()
 
 	if err != nil {
@@ -614,17 +595,10 @@ func (c *Client) GetRange(ctx context.Context, start, end string) (map[string][]
 
 	result := make(map[string][]byte)
 	for _, kv := range resp.Kvs {
-		value := kv.Value
-
-		if c.crypto != nil {
-			decryptedValue, err := c.crypto.Decrypt(value)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt value for key %s: %w", string(kv.Key), err)
-			}
-			value = decryptedValue
+		result[string(kv.Key)], err = c.DecodeValue(kv.Value)
+		if err != nil {
+			return nil, err
 		}
-
-		result[string(kv.Key)] = value
 	}
 
 	return result, nil

@@ -70,7 +70,7 @@ func (w *Worker) RequestCounter() uint64 {
 }
 
 // NewWorkerGroup creates a new group of workers
-// If logger is nil, panics will be recovered silently 
+// If logger is nil, panics will be recovered silently
 func NewWorkerGroup(workerCount int, jobQueue chan Job, parentCtx context.Context, logger *log.Logger) (*WorkerGroup, error) {
 	if workerCount < 1 {
 		return nil, ErrInvalidWorkerCount
