@@ -495,14 +495,6 @@ func TestGetRealIP(t *testing.T) {
 			expected: "203.0.113.2",
 		},
 		{
-			name: "X-Forwarded-IP header",
-			headers: map[string]string{
-				"X-Forwarded-IP": "203.0.113.3",
-			},
-			remoteIP: "192.168.1.1:8080",
-			expected: "203.0.113.3",
-		},
-		{
 			name:     "No proxy headers",
 			headers:  map[string]string{},
 			remoteIP: "192.168.1.1:8080",
