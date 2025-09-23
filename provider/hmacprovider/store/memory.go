@@ -49,9 +49,11 @@ func EvictNone() MemEvictPolicyFn {
 	}
 }
 
-// EvictHalfLife evict all noces older than half of the ttl
+// EvictHalfLife evict all nonces older than half of the ttl
 func EvictHalfLife() MemEvictPolicyFn {
 	return func(store *memStore) {
+		store.Lock()
+		defer store.Unlock()
 		// expire all entries that reached middle of the TTL
 		now := time.Now().Add(-(store.ttl / 2))
 		for nonce, expiry := range store.nonces {
@@ -64,6 +66,8 @@ func EvictHalfLife() MemEvictPolicyFn {
 
 func EvictAll() MemEvictPolicyFn {
 	return func(store *memStore) {
+		store.Lock()
+		defer store.Unlock()
 		store.nonces = make(map[string]time.Time)
 	}
 }
@@ -111,7 +115,7 @@ func (ns *memStore) AddIfNotExists(nonce string) bool {
 		// for high-traffic apis use other backends for nonce
 		if len(ns.nonces) >= ns.maxSize {
 			ns.evictPolicy(ns)
-			
+
 			// If still at capacity after eviction, reject
 			if len(ns.nonces) >= ns.maxSize {
 				return false
