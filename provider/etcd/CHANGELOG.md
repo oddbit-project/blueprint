@@ -4,6 +4,11 @@ All notable changes to the Blueprint ETCD provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.2]
+
+### Added
+- Helper functions for encryption and decryption
+
 ## [v0.8.1]
 
 ### Added
