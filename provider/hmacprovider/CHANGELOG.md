@@ -4,6 +4,11 @@ All notable changes to the Blueprint HMAC provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1]
+
+### Fixed
+- Fixed possible race condition in the eviction logic
+
 ## [v0.8.0]
 
 ### Added

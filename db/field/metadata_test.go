@@ -151,7 +151,7 @@ func TestGetStructMeta_NestedStruct(t *testing.T) {
 	// Check that nested struct is treated as a single field (not flattened)
 	idField := findFieldByDbName(meta, "id")
 	require.NotNil(t, idField)
-	
+
 	nestedField := findFieldByDbName(meta, "nested")
 	require.NotNil(t, nestedField)
 	assert.Equal(t, "nested", nestedField.DbName)

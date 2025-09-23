@@ -74,14 +74,14 @@ func (a *originalAES256GCM) decrypt(data []byte) ([]byte, error) {
 func BenchmarkAES256GCM_Encrypt_Original(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	gcm := newOriginalAES256GCM(key)
 	data := make([]byte, 1024) // 1KB test data
 	rand.Read(data)
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, err := gcm.encrypt(data)
 		if err != nil {
@@ -93,19 +93,19 @@ func BenchmarkAES256GCM_Encrypt_Original(b *testing.B) {
 func BenchmarkAES256GCM_Encrypt_ConstantTime(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	gcm, err := NewAES256GCM(key)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer gcm.Clear()
-	
+
 	data := make([]byte, 1024) // 1KB test data
 	rand.Read(data)
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, err := gcm.Encrypt(data)
 		if err != nil {
@@ -117,11 +117,11 @@ func BenchmarkAES256GCM_Encrypt_ConstantTime(b *testing.B) {
 func BenchmarkAES256GCM_Decrypt_Original(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	gcm := newOriginalAES256GCM(key)
 	data := make([]byte, 1024)
 	rand.Read(data)
-	
+
 	// Pre-encrypt data for decryption benchmark
 	encrypted, err := gcm.encrypt(data)
 	if err != nil {
@@ -130,7 +130,7 @@ func BenchmarkAES256GCM_Decrypt_Original(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, err := gcm.decrypt(encrypted)
 		if err != nil {
@@ -142,16 +142,16 @@ func BenchmarkAES256GCM_Decrypt_Original(b *testing.B) {
 func BenchmarkAES256GCM_Decrypt_ConstantTime(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	gcm, err := NewAES256GCM(key)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer gcm.Clear()
-	
+
 	data := make([]byte, 1024)
 	rand.Read(data)
-	
+
 	// Pre-encrypt data for decryption benchmark
 	encrypted, err := gcm.Encrypt(data)
 	if err != nil {
@@ -160,7 +160,7 @@ func BenchmarkAES256GCM_Decrypt_ConstantTime(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, err := gcm.Decrypt(encrypted)
 		if err != nil {
@@ -214,7 +214,7 @@ func BenchmarkAES256GCM_KeyCreation_Original(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		gcm := newOriginalAES256GCM(key)
 		_ = gcm
@@ -227,7 +227,7 @@ func BenchmarkAES256GCM_KeyCreation_ConstantTime(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		gcm, err := NewAES256GCM(key)
 		if err != nil {
@@ -241,19 +241,19 @@ func BenchmarkAES256GCM_KeyCreation_ConstantTime(b *testing.B) {
 func BenchmarkAES256GCM_Encrypt_Small_ConstantTime(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	gcm, err := NewAES256GCM(key)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer gcm.Clear()
-	
+
 	data := make([]byte, 64) // Small data
 	rand.Read(data)
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, err := gcm.Encrypt(data)
 		if err != nil {
@@ -265,19 +265,19 @@ func BenchmarkAES256GCM_Encrypt_Small_ConstantTime(b *testing.B) {
 func BenchmarkAES256GCM_Encrypt_Large_ConstantTime(b *testing.B) {
 	key := make([]byte, 32)
 	rand.Read(key)
-	
+
 	gcm, err := NewAES256GCM(key)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer gcm.Clear()
-	
+
 	data := make([]byte, 1024*1024) // 1MB data
 	rand.Read(data)
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	
+
 	for i := 0; i < b.N; i++ {
 		_, err := gcm.Encrypt(data)
 		if err != nil {

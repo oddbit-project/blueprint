@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	ErrInvalidKeyLength  = utils.Error("key length must be 32 bytes")
-	ErrDataTooShort      = utils.Error("data too short")
-	ErrNonceExhausted    = utils.Error("nonce counter exhausted, key rotation required")
+	ErrInvalidKeyLength     = utils.Error("key length must be 32 bytes")
+	ErrDataTooShort         = utils.Error("data too short")
+	ErrNonceExhausted       = utils.Error("nonce counter exhausted, key rotation required")
 	ErrAuthenticationFailed = utils.Error("authentication failed")
 )
 
@@ -67,15 +67,15 @@ func (a *aes256Gcm) Clear() {
 		for i := range a.key {
 			a.key[i] = 0
 		}
-		
+
 		// Second pass: use constant-time copy to prevent compiler optimization
 		subtle.ConstantTimeCopy(1, a.key, make([]byte, len(a.key)))
-		
+
 		// Third pass: additional zeroing
 		for i := range a.key {
 			a.key[i] = 0
 		}
-		
+
 		a.key = nil
 	}
 	// Clear counter
@@ -95,26 +95,26 @@ func (a *aes256Gcm) isCounterExhausted() bool {
 func constantTimeMinLength(data []byte, minLen int) bool {
 	// Ensure we don't leak length information through timing
 	dataLen := len(data)
-	
+
 	// Convert lengths to byte slices for constant-time comparison
 	minLenBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(minLenBytes, uint32(minLen))
-	
+
 	dataLenBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(dataLenBytes, uint32(dataLen))
-	
+
 	// Perform constant-time comparison: dataLen >= minLen
 	// This is done by checking if dataLen - minLen >= 0
 	diff := int32(dataLen) - int32(minLen)
 	isValid := 1 - (int(diff>>31) & 1) // 1 if diff >= 0, 0 otherwise
-	
+
 	return isValid == 1
 }
 
 // extractNonceConstantTime performs constant-time nonce extraction
 func extractNonceConstantTime(data []byte, nonceSize int) []byte {
 	nonce := make([]byte, nonceSize)
-	
+
 	// Simple constant-time copy for the nonce
 	// If data is shorter than nonceSize, remaining bytes stay zero
 	for i := 0; i < nonceSize; i++ {
@@ -122,7 +122,7 @@ func extractNonceConstantTime(data []byte, nonceSize int) []byte {
 			nonce[i] = data[i]
 		}
 	}
-	
+
 	return nonce
 }
 
@@ -178,15 +178,15 @@ func (a *aes256Gcm) Encrypt(data []byte) ([]byte, error) {
 func (a *aes256Gcm) Decrypt(data []byte) ([]byte, error) {
 	// Pre-allocate all possible errors for constant-time selection
 	errors := []error{
-		nil,                    // 0: success
-		ErrInvalidKeyLength,    // 1: invalid key
-		ErrDataTooShort,        // 2: data too short
-		ErrAuthenticationFailed,// 3: authentication failed
+		nil,                     // 0: success
+		ErrInvalidKeyLength,     // 1: invalid key
+		ErrDataTooShort,         // 2: data too short
+		ErrAuthenticationFailed, // 3: authentication failed
 	}
-	
+
 	errorIndex := 0
 	var result []byte
-	
+
 	// Constant-time key validation
 	keyValid := constantTimeKeyLengthCheck(a.key)
 	keyValidInt := 0
@@ -194,7 +194,7 @@ func (a *aes256Gcm) Decrypt(data []byte) ([]byte, error) {
 		keyValidInt = 1
 	}
 	errorIndex = subtle.ConstantTimeSelect(keyValidInt, errorIndex, 1)
-	
+
 	// Early return for invalid key to avoid nil pointer
 	if errorIndex != 0 {
 		return nil, errors[errorIndex]
@@ -213,7 +213,7 @@ func (a *aes256Gcm) Decrypt(data []byte) ([]byte, error) {
 
 	nonceSize := gcm.NonceSize()
 	minLen := nonceSize + gcm.Overhead()
-	
+
 	// Constant-time length validation
 	lengthValid := constantTimeMinLength(data, minLen)
 	lengthValidInt := 0
@@ -221,14 +221,14 @@ func (a *aes256Gcm) Decrypt(data []byte) ([]byte, error) {
 		lengthValidInt = 1
 	}
 	errorIndex = subtle.ConstantTimeSelect(lengthValidInt, errorIndex, 2)
-	
+
 	// Process data even if length is invalid (for constant time)
 	// but ensure we have enough data to avoid panic
 	if len(data) >= minLen {
 		// Extract nonce using constant-time operation
 		nonce := extractNonceConstantTime(data, nonceSize)
 		ciphertext := data[nonceSize:]
-		
+
 		// Attempt decryption
 		result, err = gcm.Open(nil, nonce, ciphertext, nil)
 		if err != nil {
@@ -245,7 +245,7 @@ func (a *aes256Gcm) Decrypt(data []byte) ([]byte, error) {
 		_, _ = gcm.Open(nil, dummyNonce, dummyCiphertext, nil)
 		errorIndex = subtle.ConstantTimeSelect(lengthValidInt, errorIndex, 2)
 	}
-	
+
 	// Return result based on error index
 	if errorIndex != 0 {
 		return nil, errors[errorIndex]

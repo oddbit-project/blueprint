@@ -56,11 +56,11 @@ func TestReadString(t *testing.T) {
 	// Create a temporary file with content
 	content := "test content\nwith new lines  "
 	expectedContent := "test content\nwith new lines"
-	
+
 	tempFile, err := os.CreateTemp("", "read_test_*")
 	require.NoError(t, err)
 	defer os.Remove(tempFile.Name())
-	
+
 	_, err = tempFile.WriteString(content)
 	require.NoError(t, err)
 	tempFile.Close()
@@ -78,7 +78,7 @@ func TestReadString(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "read_test_dir_*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
-	
+
 	_, err = ReadString(tempDir)
 	assert.Error(t, err)
 }

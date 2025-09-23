@@ -9,18 +9,18 @@ import (
 
 // TestStruct for FieldsValues validation - it must match the fields being updated
 type FieldsValuesTestStruct struct {
-	ID       int    `db:"id" auto:"true"`
-	Name     string `db:"name"`
-	Email    string `db:"email"`
-	Age      int    `db:"age"`
-	Active   bool   `db:"active"`
+	ID       int     `db:"id" auto:"true"`
+	Name     string  `db:"name"`
+	Email    string  `db:"email"`
+	Age      int     `db:"age"`
+	Active   bool    `db:"active"`
 	Score    float64 `db:"score"`
-	Category string `db:"category"`
+	Category string  `db:"category"`
 }
 
 func TestUpdateBuilder_FieldsValues_Basic(t *testing.T) {
 	builder := NewSqlBuilder(DefaultSqlDialect())
-	
+
 	// Empty struct is used for field validation
 	testStruct := FieldsValuesTestStruct{}
 
@@ -103,10 +103,10 @@ func TestUpdateBuilder_FieldsValues_Basic(t *testing.T) {
 
 	t.Run("nil and zero values", func(t *testing.T) {
 		fieldValues := map[string]any{
-			"name":   "",     // Empty string
-			"age":    0,      // Zero int
-			"active": false,  // False boolean
-			"score":  0.0,    // Zero float
+			"name":   "",    // Empty string
+			"age":    0,     // Zero int
+			"active": false, // False boolean
+			"score":  0.0,   // Zero float
 		}
 
 		sql, args, err := builder.Update("users", testStruct).
@@ -316,7 +316,7 @@ func TestUpdateBuilder_FieldsValues_WithOptions(t *testing.T) {
 			WithOptions(&UpdateOptions{
 				ReturningFields: []string{"name"}, // This gets overridden
 			}).
-			Returning("id").          // This should override any options
+			Returning("id"). // This should override any options
 			Build()
 
 		require.NoError(t, err)
@@ -445,8 +445,8 @@ func TestUpdateBuilder_FieldsValues_Dialects(t *testing.T) {
 	t.Run("MySQL dialect", func(t *testing.T) {
 		dialect := SqlDialect{
 			PlaceHolderFragment: "?",
-			QuoteField:         "`%s`",
-			QuoteTable:         "`%s`",
+			QuoteField:          "`%s`",
+			QuoteTable:          "`%s`",
 		}
 		builder := NewSqlBuilder(dialect)
 
@@ -476,8 +476,8 @@ func TestUpdateBuilder_FieldsValues_Dialects(t *testing.T) {
 		dialect := SqlDialect{
 			PlaceHolderFragment:   "$",
 			IncludePlaceholderNum: true,
-			QuoteField:           "\"%s\"",
-			QuoteTable:           "\"%s\"",
+			QuoteField:            "\"%s\"",
+			QuoteTable:            "\"%s\"",
 		}
 		builder := NewSqlBuilder(dialect)
 
@@ -572,7 +572,7 @@ func TestUpdateBuilder_FieldsValues_Integration(t *testing.T) {
 		// Simulate partial profile update
 		fieldValues := map[string]any{
 			"name":     "John Updated",
-			"email":    "john.updated@example.com", 
+			"email":    "john.updated@example.com",
 			"category": "premium",
 		}
 

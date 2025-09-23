@@ -221,9 +221,9 @@ type HealthResponse struct {
 type SecureResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
-		Message     string                 `json:"message"`
-		ClientInfo  map[string]interface{} `json:"client_info"`
-		Timestamp   string                 `json:"timestamp"`
+		Message    string                 `json:"message"`
+		ClientInfo map[string]interface{} `json:"client_info"`
+		Timestamp  string                 `json:"timestamp"`
 	} `json:"data"`
 }
 
@@ -308,9 +308,9 @@ func runClientDemo(client *MTLSClient, logger *log.Logger) {
 		"message":   "Hello from Blueprint mTLS client!",
 		"timestamp": time.Now().Format(time.RFC3339),
 		"client_info": map[string]interface{}{
-			"version":     "1.0",
-			"language":    "Go",
-			"framework":   "Blueprint",
+			"version":   "1.0",
+			"language":  "Go",
+			"framework": "Blueprint",
 		},
 		"metrics": map[string]interface{}{
 			"cpu_usage":    42.5,
@@ -338,7 +338,7 @@ func runClientDemo(client *MTLSClient, logger *log.Logger) {
 		}
 	} else {
 		fmt.Printf("   Admin stats retrieved successfully\n")
-		fmt.Printf("   Active connections: %d, Memory: %d MB\n", 
+		fmt.Printf("   Active connections: %d, Memory: %d MB\n",
 			adminResp.Data.ActiveConnections, adminResp.Data.MemoryUsageMB)
 	}
 

@@ -211,12 +211,12 @@ func TestConstantTimeLessOrEq(t *testing.T) {
 
 func TestExtractNonceConstantTime(t *testing.T) {
 	data := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
-	
+
 	// Test normal case
 	nonce := extractNonceConstantTime(data, 12)
 	expected := data[:12]
 	assert.Equal(t, expected, nonce)
-	
+
 	// Test short data case
 	shortData := []byte{1, 2, 3}
 	nonce = extractNonceConstantTime(shortData, 12)

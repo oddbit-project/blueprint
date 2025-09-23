@@ -452,20 +452,20 @@ func TestEnvProvider_DefaultValues(t *testing.T) {
 		"TEST_PORT": "9090",
 		// DEBUG and TIMEOUT will use defaults
 	}
-	
+
 	setEnvVars(t, testVars)
 	defer resetEnvVars(testVars)
-	
+
 	cfg := NewEnvProvider("TEST_", false)
 	config := &ConfigWithDefaults{}
-	
+
 	err := cfg.Get(config)
 	require.NoError(t, err)
-	
+
 	// Check that env vars were used
 	assert.Equal(t, "custom.host", config.Host)
 	assert.Equal(t, 9090, config.Port)
-	
+
 	// Check that defaults were applied
 	assert.Equal(t, false, config.Debug)
 	assert.Equal(t, "30s", config.Timeout)

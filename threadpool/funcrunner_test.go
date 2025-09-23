@@ -207,14 +207,14 @@ func TestFuncRunner_ContextCancellation(t *testing.T) {
 
 		// If dispatch succeeded, wait for job to complete or timeout
 		time.Sleep(300 * time.Millisecond)
-		
+
 		mu.Lock()
 		defer mu.Unlock()
-		
+
 		// Either the job was cancelled OR it completed before timeout
 		// Both are valid depending on timing, but cancelled is more likely
 		require.True(t, cancelled || completed, "Job should have either completed or been cancelled")
-		
+
 		// If it completed, it means the timeout didn't work as expected
 		// If it was cancelled, the timeout worked correctly
 		if cancelled {
@@ -319,9 +319,9 @@ func TestFuncRunner_PerformanceAndLoad(t *testing.T) {
 		require.Eventually(t, func() bool {
 			return pool.GetRequestCount() == uint64(jobCount)
 		}, 100*time.Millisecond, 10*time.Millisecond, "expected request count to reach %d", jobCount)
-		
+
 		// Log performance for reference (not a strict requirement)
-		t.Logf("Processed %d jobs in %v (%.2f jobs/sec)", 
+		t.Logf("Processed %d jobs in %v (%.2f jobs/sec)",
 			jobCount, duration, float64(jobCount)/duration.Seconds())
 	})
 
@@ -406,7 +406,7 @@ func TestFuncRunner_Integration(t *testing.T) {
 		wg.Add(1)
 		parentJob := FuncRunner(func(ctx context.Context) {
 			defer wg.Done()
-			
+
 			// Create 3 child jobs
 			for i := 0; i < 3; i++ {
 				wg.Add(1)
@@ -445,7 +445,7 @@ func BenchmarkFuncRunner_Execution(b *testing.B) {
 		// Empty job
 	})
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		job.Run(ctx)
@@ -459,7 +459,7 @@ func BenchmarkFuncRunner_WithThreadPool(b *testing.B) {
 	defer pool.Stop()
 
 	var wg sync.WaitGroup
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		wg.Add(1)

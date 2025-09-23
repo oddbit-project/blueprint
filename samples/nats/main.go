@@ -101,14 +101,14 @@ func runProducer(ctx context.Context, url, subject string) {
 		select {
 		case <-ticker.C:
 			messageCount++
-			message := fmt.Sprintf("Blueprint NATS sample message #%d at %s", 
+			message := fmt.Sprintf("Blueprint NATS sample message #%d at %s",
 				messageCount, time.Now().Format(time.RFC3339))
-			
+
 			if err := producer.Publish([]byte(message)); err != nil {
 				logger.Error(err, "Failed to publish message", nil)
 				continue
 			}
-			
+
 			logger.Info("Published message", log.KV{
 				"count": messageCount,
 			})
