@@ -522,7 +522,7 @@ func TestGetRealIP(t *testing.T) {
 			req.RemoteAddr = tt.remoteIP
 			c.Request = req
 
-			ip := getRealIP(c)
+			ip := c.ClientIP()
 			if ip != tt.expected {
 				t.Errorf("Expected IP '%s', got '%s'", tt.expected, ip)
 			}

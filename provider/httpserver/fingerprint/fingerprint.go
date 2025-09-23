@@ -150,7 +150,7 @@ func (g *Generator) Generate(c *gin.Context) *DeviceFingerprint {
 
 	// IP Address
 	if g.config.IncludeIPAddress {
-		ipAddress := getRealIP(c)
+		ipAddress := c.ClientIP()
 		fingerprint.IPAddress = ipAddress
 
 		if g.config.UseIPSubnet {
@@ -315,26 +315,6 @@ func ValidateFingerprint(fp *DeviceFingerprint) error {
 	}
 
 	return nil
-}
-
-// getRealIP extracts the real IP address from the request
-func getRealIP(c *gin.Context) string {
-	// Check proxy headers in order of preference
-	if ip := c.GetHeader("X-Forwarded-For"); ip != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		if parts := strings.Split(ip, ","); len(parts) > 0 {
-			return strings.TrimSpace(parts[0])
-		}
-	}
-	if ip := c.GetHeader("X-Real-IP"); ip != "" {
-		return ip
-	}
-	if ip := c.GetHeader("X-Forwarded-IP"); ip != "" {
-		return ip
-	}
-
-	// Fall back to remote address
-	return c.ClientIP()
 }
 
 // calculateIPSubnet calculates the subnet for an IP address

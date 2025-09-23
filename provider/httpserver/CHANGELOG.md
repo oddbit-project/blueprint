@@ -4,6 +4,15 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.2]
+
+### Added
+- TrustedProxies config parameter
+- ServerConfig GetUrl() helper
+
+### Changed 
+- Fingerprint ip detection changed from custom function to gin-tonic function
+
 ## [v0.8.1]
 
 ### Added
