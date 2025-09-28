@@ -3,16 +3,18 @@ package kafka
 import (
 	"context"
 	"errors"
+	"io"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/segmentio/kafka-go"
 	"github.com/segmentio/kafka-go/sasl/plain"
 	"github.com/segmentio/kafka-go/sasl/scram"
-	"io"
-	"slices"
-	"strings"
-	"time"
 )
 
 // ConsumerOptions additional consumer options
@@ -57,12 +59,14 @@ type Message = kafka.Message
 type ConsumerFunc func(ctx context.Context, message Message) error
 
 type Consumer struct {
-	Brokers string
-	Group   string
-	Topic   string
-	config  *kafka.ReaderConfig
-	Reader  *kafka.Reader
-	Logger  *log.Logger
+	Brokers        string
+	Group          string
+	Topic          string
+	config         *kafka.ReaderConfig
+	Reader         *kafka.Reader
+	Logger         *log.Logger
+	subscribeMutex sync.Mutex
+	activeReaders  sync.WaitGroup
 }
 
 // ApplyOptions set ReaderConfig additional parameters
@@ -290,53 +294,70 @@ func (c *Consumer) Rewind() error {
 
 // Connect to Kafka broker
 func (c *Consumer) Connect() {
+	c.subscribeMutex.Lock()
+	defer c.subscribeMutex.Unlock()
 	c.Reader = kafka.NewReader(*c.config)
 }
 
 // Disconnect Diconnect from kafka
 func (c *Consumer) Disconnect() {
-	if c.Reader != nil {
-		c.Logger.Info("Closing reader")
-		c.Reader.Close()
-		c.Reader = nil
+	c.subscribeMutex.Lock()
+	reader := c.Reader
+	c.Reader = nil
+	c.subscribeMutex.Unlock()
+
+	if reader != nil {
+		c.Logger.Info("Closing Kafka reader")
+		reader.Close()
+
+		c.Logger.Info("Waiting for active subscriptions to complete")
+		c.activeReaders.Wait()
+
+		c.Logger.Info("All subscriptions closed successfully")
 	}
 }
 
 // IsConnected Returns true if Reader was initialized
 func (c *Consumer) IsConnected() bool {
+	c.subscribeMutex.Lock()
+	defer c.subscribeMutex.Unlock()
 	return c.Reader != nil
 }
 
 // Subscribe consumes a message from a topic using a handler
 // Note: this function is blocking
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
+	c.subscribeMutex.Lock()
 
-	if !c.IsConnected() {
+	if c.Reader == nil {
 		c.Logger.Info("Connecting to Kafka consumer before subscription", nil)
-		c.Connect()
+		c.Reader = kafka.NewReader(*c.config)
 	}
 
+	c.activeReaders.Add(1)
+	reader := c.Reader
+	c.subscribeMutex.Unlock()
+
+	defer c.activeReaders.Done()
+
 	c.Logger.Info("Starting Kafka message subscription", nil)
-	defer c.Reader.Close()
 
 	for {
-		msg, err := c.Reader.ReadMessage(ctx)
+		msg, err := reader.ReadMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.EOF) {
-				c.Logger.Info("Kafka consumer received EOF, ignoring...")
-			} else {
-				c.Logger.Error(err, "Error reading Kafka message", nil)
-				return err
+			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
+				return nil
 			}
+			c.Logger.Error(err, "Error reading Kafka message", nil)
+			return err
 		}
 
-		// Process message with handler
-		// Note: if logging of messages is required, it should be implemented inside the handler
-		if err := handler(ctx, msg); err != nil {
+		if err = handler(ctx, msg); err != nil {
 			c.Logger.Error(err, "Handler error processing Kafka message", log.KV{
 				"topic":     msg.Topic,
 				"partition": msg.Partition,
@@ -352,33 +373,42 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 // If there is no message available, it will block until a message is available
 // If an error occurs, it will be returned
 func (c *Consumer) ReadMessage(ctx context.Context) (Message, error) {
-	if !c.IsConnected() {
-		c.Connect()
+	c.subscribeMutex.Lock()
+	if c.Reader == nil {
+		c.Reader = kafka.NewReader(*c.config)
 	}
-	return c.Reader.ReadMessage(ctx)
+	reader := c.Reader
+	c.subscribeMutex.Unlock()
+	return reader.ReadMessage(ctx)
 }
 
 // ChannelSubscribe subscribes to a reader handler by channel
 // Note: This function is blocking
 func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error {
-	if !c.IsConnected() {
-		c.Connect()
+	c.subscribeMutex.Lock()
+
+	if c.Reader == nil {
+		c.Reader = kafka.NewReader(*c.config)
 	}
-	defer c.Reader.Close()
+
+	c.activeReaders.Add(1)
+	reader := c.Reader
+	c.subscribeMutex.Unlock()
+
+	defer c.activeReaders.Done()
 
 	for {
-		msg, err := c.Reader.ReadMessage(ctx)
+		msg, err := reader.ReadMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
-				// clean exit
 				return nil
 			}
-			if errors.Is(err, io.EOF) {
-				c.Logger.Info("Kafka consumer received EOF, ignoring...")
-			} else {
-				return err
+			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
+				return nil
 			}
+			return err
 		}
 		ch <- msg
 	}
@@ -387,23 +417,30 @@ func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error 
 // SubscribeWithOffsets manages a reader handler that explicitly commits offsets
 // Note: this function is blocking
 func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFunc) error {
-	if !c.IsConnected() {
-		c.Connect()
+	c.subscribeMutex.Lock()
+
+	if c.Reader == nil {
+		c.Reader = kafka.NewReader(*c.config)
 	}
-	defer c.Reader.Close()
+
+	c.activeReaders.Add(1)
+	reader := c.Reader
+	c.subscribeMutex.Unlock()
+
+	defer c.activeReaders.Done()
+
 	for {
-		msg, err := c.Reader.FetchMessage(ctx)
+		msg, err := reader.FetchMessage(ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
-				// clean exit
 				return nil
 			}
-			if errors.Is(err, io.EOF) {
-				c.Logger.Info("Kafka consumer received EOF, ignoring...")
-			} else {
-				return err
+			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
+				return nil
 			}
+			return err
 		}
 		if err := handler(ctx, msg); err != nil {
 			return err
