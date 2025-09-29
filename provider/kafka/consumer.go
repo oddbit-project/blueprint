@@ -47,7 +47,7 @@ type ConsumerConfig struct {
 	Group                          string `json:"group"`    // Group consumer group, if not specified will use specified partition
 	AuthType                       string `json:"authType"` // AuthType to use, one of "none", "plain", "scram256", "scram512"
 	Username                       string `json:"username"` // Username optional username
-	secure.DefaultCredentialConfig        // optional password
+	secure.DefaultCredentialConfig                          // optional password
 	tlsProvider.ClientConfig
 	ConsumerOptions
 }
@@ -181,7 +181,7 @@ func (c ConsumerConfig) Validate() error {
 	}
 
 	if len(c.IsolationLevel) > 0 {
-		if !slices.Contains([]string{"uncommitted", "committed"}, c.StartOffset) {
+		if !slices.Contains([]string{"uncommitted", "committed"}, c.IsolationLevel) {
 			return ErrInvalidIsolationLevel
 		}
 	}
@@ -445,5 +445,6 @@ func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFun
 		if err := handler(ctx, msg); err != nil {
 			return err
 		}
+		reader.CommitMessages(ctx, msg)
 	}
 }
