@@ -94,6 +94,10 @@ func (k *KafkaIntegrationTestSuite) purgeTopic(producerCfg *ProducerConfig) {
 	defer cancel()
 
 	admin, err := NewAdmin(cfg, nil)
+	require.NoError(k.T(), err, "Failed to create Kafka admin")
+
+	// Connect to Kafka admin
+	err = admin.Connect(ctx)
 	require.NoError(k.T(), err, "Failed to connect to Kafka admin")
 	defer admin.Disconnect()
 

@@ -7,8 +7,6 @@ import (
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/segmentio/kafka-go"
-	"github.com/segmentio/kafka-go/sasl/plain"
-	"github.com/segmentio/kafka-go/sasl/scram"
 	"slices"
 	"strings"
 	"time"
@@ -107,16 +105,8 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		return nil, err
 	}
 
-	var key []byte
-	var credential *secure.Credential
-	var password string
-	var err error
-
-	key, err = secure.GenerateKey()
+	password, credential, err := setupCredentials(cfg.DefaultCredentialConfig)
 	if err != nil {
-		return nil, err
-	}
-	if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
 		return nil, err
 	}
 
@@ -124,28 +114,12 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		DialTimeout: DefaultTimeout,
 	}
 
-	password, err = credential.Get()
+	saslMechanism, err := createSASLMechanism(cfg.AuthType, cfg.Username, password)
 	if err != nil {
 		return nil, err
 	}
-	switch cfg.AuthType {
-	case AuthTypePlain:
-		transport.SASL = plain.Mechanism{
-			Username: cfg.Username,
-			Password: password,
-		}
-	case AuthTypeScram256:
-		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, password); err != nil {
-			return nil, err
-		} else {
-			transport.SASL = sasl
-		}
-	case AuthTypeScram512:
-		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, password); err != nil {
-			return nil, err
-		} else {
-			transport.SASL = sasl
-		}
+	if saslMechanism != nil {
+		transport.SASL = saslMechanism
 	}
 
 	if tls, err := cfg.TLSConfig(); err != nil {

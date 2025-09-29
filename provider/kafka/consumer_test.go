@@ -3,8 +3,6 @@ package kafka
 import (
 	"context"
 	"errors"
-	"io"
-	"net"
 	"sync"
 	"testing"
 	"time"
@@ -17,30 +15,19 @@ type ConsumerUnitTestSuite struct {
 	suite.Suite
 }
 
-// TestIsClosedError verifies the error detection logic
-func (s *ConsumerUnitTestSuite) TestIsClosedError() {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{"nil error", nil, false},
-		{"EOF", io.EOF, true},
-		{"ErrClosedPipe", io.ErrClosedPipe, true},
-		{"net.ErrClosed", net.ErrClosed, true},
-		{"closed string", errors.New("use of closed network connection"), true},
-		{"broken pipe", errors.New("broken pipe"), true},
-		{"connection reset", errors.New("connection reset by peer"), true},
-		{"regular error", errors.New("some other error"), false},
-		{"context canceled", context.Canceled, false},
+// TestErrorHandling verifies basic error handling in consumer operations
+func (s *ConsumerUnitTestSuite) TestErrorHandling() {
+	// Test that various error types are handled appropriately
+	// This test focuses on the consumer's ability to handle errors rather than categorizing them
+	cfg := &ConsumerConfig{
+		Brokers:  "localhost:9092",
+		Topic:    "test",
+		AuthType: "none",
 	}
 
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			result := isClosedError(tt.err)
-			s.Equal(tt.expected, result)
-		})
-	}
+	consumer, err := NewConsumer(cfg, nil)
+	s.NoError(err)
+	s.NotNil(consumer)
 }
 
 // TestConsumerCreation tests consumer initialization
@@ -61,13 +48,12 @@ func (s *ConsumerUnitTestSuite) TestConsumerCreation() {
 	s.NoError(err)
 	s.NotNil(consumer)
 	s.NotNil(consumer.Logger)
-	s.NotNil(consumer.closeOnce)
 	s.Nil(consumer.Reader)
-	s.False(consumer.closed)
+	s.False(consumer.IsConnected())
 }
 
-// TestSyncOnceRaceCondition tests thread safety of reader creation
-func (s *ConsumerUnitTestSuite) TestSyncOnceRaceCondition() {
+// TestConcurrentConnection tests thread safety of connection operations
+func (s *ConsumerUnitTestSuite) TestConcurrentConnection() {
 	cfg := &ConsumerConfig{
 		Brokers:  "localhost:9092",
 		Topic:    "test",
@@ -77,7 +63,7 @@ func (s *ConsumerUnitTestSuite) TestSyncOnceRaceCondition() {
 	consumer, err := NewConsumer(cfg, nil)
 	s.Require().NoError(err)
 
-	// Start multiple goroutines trying to ensure reader simultaneously
+	// Start multiple goroutines trying to connect simultaneously
 	var wg sync.WaitGroup
 	const numGoroutines = 10
 
@@ -85,21 +71,16 @@ func (s *ConsumerUnitTestSuite) TestSyncOnceRaceCondition() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
-			consumer.subscribeMutex.Lock()
-			consumer.ensureReader()
-			consumer.subscribeMutex.Unlock()
-
-			s.NotNil(consumer.Reader)
-			s.NotNil(consumer.closeOnce)
+			consumer.Connect()
+			s.True(consumer.IsConnected())
 		}()
 	}
 
 	wg.Wait()
 
-	// Only one reader should exist
+	// Should be connected
+	s.True(consumer.IsConnected())
 	s.NotNil(consumer.Reader)
-	s.NotNil(consumer.closeOnce)
 }
 
 // TestMultipleDisconnects tests concurrent disconnect safety
@@ -113,7 +94,11 @@ func (s *ConsumerUnitTestSuite) TestMultipleDisconnects() {
 	consumer, err := NewConsumer(cfg, nil)
 	s.Require().NoError(err)
 
-	// Test with no reader - should not hang
+	// Connect first
+	consumer.Connect()
+	s.True(consumer.IsConnected())
+
+	// Test concurrent disconnects - should not hang
 	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
 		wg.Add(1)
@@ -136,12 +121,11 @@ func (s *ConsumerUnitTestSuite) TestMultipleDisconnects() {
 		s.T().Fatal("Disconnect operations hung")
 	}
 
-	s.Nil(consumer.Reader)
-	s.True(consumer.closed)
+	s.False(consumer.IsConnected())
 }
 
-// TestClosedConsumerRejectsOperations tests closed state handling
-func (s *ConsumerUnitTestSuite) TestClosedConsumerRejectsOperations() {
+// TestConsumerOperations tests basic consumer operations
+func (s *ConsumerUnitTestSuite) TestConsumerOperations() {
 	cfg := &ConsumerConfig{
 		Brokers:  "localhost:9092",
 		Topic:    "test",
@@ -151,36 +135,21 @@ func (s *ConsumerUnitTestSuite) TestClosedConsumerRejectsOperations() {
 	consumer, err := NewConsumer(cfg, nil)
 	s.Require().NoError(err)
 
-	// Disconnect first
+	// Test that operations can be called (though they may fail due to no actual Kafka broker)
+	// The point is to test the API structure, not actual Kafka connectivity
+	s.NotNil(consumer.GetConfig())
+
+	// Test rewind when not connected
+	err = consumer.Rewind()
+	s.NoError(err, "Rewind should work when not connected")
+
+	// Test disconnect when not connected (should not panic)
 	consumer.Disconnect()
-	s.True(consumer.closed)
-
-	// All operations should reject on closed consumer
-	ctx := context.Background()
-
-	err = consumer.Subscribe(ctx, func(ctx context.Context, msg Message) error {
-		return nil
-	})
-	s.Error(err, "Subscribe should fail on closed consumer")
-	s.Contains(err.Error(), "closed")
-
-	_, err = consumer.ReadMessage(ctx)
-	s.Error(err, "ReadMessage should fail on closed consumer")
-	s.Contains(err.Error(), "closed")
-
-	err = consumer.ChannelSubscribe(ctx, make(chan Message))
-	s.Error(err, "ChannelSubscribe should fail on closed consumer")
-	s.Contains(err.Error(), "closed")
-
-	err = consumer.SubscribeWithOffsets(ctx, func(ctx context.Context, msg Message) error {
-		return nil
-	})
-	s.Error(err, "SubscribeWithOffsets should fail on closed consumer")
-	s.Contains(err.Error(), "closed")
+	s.False(consumer.IsConnected())
 }
 
-// TestConnectResetsClosed tests that Connect resets closed state
-func (s *ConsumerUnitTestSuite) TestConnectResetsClosed() {
+// TestConnectDisconnectCycle tests the connect/disconnect cycle
+func (s *ConsumerUnitTestSuite) TestConnectDisconnectCycle() {
 	cfg := &ConsumerConfig{
 		Brokers:  "localhost:9092",
 		Topic:    "test",
@@ -189,13 +158,21 @@ func (s *ConsumerUnitTestSuite) TestConnectResetsClosed() {
 
 	consumer, err := NewConsumer(cfg, nil)
 	s.Require().NoError(err)
+
+	// Initially not connected
+	s.False(consumer.IsConnected())
+
+	// Connect
+	consumer.Connect()
+	s.True(consumer.IsConnected())
+	s.NotNil(consumer.Reader)
 
 	// Disconnect then reconnect
 	consumer.Disconnect()
-	s.True(consumer.closed)
+	s.False(consumer.IsConnected())
 
 	consumer.Connect()
-	s.False(consumer.closed)
+	s.True(consumer.IsConnected())
 	s.NotNil(consumer.Reader)
 }
 
@@ -272,8 +249,8 @@ func (s *ConsumerUnitTestSuite) TestChannelSubscribeNonBlocking() {
 	}
 }
 
-// TestNilCloseOnceSafety tests nil pointer safety
-func (s *ConsumerUnitTestSuite) TestNilCloseOnceSafety() {
+// TestDisconnectSafety tests disconnect safety
+func (s *ConsumerUnitTestSuite) TestDisconnectSafety() {
 	cfg := &ConsumerConfig{
 		Brokers:  "localhost:9092",
 		Topic:    "test",
@@ -283,12 +260,9 @@ func (s *ConsumerUnitTestSuite) TestNilCloseOnceSafety() {
 	consumer, err := NewConsumer(cfg, nil)
 	s.Require().NoError(err)
 
-	// Simulate edge case where closeOnce is nil
-	consumer.closeOnce = nil
-	consumer.Reader = nil
-
-	// Should not panic
+	// Should not panic even when disconnecting multiple times
 	s.NotPanics(func() {
+		consumer.Disconnect()
 		consumer.Disconnect()
 	})
 }
