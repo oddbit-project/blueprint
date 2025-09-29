@@ -145,9 +145,7 @@ func (c ConsumerConfig) ApplyOptions(r *kafka.ReaderConfig) {
 		r.PartitionWatchInterval = time.Duration(c.PartitionWatchInterval) * time.Millisecond
 	}
 
-	if !c.WatchPartitionChanges {
-		r.WatchPartitionChanges = false
-	}
+	r.WatchPartitionChanges = c.WatchPartitionChanges
 
 	if c.JoinGroupBackoff > 0 {
 		r.JoinGroupBackoff = time.Duration(c.JoinGroupBackoff) * time.Millisecond
@@ -318,6 +316,13 @@ func (c *Consumer) IsConnected() bool {
 // Subscribe consumes a message from a topic using a handler
 // Note: this function is blocking
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	if handler == nil {
+		return ErrNilHandler
+	}
+
 	c.subscribeMutex.Lock()
 
 	if c.Reader == nil {
@@ -340,7 +345,7 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
 			}
@@ -364,18 +369,32 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 // If there is no message available, it will block until a message is available
 // If an error occurs, it will be returned
 func (c *Consumer) ReadMessage(ctx context.Context) (Message, error) {
+	if ctx == nil {
+		return Message{}, ErrNilContext
+	}
+
 	c.subscribeMutex.Lock()
 	if c.Reader == nil {
 		c.Reader = kafka.NewReader(*c.config)
 	}
+	c.activeReaders.Add(1)
 	reader := c.Reader
 	c.subscribeMutex.Unlock()
+
+	defer c.activeReaders.Done()
 	return reader.ReadMessage(ctx)
 }
 
 // ChannelSubscribe subscribes to a reader handler by channel
 // Note: This function is blocking
 func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	if ch == nil {
+		return ErrNilChannel
+	}
+
 	c.subscribeMutex.Lock()
 
 	if c.Reader == nil {
@@ -395,19 +414,33 @@ func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error 
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
 			}
+			c.Logger.Error(err, "Error reading Kafka message in channel subscription", nil)
 			return err
 		}
-		ch <- msg
+		select {
+		case ch <- msg:
+			// Message sent successfully
+		case <-ctx.Done():
+			c.Logger.Info("Channel subscription context canceled while sending message", nil)
+			return nil
+		}
 	}
 }
 
 // SubscribeWithOffsets manages a reader handler that explicitly commits offsets
 // Note: this function is blocking
 func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFunc) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	if handler == nil {
+		return ErrNilHandler
+	}
+
 	c.subscribeMutex.Lock()
 
 	if c.Reader == nil {
@@ -427,15 +460,28 @@ func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFun
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
 			}
+			c.Logger.Error(err, "Error fetching Kafka message in offset subscription", nil)
 			return err
 		}
 		if err := handler(ctx, msg); err != nil {
+			c.Logger.Error(err, "Handler error processing Kafka message in offset subscription", log.KV{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+			})
 			return err
 		}
-		reader.CommitMessages(ctx, msg)
+		if err := reader.CommitMessages(ctx, msg); err != nil {
+			c.Logger.Error(err, "Failed to commit Kafka message", log.KV{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+			})
+			return err
+		}
 	}
 }

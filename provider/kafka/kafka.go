@@ -25,6 +25,9 @@ const (
 	ErrMissingAdminBroker = utils.Error("Missing Admin broker address")
 	ErrAdminNotConnected  = utils.Error("Admin not connected - call Connect() first")
 	ErrNilConfig          = utils.Error("Config is nil")
+	ErrNilHandler         = utils.Error("Handler function cannot be nil")
+	ErrNilChannel         = utils.Error("Channel cannot be nil")
+	ErrNilContext         = utils.Error("Context cannot be nil")
 
 	AuthTypeNone     = "none"
 	AuthTypePlain    = "plain"
