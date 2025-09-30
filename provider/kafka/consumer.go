@@ -347,6 +347,7 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
+
 			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
@@ -416,6 +417,7 @@ func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error 
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
+
 			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
@@ -467,6 +469,7 @@ func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFun
 				return nil
 			}
 			c.Logger.Error(err, "Error fetching Kafka message in offset subscription", nil)
+
 			return err
 		}
 		if err := handler(ctx, msg); err != nil {

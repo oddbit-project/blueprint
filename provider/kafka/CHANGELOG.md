@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Duplicate authentication setup code from individual Consumer, Producer, and Admin constructors
 - Redundant credential management patterns across components
 
+
 ## [v0.8.1]
 
 ### Fixed
