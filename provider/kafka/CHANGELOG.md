@@ -41,7 +41,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Removed
 - Duplicate authentication setup code from individual Consumer, Producer, and Admin constructors
 - Redundant credential management patterns across components
-- Test dependencies on missing functionality (`isClosedError`, `closeOnce`, `closed` fields, `ensureReader` method)
 
 ## [v0.8.1]
 
