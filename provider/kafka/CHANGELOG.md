@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Enhanced parameter validation**: Added nil checks for context, handler functions, and channels in all Consumer subscription methods
 - **New error constants**: Added `ErrNilHandler`, `ErrNilChannel`, and `ErrNilContext` for better error reporting
 - **Improved error handling**: Enhanced error logging with structured context information for better debugging
+- **New test coverage**: Added `TestIsolationLevelConfiguration` unit test for isolation level validation
+- **New test coverage**: Added `TestAdminListTopicsDeduplication` integration test for multi-partition topic handling
 
 ### Changed
 - **Code refactoring for improved maintainability**: Extracted duplicate authentication logic into shared `createSASLMechanism()` function
@@ -20,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Better channel handling**: Added graceful context cancellation handling in `ChannelSubscribe` to prevent blocking on channel sends
 
 ### Fixed
+- **Memory leak in Admin.NewAdmin()**: Fixed missing `credential.Clear()` call that left sensitive password data in memory (admin.go:70)
+- **Duplicate topics in Admin.ListTopics()**: Fixed topic deduplication issue where topics with multiple partitions appeared multiple times in the list; now uses map-based deduplication (admin.go:127-134)
+- **Incomplete isolation level handling**: Fixed consumer configuration to properly handle "committed" isolation level; previously only "uncommitted" was handled (consumer.go:170-171)
+- **Inconsistent error logging in Producer.WriteMulti()**: Added error logging to match the logging behavior of other producer methods (producer.go:213)
 - **Offset commit error handling**: Fixed `SubscribeWithOffsets` to properly handle and log commit errors instead of silently ignoring them
 - **Thread safety improvements**: Enhanced `ReadMessage` method with proper reader lifecycle management using WaitGroup
 - **Graceful shutdown**: Improved error detection for closed readers across all subscription methods

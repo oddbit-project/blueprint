@@ -522,6 +522,69 @@ func (s *ConsumerIntegrationTestSuite) TestMultipleSubscribers() {
 	s.Greater(processed, 0)
 }
 
+// TestIsolationLevelConfiguration tests that isolation level is properly configured
+func (s *ConsumerUnitTestSuite) TestIsolationLevelConfiguration() {
+	tests := []struct {
+		name           string
+		isolationLevel string
+		shouldError    bool
+	}{
+		{
+			name:           "ReadCommitted isolation level",
+			isolationLevel: "committed",
+			shouldError:    false,
+		},
+		{
+			name:           "ReadUncommitted isolation level",
+			isolationLevel: "uncommitted",
+			shouldError:    false,
+		},
+		{
+			name:           "Empty isolation level (default)",
+			isolationLevel: "",
+			shouldError:    false,
+		},
+		{
+			name:           "Invalid isolation level",
+			isolationLevel: "invalid",
+			shouldError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfg := &ConsumerConfig{
+				Brokers:  "localhost:9092",
+				Topic:    "test",
+				AuthType: "none",
+				ConsumerOptions: ConsumerOptions{
+					IsolationLevel: tt.isolationLevel,
+				},
+			}
+
+			consumer, err := NewConsumer(cfg, nil)
+			if tt.shouldError {
+				s.Error(err, "Expected error for isolation level: %s", tt.isolationLevel)
+				s.Nil(consumer)
+			} else {
+				s.NoError(err, "Should not error for isolation level: %s", tt.isolationLevel)
+				s.NotNil(consumer)
+
+				// Verify the config was applied correctly
+				readerCfg := consumer.GetConfig()
+				s.NotNil(readerCfg)
+
+				// Check that the isolation level was set (if specified)
+				if tt.isolationLevel == "committed" {
+					s.Equal(int(1), int(readerCfg.IsolationLevel), "IsolationLevel should be ReadCommitted (1)")
+				} else if tt.isolationLevel == "uncommitted" {
+					s.Equal(int(0), int(readerCfg.IsolationLevel), "IsolationLevel should be ReadUncommitted (0)")
+				}
+			}
+		})
+	}
+}
+
 // TestConsumerUnitTests runs the unit test suite
 func TestConsumerUnitTests(t *testing.T) {
 	suite.Run(t, new(ConsumerUnitTestSuite))

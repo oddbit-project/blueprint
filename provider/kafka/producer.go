@@ -210,6 +210,7 @@ func (p *Producer) Write(ctx context.Context, value []byte) error {
 // WriteMulti Write multiple messages to Topic
 func (p *Producer) WriteMulti(ctx context.Context, values ...[]byte) error {
 	if p.Writer == nil {
+		p.Logger.Error(ErrProducerClosed, "Failed to write messages - producer closed", nil)
 		return ErrProducerClosed
 	}
 	ml := make([]kafka.Message, len(values))

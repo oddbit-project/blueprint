@@ -42,7 +42,7 @@ func NewAdmin(cfg *AdminConfig, logger *log.Logger) (*Admin, error) {
 		return nil, err
 	}
 
-	password, _, err := setupCredentials(cfg.DefaultCredentialConfig)
+	password, credential, err := setupCredentials(cfg.DefaultCredentialConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +64,10 @@ func NewAdmin(cfg *AdminConfig, logger *log.Logger) (*Admin, error) {
 	} else {
 		dialer.TLS = tls
 	}
+
+	// remove credential from memory
+	// it still exists in the dialer configuration
+	credential.Clear()
 
 	if logger == nil {
 		logger = NewAdminLogger(cfg.Brokers)
@@ -119,9 +123,14 @@ func (c *Admin) ListTopics(ctx context.Context) ([]string, error) {
 		c.Logger.Error(err, "failed to read partitions")
 		return nil, err
 	} else {
-		topics := make([]string, len(partitions))
-		for i, v := range partitions {
-			topics[i] = v.Topic
+		// Use map to deduplicate topics (multiple partitions per topic)
+		topicMap := make(map[string]struct{})
+		for _, v := range partitions {
+			topicMap[v.Topic] = struct{}{}
+		}
+		topics := make([]string, 0, len(topicMap))
+		for topic := range topicMap {
+			topics = append(topics, topic)
 		}
 		return topics, nil
 	}

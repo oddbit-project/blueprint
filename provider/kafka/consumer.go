@@ -167,6 +167,8 @@ func (c ConsumerConfig) ApplyOptions(r *kafka.ReaderConfig) {
 		switch c.IsolationLevel {
 		case "uncommitted":
 			r.IsolationLevel = kafka.ReadUncommitted
+		case "committed":
+			r.IsolationLevel = kafka.ReadCommitted
 		}
 	}
 }
