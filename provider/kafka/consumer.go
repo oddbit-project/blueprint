@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"slices"
 	"strings"
 	"sync"
@@ -13,8 +14,6 @@ import (
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/segmentio/kafka-go"
-	"github.com/segmentio/kafka-go/sasl/plain"
-	"github.com/segmentio/kafka-go/sasl/scram"
 )
 
 // ConsumerOptions additional consumer options
@@ -47,7 +46,7 @@ type ConsumerConfig struct {
 	Group                          string `json:"group"`    // Group consumer group, if not specified will use specified partition
 	AuthType                       string `json:"authType"` // AuthType to use, one of "none", "plain", "scram256", "scram512"
 	Username                       string `json:"username"` // Username optional username
-	secure.DefaultCredentialConfig        // optional password
+	secure.DefaultCredentialConfig                          // optional password
 	tlsProvider.ClientConfig
 	ConsumerOptions
 }
@@ -57,6 +56,22 @@ type Message = kafka.Message
 
 // ConsumerFunc Reader handler type
 type ConsumerFunc func(ctx context.Context, message Message) error
+
+// isClosedError checks if an error indicates a closed connection
+func isClosedError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
+		return true
+	}
+
+	errStr := err.Error()
+	return strings.Contains(errStr, "use of closed network connection") ||
+		   strings.Contains(errStr, "broken pipe") ||
+		   strings.Contains(errStr, "connection reset by peer")
+}
 
 type Consumer struct {
 	Brokers        string
@@ -130,9 +145,7 @@ func (c ConsumerConfig) ApplyOptions(r *kafka.ReaderConfig) {
 		r.PartitionWatchInterval = time.Duration(c.PartitionWatchInterval) * time.Millisecond
 	}
 
-	if !c.WatchPartitionChanges {
-		r.WatchPartitionChanges = false
-	}
+	r.WatchPartitionChanges = c.WatchPartitionChanges
 
 	if c.JoinGroupBackoff > 0 {
 		r.JoinGroupBackoff = time.Duration(c.JoinGroupBackoff) * time.Millisecond
@@ -154,6 +167,8 @@ func (c ConsumerConfig) ApplyOptions(r *kafka.ReaderConfig) {
 		switch c.IsolationLevel {
 		case "uncommitted":
 			r.IsolationLevel = kafka.ReadUncommitted
+		case "committed":
+			r.IsolationLevel = kafka.ReadCommitted
 		}
 	}
 }
@@ -181,7 +196,7 @@ func (c ConsumerConfig) Validate() error {
 	}
 
 	if len(c.IsolationLevel) > 0 {
-		if !slices.Contains([]string{"uncommitted", "committed"}, c.StartOffset) {
+		if !slices.Contains([]string{"uncommitted", "committed"}, c.IsolationLevel) {
 			return ErrInvalidIsolationLevel
 		}
 	}
@@ -198,16 +213,8 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		return nil, err
 	}
 
-	var key []byte
-	var credential *secure.Credential
-	var password string
-	var err error
-
-	key, err = secure.GenerateKey()
+	password, credential, err := setupCredentials(cfg.DefaultCredentialConfig)
 	if err != nil {
-		return nil, err
-	}
-	if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
 		return nil, err
 	}
 
@@ -216,28 +223,12 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		Timeout:   DefaultTimeout,
 	}
 
-	password, err = credential.Get()
+	saslMechanism, err := createSASLMechanism(cfg.AuthType, cfg.Username, password)
 	if err != nil {
 		return nil, err
 	}
-	switch cfg.AuthType {
-	case AuthTypePlain:
-		dialer.SASLMechanism = plain.Mechanism{
-			Username: cfg.Username,
-			Password: password,
-		}
-	case AuthTypeScram256:
-		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, password); err != nil {
-			return nil, err
-		} else {
-			dialer.SASLMechanism = sasl
-		}
-	case AuthTypeScram512:
-		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, password); err != nil {
-			return nil, err
-		} else {
-			dialer.SASLMechanism = sasl
-		}
+	if saslMechanism != nil {
+		dialer.SASLMechanism = saslMechanism
 	}
 
 	if tls, err := cfg.TLSConfig(); err != nil {
@@ -327,6 +318,13 @@ func (c *Consumer) IsConnected() bool {
 // Subscribe consumes a message from a topic using a handler
 // Note: this function is blocking
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	if handler == nil {
+		return ErrNilHandler
+	}
+
 	c.subscribeMutex.Lock()
 
 	if c.Reader == nil {
@@ -349,7 +347,8 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+
+			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
 			}
@@ -373,18 +372,32 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 // If there is no message available, it will block until a message is available
 // If an error occurs, it will be returned
 func (c *Consumer) ReadMessage(ctx context.Context) (Message, error) {
+	if ctx == nil {
+		return Message{}, ErrNilContext
+	}
+
 	c.subscribeMutex.Lock()
 	if c.Reader == nil {
 		c.Reader = kafka.NewReader(*c.config)
 	}
+	c.activeReaders.Add(1)
 	reader := c.Reader
 	c.subscribeMutex.Unlock()
+
+	defer c.activeReaders.Done()
 	return reader.ReadMessage(ctx)
 }
 
 // ChannelSubscribe subscribes to a reader handler by channel
 // Note: This function is blocking
 func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	if ch == nil {
+		return ErrNilChannel
+	}
+
 	c.subscribeMutex.Lock()
 
 	if c.Reader == nil {
@@ -404,19 +417,34 @@ func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan Message) error 
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+
+			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
 			}
+			c.Logger.Error(err, "Error reading Kafka message in channel subscription", nil)
 			return err
 		}
-		ch <- msg
+		select {
+		case ch <- msg:
+			// Message sent successfully
+		case <-ctx.Done():
+			c.Logger.Info("Channel subscription context canceled while sending message", nil)
+			return nil
+		}
 	}
 }
 
 // SubscribeWithOffsets manages a reader handler that explicitly commits offsets
 // Note: this function is blocking
 func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFunc) error {
+	if ctx == nil {
+		return ErrNilContext
+	}
+	if handler == nil {
+		return ErrNilHandler
+	}
+
 	c.subscribeMutex.Lock()
 
 	if c.Reader == nil {
@@ -436,13 +464,28 @@ func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerFun
 				c.Logger.Info("Kafka subscription context canceled, shutting down gracefully", nil)
 				return nil
 			}
-			if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.EOF) {
+			if isClosedError(err) {
 				c.Logger.Info("Kafka reader closed, shutting down gracefully", nil)
 				return nil
 			}
+			c.Logger.Error(err, "Error fetching Kafka message in offset subscription", nil)
+
 			return err
 		}
 		if err := handler(ctx, msg); err != nil {
+			c.Logger.Error(err, "Handler error processing Kafka message in offset subscription", log.KV{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+			})
+			return err
+		}
+		if err := reader.CommitMessages(ctx, msg); err != nil {
+			c.Logger.Error(err, "Failed to commit Kafka message", log.KV{
+				"topic":     msg.Topic,
+				"partition": msg.Partition,
+				"offset":    msg.Offset,
+			})
 			return err
 		}
 	}

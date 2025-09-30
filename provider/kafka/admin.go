@@ -6,8 +6,6 @@ import (
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/segmentio/kafka-go"
-	"github.com/segmentio/kafka-go/sasl/plain"
-	"github.com/segmentio/kafka-go/sasl/scram"
 	"slices"
 )
 
@@ -44,16 +42,8 @@ func NewAdmin(cfg *AdminConfig, logger *log.Logger) (*Admin, error) {
 		return nil, err
 	}
 
-	var key []byte
-	var credential *secure.Credential
-	var password string
-	var err error
-
-	key, err = secure.GenerateKey()
+	password, credential, err := setupCredentials(cfg.DefaultCredentialConfig)
 	if err != nil {
-		return nil, err
-	}
-	if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
 		return nil, err
 	}
 
@@ -62,35 +52,22 @@ func NewAdmin(cfg *AdminConfig, logger *log.Logger) (*Admin, error) {
 		Timeout:   DefaultTimeout,
 	}
 
-	password, err = credential.Get()
+	saslMechanism, err := createSASLMechanism(cfg.AuthType, cfg.Username, password)
 	if err != nil {
 		return nil, err
 	}
-
-	switch cfg.AuthType {
-	case AuthTypePlain:
-		dialer.SASLMechanism = plain.Mechanism{
-			Username: cfg.Username,
-			Password: password,
-		}
-	case AuthTypeScram256:
-		if sasl, err := scram.Mechanism(scram.SHA256, cfg.Username, password); err != nil {
-			return nil, err
-		} else {
-			dialer.SASLMechanism = sasl
-		}
-	case AuthTypeScram512:
-		if sasl, err := scram.Mechanism(scram.SHA512, cfg.Username, password); err != nil {
-			return nil, err
-		} else {
-			dialer.SASLMechanism = sasl
-		}
+	if saslMechanism != nil {
+		dialer.SASLMechanism = saslMechanism
 	}
 	if tls, err := cfg.TLSConfig(); err != nil {
 		return nil, err
 	} else {
 		dialer.TLS = tls
 	}
+
+	// remove credential from memory
+	// it still exists in the dialer configuration
+	credential.Clear()
 
 	if logger == nil {
 		logger = NewAdminLogger(cfg.Brokers)
@@ -132,10 +109,7 @@ func (c *Admin) IsConnected() bool {
 
 func (c *Admin) GetTopics(ctx context.Context, topics ...string) ([]kafka.Partition, error) {
 	if c.Conn == nil {
-		if err := c.Connect(ctx); err != nil {
-			return nil, err
-		}
-		defer c.Disconnect()
+		return nil, ErrAdminNotConnected
 	}
 	return c.Conn.ReadPartitions(topics...)
 }
@@ -143,18 +117,20 @@ func (c *Admin) GetTopics(ctx context.Context, topics ...string) ([]kafka.Partit
 // ListTopics list existing kafka topics
 func (c *Admin) ListTopics(ctx context.Context) ([]string, error) {
 	if c.Conn == nil {
-		if err := c.Connect(ctx); err != nil {
-			return nil, err
-		}
-		defer c.Disconnect()
+		return nil, ErrAdminNotConnected
 	}
 	if partitions, err := c.Conn.ReadPartitions(); err != nil {
 		c.Logger.Error(err, "failed to read partitions")
 		return nil, err
 	} else {
-		topics := make([]string, len(partitions))
-		for i, v := range partitions {
-			topics[i] = v.Topic
+		// Use map to deduplicate topics (multiple partitions per topic)
+		topicMap := make(map[string]struct{})
+		for _, v := range partitions {
+			topicMap[v.Topic] = struct{}{}
+		}
+		topics := make([]string, 0, len(topicMap))
+		for topic := range topicMap {
+			topics = append(topics, topic)
 		}
 		return topics, nil
 	}
@@ -177,10 +153,7 @@ func (c *Admin) TopicExists(ctx context.Context, topic string) (bool, error) {
 // CreateTopic create a new Topic
 func (c *Admin) CreateTopic(ctx context.Context, topic string, numPartitions int, replicationFactor int) error {
 	if c.Conn == nil {
-		if err := c.Connect(ctx); err != nil {
-			return err
-		}
-		defer c.Disconnect()
+		return ErrAdminNotConnected
 	}
 	c.Logger.
 		WithField("topicName", topic).
@@ -197,10 +170,7 @@ func (c *Admin) CreateTopic(ctx context.Context, topic string, numPartitions int
 // DeleteTopic removes a Topic
 func (c *Admin) DeleteTopic(ctx context.Context, topic string) error {
 	if c.Conn == nil {
-		if err := c.Connect(ctx); err != nil {
-			return err
-		}
-		defer c.Disconnect()
+		return ErrAdminNotConnected
 	}
 	c.Logger.
 		WithField("topicName", topic).

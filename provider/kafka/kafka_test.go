@@ -94,6 +94,10 @@ func (k *KafkaIntegrationTestSuite) purgeTopic(producerCfg *ProducerConfig) {
 	defer cancel()
 
 	admin, err := NewAdmin(cfg, nil)
+	require.NoError(k.T(), err, "Failed to create Kafka admin")
+
+	// Connect to Kafka admin
+	err = admin.Connect(ctx)
 	require.NoError(k.T(), err, "Failed to connect to Kafka admin")
 	defer admin.Disconnect()
 
@@ -424,6 +428,52 @@ func (k *KafkaIntegrationTestSuite) TestProducer() {
 		require.NoError(k.T(), err, fmt.Sprintf("Failed to read JSON message %d", i))
 		assert.Equal(k.T(), string(jsonValue), string(msg.Value))
 	}
+}
+
+// TestAdminListTopicsDeduplication tests that ListTopics deduplicates topics with multiple partitions
+func (k *KafkaIntegrationTestSuite) TestAdminListTopicsDeduplication() {
+	cfg := &AdminConfig{
+		Brokers:      k.brokers,
+		AuthType:     "none",
+		ClientConfig: tlsProvider.ClientConfig{TLSEnable: false},
+	}
+
+	admin, err := NewAdmin(cfg, nil)
+	require.NoError(k.T(), err, "Failed to create admin")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = admin.Connect(ctx)
+	require.NoError(k.T(), err, "Failed to connect admin")
+	defer admin.Disconnect()
+
+	// Create a topic with multiple partitions
+	testTopic := "test_multi_partition_topic"
+	err = admin.CreateTopic(ctx, testTopic, 3, 1) // 3 partitions
+	require.NoError(k.T(), err, "Failed to create multi-partition topic")
+
+	// Give Kafka time to propagate the topic
+	time.Sleep(2 * time.Second)
+
+	// List topics - should return unique topic names only
+	topics, err := admin.ListTopics(ctx)
+	require.NoError(k.T(), err, "Failed to list topics")
+
+	// Count how many times our test topic appears
+	count := 0
+	for _, topic := range topics {
+		if topic == testTopic {
+			count++
+		}
+	}
+
+	// Should appear exactly once despite having 3 partitions
+	assert.Equal(k.T(), 1, count, "Topic should appear exactly once in the list despite having multiple partitions")
+
+	// Clean up
+	err = admin.DeleteTopic(ctx, testTopic)
+	require.NoError(k.T(), err, "Failed to delete test topic")
 }
 
 // TestKafkaIntegration runs the integration test suite
