@@ -4,6 +4,12 @@ All notable changes to the Blueprint SMTP provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1]
+
+### Changed
+- Updated go-mail to version 0.7.1 to mitigate CVE-2025-59937
+
+
 ## [v0.8.0]
 
 ### Added
