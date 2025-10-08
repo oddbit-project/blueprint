@@ -188,18 +188,17 @@ func getUserHandler(c *gin.Context) {
 
 func createUserHandler(c *gin.Context) {
     var newUser User
-    if err := c.ShouldBindJSON(&newUser); err != nil {
-        response.ValidationError(c, err)
-        return
+    if !httpserver.ValidateJSON(c, &newUser) {
+        return // Validation failed, error response already sent
     }
-    
+
     // Create user in database (implement your logic)
     createdUser, err := createUser(newUser)
     if err != nil {
         response.Http500(c, err)
         return
     }
-    
+
     c.JSON(201, response.JSONResponse{
         Success: true,
         Data:    createdUser,
@@ -209,19 +208,18 @@ func createUserHandler(c *gin.Context) {
 func updateUserHandler(c *gin.Context) {
     userID := c.Param("id")
     var updateData User
-    
-    if err := c.ShouldBindJSON(&updateData); err != nil {
-        response.ValidationError(c, err)
-        return
+
+    if !httpserver.ValidateJSON(c, &updateData) {
+        return // Validation failed, error response already sent
     }
-    
+
     // Update user in database (implement your logic)
     updatedUser, err := updateUser(userID, updateData)
     if err != nil {
         response.Http500(c, err)
         return
     }
-    
+
     c.JSON(200, response.JSONResponse{
         Success: true,
         Data:    updatedUser,
