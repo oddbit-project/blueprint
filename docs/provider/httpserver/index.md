@@ -180,6 +180,14 @@ func setupRoutes(server *httpserver.Server) {
 - Custom middleware development patterns
 - Middleware ordering and best practices
 
+### Request Validation
+- [Request Validation](validation.md) - Two-stage validation system
+- JSON request body validation with `ValidateJSON()`
+- Query parameter validation with `ValidateQuery()`
+- Custom validation logic with `Validator` interface
+- Nested structure and collection validation
+- Field-specific error reporting with full paths
+
 ## Configuration
 
 ### Server Configuration
@@ -292,7 +300,8 @@ For debugging and troubleshooting information:
 ## Next Steps
 
 1. Start with the [API Reference](api-reference.md) for complete server documentation
-2. Review [Session Management](session.md) for stateful web applications
-3. Implement [Security](security.md) headers and CSRF protection
-4. Add [Authentication](auth.md) for securing your endpoints
-5. Check [Examples](examples.md) for complete integration patterns
+2. Implement [Request Validation](validation.md) for input validation and business logic
+3. Review [Session Management](session.md) for stateful web applications
+4. Implement [Security](security.md) headers and CSRF protection
+5. Add [Authentication](auth.md) for securing your endpoints
+6. Check [Examples](examples.md) for complete integration patterns

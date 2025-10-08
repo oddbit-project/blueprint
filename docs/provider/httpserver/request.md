@@ -368,10 +368,49 @@ func checkUserExists(email string) bool { /* ... */ }
 func createUser(user User) (*User, error) { /* ... */ }
 ```
 
+## Request Validation
+
+Blueprint provides comprehensive request validation utilities for both JSON bodies and query parameters. For detailed documentation on the two-stage validation system with custom business logic support, see:
+
+**[Request Validation Guide](validation.md)** - Complete validation documentation covering:
+- `ValidateJSON()` for JSON request body validation
+- `ValidateQuery()` for URL query parameter validation
+- Custom validation with the `Validator` interface
+- Nested structure and collection validation
+- Field-specific error reporting
+
+### Quick Example
+
+```go
+import "github.com/oddbit-project/blueprint/provider/httpserver"
+
+type LoginRequest struct {
+    Username string `json:"username" binding:"required,email"`
+    Password string `json:"password" binding:"required,min=8"`
+}
+
+func (r *LoginRequest) Validate() error {
+    if r.Username == "admin" && len(r.Password) < 12 {
+        return httpserver.NewFieldError("password", "admin password must be at least 12 characters")
+    }
+    return nil
+}
+
+func LoginHandler(c *gin.Context) {
+    var req LoginRequest
+    if !httpserver.ValidateJSON(c, &req) {
+        return // Validation failed, error response already sent
+    }
+
+    // Continue with valid request
+    // ...
+}
+```
+
 ## Best Practices
 
 ### Request Handling
-1. **Always validate user input** using Gin's binding features
+1. **Always validate user input** using `ValidateJSON()` or `ValidateQuery()`
 2. **Use content type detection** to handle requests appropriately
 3. **Implement CSRF protection** for state-changing operations
 4. **Handle both JSON and HTML requests** in the same handlers when possible
