@@ -1,8 +1,12 @@
 package htpasswd
 
 import (
+	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
+
+	"golang.org/x/crypto/argon2"
 )
 
 func TestHashPassword(t *testing.T) {
@@ -20,7 +24,7 @@ func TestHashPassword(t *testing.T) {
 		{"sha512", HashTypeSHA512, "{SHA512}"},
 		{"crypt", HashTypeCrypt, ""},
 		{"plain", HashTypePlain, ""},
-		{"argon2", HashTypeArgon2, "$argon2i$"},
+		{"argon2", HashTypeArgon2, "$argon2id$"},
 	}
 
 	for _, tc := range testCases {
@@ -206,9 +210,9 @@ func TestArgon2Specific(t *testing.T) {
 		t.Fatalf("HashArgon2 failed: %v", err)
 	}
 
-	// Test format - should start with $argon2i$
-	if !strings.HasPrefix(hash, "$argon2i$") {
-		t.Errorf("Argon2 hash should start with $argon2i$, got: %s", hash)
+	// Test format - should start with $argon2id$
+	if !strings.HasPrefix(hash, "$argon2id$") {
+		t.Errorf("Argon2 hash should start with $argon2id$, got: %s", hash)
 	}
 
 	// Test that hash contains version
@@ -419,8 +423,8 @@ func TestArgon2SpecialCharacters(t *testing.T) {
 	testPasswords := []string{
 		"pass!@#$%^&*()",
 		"пароль", // Cyrillic
-		"密码",    // Chinese
-		"🔐🔑",   // Emojis
+		"密码",     // Chinese
+		"🔐🔑",     // Emojis
 		"pass\nword",
 		"pass\tword",
 		"pass word",
@@ -512,8 +516,8 @@ func TestArgon2Integration(t *testing.T) {
 		t.Fatalf("Failed to get user: %v", err)
 	}
 
-	if !strings.HasPrefix(entry.Hash, "$argon2i$") {
-		t.Errorf("Hash should start with $argon2i$, got: %s", entry.Hash)
+	if !strings.HasPrefix(entry.Hash, "$argon2id$") {
+		t.Errorf("Hash should start with $argon2id$, got: %s", entry.Hash)
 	}
 
 	// Test detection
@@ -521,4 +525,96 @@ func TestArgon2Integration(t *testing.T) {
 	if detectedType != HashTypeArgon2 {
 		t.Errorf("Hash type detection failed: expected %v, got %v", HashTypeArgon2, detectedType)
 	}
+}
+
+func TestArgon2VariantSupport(t *testing.T) {
+	password := "testpassword"
+
+	// Helper function to generate argon2i hash (for testing verification)
+	generateArgon2iHash := func(password string) string {
+		salt := []byte("somesalt1234567")
+		hash := argon2.Key([]byte(password), salt, 2, 65536, 1, 32)
+		saltB64 := base64.RawStdEncoding.EncodeToString(salt)
+		hashB64 := base64.RawStdEncoding.EncodeToString(hash)
+		return fmt.Sprintf("$argon2i$v=19$m=65536,t=2,p=1$%s$%s", saltB64, hashB64)
+	}
+
+	// Helper function to generate argon2id hash (for testing verification)
+	generateArgon2idHash := func(password string) string {
+		salt := []byte("somesalt1234567")
+		hash := argon2.IDKey([]byte(password), salt, 2, 65536, 1, 32)
+		saltB64 := base64.RawStdEncoding.EncodeToString(salt)
+		hashB64 := base64.RawStdEncoding.EncodeToString(hash)
+		return fmt.Sprintf("$argon2id$v=19$m=65536,t=2,p=1$%s$%s", saltB64, hashB64)
+	}
+
+	// Test that we can verify both argon2i and argon2id hashes
+	testCases := []struct {
+		name         string
+		password     string
+		hashFunc     func(string) string
+		expectedType string
+	}{
+		{
+			name:         "argon2i hash",
+			password:     "testpass",
+			hashFunc:     generateArgon2iHash,
+			expectedType: "$argon2i$",
+		},
+		{
+			name:         "argon2id hash",
+			password:     "testpass",
+			hashFunc:     generateArgon2idHash,
+			expectedType: "$argon2id$",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			hash := tc.hashFunc(tc.password)
+
+			// Verify the hash has the correct prefix
+			if !strings.HasPrefix(hash, tc.expectedType) {
+				t.Errorf("Expected hash to start with %s, got: %s", tc.expectedType, hash)
+			}
+
+			// Verify detection works for both variants
+			detectedType := DetectHashType(hash)
+			if detectedType != HashTypeArgon2 {
+				t.Errorf("Hash type detection failed: expected %v, got %v", HashTypeArgon2, detectedType)
+			}
+
+			// Verify the password matches
+			if !VerifyArgon2(tc.password, hash) {
+				t.Errorf("Password verification failed for %s", tc.name)
+			}
+
+			// Verify wrong password fails
+			if VerifyArgon2("wrongpassword", hash) {
+				t.Errorf("Password verification should fail for wrong password with %s", tc.name)
+			}
+
+			// Verify using the general VerifyPassword function
+			if !VerifyPassword(tc.password, hash) {
+				t.Errorf("VerifyPassword failed for %s", tc.name)
+			}
+		})
+	}
+
+	// Test that HashArgon2 generates argon2id (not argon2i)
+	t.Run("HashArgon2 generates argon2id", func(t *testing.T) {
+		hash, err := HashArgon2(password)
+		if err != nil {
+			t.Fatalf("HashArgon2 failed: %v", err)
+		}
+
+		if !strings.HasPrefix(hash, "$argon2id$") {
+			t.Errorf("HashArgon2 should generate argon2id hashes, got: %s", hash)
+		}
+
+		// Verify it works
+		if !VerifyArgon2(password, hash) {
+			t.Errorf("Generated hash should verify correctly")
+		}
+	})
 }

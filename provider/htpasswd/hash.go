@@ -27,7 +27,7 @@ const (
 	HashTypeSHA512
 	HashTypeCrypt
 	HashTypePlain
-	HashTypeArgon2
+	HashTypeArgon2 // argon2i or argon2id (generates argon2id, verifies both)
 )
 
 // HashPassword hashes a password using the specified algorithm
@@ -186,7 +186,7 @@ func VerifySHA512(password, hash string) bool {
 	return subtle.ConstantTimeCompare([]byte(expectedHash), []byte(hash)) == 1
 }
 
-// HashArgon2 hashes password using Argon2
+// HashArgon2 hashes password using Argon2id
 func HashArgon2(password string) (string, error) {
 	mem := uint32(65536) // memory KB
 	time := uint32(2)    // iterations
@@ -199,20 +199,20 @@ func HashArgon2(password string) (string, error) {
 	}
 
 	keyLen := uint32(32) // 32-byte hash (htpasswd standard)
-	hash := argon2.Key([]byte(password), salt, time, mem, threads, keyLen)
+	hash := argon2.IDKey([]byte(password), salt, time, mem, threads, keyLen)
 
 	// Raw base64 encoding (no padding, same as htpasswd)
 	saltB64 := base64.RawStdEncoding.EncodeToString(salt)
 	hashB64 := base64.RawStdEncoding.EncodeToString(hash)
 
 	// create htpasswd style output
-	encoded := fmt.Sprintf("$argon2i$v=19$m=%d,t=%d,p=%d$%s$%s",
+	encoded := fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
 		mem, time, threads, saltB64, hashB64)
 
 	return encoded, nil
 }
 
-// VerifyArgon2 verifies Argon2 hash
+// VerifyArgon2 verifies Argon2 hash (supports both argon2i and argon2id variants)
 func VerifyArgon2(password, hash string) bool {
 	// Format: $argon2i$v=19$m=65536,t=2,p=1$base64salt$base64hash
 	// Also supports: $argon2id$v=19$m=65536,t=2,p=1$base64salt$base64hash
