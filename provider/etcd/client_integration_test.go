@@ -577,7 +577,7 @@ func TestLease(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a lease with 5 second TTL
-	leaseID, err := client.Lease(5)
+	leaseID, err := client.Lease(ctx, 5)
 	require.NoError(t, err)
 	assert.NotEqual(t, clientv3.LeaseID(0), leaseID)
 

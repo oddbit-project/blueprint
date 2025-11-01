@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"github.com/oddbit-project/blueprint/crypt/secure"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"strings"
 	"time"
+
+	"github.com/oddbit-project/blueprint/crypt/secure"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // Client is a wrapper around etcd's clientv3.Client that provides additional functionality
@@ -270,8 +271,10 @@ func (c *Client) Transaction(ctx context.Context) clientv3.Txn {
 
 // Lease creates a new lease with the specified time-to-live in seconds.
 // Returns a lease ID that can be attached to keys for automatic expiration.
-func (c *Client) Lease(ttl int64) (clientv3.LeaseID, error) {
-	ctx := context.Background()
+func (c *Client) Lease(ctx context.Context, ttl int64) (clientv3.LeaseID, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if c.requestTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, c.requestTimeout)
