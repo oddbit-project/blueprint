@@ -4,6 +4,17 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.4]
+
+### Added
+- `BasicAuthProvider` basic auth provider wih pluggable backend
+- `HtpasswdBackend` htpasswd backend for basic auth provider
+
+### Changed
+- Refactored `authToken` to use subtle.ConstantTimeCompare()
+- Refactored `authTokenList` to use subtle.ConstantTimeCompare()
+
+
 ## [v0.8.3]
 
 ### Added

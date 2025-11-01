@@ -26,7 +26,7 @@ func WithRealm(realm string) BasicAuthProviderOption {
 	}
 }
 
-func NewBasicAuthProvider(b backend.Authenticator, opts ...BasicAuthProviderOption) (*BasicAuthProvider, error) {
+func NewBasicAuthProvider(b backend.Authenticator, opts ...BasicAuthProviderOption) (Provider, error) {
 	if b == nil {
 		return nil, errors.New("authenticator backend is required")
 	}
