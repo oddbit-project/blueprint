@@ -231,7 +231,7 @@ func leaseDemo(ctx context.Context, client *etcd.Client) error {
 	fmt.Println("\nLease Demo")
 	fmt.Println("-----------")
 
-	leaseID, err := client.Lease(5) // 5 seconds TTL
+	leaseID, err := client.Lease(ctx, 5) // 5 seconds TTL
 	if err != nil {
 		return fmt.Errorf("create lease failed: %w", err)
 	}
