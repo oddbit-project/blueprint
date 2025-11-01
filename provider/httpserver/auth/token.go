@@ -1,8 +1,9 @@
 package auth
 
 import (
+	"crypto/subtle"
+
 	"github.com/gin-gonic/gin"
-	"slices"
 )
 
 const (
@@ -42,9 +43,15 @@ func NewAuthTokenList(headerName string, keyList []string) Provider {
 		keyList:    keyList,
 	}
 }
+
+// CanAccess returns true if request is valid
+// Note: this method supports empty keys as a means to disable authentication
 func (a *authTokenList) CanAccess(c *gin.Context) bool {
-	if len(a.keyList) > 0 {
-		return slices.Contains(a.keyList, c.Request.Header.Get(a.headerName))
+	key := c.Request.Header.Get(a.headerName)
+	for _, existingKey := range a.keyList {
+		if subtle.ConstantTimeCompare([]byte(key), []byte(existingKey)) == 1 {
+			return true
+		}
 	}
-	return true
+	return false
 }
