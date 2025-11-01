@@ -92,6 +92,7 @@ func TestHashTypes(t *testing.T) {
 		{"bcrypt", HashTypeBcrypt, "bcrypt_user"},
 		{"sha1", HashTypeSHA1, "sha1_user"},
 		{"apache_md5", HashTypeApacheMD5, "md5_user"},
+		{"argon2", HashTypeArgon2, "argon2_user"},
 	}
 
 	for _, tc := range testCases {
@@ -113,7 +114,7 @@ func TestHashTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to get user %s: %v", tc.username, err)
 			}
-			
+
 			detectedType := DetectHashType(entry.Hash)
 			if detectedType != tc.hashType {
 				t.Fatalf("Hash type mismatch for %s: expected %v, got %v", tc.name, tc.hashType, detectedType)

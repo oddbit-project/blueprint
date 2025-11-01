@@ -4,6 +4,12 @@ All notable changes to the Blueprint HTPasswd provider will be documented in thi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1]
+
+### Added
+- Experimental Argon2 support
+
+
 ## [v0.8.0]
 
 ### Added

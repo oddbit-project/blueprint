@@ -28,7 +28,7 @@ func NewContainer() *Container {
 	}
 }
 
-// NewFromFile creates a container from file
+// NewFromFile creates a container from a file
 func NewFromFile(path string) (*Container, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -38,13 +38,13 @@ func NewFromFile(path string) (*Container, error) {
 	return NewFromReader(f)
 }
 
-// NewFromReader creates a container from reader
+// NewFromReader creates a container from a reader
 func NewFromReader(src io.Reader) (*Container, error) {
 	container := NewContainer()
 	return container, container.Read(src)
 }
 
-// Load reads and parses a htpasswd source
+// Load reads and parses an htpasswd source
 func (c *Container) Read(src io.Reader) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

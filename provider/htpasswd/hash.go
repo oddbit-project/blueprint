@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"strings"
 
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -26,6 +27,7 @@ const (
 	HashTypeSHA512
 	HashTypeCrypt
 	HashTypePlain
+	HashTypeArgon2 // argon2i or argon2id (generates argon2id, verifies both)
 )
 
 // HashPassword hashes a password using the specified algorithm
@@ -43,6 +45,8 @@ func HashPassword(password string, hashType HashType) (string, error) {
 		return HashSHA512(password)
 	case HashTypeCrypt:
 		return HashCrypt(password)
+	case HashTypeArgon2:
+		return HashArgon2(password)
 	case HashTypePlain:
 		return password, nil
 	default:
@@ -67,6 +71,8 @@ func VerifyPassword(password, hash string) bool {
 		return VerifySHA512(password, hash)
 	case HashTypeCrypt:
 		return VerifyCrypt(password, hash)
+	case HashTypeArgon2:
+		return VerifyArgon2(password, hash)
 	case HashTypePlain:
 		return subtle.ConstantTimeCompare([]byte(password), []byte(hash)) == 1
 	default:
@@ -90,6 +96,9 @@ func DetectHashType(hash string) HashType {
 	}
 	if strings.HasPrefix(hash, "{SHA512}") {
 		return HashTypeSHA512
+	}
+	if strings.HasPrefix(hash, "$argon2i$") || strings.HasPrefix(hash, "$argon2id$") {
+		return HashTypeArgon2
 	}
 	if len(hash) == 13 && !strings.Contains(hash, "$") {
 		return HashTypeCrypt
@@ -175,6 +184,74 @@ func VerifySHA512(password, hash string) bool {
 	}
 
 	return subtle.ConstantTimeCompare([]byte(expectedHash), []byte(hash)) == 1
+}
+
+// HashArgon2 hashes password using Argon2id
+func HashArgon2(password string) (string, error) {
+	mem := uint32(65536) // memory KB
+	time := uint32(2)    // iterations
+	threads := uint8(1)  // parallelism
+	saltLen := 16        // 16 bytes salt
+
+	salt := make([]byte, saltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", err
+	}
+
+	keyLen := uint32(32) // 32-byte hash (htpasswd standard)
+	hash := argon2.IDKey([]byte(password), salt, time, mem, threads, keyLen)
+
+	// Raw base64 encoding (no padding, same as htpasswd)
+	saltB64 := base64.RawStdEncoding.EncodeToString(salt)
+	hashB64 := base64.RawStdEncoding.EncodeToString(hash)
+
+	// create htpasswd style output
+	encoded := fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
+		mem, time, threads, saltB64, hashB64)
+
+	return encoded, nil
+}
+
+// VerifyArgon2 verifies Argon2 hash (supports both argon2i and argon2id variants)
+func VerifyArgon2(password, hash string) bool {
+	// Format: $argon2i$v=19$m=65536,t=2,p=1$base64salt$base64hash
+	// Also supports: $argon2id$v=19$m=65536,t=2,p=1$base64salt$base64hash
+	parts := strings.Split(hash, "$")
+	if len(parts) != 6 {
+		return false
+	}
+	variant := parts[1]
+	if variant != "argon2i" && variant != "argon2id" {
+		return false
+	}
+	params := parts[3]  // m=65536,t=2,p=1
+	saltB64 := parts[4] // base64 salt
+	hashB64 := parts[5] // base64 hash
+	var mem, time uint32
+	var threads uint8
+	_, err := fmt.Sscanf(params, "m=%d,t=%d,p=%d", &mem, &time, &threads)
+	if err != nil {
+		return false
+	}
+
+	salt, err := base64.RawStdEncoding.DecodeString(saltB64)
+	if err != nil {
+		return false
+	}
+
+	expectedHash, err := base64.RawStdEncoding.DecodeString(hashB64)
+	if err != nil {
+		return false
+	}
+
+	keyLen := uint32(len(expectedHash))
+	var computed []byte
+	if variant == "argon2i" {
+		computed = argon2.Key([]byte(password), salt, time, mem, threads, keyLen)
+	} else {
+		computed = argon2.IDKey([]byte(password), salt, time, mem, threads, keyLen)
+	}
+	return subtle.ConstantTimeCompare(computed, expectedHash) == 1
 }
 
 // generateSalt generates a random salt for Apache MD5
