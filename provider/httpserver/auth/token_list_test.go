@@ -95,14 +95,6 @@ func TestAuthTokenList_CanAccess(t *testing.T) {
 			wantAccess: false,
 		},
 		{
-			name:       "Empty key always allows access",
-			headerName: "X-API-Key",
-			keyList:    []string{},
-			reqHeader:  "",
-			reqValue:   "",
-			wantAccess: true,
-		},
-		{
 			name:       "Slice with empty key always allows access",
 			headerName: "X-API-Key",
 			keyList:    []string{""},

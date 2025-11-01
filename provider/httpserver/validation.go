@@ -336,7 +336,7 @@ func ValidateJSON(c *gin.Context, obj interface{}) bool {
 // 1. Binding validation using `binding` tags
 // 2. Recursive custom validation for structs implementing Validator interface
 //
-// Error responses include full field paths for nested structures
+// # Error responses include full field paths for nested structures
 //
 // Example usage:
 //

@@ -11,7 +11,7 @@ import (
 
 func TestNewCorsConfig(t *testing.T) {
 	cfg := NewCorsConfig()
-	
+
 	assert.True(t, cfg.CorsEnabled)
 	assert.Empty(t, cfg.AllowOrigins)
 	assert.Equal(t, []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}, cfg.AllowMethods)
@@ -101,30 +101,30 @@ func TestCorsConfig_Validate(t *testing.T) {
 
 func TestCORSMiddleware_Disabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled: false,
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Origin", "https://example.com")
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, 200, w.Code)
 	assert.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
 }
 
 func TestCORSMiddleware_DevMode(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled:      true,
 		DevMode:          true,
@@ -135,7 +135,7 @@ func TestCORSMiddleware_DevMode(t *testing.T) {
 		MaxAge:           7200,
 		Vary:             "Origin",
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
@@ -147,7 +147,7 @@ func TestCORSMiddleware_DevMode(t *testing.T) {
 	router.OPTIONS("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	tests := []struct {
 		name           string
 		method         string
@@ -189,7 +189,7 @@ func TestCORSMiddleware_DevMode(t *testing.T) {
 			wantCORSHeader: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/test", nil)
@@ -197,11 +197,11 @@ func TestCORSMiddleware_DevMode(t *testing.T) {
 				req.Header.Set("Origin", tt.origin)
 			}
 			w := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(w, req)
-			
+
 			assert.Equal(t, tt.wantStatus, w.Code)
-			
+
 			if tt.checkHeaders && tt.wantCORSHeader {
 				assert.Equal(t, tt.origin, w.Header().Get("Access-Control-Allow-Origin"))
 				assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
@@ -217,7 +217,7 @@ func TestCORSMiddleware_DevMode(t *testing.T) {
 
 func TestCORSMiddleware_WildcardOrigin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled:      true,
 		AllowOrigins:     []string{"*"},
@@ -227,13 +227,13 @@ func TestCORSMiddleware_WildcardOrigin(t *testing.T) {
 		MaxAge:           3600,
 		Vary:             "Origin",
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	tests := []struct {
 		name       string
 		method     string
@@ -259,17 +259,17 @@ func TestCORSMiddleware_WildcardOrigin(t *testing.T) {
 			wantStatus: 405,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/test", nil)
 			req.Header.Set("Origin", tt.origin)
 			w := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(w, req)
-			
+
 			assert.Equal(t, tt.wantStatus, w.Code)
-			
+
 			if tt.wantStatus == 200 || tt.wantStatus == 204 {
 				assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
 				assert.Equal(t, "false", w.Header().Get("Access-Control-Allow-Credentials"))
@@ -281,7 +281,7 @@ func TestCORSMiddleware_WildcardOrigin(t *testing.T) {
 
 func TestCORSMiddleware_SpecificOrigins(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled:      true,
 		AllowOrigins:     []string{"https://allowed1.com", "https://allowed2.com"},
@@ -292,13 +292,13 @@ func TestCORSMiddleware_SpecificOrigins(t *testing.T) {
 		MaxAge:           3600,
 		Vary:             "Origin",
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	tests := []struct {
 		name           string
 		method         string
@@ -349,7 +349,7 @@ func TestCORSMiddleware_SpecificOrigins(t *testing.T) {
 			wantCORSHeader: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/test", nil)
@@ -357,11 +357,11 @@ func TestCORSMiddleware_SpecificOrigins(t *testing.T) {
 				req.Header.Set("Origin", tt.origin)
 			}
 			w := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(w, req)
-			
+
 			assert.Equal(t, tt.wantStatus, w.Code)
-			
+
 			if tt.wantCORSHeader {
 				assert.Equal(t, tt.origin, w.Header().Get("Access-Control-Allow-Origin"))
 				assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
@@ -378,32 +378,32 @@ func TestCORSMiddleware_SpecificOrigins(t *testing.T) {
 
 func TestCORSMiddleware_OptionsNotAllowed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled:  true,
 		AllowOrigins: []string{"https://example.com"},
 		AllowMethods: []string{"GET", "POST"}, // OPTIONS not included
 		MaxAge:       3600,
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	req := httptest.NewRequest("OPTIONS", "/test", nil)
 	req.Header.Set("Origin", "https://example.com")
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, 405, w.Code)
 }
 
 func TestCORSMiddleware_EmptyExposeHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled:   true,
 		AllowOrigins:  []string{"https://example.com"},
@@ -411,33 +411,33 @@ func TestCORSMiddleware_EmptyExposeHeaders(t *testing.T) {
 		ExposeHeaders: []string{}, // Empty expose headers
 		MaxAge:        3600,
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.Header.Set("Origin", "https://example.com")
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, 200, w.Code)
 	assert.Empty(t, w.Header().Get("Access-Control-Expose-Headers"))
 }
 
 func TestCORSMiddleware_CaseInsensitiveMethods(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	cfg := &CorsConfig{
 		CorsEnabled:  true,
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"get", "POST", "Options"}, // Mixed case
 		MaxAge:       3600,
 	}
-	
+
 	router := gin.New()
 	router.Use(CORSMiddleware(cfg))
 	router.GET("/test", func(c *gin.Context) {
@@ -449,7 +449,7 @@ func TestCORSMiddleware_CaseInsensitiveMethods(t *testing.T) {
 	router.OPTIONS("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
-	
+
 	tests := []struct {
 		name       string
 		method     string
@@ -491,15 +491,15 @@ func TestCORSMiddleware_CaseInsensitiveMethods(t *testing.T) {
 			wantStatus: 405,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/test", nil)
 			req.Header.Set("Origin", "https://example.com")
 			w := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(w, req)
-			
+
 			assert.Equal(t, tt.wantStatus, w.Code)
 		})
 	}
