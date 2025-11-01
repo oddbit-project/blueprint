@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - Refactored `authToken` to use subtle.ConstantTimeCompare()
 - Refactored `authTokenList` to use subtle.ConstantTimeCompare()
-
+- Behavior change - to disable auth in authTokenList, an explicit empty string `""` is required as key; 
 
 ## [v0.8.3]
 

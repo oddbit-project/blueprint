@@ -19,14 +19,142 @@ request access permissions.
 ### Core Components
 
 - **Provider Interface**: Unified authentication contract
-- **Concrete Providers**: JWT, Token, HMAC, Session authentication
-- **Middleware Integration**: Seamless Gin framework integration  
+- **Concrete Providers**: Basic, JWT, Token, HMAC, Session authentication
+- **Middleware Integration**: Seamless Gin framework integration
 - **Context Storage**: Authentication data available throughout request lifecycle
 - **Utility Functions**: Helper methods for extracting authentication information
 
 ## Authentication Providers
 
-### 1. Token Authentication
+### 1. Basic Authentication
+
+HTTP Basic Authentication with pluggable authentication backends.
+
+#### Setup with Htpasswd Backend
+
+```go
+import (
+    "github.com/oddbit-project/blueprint/provider/httpserver/auth"
+    "github.com/oddbit-project/blueprint/provider/httpserver/auth/backend"
+)
+
+// Create htpasswd backend with user credentials
+userMap := map[string]string{
+    "admin": "$2a$10$...",  // bcrypt hashed password
+    "user":  "$2a$10$...",  // bcrypt hashed password
+}
+
+htpasswdBackend, err := backend.NewHtpasswdBackendFromMap(userMap)
+if err != nil {
+    log.Fatal(err, "failed to create htpasswd backend")
+}
+
+// Create Basic Auth provider
+authBasic, err := auth.NewBasicAuthProvider(htpasswdBackend)
+if err != nil {
+    log.Fatal(err, "failed to create basic auth provider")
+}
+
+// Apply globally
+server.UseAuth(authBasic)
+
+// Or apply to specific routes
+protected := router.Group("/api")
+protected.Use(auth.AuthMiddleware(authBasic))
+```
+
+#### Custom Realm Configuration
+
+```go
+// Create Basic Auth with custom realm
+authBasic, err := auth.NewBasicAuthProvider(
+    htpasswdBackend,
+    auth.WithRealm("My Protected Area"),
+)
+```
+
+#### Client Usage
+
+**HTTP Request:**
+```http
+GET /api/resource HTTP/1.1
+Host: example.com
+Authorization: Basic YWRtaW46cGFzc3dvcmQ=
+```
+
+**curl Example:**
+```bash
+curl -u admin:password https://example.com/api/resource
+```
+
+#### Handler Access
+
+```go
+func protectedHandler(c *gin.Context) {
+    // Get authenticated username
+    username, exists := c.Get(gin.AuthUserKey)
+    if !exists {
+        c.JSON(401, gin.H{"error": "Not authenticated"})
+        return
+    }
+
+    c.JSON(200, gin.H{
+        "user": username,
+        "message": "Access granted",
+    })
+}
+```
+
+#### Custom Authentication Backend
+
+Implement the `Authenticator` interface for custom backends:
+
+```go
+import "github.com/oddbit-project/blueprint/provider/httpserver/auth/backend"
+
+type DatabaseAuthBackend struct {
+    db *sql.DB
+}
+
+func (d *DatabaseAuthBackend) ValidateUser(userName string, secret string) (bool, error) {
+    var hashedPassword string
+    err := d.db.QueryRow("SELECT password FROM users WHERE username = ?", userName).Scan(&hashedPassword)
+    if err != nil {
+        return false, err
+    }
+
+    // Verify password (e.g., using bcrypt)
+    err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(secret))
+    return err == nil, nil
+}
+
+// Use custom backend
+dbBackend := &DatabaseAuthBackend{db: dbConnection}
+authBasic, err := auth.NewBasicAuthProvider(dbBackend)
+```
+
+**Features:**
+- Standards-compliant HTTP Basic Authentication (RFC 7617)
+- Pluggable authentication backends via `Authenticator` interface
+- Built-in htpasswd backend with bcrypt support
+- Custom realm configuration for WWW-Authenticate challenges
+- Authenticated username stored in gin.Context
+- Comprehensive security logging
+
+**Use Cases:**
+- Legacy system integration
+- Simple admin panels
+- Internal tools and dashboards
+- Development and testing environments
+- Service-to-service communication with basic credentials
+
+**Security Considerations:**
+- **Always use HTTPS**: Basic Auth credentials are base64-encoded, not encrypted
+- **Strong passwords**: Use bcrypt or similar for password hashing
+- **Rate limiting**: Protect against brute-force attacks
+- **Audit logging**: Monitor failed authentication attempts
+
+### 2. Token Authentication
 
 Simple API key authentication for basic access control.
 
@@ -75,7 +203,7 @@ server.UseAuth(authTokens)
 - Simple client authentication
 - Development and testing environments
 
-### 2. JWT Authentication
+### 3. JWT Authentication
 
 JSON Web Token authentication with comprehensive claim validation.
 
@@ -144,7 +272,7 @@ func protectedHandler(c *gin.Context) {
 - Context storage for parsed claims
 - Expiration and issuer verification
 
-### 3. HMAC Authentication
+### 4. HMAC Authentication
 
 High-security authentication using HMAC-SHA256 signatures with replay protection.
 
@@ -219,7 +347,7 @@ func hmacProtectedHandler(c *gin.Context) {
 }
 ```
 
-### 4. Session Authentication
+### 5. Session Authentication
 
 Cookie-based authentication integrated with the session management system.
 
@@ -367,7 +495,7 @@ func setupRoutes(router *gin.Engine) {
     // Public routes
     router.GET("/", homeHandler)
     router.POST("/login", loginHandler)
-    
+
     // Session-based web routes
     web := router.Group("/dashboard")
     web.Use(auth.AuthMiddleware(authSession))
@@ -375,7 +503,7 @@ func setupRoutes(router *gin.Engine) {
         web.GET("/", dashboardHandler)
         web.POST("/logout", logoutHandler)
     }
-    
+
     // JWT-based API routes
     api := router.Group("/api")
     api.Use(auth.AuthMiddleware(authJWT))
@@ -383,7 +511,15 @@ func setupRoutes(router *gin.Engine) {
         api.GET("/data", getDataHandler)
         api.POST("/data", createDataHandler)
     }
-    
+
+    // Basic Auth for admin panel
+    admin := router.Group("/admin")
+    admin.Use(auth.AuthMiddleware(authBasic))
+    {
+        admin.GET("/users", listUsersHandler)
+        admin.GET("/settings", settingsHandler)
+    }
+
     // HMAC-secured service routes
     service := router.Group("/service")
     service.Use(auth.AuthMiddleware(authHMAC))

@@ -72,7 +72,7 @@ func (c *Config) Validate() error {
 		return ErrInvalidSameSite
 
 	}
-	
+
 	return nil
 }
 
