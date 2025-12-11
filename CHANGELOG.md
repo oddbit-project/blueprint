@@ -15,6 +15,17 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.2]
+
+### Added
+
+- **PIN Generation** (crypt/pin) - Cryptographically secure PIN generation and comparison
+    - Numeric PIN generation using `crypto/rand` for secure randomness
+    - Alphanumeric PIN generation with uppercase letters and digits
+    - Auto-formatting with dashes every 3 characters for readability
+    - Constant-time comparison functions to prevent timing attacks
+    - Case-insensitive alphanumeric comparison support
+
 ## [v0.8.0] - Core Framework + Module Independence
 
 ### Module Version Matrix
