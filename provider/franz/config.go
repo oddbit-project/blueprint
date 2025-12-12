@@ -275,9 +275,13 @@ func (c *ProducerConfig) buildOpts() ([]kgo.Opt, error) {
 	}
 
 	// Idempotent producer
+	// kgo enables idempotency by default, which requires acks=all
+	// Explicitly disable it when not requested to allow other acks settings
 	if c.Idempotent {
 		opts = append(opts, kgo.RequiredAcks(kgo.AllISRAcks()))
 		opts = append(opts, kgo.MaxProduceRequestsInflightPerBroker(1))
+	} else {
+		opts = append(opts, kgo.DisableIdempotentWrite())
 	}
 
 	// Transactional producer
