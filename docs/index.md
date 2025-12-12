@@ -41,6 +41,7 @@ All existing imports continue to work without changes due to Go module rewrite r
 ## Security
 
 - [Password Hashing](crypt/password-hashing.md)
+- [PIN Generation](crypt/pin.md)
 - [Secure Credentials](crypt/secure-credentials.md)
 - [TLS](provider/tls.md)
 

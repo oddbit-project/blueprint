@@ -80,6 +80,7 @@ nav:
   - Security:
     - Secure Credentials: crypt/secure-credentials.md
     - Password Hashing: crypt/password-hashing.md
+    - PIN Generation: crypt/pin.md
     - htpasswd Authentication: provider/htpasswd.md
     - TLS: provider/tls.md
   

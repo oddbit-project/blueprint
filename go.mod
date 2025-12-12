@@ -14,6 +14,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
+	github.com/oddbit-project/blueprint/provider/franz v0.8.0
 	github.com/oddbit-project/blueprint/provider/clickhouse v0.8.0
 	github.com/oddbit-project/blueprint/provider/etcd v0.8.1
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.0
