@@ -6,6 +6,7 @@ use (
 	.
 	./provider/clickhouse
 	./provider/etcd
+	./provider/franz
 	./provider/hmacprovider
 	./provider/htpasswd
 	./provider/httpserver
