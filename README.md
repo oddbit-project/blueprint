@@ -335,6 +335,7 @@ Blueprint's base library provides the following components for application devel
 
 ### **Security & Cryptography**
 - **[Password Hashing](docs/crypt/password-hashing.md)** - Argon2id password hashing with timing attack protection
+- **[PIN Generation](docs/crypt/pin.md)** - Cryptographically secure PIN generation and comparison
 - **[Secure Credentials](docs/crypt/secure-credentials.md)** - In-memory credential encryption and key management
 - **[TLS](docs/provider/tls.md)** - TLS/SSL certificate management
 

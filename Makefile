@@ -1,9 +1,9 @@
 SBOM_FILE=sbom.json
 
 # Provider modules list
-PROVIDERS := kafka nats mqtt redis s3 etcd pgsql clickhouse httpserver metrics smtp htpasswd hmacprovider
+PROVIDERS := franz kafka nats mqtt redis s3 etcd pgsql clickhouse httpserver metrics smtp htpasswd hmacprovider
 
-.PHONY: help sbom sbom-clean install-sbom-tool test test-unit test-integration test-all test-providers test-pgsql test-clickhouse test-kafka test-nats test-mqtt test-s3 test-db test-coverage test-coverage-unit clean-test benchmark-s3
+.PHONY: help sbom sbom-clean install-sbom-tool test test-unit test-integration test-all test-providers test-pgsql test-clickhouse test-kafka test-franz test-nats test-mqtt test-s3 test-db test-coverage test-coverage-unit clean-test benchmark-s3
 .PHONY: build build-all build-providers tidy tidy-all tidy-providers update-deps tag-version
 
 # Default target
@@ -82,6 +82,10 @@ test-clickhouse:
 test-kafka:
 	@echo "Running Kafka integration tests with testcontainers and race detector..."
 	@go test -v -race ./provider/kafka/...
+
+test-franz:
+	@echo "Running Franz (Kafka) integration tests with testcontainers and race detector..."
+	@cd provider/franz && go test -v -race ./...
 
 test-nats:
 	@echo "Running NATS integration tests with testcontainers and race detector..."
