@@ -1002,6 +1002,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../../crypt/pin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PIN Generation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../htpasswd/" class="md-nav__link">
         
   
@@ -1286,6 +1309,15 @@
   <a href="#middleware-components" class="md-nav__link">
     <span class="md-ellipsis">
       Middleware Components
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#request-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Request Validation
     </span>
   </a>
   
@@ -1752,12 +1784,58 @@
   
   
     <li class="md-nav__item">
+      <a href="../franz/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Franz (Kafka)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../kafka/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Kafka
+    Kafka (Legacy)
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kafka-to-franz-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Kafka Migration Guide
     
   </span>
   
@@ -2366,6 +2444,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#request-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Request Validation
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2708,6 +2795,15 @@ session management, and middleware components for building robust web applicatio
 <li>Custom middleware development patterns</li>
 <li>Middleware ordering and best practices</li>
 </ul>
+<h3 id="request-validation">Request Validation<a class="headerlink" href="#request-validation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="validation/">Request Validation</a> - Two-stage validation system</li>
+<li>JSON request body validation with <code>ValidateJSON()</code></li>
+<li>Query parameter validation with <code>ValidateQuery()</code></li>
+<li>Custom validation logic with <code>Validator</code> interface</li>
+<li>Nested structure and collection validation</li>
+<li>Field-specific error reporting with full paths</li>
+</ul>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <h3 id="server-configuration">Server Configuration<a class="headerlink" href="#server-configuration" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ServerConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
@@ -2806,6 +2902,7 @@ session management, and middleware components for building robust web applicatio
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Start with the <a href="api-reference/">API Reference</a> for complete server documentation</li>
+<li>Implement <a href="validation/">Request Validation</a> for input validation and business logic</li>
 <li>Review <a href="session/">Session Management</a> for stateful web applications</li>
 <li>Implement <a href="security/">Security</a> headers and CSRF protection</li>
 <li>Add <a href="auth/">Authentication</a> for securing your endpoints</li>
@@ -2833,7 +2930,7 @@ session management, and middleware components for building robust web applicatio
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="July 18, 2025 04:42:18 UTC">July 18, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 8, 2025 03:22:00 UTC">October 8, 2025</span>
   </span>
 
     
