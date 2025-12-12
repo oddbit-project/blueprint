@@ -183,6 +183,7 @@ require (
 replace (
 	github.com/oddbit-project/blueprint/provider/clickhouse => ./provider/clickhouse
 	github.com/oddbit-project/blueprint/provider/etcd => ./provider/etcd
+	github.com/oddbit-project/blueprint/provider/franz => ./provider/franz
 	github.com/oddbit-project/blueprint/provider/hmacprovider => ./provider/hmacprovider
 	github.com/oddbit-project/blueprint/provider/htpasswd => ./provider/htpasswd
 	github.com/oddbit-project/blueprint/provider/httpserver => ./provider/httpserver
