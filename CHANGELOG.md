@@ -15,6 +15,14 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.3]
+
+### Changed
+
+- **CI/CD**: SBOM generation now triggers on version tags and attaches artifacts to GitHub releases
+    - CycloneDX JSON SBOMs for core module and all providers
+    - Trivy vulnerability scan report included in release assets
+
 ## [v0.8.2]
 
 ### Added
