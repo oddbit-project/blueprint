@@ -98,7 +98,9 @@ nav:
   - Providers:
     - ClickHouse: provider/clickhouse.md
     - etcd: provider/etcd.md
-    - Kafka: provider/kafka.md
+    - Franz (Kafka): provider/franz.md
+    - Kafka (Legacy): provider/kafka.md
+    - Kafka Migration Guide: provider/kafka-to-franz-migration.md
     - PostgreSQL: provider/pgsql.md
     - Redis: provider/redis.md
     - S3 Storage: provider/s3.md

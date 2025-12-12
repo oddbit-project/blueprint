@@ -47,7 +47,8 @@ All existing imports continue to work without changes due to Go module rewrite r
 ## Providers
 
 ### Message Queues & Communication
-- [Kafka](provider/kafka.md)
+- [Franz (Kafka)](provider/franz.md) - High-performance Kafka client with batch processing and transactions
+- [Kafka](provider/kafka.md) - Legacy Kafka client (see [migration guide](provider/kafka-to-franz-migration.md))
 - [MQTT](provider/mqtt.md)
 - [NATS](provider/nats.md)
 
