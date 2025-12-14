@@ -376,7 +376,7 @@ func (s *PGIntegrationTestSuite) testFunctions(repo testRepository) {
 	}
 	// insert multiple records
 	// we need to convert to []any
-	require.NoError(s.T(), repo.Insert(db.ToAnySlice(records)...))
+	require.NoError(s.T(), repo.Insert(records))
 
 	// read multiple records
 	records = make([]*sampleRecord, 0)

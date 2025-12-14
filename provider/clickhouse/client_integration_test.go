@@ -183,7 +183,7 @@ func (s *ClickhouseIntegrationTestSuite) TestRepositoryOperations() {
 		},
 	}
 
-	err := repo.Insert(records...)
+	err := repo.Insert(records)
 	assert.NoError(s.T(), err, "Insert should succeed")
 
 	// Count records

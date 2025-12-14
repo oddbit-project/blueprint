@@ -541,38 +541,6 @@ func getUserSafely(ctx context.Context, client db.Client, userID int) (*User, er
 }
 ```
 
-## Helper Functions
-
-### ToAnySlice
-
-```go
-func ToAnySlice[T any](in []T) []any
-```
-
-Converts a typed slice to a slice of any, useful for batch operations with Repository.Insert().
-
-**Example:**
-```go
-// Convert typed slice to []any for batch insert
-users := []*User{
-    {Name: "Alice", Email: "alice@example.com"},
-    {Name: "Bob", Email: "bob@example.com"},
-    {Name: "Charlie", Email: "charlie@example.com"},
-}
-
-// Convert and insert
-records := db.ToAnySlice(users)
-err := repo.Insert(records...)
-
-// Or in one line
-err := repo.Insert(db.ToAnySlice(users)...)
-```
-
-**Use Cases:**
-- Batch insert operations with Repository
-- Converting typed slices for variadic functions
-- Working with strongly-typed data that needs []any interface
-
 ## Advanced Usage Patterns
 
 ### Transaction Support

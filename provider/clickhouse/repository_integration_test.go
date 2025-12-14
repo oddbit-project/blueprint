@@ -224,7 +224,7 @@ func (s *ClickhouseRepositoryTestSuite) TestCounters() {
 		},
 	}
 
-	err := s.repo.Insert(records...)
+	err := s.repo.Insert(records)
 	assert.NoError(s.T(), err, "Insert should succeed")
 
 	// Direct count with SQL (workaround for type issue)

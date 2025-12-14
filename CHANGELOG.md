@@ -15,6 +15,16 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.4]
+
+### Changed
+
+- **db.Repository**: Changed ```Insert()``` interface to remove variadic lists; existing code may require migration
+
+
+### Removed
+- **db.Repository**: Removed helper function ```ToAnySlice()```
+
 ## [v0.8.3]
 
 ### Changed
