@@ -97,7 +97,7 @@ func main() {
 			},
 		}
 
-		if err = repo.Insert(sampleRecords...); err != nil {
+		if err = repo.Insert(sampleRecords); err != nil {
 			logger.Error(err, "Failed to insert records")
 		} else {
 			fmt.Println("Inserted sample records")

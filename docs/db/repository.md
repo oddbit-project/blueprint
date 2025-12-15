@@ -368,22 +368,10 @@ users := []any{
     &UserRecord{Name: "Bob", Email: "bob@example.com"},
     &UserRecord{Name: "Charlie", Email: "charlie@example.com"},
 }
-err := repo.Insert(users...)
+err := repo.Insert(users)
 ```
 
-*Method 2: Using ToAnySlice helper*
-```go
-// With typed slice
-typedUsers := []*UserRecord{
-    {Name: "Alice", Email: "alice@example.com"},
-    {Name: "Bob", Email: "bob@example.com"},
-}
-
-// Convert and insert
-err := repo.Insert(db.ToAnySlice(typedUsers)...)
-```
-
-*Method 3: Large datasets with chunking*
+*Method 2: Large datasets with chunking*
 ```go
 func batchInsertLarge(repo db.Repository, users []*UserRecord) error {
     const chunkSize = 1000
@@ -400,7 +388,7 @@ func batchInsertLarge(repo db.Repository, users []*UserRecord) error {
             records[j] = user
         }
         
-        if err := repo.Insert(records...); err != nil {
+        if err := repo.Insert(records); err != nil {
             return fmt.Errorf("chunk %d-%d failed: %w", i, end-1, err)
         }
     }
@@ -408,7 +396,7 @@ func batchInsertLarge(repo db.Repository, users []*UserRecord) error {
 }
 ```
 
-*Method 4: Batch insert with transaction*
+*Method 3: Batch insert with transaction*
 ```go
 func batchInsertWithTransaction(repo db.Repository, users []*UserRecord) error {
     tx, err := repo.NewTransaction(nil)
@@ -416,9 +404,8 @@ func batchInsertWithTransaction(repo db.Repository, users []*UserRecord) error {
         return err
     }
     defer tx.Rollback()
-    
-    records := db.ToAnySlice(users)
-    if err := tx.Insert(records...); err != nil {
+	
+    if err := tx.Insert(users); err != nil {
         return err
     }
     
@@ -1094,10 +1081,7 @@ func batchInsertWithProgress(repo db.Repository, users []*UserRecord) error {
         }
         
         batch := users[i:end]
-        records := db.ToAnySlice(batch)
-        
-        err := repo.Insert(records...)
-        if err != nil {
+        if err := repo.Insert(batch); err != nil {
             return fmt.Errorf("batch %d-%d failed: %w", i, end-1, err)
         }
         
@@ -1116,9 +1100,8 @@ func batchInsertWithErrorRecovery(repo db.Repository, users []*UserRecord) error
     }
     
     // Try batch insert first
-    records := db.ToAnySlice(users)
-    err := repo.Insert(records...)
-    if err == nil {
+    
+    if err := repo.Insert(users); err == nil {
         log.Printf("Successfully batch inserted %d users", len(users))
         return nil
     }

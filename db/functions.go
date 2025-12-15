@@ -3,12 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
 	"github.com/oddbit-project/blueprint/db/field"
 	"github.com/oddbit-project/blueprint/db/qb"
-	"reflect"
-	"strings"
 )
 
 type SqlAdapter interface {
@@ -306,12 +307,4 @@ func Count(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDatase
 		return 0, err
 	}
 	return count, nil
-}
-
-func ToAnySlice[T any](in []T) []any {
-	out := make([]any, len(in))
-	for i, v := range in {
-		out[i] = v
-	}
-	return out
 }
