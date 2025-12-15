@@ -99,21 +99,21 @@ func TestBasicBindingValidation(t *testing.T) {
 			name:           "missing required field",
 			payload:        `{"username":"test@example.com"}`,
 			expectValid:    false,
-			expectedField:  "Password",
+			expectedField:  "password",
 			expectedErrMsg: "Error: Field validation failed on the 'required' validator",
 		},
 		{
 			name:           "invalid email format",
 			payload:        `{"username":"notanemail","password":"password123"}`,
 			expectValid:    false,
-			expectedField:  "Username",
+			expectedField:  "username",
 			expectedErrMsg: "Error: Field validation failed on the 'email' validator",
 		},
 		{
 			name:           "password too short",
 			payload:        `{"username":"test@example.com","password":"short"}`,
 			expectValid:    false,
-			expectedField:  "Password",
+			expectedField:  "password",
 			expectedErrMsg: "Error: Field validation failed on the 'min' validator",
 		},
 	}
@@ -252,7 +252,7 @@ func TestNestedStructValidation(t *testing.T) {
 			name:           "nested binding error",
 			payload:        `{"name":"John","address":{"street":"Main St","zip_code":"123"}}`,
 			expectValid:    false,
-			expectedField:  "ZipCode",
+			expectedField:  "zip_code",
 			expectedErrMsg: "Error: Field validation failed on the 'len' validator",
 		},
 	}
@@ -420,7 +420,7 @@ func TestSliceValidation(t *testing.T) {
 			name:          "missing required field in slice",
 			payload:       `{"items":[{"name":"item1"},{}]}`,
 			expectValid:   false,
-			expectedField: "Name",
+			expectedField: "name",
 		},
 	}
 
@@ -994,7 +994,7 @@ func TestBackwardCompatibility(t *testing.T) {
 		{
 			name:            "binding validation error format",
 			payload:         `{"email":"notanemail"}`,
-			expectedField:   "Email",
+			expectedField:   "email",
 			expectedMessage: "Error: Field validation failed on the 'email' validator",
 		},
 		{
