@@ -4,6 +4,12 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.5]
+
+### Changed
+- Fixed issue with `ValidateJSON` where json fields were being named using the struct name, instead of the json tag name 
+
+
 ## [v0.8.4]
 
 ### Added
