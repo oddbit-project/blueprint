@@ -1,6 +1,4 @@
-go 1.24.0
-
-toolchain go1.24.7
+go 1.24.7
 
 use (
 	.
@@ -16,6 +14,7 @@ use (
 	./provider/mqtt
 	./provider/nats
 	./provider/pgsql
+	./provider/prometheus
 	./provider/redis
 	./provider/s3
 	./provider/smtp
