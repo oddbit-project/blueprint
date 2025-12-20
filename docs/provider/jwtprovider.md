@@ -39,9 +39,9 @@ Key features:
 
 ```go
 type JWTConfig struct {
-	SigningKey        *secure.DefaultCredentialConfig `json:"signingKey,omitempty"`     // For HMAC algorithms
-	PrivateKey        *secure.KeyConfig               `json:"privateKey,omitempty"`     // For asymmetric algorithms
-	PublicKey         *secure.KeyConfig               `json:"publicKey,omitempty"`      // For asymmetric algorithms
+	CfgSigningKey     *secure.DefaultCredentialConfig `json:"signingKey,omitempty"`     // For HMAC algorithms
+	CfgPrivateKey     *secure.KeyConfig               `json:"privateKey,omitempty"`     // For asymmetric algorithms
+	CfgPublicKey      *secure.KeyConfig               `json:"publicKey,omitempty"`      // For asymmetric algorithms
 	SigningAlgorithm  string                          `json:"signingAlgorithm"`         // Algorithm to use
 	ExpirationSeconds int                             `json:"expirationSeconds"`        // Token expiration
 	Issuer            string                          `json:"issuer"`                   // Token issuer
@@ -97,8 +97,8 @@ func main() {
         log.Fatal(err)
     }
     
-	config.SigningKey = &secure.DefaultCredentialConfig{
-        Key: signingKey,
+	config.CfgSigningKey = &secure.DefaultCredentialConfig{
+        Password: string(signingKey),
     }
 
     // Create JWT provider
@@ -166,14 +166,14 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu8...
 	if err != nil {
         log.Fatal(err)
     }
-	config.PrivateKey = privateKeyConfig
+	config.CfgPrivateKey = privateKeyConfig
 
     // Configure public key  
 	publicKeyConfig, err := secure.NewKeyConfig([]byte(publicKeyPEM))
 	if err != nil {
         log.Fatal(err)
     }
-	config.PublicKey = publicKeyConfig
+	config.CfgPublicKey = publicKeyConfig
 
     // Create provider
 	provider, err := jwtprovider.NewProvider(config)

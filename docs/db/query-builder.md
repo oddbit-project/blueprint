@@ -20,21 +20,32 @@ The Query Builder system includes:
 
 ## Core Components
 
-### SqlDialect Interface
+### SqlDialect Struct
 
 ```go
-type SqlDialect interface {
-    Name() string
-    Quote(identifier string) string
-    Placeholder(position int) string
+type SqlDialect struct {
+    PlaceHolderFragment   string
+    IncludePlaceholderNum bool
+    QuoteTable            string
+    QuoteField            string
+    QuoteSchema           string
+    QuoteDatabase         string
+    QuoteSeparator        string
 }
 ```
 
-The SqlDialect interface abstracts database-specific SQL generation:
+The SqlDialect struct provides database-specific SQL generation settings:
 
-- **Name()**: Returns the dialect name (e.g., "pgx", "clickhouse")
-- **Quote()**: Quotes identifiers for the target database
-- **Placeholder()**: Generates parameter placeholders ($1, ?, etc.)
+- **PlaceHolderFragment**: The placeholder character (e.g., "$" for PostgreSQL, "?" for others)
+- **IncludePlaceholderNum**: Whether to include position numbers in placeholders ($1, $2 vs ?, ?)
+- **QuoteTable/QuoteField/QuoteSchema/QuoteDatabase**: Quote characters for different identifiers
+- **QuoteSeparator**: Separator between schema and table names
+
+**Key Methods:**
+- **Placeholder(count int) string**: Generates parameter placeholder string
+- **Table(name string) (string, error)**: Quotes a table name
+- **TableSchema(schema, name string) string**: Quotes a schema-qualified table name
+- **Field(name string) string**: Quotes a field name
 
 ### SqlBuilder
 
@@ -59,11 +70,11 @@ import (
 
 func main() {
     // Create builder with PostgreSQL dialect
-    dialect := qb.NewPostgreSqlDialect()
+    dialect := qb.PostgreSQLDialect()
     builder := qb.NewSqlBuilder(dialect)
-    
+
     // Builder is ready for query generation
-    log.Printf("Using dialect: %s", builder.Dialect().Name())
+    log.Printf("Using PostgreSQL dialect")
 }
 ```
 

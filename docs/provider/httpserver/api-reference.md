@@ -317,7 +317,7 @@ server.UseRateLimiting(60)
 ### Session Management
 
 ```go
-func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.Logger) *session.SessionManager
+func (s *Server) UseSession(config *session.Config, backend kv.KV, logger *log.Logger) (*session.Manager, error)
 ```
 Adds session middleware with specified configuration and storage backend.
 
@@ -327,18 +327,25 @@ Adds session middleware with specified configuration and storage backend.
 - `logger`: Logger for session operations
 
 **Returns:**
-- SessionManager instance for additional session operations
+- `*session.Manager`: Session manager instance for additional session operations
+- `error`: Error if session setup fails
 
 **Example:**
 ```go
 // Memory-based sessions
 backend := kv.NewMemoryKV()
 sessionConfig := session.NewConfig()
-manager := server.UseSession(sessionConfig, backend, logger)
+manager, err := server.UseSession(sessionConfig, backend, logger)
+if err != nil {
+    log.Fatal(err)
+}
 
 // Redis-based sessions
 redisBackend, _ := redis.NewClient(redisConfig)
-manager := server.UseSession(sessionConfig, redisBackend, logger)
+manager, err := server.UseSession(sessionConfig, redisBackend, logger)
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 ## Response Helper API

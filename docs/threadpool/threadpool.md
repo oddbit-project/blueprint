@@ -45,7 +45,7 @@ func (j *MyJob) Run(ctx context.Context) {
 
 func main() {
     // Create a logger
-    logger := log.NewLogger()
+    logger := log.New("threadpool")
 
     // Create a thread pool with 5 workers and a queue capacity of 10
     // The pool will process at most 5 jobs concurrently

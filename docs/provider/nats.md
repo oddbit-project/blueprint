@@ -6,7 +6,7 @@ Blueprint NATS client implementation for message publishing and consumption.
 
 The NATS client provides a simple interface for connecting to NATS servers, publishing messages, and consuming messages using subjects and queues. It supports:
 
-- Multiple authentication methods (none, basic, token, NKey, JWT)
+- Multiple authentication methods (none, basic, token)
 - TLS for secure connections
 - Publish/Subscribe patterns
 - Request/Reply patterns
@@ -21,11 +21,9 @@ The NATS client provides a simple interface for connecting to NATS servers, publ
 type ProducerConfig struct {
 	URL      string // NATS server URL (e.g., "nats://localhost:4222")
 	Subject  string // Default subject to publish to
-	AuthType string // Authentication type: "none", "basic", "token", "nkey", "jwt"
+	AuthType string // Authentication type: "none", "basic", "token"
 	Username string // Username for basic auth
 	Password string // Password for basic auth
-	NKeyPath string // Path to NKey seed file
-	JwtPath  string // Path to JWT file
 	Token    string // Auth token
 
 	// Connection settings
@@ -48,11 +46,9 @@ type ProducerConfig struct {
 type ConsumerConfig struct {
 	URL        string // NATS server URL (e.g., "nats://localhost:4222")
 	Subject    string // Subject pattern to subscribe to
-	AuthType   string // Authentication type: "none", "basic", "token", "nkey", "jwt"
+	AuthType   string // Authentication type: "none", "basic", "token"
 	Username   string // Username for basic auth
 	Password   string // Password for basic auth
-	NKeyPath   string // Path to NKey seed file
-	JwtPath    string // Path to JWT file
 	Token      string // Auth token
 	QueueGroup string // Queue group for distributing messages among subscribers
 
@@ -91,7 +87,7 @@ func main() {
 	}
 
 	// Create logger
-	logger := log.NewLogger()
+	logger := log.New("nats-producer")
 
 	// Create producer
 	producer, err := nats.NewProducer(config, logger)
@@ -166,8 +162,8 @@ func main() {
     }
     
     // Create logger
-	logger := log.NewLogger()
-    
+	logger := log.New("nats-consumer")
+
     // Create consumer
 	consumer, err := nats.NewConsumer(config, logger)
 	if err != nil {
@@ -253,28 +249,6 @@ config := &nats.ProducerConfig{
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeToken,
 	Token:    "my-auth-token",
-}
-```
-
-### NKey Authentication
-
-```go
-config := &nats.ProducerConfig{
-	URL:      "nats://localhost:4222",
-	Subject:  "my.subject",
-	AuthType: nats.AuthTypeNKey,
-	NKeyPath: "/path/to/nkey.seed",
-}
-```
-
-### JWT Authentication
-
-```go
-config := &nats.ProducerConfig{
-	URL:      "nats://localhost:4222",
-	Subject:  "my.subject",
-	AuthType: nats.AuthTypeJWT,
-	JwtPath:  "/path/to/user.jwt",
 }
 ```
 

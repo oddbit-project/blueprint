@@ -625,12 +625,12 @@ The Repository also implements a GridOps interface that provides methods for wor
 ```go
 type GridOps interface {
 	Grid(record any) (*Grid, error)
-	QueryGrid(record any, args GridQuery, dest any) error
+	QueryGrid(record any, args *GridQuery, dest any) error
 }
 ```
 
 - `Grid(record any) (*Grid, error)` - Creates a Grid object based on the provided record type, using field tags to determine which fields can be sorted, filtered, or searched
-- `QueryGrid(record any, args GridQuery, dest any) error` - Creates a Grid object and executes a query using the provided GridQuery parameters
+- `QueryGrid(record any, args *GridQuery, dest any) error` - Creates a Grid object and executes a query using the provided GridQuery parameters
 
 ### Example Usage
 
