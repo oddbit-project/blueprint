@@ -330,6 +330,8 @@ dbNode, _ := cfg.GetConfigNode("database")
 host, _ := dbNode.GetStringKey("host") // "localhost"
 ```
 
+> **Note:** The `GetConfigNode()` method is only implemented for `JsonProvider`. When called on `EnvProvider`, it always returns `config.ErrNotImplemented` since environment variables don't have a natural hierarchical structure that can be extracted as sub-providers.
+
 ### Default Values Behavior
 
 Default values are applied when:

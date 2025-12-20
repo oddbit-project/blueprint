@@ -258,6 +258,28 @@ func NewGridQuery(searchType uint, limit uint, offset uint) (*GridQuery, error)
 
 Creates a new GridQuery with the specified search type, limit, and offset.
 
+#### Page
+```go
+func (g *GridQuery) Page(page, itemsPerPage int)
+```
+
+Sets pagination parameters using page number and items per page, calculating the appropriate offset automatically.
+
+**Parameters:**
+- `page`: Page number (1-based, minimum 1)
+- `itemsPerPage`: Number of items per page (minimum 1, defaults to `DefaultPageSize` if less than 1)
+
+**Example:**
+```go
+query, _ := db.NewGridQuery(db.SearchStart, 0, 0)
+
+// Set to page 3 with 25 items per page
+query.Page(3, 25)  // Sets Offset=50, Limit=25
+
+// Page 1 with default page size
+query.Page(1, 0)   // Uses DefaultPageSize for Limit
+```
+
 #### NewGrid
 
 ```go

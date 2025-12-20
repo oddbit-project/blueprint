@@ -64,9 +64,39 @@ By default, logs are appended to existing files. Use this function to overwrite 
 config = log.DisableFileAppend(config)
 ```
 
-## File Rotation
+## Log Rotation
 
-The Blueprint logger doesn't include built-in log rotation. For production environments, consider using these approaches:
+The Blueprint logger includes built-in log rotation support via the lumberjack library. Configure rotation using these Config fields:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `FileRotation` | Enable log rotation | `false` |
+| `MaxSizeMb` | Maximum log file size in MB before rotation | `100` |
+| `MaxBackups` | Maximum number of old log files to retain | `3` |
+| `MaxAgeDays` | Maximum age in days to keep old log files | `28` |
+| `Compress` | Compress rotated log files | `false` |
+
+### Rotation Configuration Example
+
+```go
+config := log.NewDefaultConfig()
+config = log.EnableFileOutput(config, "/var/log/myapp/app.log")
+
+// Enable rotation
+config.FileRotation = true
+config.MaxSizeMb = 50       // Rotate when file reaches 50MB
+config.MaxBackups = 5       // Keep 5 old files
+config.MaxAgeDays = 30      // Delete files older than 30 days
+config.Compress = true      // Compress old files with gzip
+
+if err := log.Configure(config); err != nil {
+    panic(err)
+}
+```
+
+### Alternative Approaches
+
+If you prefer external rotation, you can also:
 
 1. Create a new log file with a timestamp for each application run
 2. Use an external log rotation solution like logrotate

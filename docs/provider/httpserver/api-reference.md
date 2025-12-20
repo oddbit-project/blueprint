@@ -10,13 +10,14 @@ Configuration structure for HTTP server settings:
 
 ```go
 type ServerConfig struct {
-    Host         string            `json:"host"`         // Server bind address (default: "")
-    Port         int               `json:"port"`         // Server port (default: 5000)
-    ReadTimeout  int               `json:"readTimeout"`  // Read timeout in seconds (default: 600)
-    WriteTimeout int               `json:"writeTimeout"` // Write timeout in seconds (default: 600)
-    Debug        bool              `json:"debug"`        // Enable debug mode (default: false)
-    Options      map[string]string `json:"options"`      // Additional server options
-    tlsProvider.ServerConfig                           // TLS configuration
+    Host           string            `json:"host"`           // Server bind address (default: "")
+    Port           int               `json:"port"`           // Server port (default: 5000)
+    ReadTimeout    int               `json:"readTimeout"`    // Read timeout in seconds (default: 600)
+    WriteTimeout   int               `json:"writeTimeout"`   // Write timeout in seconds (default: 600)
+    Debug          bool              `json:"debug"`          // Enable debug mode (default: false)
+    Options        map[string]string `json:"options"`        // Additional server options
+    TrustedProxies []string          `json:"trustedProxies"` // List of trusted proxy IPs/CIDRs
+    tlsProvider.ServerConfig                                 // TLS configuration
 }
 ```
 
@@ -62,6 +63,7 @@ const (
     OptAuthTokenHeader        = "authTokenHeader"        // Custom auth header name
     OptAuthTokenSecret        = "authTokenSecret"        // Auth token secret
     OptDefaultSecurityHeaders = "defaultSecurityHeaders" // Enable default security headers
+    OptHMACSecret             = "hmacSecret"             // HMAC secret for request signing
 )
 ```
 > Note: 'authTokenHeader' and 'authTokenSecret' will be used to configure automatically 
@@ -153,6 +155,26 @@ defer cancel()
 if err := server.Shutdown(ctx); err != nil {
     logger.Error(err, "shutdown failed")
 }
+```
+
+#### URL Generation
+
+```go
+func (c *ServerConfig) GetUrl() string
+```
+Builds the full URL from the server configuration.
+
+**Returns:**
+- `string`: Full URL (e.g., "http://localhost:8080" or "https://localhost:8080" if TLS is enabled)
+
+**Example:**
+```go
+config := NewServerConfig()
+config.Host = "api.example.com"
+config.Port = 443
+config.TLSEnable = true
+
+url := config.GetUrl()  // Returns "https://api.example.com:443"
 ```
 
 #### Router Access
@@ -407,6 +429,23 @@ Generates 500 Internal Server Error response with error logging.
 func ValidationError(ctx *gin.Context, errors interface{})
 ```
 Generates 400 Bad Request response for validation failures.
+
+```go
+func Success(ctx *gin.Context, data any)
+```
+Generates a JSON success response with an optional payload.
+
+**Parameters:**
+- `ctx`: Gin context
+- `data`: Optional data payload (can be nil)
+
+**Response Format:**
+```json
+{
+    "success": true,
+    "data": { ... }
+}
+```
 
 **JSON Response Example:**
 ```json

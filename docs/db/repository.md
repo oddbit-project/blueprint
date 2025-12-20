@@ -714,6 +714,44 @@ func main() {
 
 For more detailed information about grid functionality, see the [Data Grid documentation](dbgrid.md).
 
+### Identifier Interface
+
+The Identifier interface provides methods for accessing the underlying database connection and table name:
+
+```go
+type Identifier interface {
+    Db() *sqlx.DB
+    Name() string
+}
+```
+
+#### Db
+```go
+func (r *repository) Db() *sqlx.DB
+```
+
+Returns the underlying sqlx database connection. Useful for advanced operations that require direct database access.
+
+**Example:**
+```go
+// Access raw connection for custom operations
+db := repo.Db()
+rows, err := db.QueryContext(ctx, "SELECT version()")
+```
+
+#### Name
+```go
+func (r *repository) Name() string
+```
+
+Returns the repository's table name.
+
+**Example:**
+```go
+tableName := repo.Name()  // e.g., "users"
+log.Printf("Working with table: %s", tableName)
+```
+
 ### Builder Interface
 
 The Builder interface provides methods for creating SQL query builders:

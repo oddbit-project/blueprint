@@ -149,6 +149,51 @@ type Job interface {
 
 Interface that must be implemented by all jobs submitted to the thread pool.
 
+#### Pool
+
+```go
+type Pool interface {
+    Start(ctx context.Context) error
+    Stop() error
+    Dispatch(j Job)
+    TryDispatch(j Job) bool
+    DispatchWithTimeout(j Job, timeout time.Duration) bool
+    DispatchWithContext(ctx context.Context, j Job) error
+    GetRequestCount() uint64
+    GetQueueLen() int
+    GetQueueCapacity() int
+    GetWorkerCount() int
+}
+```
+
+Interface defining all pool operations. Useful for mocking in tests.
+
+#### FuncRunner
+
+```go
+func FuncRunner(job func(ctx context.Context)) Job
+```
+
+Helper function that wraps a simple function as a Job. This allows using anonymous functions directly without creating a struct.
+
+**Example:**
+```go
+pool, _ := threadpool.NewThreadPool(5, 10)
+pool.Start(context.Background())
+
+// Using FuncRunner instead of creating a Job struct
+pool.Dispatch(threadpool.FuncRunner(func(ctx context.Context) {
+    // Your job logic here
+    fmt.Println("Job executed!")
+}))
+
+// With closure over variables
+userID := 123
+pool.Dispatch(threadpool.FuncRunner(func(ctx context.Context) {
+    processUser(ctx, userID)
+}))
+```
+
 ### Functions
 
 #### NewThreadPool
