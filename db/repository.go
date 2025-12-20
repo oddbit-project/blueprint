@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"reflect"
+
 	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
@@ -46,7 +48,7 @@ type Executor interface {
 }
 
 type Writer interface {
-	Insert(records ...any) error
+	Insert(records any) error
 	InsertReturning(record any, returnFields []string, target ...any) error
 }
 type Updater interface {
@@ -267,11 +269,33 @@ func (r *repository) Select(sql string, target any, args ...any) error {
 	return r.conn.SelectContext(r.ctx, target, sql, args...)
 }
 
-func (r *repository) Insert(rows ...any) error {
-	qry, args, err := r.sqlBuilder.BuildSQLBatchInsert(r.tableName, rows)
+func (r *repository) Insert(rows any) error {
+	var batch []any
+
+	switch v := rows.(type) {
+	case []any:
+		batch = v
+
+	default:
+		rv := reflect.ValueOf(rows)
+
+		// Handle slice of structs (or pointers)
+		if rv.Kind() == reflect.Slice {
+			batch = make([]any, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				batch[i] = rv.Index(i).Interface()
+			}
+		} else {
+			// Single record
+			batch = []any{rows}
+		}
+	}
+
+	qry, args, err := r.sqlBuilder.BuildSQLBatchInsert(r.tableName, batch)
 	if err != nil {
 		return err
 	}
+
 	return RawInsert(r.ctx, r.conn, qry, args)
 }
 
@@ -604,11 +628,33 @@ func (t *tx) Select(sql string, target any, args ...any) error {
 	return t.conn.SelectContext(t.ctx, target, sql, args...)
 }
 
-func (t *tx) Insert(rows ...any) error {
-	qry, args, err := t.sqlBuilder.BuildSQLBatchInsert(t.tableName, rows)
+func (t *tx) Insert(rows any) error {
+	var batch []any
+
+	switch v := rows.(type) {
+	case []any:
+		batch = v
+
+	default:
+		rv := reflect.ValueOf(rows)
+
+		// Handle slice of structs (or pointers)
+		if rv.Kind() == reflect.Slice {
+			batch = make([]any, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				batch[i] = rv.Index(i).Interface()
+			}
+		} else {
+			// Single record
+			batch = []any{rows}
+		}
+	}
+
+	qry, args, err := t.sqlBuilder.BuildSQLBatchInsert(t.tableName, batch)
 	if err != nil {
 		return err
 	}
+
 	return RawInsert(t.ctx, t.conn, qry, args)
 }
 

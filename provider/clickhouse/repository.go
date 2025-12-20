@@ -9,6 +9,7 @@ import (
 	"github.com/oddbit-project/blueprint/db"
 	"github.com/oddbit-project/blueprint/db/qb"
 	"github.com/oddbit-project/blueprint/utils"
+	"reflect"
 	"strings"
 )
 
@@ -261,21 +262,43 @@ func (r *repository) Select(sql string, target any, args ...any) error {
 
 // Insert inserts a collection of rows
 // Note: inserts are always batched
-func (r *repository) Insert(rows ...any) error {
+func (r *repository) Insert(rows any) error {
 	tableName, err := r.sqlDialect.Table(r.tableName)
 	if err != nil {
 		return err
 	}
-	batch, err := r.conn.PrepareBatch(r.ctx, fmt.Sprintf("INSERT INTO %s", tableName))
+
+	batch, err := r.conn.PrepareBatch(
+		r.ctx,
+		fmt.Sprintf("INSERT INTO %s", tableName),
+	)
 	if err != nil {
 		return err
 	}
-	for _, r := range rows {
-		if err := batch.AppendStruct(r); err != nil {
+
+	appendRow := func(row any) error {
+		if err := batch.AppendStruct(row); err != nil {
 			batch.Abort()
 			return err
 		}
+		return nil
 	}
+
+	rv := reflect.ValueOf(rows)
+
+	// Handle slice vs single record
+	if rv.Kind() == reflect.Slice {
+		for i := 0; i < rv.Len(); i++ {
+			if err := appendRow(rv.Index(i).Interface()); err != nil {
+				return err
+			}
+		}
+	} else {
+		if err := appendRow(rows); err != nil {
+			return err
+		}
+	}
+
 	return batch.Send()
 }
 

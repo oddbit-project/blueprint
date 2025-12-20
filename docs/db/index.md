@@ -93,7 +93,7 @@ func main() {
         {Name: "Charlie", Email: "charlie@example.com", CreatedAt: time.Now()},
     }
     
-    if err := repo.Insert(db.ToAnySlice(batchUsers)...); err != nil {
+    if err := repo.Insert(batchUsers); err != nil {
         log.Fatal(err)
     }
     
