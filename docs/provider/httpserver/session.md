@@ -138,7 +138,7 @@ func setupAdvancedSession(server *httpserver.Server, logger *log.Logger) {
     }
 
     // Add middleware
-    server.Router().Use(sessionManager.Middleware())
+    server.Route().Use(sessionManager.Middleware())
 }
 
 func setupSessionWithJSONMarshaller(server *httpserver.Server, logger *log.Logger) {
@@ -161,7 +161,7 @@ func setupSessionWithJSONMarshaller(server *httpserver.Server, logger *log.Logge
         logger.Fatal(err, "failed to create session manager")
     }
 
-    server.Router().Use(sessionManager.Middleware())
+    server.Route().Use(sessionManager.Middleware())
 }
 ```
 
@@ -750,13 +750,13 @@ func main() {
     // Security headers
     securityConfig := security.DefaultSecurityConfig()
     securityConfig.CSP = "default-src 'self'; script-src 'self' 'nonce-{nonce}'"
-    server.Router().Use(security.SecurityMiddleware(securityConfig))
+    server.Route().Use(security.SecurityMiddleware(securityConfig))
 
     // CSRF protection
-    server.Router().Use(security.CSRFProtection())
+    server.Route().Use(security.CSRFProtection())
 
     // Rate limiting
-    server.Router().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    server.Route().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
 
     // Routes
     setupRoutes(server, sessionManager)
@@ -768,7 +768,7 @@ func main() {
 }
 
 func setupRoutes(server *httpserver.Server, sessionManager *session.Manager) {
-    router := server.Router()
+    router := server.Route()
     
     // Public routes
     router.GET("/", homeHandler)

@@ -38,7 +38,7 @@ type Config struct {
 	// TLS configuration
 	tls.ClientConfig
 
-	// connection polling
+	// connection pooling
 	MaxIdleConns        int           `json:"maxIdleConns"`        // Total idle connections
 	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"` // Per-host idle connections
 	MaxConnsPerHost     int           `json:"maxConnsPerHost"`     // Max connections per host
@@ -129,7 +129,7 @@ func (c *Config) Validate() error {
 		c.IdleConnTimeout = 60 * time.Second
 	}
 
-	// Validate connection polling parameter
+	// Validate connection pooling parameters
 	if c.MaxIdleConns < 0 {
 		return errors.New("invalid max idle connections")
 	}
