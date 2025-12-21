@@ -155,6 +155,34 @@ Low-level function to verify a password against a hash.
 - `*Argon2Config`: Configuration used to create the hash
 - `error`: Error if comparison fails
 
+#### Argon2IdDecodeHash
+```go
+func Argon2IdDecodeHash(hash string) (*Argon2Config, []byte, []byte, error)
+```
+Parses an Argon2id hash string and extracts its components.
+
+**Parameters:**
+- `hash`: The complete Argon2id hash string (format: `$argon2id$v=19$m=...,t=...,p=...$[salt]$[hash]`)
+
+**Returns:**
+- `*Argon2Config`: Configuration extracted from the hash (memory, iterations, parallelism, etc.)
+- `[]byte`: The salt bytes (base64-decoded)
+- `[]byte`: The hash key bytes (base64-decoded)
+- `error`: `ErrInvalidHash` if format is invalid, `ErrIncompatibleVersion` if Argon2 version doesn't match
+
+**Example:**
+```go
+hash := "$argon2id$v=19$m=65536,t=4,p=8$c29tZXNhbHQ$aGFzaGtleQ"
+config, salt, key, err := hashing.Argon2IdDecodeHash(hash)
+if err != nil {
+    log.Fatal(err)
+}
+
+log.Printf("Memory: %d KB, Iterations: %d, Parallelism: %d",
+    config.Memory, config.Iterations, config.Parallelism)
+log.Printf("Salt length: %d, Key length: %d", len(salt), len(key))
+```
+
 ### Error Constants
 
 ```go

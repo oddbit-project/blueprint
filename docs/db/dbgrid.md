@@ -214,12 +214,12 @@ A function type for custom filtering operations that transform input values to d
 ```go
 type Grid struct {
     tableName  string
-    spec       *FieldSpec
+    spec       *fieldSpec  // Internal unexported type
     filterFunc map[string]GridFilterFunc
 }
 ```
 
-The main Grid component that handles query building and validation.
+The main Grid component that handles query building and validation. The `spec` field uses an internal type that is populated automatically when creating a Grid from a struct.
 
 #### GridQuery
 
@@ -253,10 +253,32 @@ Error type that includes the scope and field where an error occurred.
 #### NewGridQuery
 
 ```go
-func NewGridQuery(searchType uint, limit uint, offset uint) (GridQuery, error)
+func NewGridQuery(searchType uint, limit uint, offset uint) (*GridQuery, error)
 ```
 
 Creates a new GridQuery with the specified search type, limit, and offset.
+
+#### Page
+```go
+func (g *GridQuery) Page(page, itemsPerPage int)
+```
+
+Sets pagination parameters using page number and items per page, calculating the appropriate offset automatically.
+
+**Parameters:**
+- `page`: Page number (1-based, minimum 1)
+- `itemsPerPage`: Number of items per page (minimum 1, defaults to `DefaultPageSize` if less than 1)
+
+**Example:**
+```go
+query, _ := db.NewGridQuery(db.SearchStart, 0, 0)
+
+// Set to page 3 with 25 items per page
+query.Page(3, 25)  // Sets Offset=50, Limit=25
+
+// Page 1 with default page size
+query.Page(1, 0)   // Uses DefaultPageSize for Limit
+```
 
 #### NewGrid
 
@@ -265,14 +287,6 @@ func NewGrid(tableName string, record any) (*Grid, error)
 ```
 
 Creates a new Grid from a struct definition.
-
-#### NewGridWithSpec
-
-```go
-func NewGridWithSpec(tableName string, spec *FieldSpec) *Grid
-```
-
-Creates a new Grid from an existing FieldSpec.
 
 ### Grid Methods
 
@@ -287,7 +301,7 @@ Adds a custom filter function for a specific field.
 #### ValidQuery
 
 ```go
-func (grid *Grid) ValidQuery(query GridQuery) error
+func (grid *Grid) ValidQuery(query *GridQuery) error
 ```
 
 Validates a GridQuery against the grid's field specifications.
@@ -295,7 +309,7 @@ Validates a GridQuery against the grid's field specifications.
 #### Build
 
 ```go
-func (grid *Grid) Build(qry *goqu.SelectDataset, args GridQuery) (*goqu.SelectDataset, error)
+func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectDataset, error)
 ```
 
 Builds a goqu SelectDataset from the grid query.
@@ -456,7 +470,7 @@ The Grid component is integrated with the Repository through the GridOps interfa
 ```go
 type GridOps interface {
 	Grid(record any) (*Grid, error)
-	QueryGrid(record any, args GridQuery, dest any) error
+	QueryGrid(record any, args *GridQuery, dest any) error
 }
 ```
 

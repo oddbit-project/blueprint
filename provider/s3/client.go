@@ -107,12 +107,12 @@ func (c *Client) Connect(ctx context.Context) error {
 		opts.Creds = credentials.NewStaticV4(c.config.AccessKeyID, secretKey, "")
 	}
 
-	// connection polling
+	// connection pooling
 	transport := &http.Transport{
-		MaxIdleConns:        50, // Total idle connections
-		MaxIdleConnsPerHost: 10, // Per-host idle connections
-		MaxConnsPerHost:     20, // Max connections per host
-		IdleConnTimeout:     60 * time.Second,
+		MaxIdleConns:        c.config.MaxIdleConns,
+		MaxIdleConnsPerHost: c.config.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     c.config.MaxConnsPerHost,
+		IdleConnTimeout:     c.config.IdleConnTimeout,
 	}
 
 	// Configure custom HTTP client for non-SSL connections

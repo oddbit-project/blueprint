@@ -20,21 +20,32 @@ The Query Builder system includes:
 
 ## Core Components
 
-### SqlDialect Interface
+### SqlDialect Struct
 
 ```go
-type SqlDialect interface {
-    Name() string
-    Quote(identifier string) string
-    Placeholder(position int) string
+type SqlDialect struct {
+    PlaceHolderFragment   string
+    IncludePlaceholderNum bool
+    QuoteTable            string
+    QuoteField            string
+    QuoteSchema           string
+    QuoteDatabase         string
+    QuoteSeparator        string
 }
 ```
 
-The SqlDialect interface abstracts database-specific SQL generation:
+The SqlDialect struct provides database-specific SQL generation settings:
 
-- **Name()**: Returns the dialect name (e.g., "pgx", "clickhouse")
-- **Quote()**: Quotes identifiers for the target database
-- **Placeholder()**: Generates parameter placeholders ($1, ?, etc.)
+- **PlaceHolderFragment**: The placeholder character (e.g., "$" for PostgreSQL, "?" for others)
+- **IncludePlaceholderNum**: Whether to include position numbers in placeholders ($1, $2 vs ?, ?)
+- **QuoteTable/QuoteField/QuoteSchema/QuoteDatabase**: Quote characters for different identifiers
+- **QuoteSeparator**: Separator between schema and table names
+
+**Key Methods:**
+- **Placeholder(count int) string**: Generates parameter placeholder string
+- **Table(name string) (string, error)**: Quotes a table name
+- **TableSchema(schema, name string) string**: Quotes a schema-qualified table name
+- **Field(name string) string**: Quotes a field name
 
 ### SqlBuilder
 
@@ -59,11 +70,11 @@ import (
 
 func main() {
     // Create builder with PostgreSQL dialect
-    dialect := qb.NewPostgreSqlDialect()
+    dialect := qb.PostgreSQLDialect()
     builder := qb.NewSqlBuilder(dialect)
-    
+
     // Builder is ready for query generation
-    log.Printf("Using dialect: %s", builder.Dialect().Name())
+    log.Printf("Using PostgreSQL dialect")
 }
 ```
 
@@ -328,15 +339,20 @@ func whereExamples() {
     
     // Pattern matching
     condition6 := qb.Like("name", "John%")
-    condition7 := qb.ILike("email", "%@EXAMPLE.COM") // Case-insensitive
-    
+    condition7 := qb.NotLike("email", "%spam%")
+
     // NULL checks
     condition8 := qb.IsNull("deleted_at")
     condition9 := qb.IsNotNull("confirmed_at")
-    
-    // IN clauses
-    condition10 := qb.In("status", []any{"active", "pending"})
-    condition11 := qb.NotIn("role", []any{"admin", "super_admin"})
+
+    // IN clauses (variadic arguments)
+    condition10 := qb.In("status", "active", "pending")
+
+    // BETWEEN clause
+    condition11 := qb.Between("age", 18, 65)
+
+    // Field-to-field comparison
+    condition12 := qb.Compare("updated_at", ">", "created_at")
 }
 ```
 
@@ -433,27 +449,6 @@ func useRawExpressions(builder *qb.SqlBuilder) error {
             "rank": qb.Raw("rank + 1"),
         }).
         Where(qb.Eq("active", true))
-    
-    sql, args, err := updateBuilder.Build()
-    return executeSQL(sql, args)
-}
-```
-
-### Subqueries
-
-```go
-func updateWithSubquery(builder *qb.SqlBuilder) error {
-    // Subquery to get average score
-    avgSubquery := builder.SqlBuilder().
-        Select("AVG(score)").
-        From("users").
-        Where(qb.Eq("department", "engineering"))
-    
-    updateBuilder := builder.Update("users", &User{}).
-        FieldsValues(map[string]any{
-            "performance_rating": qb.Subquery(avgSubquery),
-        }).
-        Where(qb.Eq("id", 123))
     
     sql, args, err := updateBuilder.Build()
     return executeSQL(sql, args)

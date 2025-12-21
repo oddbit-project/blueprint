@@ -60,7 +60,7 @@ func main() {
     server := httpserver.NewServer(config, logger)
     
     // Add routes
-    server.Router().GET("/health", func(c *gin.Context) {
+    server.Route().GET("/health", func(c *gin.Context) {
         c.JSON(200, gin.H{"status": "healthy"})
     })
     
@@ -108,13 +108,13 @@ func main() {
     
     // Apply security headers
     securityConfig := security.DefaultSecurityConfig()
-    server.Router().Use(security.SecurityMiddleware(securityConfig))
+    server.Route().Use(security.SecurityMiddleware(securityConfig))
     
     // Apply CSRF protection
-    server.Router().Use(security.CSRFProtection())
+    server.Route().Use(security.CSRFProtection())
     
     // Apply rate limiting
-    server.Router().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    server.Route().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
     
     // Routes
     setupRoutes(server)
@@ -126,7 +126,7 @@ func main() {
 }
 
 func setupRoutes(server *httpserver.Server) {
-    router := server.Router()
+    router := server.Route()
     
     // Public routes
     router.GET("/", homeHandler)

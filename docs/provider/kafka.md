@@ -33,7 +33,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	logger := log.NewLogger("kafka-example")
+	logger := log.New("kafka-example")
     
     // Configure the producer
 	producerCfg := &kafka.ProducerConfig{
@@ -72,8 +72,8 @@ func main() {
         logger.Error(err, "Failed to write message", nil)
     }
     
-    // Write with a key
-	err = producer.Write(ctx, []byte("Message with key"), []byte("user-123"))
+    // Write with a key (use WriteWithKey for keyed messages)
+	err = producer.WriteWithKey(ctx, []byte("Message with key"), []byte("user-123"))
 	if err != nil {
         logger.Error(err, "Failed to write message with key", nil)
     }
@@ -123,7 +123,7 @@ import (
 )
 
 func main() {
-	logger := log.NewLogger("kafka-consumer")
+	logger := log.New("kafka-consumer")
     
     // Configure the consumer
 	consumerCfg := &kafka.ConsumerConfig{
@@ -192,15 +192,11 @@ func main() {
             logger.Info("Processing message", log.KV{
                 "value_len": len(msg.Value),
             })
-            
-            // Parse JSON messages
-            if consumer.IsJsonMessage(msg) {
-                var data map[string]interface{}
-                if err := consumer.DecodeJson(msg, &data); err != nil {
-                    logger.Error(err, "Failed to decode JSON message", nil)
-                } else {
-                    logger.Info("Received JSON message", data)
-                }
+
+            // Parse JSON messages manually
+            var data map[string]interface{}
+            if err := json.Unmarshal(msg.Value, &data); err == nil {
+                logger.Info("Received JSON message", data)
             }
         }
     }
@@ -238,6 +234,130 @@ type ConsumerOptions struct {
 	CommitInterval uint    // Auto-commit interval in milliseconds
 	StartOffset     string // Where to start reading: "newest", "oldest"
 }
+```
+
+## Additional Producer Methods
+
+### WriteWithKey
+```go
+func (p *Producer) WriteWithKey(ctx context.Context, value []byte, key []byte) error
+```
+Writes a message with a specific key for partitioning.
+
+### WriteWithHeaders
+```go
+func (p *Producer) WriteWithHeaders(ctx context.Context, value []byte, key []byte, headers []kafka.Header) error
+```
+Writes a message with custom headers using kafka.Header structs.
+
+**Example:**
+```go
+headers := []kafka.Header{
+    {Key: "correlation-id", Value: []byte("abc-123")},
+    {Key: "content-type", Value: []byte("application/json")},
+}
+err := producer.WriteWithHeaders(ctx, []byte(`{"event":"user_created"}`), []byte("user-1"), headers)
+```
+
+## Additional Consumer Methods
+
+### ChannelSubscribe
+```go
+func (c *Consumer) ChannelSubscribe(ctx context.Context, ch chan kafka.Message) error
+```
+Subscribes to messages via a channel instead of a callback.
+
+**Example:**
+```go
+msgChan := make(chan kafka.Message, 100)
+go func() {
+    if err := consumer.ChannelSubscribe(ctx, msgChan); err != nil {
+        log.Error(err, "Channel subscription failed")
+    }
+}()
+
+for msg := range msgChan {
+    log.Info("Received message", log.KV{"value": string(msg.Value)})
+}
+```
+
+### SubscribeWithOffsets
+```go
+func (c *Consumer) SubscribeWithOffsets(ctx context.Context, handler ConsumerHandler) error
+```
+Subscribes with manual offset commit control.
+
+### Connection Management
+```go
+func (c *Consumer) Connect() error      // Establish connection
+func (c *Consumer) Disconnect()         // Close connection
+func (c *Consumer) IsConnected() bool   // Check connection status
+func (c *Consumer) GetConfig() *kafka.ReaderConfig  // Get reader configuration
+func (c *Consumer) Rewind() error       // Read from beginning of topic
+```
+
+## Admin Client
+
+The Kafka provider includes an Admin client for topic management:
+
+```go
+import "github.com/oddbit-project/blueprint/provider/kafka"
+
+// Create admin client
+adminCfg := &kafka.AdminConfig{
+    Brokers:  "localhost:9092",
+    AuthType: "none",
+}
+admin, err := kafka.NewAdmin(adminCfg, logger)
+if err != nil {
+    log.Fatal(err)
+}
+defer admin.Disconnect()
+```
+
+### Admin Methods
+
+```go
+// Connect to Kafka cluster
+func (a *Admin) Connect() error
+
+// Disconnect from cluster
+func (a *Admin) Disconnect()
+
+// List all topics
+func (a *Admin) ListTopics() ([]string, error)
+
+// Check if topic exists
+func (a *Admin) TopicExists(topic string) (bool, error)
+
+// Create a new topic
+func (a *Admin) CreateTopic(topic string, partitions int, replicationFactor int) error
+
+// Delete a topic
+func (a *Admin) DeleteTopic(topic string) error
+
+// Get topic metadata
+func (a *Admin) GetTopics() ([]kafka.TopicMetadata, error)
+```
+
+**Example:**
+```go
+// List existing topics
+topics, err := admin.ListTopics()
+if err != nil {
+    log.Error(err, "Failed to list topics")
+}
+
+// Create a new topic
+if exists, _ := admin.TopicExists("my-topic"); !exists {
+    err := admin.CreateTopic("my-topic", 3, 1)  // 3 partitions, replication factor 1
+    if err != nil {
+        log.Error(err, "Failed to create topic")
+    }
+}
+
+// Delete a topic
+err = admin.DeleteTopic("old-topic")
 ```
 
 ## Security Best Practices

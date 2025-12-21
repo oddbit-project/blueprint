@@ -147,6 +147,70 @@ if err != nil {
 }
 ```
 
+## Formatted Logging Methods
+
+In addition to the standard logging methods, the logger provides formatted variants that support printf-style formatting:
+
+```go
+logger := log.New("mymodule")
+
+// Formatted logging methods
+logger.Debugf("Processing item %d of %d", current, total)
+logger.Infof("User %s logged in from %s", username, ipAddress)
+logger.Warnf("Cache hit rate below threshold: %.2f%%", hitRate)
+logger.Errorf(err, "Failed to process request %s", requestID)
+logger.Fatalf(err, "Critical failure in %s", component)
+```
+
+### Context-Based Formatted Logging
+
+When using context-aware logging, formatted variants are also available:
+
+```go
+// These functions extract the logger from context and use formatted output
+log.Debugf(ctx, "Processing item %d", itemID)
+log.Infof(ctx, "Request completed in %dms", duration)
+log.Warnf(ctx, "Retry attempt %d of %d", attempt, maxRetries)
+log.Errorf(ctx, err, "Failed to connect to %s", hostname)
+log.Fatalf(ctx, err, "Unrecoverable error in %s", service)
+```
+
+## Additional Utility Functions
+
+### Context Utilities
+
+```go
+// MergeContextFields combines multiple field sets into one
+fields := log.MergeContextFields(
+    log.ContextFields{"user_id": userID},
+    log.ContextFields{"request_id": reqID},
+)
+
+// NewTraceID generates a new unique trace ID
+traceID := log.NewTraceID()
+
+// ExtractLoggerFromContext retrieves the logger from context
+logger := log.ExtractLoggerFromContext(ctx)
+```
+
+### Logger Utility Methods
+
+```go
+logger := log.New("mymodule")
+
+// Get module information
+info := logger.ModuleInfo()  // Returns the module name
+
+// Get hostname
+hostname := logger.Hostname()  // Returns the system hostname
+
+// Set custom output writer
+logger.WithOutput(customWriter)
+
+// Access the underlying zerolog logger for advanced usage
+zl := logger.GetZerolog()
+```
+
 ## Best Practices
 
 1. **Include relevant fields**: Add meaningful fields to help with debugging and analysis

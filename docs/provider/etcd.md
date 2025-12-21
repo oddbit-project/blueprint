@@ -61,7 +61,7 @@ func main() {
 ```go
 config := etcd.DefaultConfig().
 WithEndpoints("localhost:2379", "localhost:2380").
-WithTimeout(10 * time.Second).
+WithTimeout(10). // timeout in seconds
 WithAuth("username", "password")
 
 client, err := config.NewClient()
@@ -69,18 +69,18 @@ client, err := config.NewClient()
 
 ### Configuration Options
 
-| Option                 | Type            | Default              | Description                   |
-|------------------------|-----------------|----------------------|-------------------------------|
-| `Endpoints`            | `[]string`      | `["localhost:2379"]` | etcd server URLs              |
-| `Username`             | `string`        | `""`                 | Authentication username       |
-| `DialTimeout`          | `time.Duration` | `5s`                 | Connection timeout            |
-| `DialKeepAliveTime`    | `time.Duration` | `30s`                | Keep-alive interval           |
-| `DialKeepAliveTimeout` | `time.Duration` | `10s`                | Keep-alive timeout            |
-| `RequestTimeout`       | `time.Duration` | `5s`                 | Individual request timeout    |
-| `EnableEncryption`     | `bool`          | `false`              | Enable client-side encryption |
-| `EncryptionKey`        | `[]byte`        | `nil`                | 32-byte encryption key        |
-| `MaxCallSendMsgSize`   | `int`           | `2MB`                | Max message send size         |
-| `MaxCallRecvMsgSize`   | `int`           | `2MB`                | Max message receive size      |
+| Option                 | Type       | Default              | Description                       |
+|------------------------|------------|----------------------|-----------------------------------|
+| `Endpoints`            | `[]string` | `["localhost:2379"]` | etcd server URLs                  |
+| `Username`             | `string`   | `""`                 | Authentication username           |
+| `DialTimeout`          | `int`      | `5`                  | Connection timeout (seconds)      |
+| `DialKeepAliveTime`    | `int`      | `30`                 | Keep-alive interval (seconds)     |
+| `DialKeepAliveTimeout` | `int`      | `10`                 | Keep-alive timeout (seconds)      |
+| `RequestTimeout`       | `int`      | `5`                  | Individual request timeout (secs) |
+| `EnableEncryption`     | `bool`     | `false`              | Enable client-side encryption     |
+| `EncryptionKey`        | `[]byte`   | `nil`                | 32-byte encryption key            |
+| `MaxCallSendMsgSize`   | `int`      | `2MB`                | Max message send size             |
+| `MaxCallRecvMsgSize`   | `int`      | `2MB`                | Max message receive size          |
 
 ### TLS Configuration
 
@@ -250,7 +250,7 @@ Implement TTL-based key expiration:
 
 ```go
 // Create a lease with 60 second TTL
-leaseID, err := client.Lease(60)
+leaseID, err := client.Lease(ctx, 60)
 
 // Store key with lease
 err = client.PutWithLease(ctx, "/temp/session",

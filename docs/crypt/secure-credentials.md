@@ -250,6 +250,55 @@ Creates a credential with random data of specified length.
 - `*Credential`: Credential with random data
 - `error`: Error if random generation fails
 
+### Low-Level Encryption API
+
+For advanced use cases, you can use the AES256GCM encryption provider directly:
+
+#### AES256GCM Interface
+```go
+type AES256GCM interface {
+    Encrypt(data []byte) ([]byte, error)
+    Decrypt(data []byte) ([]byte, error)
+    Clear()
+}
+```
+
+#### NewAES256GCM
+```go
+func NewAES256GCM(key []byte) (AES256GCM, error)
+```
+Creates a new AES-256-GCM encryption provider.
+
+**Parameters:**
+- `key`: 32-byte encryption key
+
+**Returns:**
+- `AES256GCM`: Encryption provider instance
+- `error`: `ErrInvalidKeyLength` if key is not 32 bytes
+
+**Example:**
+```go
+key := secure.RandomKey32()
+cipher, err := secure.NewAES256GCM(key)
+if err != nil {
+    log.Fatal(err)
+}
+defer cipher.Clear()
+
+// Encrypt data
+plaintext := []byte("sensitive data")
+ciphertext, err := cipher.Encrypt(plaintext)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Decrypt data
+decrypted, err := cipher.Decrypt(ciphertext)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 ### Error Constants
 
 ```go
@@ -259,6 +308,17 @@ var (
     ErrInvalidKey          = errors.New("invalid encryption key")
     ErrEmptyCredential     = errors.New("empty credential")
     ErrSecretsFileNotFound = errors.New("secrets file not found")
+)
+```
+
+#### AES256GCM-Specific Errors
+
+```go
+var (
+    ErrInvalidKeyLength    = errors.New("key length must be 32 bytes")
+    ErrDataTooShort        = errors.New("data too short")
+    ErrNonceExhausted      = errors.New("nonce counter exhausted, key rotation required")
+    ErrAuthenticationFailed = errors.New("authentication failed")
 )
 ```
 

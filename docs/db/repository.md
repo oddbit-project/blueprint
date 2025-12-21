@@ -625,12 +625,12 @@ The Repository also implements a GridOps interface that provides methods for wor
 ```go
 type GridOps interface {
 	Grid(record any) (*Grid, error)
-	QueryGrid(record any, args GridQuery, dest any) error
+	QueryGrid(record any, args *GridQuery, dest any) error
 }
 ```
 
 - `Grid(record any) (*Grid, error)` - Creates a Grid object based on the provided record type, using field tags to determine which fields can be sorted, filtered, or searched
-- `QueryGrid(record any, args GridQuery, dest any) error` - Creates a Grid object and executes a query using the provided GridQuery parameters
+- `QueryGrid(record any, args *GridQuery, dest any) error` - Creates a Grid object and executes a query using the provided GridQuery parameters
 
 ### Example Usage
 
@@ -713,6 +713,44 @@ func main() {
 ```
 
 For more detailed information about grid functionality, see the [Data Grid documentation](dbgrid.md).
+
+### Identifier Interface
+
+The Identifier interface provides methods for accessing the underlying database connection and table name:
+
+```go
+type Identifier interface {
+    Db() *sqlx.DB
+    Name() string
+}
+```
+
+#### Db
+```go
+func (r *repository) Db() *sqlx.DB
+```
+
+Returns the underlying sqlx database connection. Useful for advanced operations that require direct database access.
+
+**Example:**
+```go
+// Access raw connection for custom operations
+db := repo.Db()
+rows, err := db.QueryContext(ctx, "SELECT version()")
+```
+
+#### Name
+```go
+func (r *repository) Name() string
+```
+
+Returns the repository's table name.
+
+**Example:**
+```go
+tableName := repo.Name()  // e.g., "users"
+log.Printf("Working with table: %s", tableName)
+```
 
 ### Builder Interface
 

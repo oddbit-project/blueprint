@@ -38,10 +38,10 @@ func main() {
 	config.Host = "smtp.gmail.com"
 	config.Port = 587
 	config.Username = "your-email@gmail.com"
-	config.DefaultCredentialConfig.Password = "your-app-password"
+	config.Password = "your-app-password"  // Embedded field, accessed directly
 	config.AuthType = "plain"
 	config.From = "your-email@gmail.com"
-	config.ClientConfig.TLSEnable = true
+	config.TLSEnable = true  // Embedded field, accessed directly
 
 	mailer, err := smtp.NewMailer(config)
 	if err != nil {
@@ -105,14 +105,14 @@ TLSInsecureSkipVerify: false,
 | `Host`                  | `string` | `"127.0.0.1"`        | SMTP server hostname                                |
 | `Port`                  | `int`    | `1025`               | SMTP server port                                    |
 | `Username`              | `string` | `""`                 | SMTP authentication username                        |
-| `DefaultCredentialConfig.Password` | `string` | `""` | SMTP authentication password |
-| `DefaultCredentialConfig.PasswordEnvVar` | `string` | `""` | Environment variable for password |
-| `DefaultCredentialConfig.PasswordFile` | `string` | `""` | File path containing password |
+| `Password`              | `string` | `""`                 | SMTP authentication password (embedded field)       |
+| `PasswordEnvVar`        | `string` | `""`                 | Environment variable for password                   |
+| `PasswordFile`          | `string` | `""`                 | File path containing password                       |
 | `AuthType`              | `string` | `""`                 | Authentication method (plain, login, crammd5, etc.) |
 | `From`                  | `string` | `"no-reply@acme.co"` | Default sender address                              |
 | `Bcc`                   | `string` | `""`                 | Comma-separated BCC addresses                       |
-| `ClientConfig.TLSEnable` | `bool` | `false` | Enable TLS encryption |
-| `ClientConfig.TLSInsecureSkipVerify` | `bool` | `false` | Skip TLS certificate verification |
+| `TLSEnable`             | `bool`   | `false`              | Enable TLS encryption (embedded field)              |
+| `TLSInsecureSkipVerify` | `bool`   | `false`              | Skip TLS certificate verification                   |
 
 ## Authentication Types
 
@@ -145,10 +145,10 @@ func main() {
 	config.Host = "smtp.gmail.com"
 	config.Port = 587
 	config.Username = "your-email@gmail.com"
-	config.DefaultCredentialConfig.Password = "your-app-password"
+	config.Password = "your-app-password"
 	config.AuthType = "plain"
 	config.From = "your-email@gmail.com"
-	config.ClientConfig.TLSEnable = true
+	config.TLSEnable = true
 
 	// Create mailer
 	mailer, err := smtp.NewMailer(config)
@@ -346,7 +346,7 @@ config.PasswordFile = "/run/secrets/smtp_password"
 
 ```go
 // Enable TLS with certificate verification
-config.ClientConfig.TLSEnable = true
+config.TLSEnable = true
 config.TLSInsecureSkipVerify = false
 
 // Use custom CA certificates
@@ -561,7 +561,7 @@ config.Host = "127.0.0.1"
 config.Port = 1025
 config.AuthType = "noauth" // No authentication needed for MailHog
 config.From = "test@example.com"
-config.ClientConfig.TLSEnable = false
+config.TLSEnable = false
 ```
 
 ## Performance Considerations
@@ -580,7 +580,7 @@ config.ClientConfig.TLSEnable = false
 config.Host = "smtp.gmail.com"
 config.Port = 587
 config.AuthType = "plain"
-config.ClientConfig.TLSEnable = true
+config.TLSEnable = true
 // Requires App Password, not regular password
 ```
 
@@ -590,7 +590,7 @@ config.ClientConfig.TLSEnable = true
 config.Host = "smtp-mail.outlook.com"
 config.Port = 587
 config.AuthType = "plain"
-config.ClientConfig.TLSEnable = true
+config.TLSEnable = true
 ```
 
 ### Amazon SES
@@ -599,7 +599,7 @@ config.ClientConfig.TLSEnable = true
 config.Host = "email-smtp.us-east-1.amazonaws.com"
 config.Port = 587
 config.AuthType = "plain"
-config.ClientConfig.TLSEnable = true
+config.TLSEnable = true
 // Requires SES SMTP credentials
 ```
 
@@ -611,7 +611,7 @@ config.Port = 587
 config.Username = "apikey"
 config.Password = "your-sendgrid-api-key"
 config.AuthType = "plain"
-config.ClientConfig.TLSEnable = true
+config.TLSEnable = true
 ```
 
 ## Troubleshooting

@@ -25,7 +25,9 @@ type Client interface {
 ### Methods
 
 #### GetClient() *sqlx.DB
-Returns the underlying sqlx.DB connection. This provides direct access to the database connection for advanced operations.
+Defined in the interface to return the underlying sqlx.DB connection.
+
+> **Note**: The `SqlClient` implementation provides the `Db()` method instead of `GetClient()`. Use `client.Db()` when working with `SqlClient` instances.
 
 #### IsConnected() bool
 Returns true if the client has an active database connection.
@@ -58,6 +60,17 @@ type SqlClient struct {
 - **Dsn**: Database connection string
 - **DriverName**: SQL driver name (e.g., "postgres", "clickhouse")
 - **connOptions**: Optional connection configuration
+
+### SqlClient Methods
+
+#### Db() *sqlx.DB
+Returns the underlying sqlx.DB connection. If not connected, automatically calls `Connect()`. Panics if connection fails.
+
+```go
+// Get the underlying database connection
+db := client.Db()
+rows, err := db.QueryContext(ctx, "SELECT * FROM users")
+```
 
 ## ConnectionOptions Interface
 
@@ -107,7 +120,7 @@ func main() {
     }
     
     // Get underlying sqlx.DB for direct operations
-    db := client.GetClient()
+    db := client.Db()
     rows, err := db.Query("SELECT version()")
     if err != nil {
         log.Fatal(err)
@@ -205,7 +218,7 @@ func checkConnectionHealth(client db.Client) error {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
     
-    return client.GetClient().PingContext(ctx)
+    return client.Db().PingContext(ctx)
 }
 
 func maintainConnection(client db.Client) {
