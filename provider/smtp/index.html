@@ -1261,6 +1261,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../httpserver/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Request Validation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../httpserver/request/" class="md-nav__link">
         
   
@@ -2895,10 +2918,10 @@ provides a secure and feature-rich solution for sending emails.</p>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Host</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;smtp.gmail.com&quot;</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Port</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">587</span>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Username</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-email@gmail.com&quot;</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">DefaultCredentialConfig</span><span class="p">.</span><span class="nx">Password</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-app-password&quot;</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Password</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-app-password&quot;</span><span class="w">  </span><span class="c1">// Embedded field, accessed directly</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;plain&quot;</span>
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">From</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-email@gmail.com&quot;</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span><span class="w">  </span><span class="c1">// Embedded field, accessed directly</span>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nx">mailer</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">smtp</span><span class="p">.</span><span class="nx">NewMailer</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
 </span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
@@ -2975,19 +2998,19 @@ provides a secure and feature-rich solution for sending emails.</p>
 <td>SMTP authentication username</td>
 </tr>
 <tr>
-<td><code>DefaultCredentialConfig.Password</code></td>
+<td><code>Password</code></td>
 <td><code>string</code></td>
 <td><code>""</code></td>
-<td>SMTP authentication password</td>
+<td>SMTP authentication password (embedded field)</td>
 </tr>
 <tr>
-<td><code>DefaultCredentialConfig.PasswordEnvVar</code></td>
+<td><code>PasswordEnvVar</code></td>
 <td><code>string</code></td>
 <td><code>""</code></td>
 <td>Environment variable for password</td>
 </tr>
 <tr>
-<td><code>DefaultCredentialConfig.PasswordFile</code></td>
+<td><code>PasswordFile</code></td>
 <td><code>string</code></td>
 <td><code>""</code></td>
 <td>File path containing password</td>
@@ -3011,13 +3034,13 @@ provides a secure and feature-rich solution for sending emails.</p>
 <td>Comma-separated BCC addresses</td>
 </tr>
 <tr>
-<td><code>ClientConfig.TLSEnable</code></td>
+<td><code>TLSEnable</code></td>
 <td><code>bool</code></td>
 <td><code>false</code></td>
-<td>Enable TLS encryption</td>
+<td>Enable TLS encryption (embedded field)</td>
 </tr>
 <tr>
-<td><code>ClientConfig.TLSInsecureSkipVerify</code></td>
+<td><code>TLSInsecureSkipVerify</code></td>
 <td><code>bool</code></td>
 <td><code>false</code></td>
 <td>Skip TLS certificate verification</td>
@@ -3051,10 +3074,10 @@ provides a secure and feature-rich solution for sending emails.</p>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Host</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;smtp.gmail.com&quot;</span>
 </span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Port</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">587</span>
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Username</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-email@gmail.com&quot;</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">DefaultCredentialConfig</span><span class="p">.</span><span class="nx">Password</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-app-password&quot;</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">Password</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-app-password&quot;</span>
 </span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;plain&quot;</span>
 </span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">From</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-email@gmail.com&quot;</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
 </span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>
 </span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">    </span><span class="c1">// Create mailer</span>
 </span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">    </span><span class="nx">mailer</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">smtp</span><span class="p">.</span><span class="nx">NewMailer</span><span class="p">(</span><span class="nx">config</span><span class="p">)</span>
@@ -3212,7 +3235,7 @@ provides a secure and feature-rich solution for sending emails.</p>
 </span></code></pre></div>
 <h3 id="tls-configuration">TLS Configuration<a class="headerlink" href="#tls-configuration" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1">// Enable TLS with certificate verification</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
 </span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span>
 </span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
 </span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1">// Use custom CA certificates</span>
@@ -3402,7 +3425,7 @@ provides a secure and feature-rich solution for sending emails.</p>
 </span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Port</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1025</span>
 </span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;noauth&quot;</span><span class="w"> </span><span class="c1">// No authentication needed for MailHog</span>
 </span><span id="__span-23-5"><a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="nx">config</span><span class="p">.</span><span class="nx">From</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;test@example.com&quot;</span>
-</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-23-6"><a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span>
 </span></code></pre></div>
 <h2 id="performance-considerations">Performance Considerations<a class="headerlink" href="#performance-considerations" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3417,20 +3440,20 @@ provides a secure and feature-rich solution for sending emails.</p>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Host</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;smtp.gmail.com&quot;</span>
 </span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Port</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">587</span>
 </span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;plain&quot;</span>
-</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
 </span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="c1">// Requires App Password, not regular password</span>
 </span></code></pre></div>
 <h3 id="outlookhotmail">Outlook/Hotmail<a class="headerlink" href="#outlookhotmail" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Host</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;smtp-mail.outlook.com&quot;</span>
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Port</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">587</span>
 </span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;plain&quot;</span>
-</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
 </span></code></pre></div>
 <h3 id="amazon-ses">Amazon SES<a class="headerlink" href="#amazon-ses" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Host</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;email-smtp.us-east-1.amazonaws.com&quot;</span>
 </span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Port</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">587</span>
 </span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;plain&quot;</span>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
 </span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="c1">// Requires SES SMTP credentials</span>
 </span></code></pre></div>
 <h3 id="sendgrid">SendGrid<a class="headerlink" href="#sendgrid" title="Permanent link">&para;</a></h3>
@@ -3439,7 +3462,7 @@ provides a secure and feature-rich solution for sending emails.</p>
 </span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Username</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;apikey&quot;</span>
 </span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="nx">config</span><span class="p">.</span><span class="nx">Password</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;your-sendgrid-api-key&quot;</span>
 </span><span id="__span-27-5"><a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="nx">config</span><span class="p">.</span><span class="nx">AuthType</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">&quot;plain&quot;</span>
-</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="nx">config</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="nx">config</span><span class="p">.</span><span class="nx">TLSEnable</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">true</span>
 </span></code></pre></div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="connection-issues">Connection Issues<a class="headerlink" href="#connection-issues" title="Permanent link">&para;</a></h3>
@@ -3495,7 +3518,7 @@ provides a secure and feature-rich solution for sending emails.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="September 12, 2025 03:26:26 UTC">September 12, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="December 21, 2025 01:16:12 UTC">December 21, 2025</span>
   </span>
 
     

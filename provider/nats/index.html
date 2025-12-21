@@ -1261,6 +1261,29 @@
   
   
     <li class="md-nav__item">
+      <a href="../httpserver/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Request Validation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../httpserver/request/" class="md-nav__link">
         
   
@@ -1823,24 +1846,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#nkey-authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      NKey Authentication
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jwt-authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      JWT Authentication
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2321,24 +2326,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#nkey-authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      NKey Authentication
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jwt-authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      JWT Authentication
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2382,7 +2369,7 @@
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>The NATS client provides a simple interface for connecting to NATS servers, publishing messages, and consuming messages using subjects and queues. It supports:</p>
 <ul>
-<li>Multiple authentication methods (none, basic, token, NKey, JWT)</li>
+<li>Multiple authentication methods (none, basic, token)</li>
 <li>TLS for secure connections</li>
 <li>Publish/Subscribe patterns</li>
 <li>Request/Reply patterns</li>
@@ -2394,50 +2381,46 @@
 <div class="language-go highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ProducerConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL (e.g., &quot;nats://localhost:4222&quot;)</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="w">  </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Default subject to publish to</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Authentication type: &quot;none&quot;, &quot;basic&quot;, &quot;token&quot;, &quot;nkey&quot;, &quot;jwt&quot;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Authentication type: &quot;none&quot;, &quot;basic&quot;, &quot;token&quot;</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nx">Username</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Username for basic auth</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nx">Password</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Password for basic auth</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nx">NKeyPath</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Path to NKey seed file</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nx">JwtPath</span><span class="w">  </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Path to JWT file</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nx">Token</span><span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Auth token</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="c1">// Connection settings</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// PingInterval in seconds, defaults to 2 minutes</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// MaxPingsOut value, defaults to 2</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Connection timeout in milliseconds, defaults to 2000</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="w">            </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Skip certificate verification</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="w">           </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="w">            </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="p">}</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nx">Token</span><span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Auth token</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="c1">// Connection settings</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// PingInterval in seconds, defaults to 2 minutes</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// MaxPingsOut value, defaults to 2</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Connection timeout in milliseconds, defaults to 2000</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="w">            </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Skip certificate verification</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="w">           </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="w">            </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">}</span>
 </span></code></pre></div>
 <h3 id="consumer-configuration">Consumer Configuration<a class="headerlink" href="#consumer-configuration" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ConsumerConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">        </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL (e.g., &quot;nats://localhost:4222&quot;)</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Subject pattern to subscribe to</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Authentication type: &quot;none&quot;, &quot;basic&quot;, &quot;token&quot;, &quot;nkey&quot;, &quot;jwt&quot;</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Authentication type: &quot;none&quot;, &quot;basic&quot;, &quot;token&quot;</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nx">Username</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Username for basic auth</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nx">Password</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Password for basic auth</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nx">NKeyPath</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Path to NKey seed file</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nx">JwtPath</span><span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Path to JWT file</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nx">Token</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Auth token</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nx">QueueGroup</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Queue group for distributing messages among subscribers</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="c1">// Connection settings</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// PingInterval in seconds, defaults to 2 minutes</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// MaxPingsOut value, defaults to 2</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Connection timeout in milliseconds, defaults to 2000</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="w">            </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Skip certificate verification</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="w">           </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="w">            </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="p">}</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nx">Token</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Auth token</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nx">QueueGroup</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Queue group for distributing messages among subscribers</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="c1">// Connection settings</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// PingInterval in seconds, defaults to 2 minutes</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// MaxPingsOut value, defaults to 2</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Connection timeout in milliseconds, defaults to 2000</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="w">            </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Skip certificate verification</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="w">           </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="w">            </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="producer-usage">Producer Usage<a class="headerlink" href="#producer-usage" title="Permanent link">&para;</a></h2>
 <h3 id="creating-a-producer">Creating a Producer<a class="headerlink" href="#creating-a-producer" title="Permanent link">&para;</a></h3>
@@ -2457,7 +2440,7 @@
 </span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="p">}</span>
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
 </span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="c1">// Create logger</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">NewLogger</span><span class="p">()</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">&quot;nats-producer&quot;</span><span class="p">)</span>
 </span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
 </span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="c1">// Create producer</span>
 </span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span><span class="nx">producer</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">NewProducer</span><span class="p">(</span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
@@ -2525,7 +2508,7 @@
 </span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="p">}</span>
 </span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
 </span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">    </span><span class="c1">// Create logger</span>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">NewLogger</span><span class="p">()</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">&quot;nats-consumer&quot;</span><span class="p">)</span>
 </span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>
 </span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">    </span><span class="c1">// Create consumer</span>
 </span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">    </span><span class="nx">consumer</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">NewConsumer</span><span class="p">(</span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
@@ -2604,34 +2587,18 @@
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nx">Token</span><span class="p">:</span><span class="w">    </span><span class="s">&quot;my-auth-token&quot;</span><span class="p">,</span>
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">}</span>
 </span></code></pre></div>
-<h3 id="nkey-authentication">NKey Authentication<a class="headerlink" href="#nkey-authentication" title="Permanent link">&para;</a></h3>
+<h2 id="tls-configuration">TLS Configuration<a class="headerlink" href="#tls-configuration" title="Permanent link">&para;</a></h2>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">nats</span><span class="p">.</span><span class="nx">ProducerConfig</span><span class="p">{</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nx">URL</span><span class="p">:</span><span class="w">      </span><span class="s">&quot;nats://localhost:4222&quot;</span><span class="p">,</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="p">:</span><span class="w">  </span><span class="s">&quot;my.subject&quot;</span><span class="p">,</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeNKey</span><span class="p">,</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nx">NKeyPath</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/nkey.seed&quot;</span><span class="p">,</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">}</span>
-</span></code></pre></div>
-<h3 id="jwt-authentication">JWT Authentication<a class="headerlink" href="#jwt-authentication" title="Permanent link">&para;</a></h3>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">nats</span><span class="p">.</span><span class="nx">ProducerConfig</span><span class="p">{</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nx">URL</span><span class="p">:</span><span class="w">      </span><span class="s">&quot;nats://localhost:4222&quot;</span><span class="p">,</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="p">:</span><span class="w">  </span><span class="s">&quot;my.subject&quot;</span><span class="p">,</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeJWT</span><span class="p">,</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nx">JwtPath</span><span class="p">:</span><span class="w">  </span><span class="s">&quot;/path/to/user.jwt&quot;</span><span class="p">,</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">}</span>
-</span></code></pre></div>
-<h2 id="tls-configuration">TLS Configuration<a class="headerlink" href="#tls-configuration" title="Permanent link">&para;</a></h2>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">nats</span><span class="p">.</span><span class="nx">ProducerConfig</span><span class="p">{</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span><span class="nx">URL</span><span class="p">:</span><span class="w">      </span><span class="s">&quot;nats://localhost:4222&quot;</span><span class="p">,</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="p">:</span><span class="w">  </span><span class="s">&quot;my.subject&quot;</span><span class="p">,</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeNone</span><span class="p">,</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="p">:</span><span class="w">            </span><span class="kc">true</span><span class="p">,</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="p">:</span><span class="w">           </span><span class="s">&quot;/path/to/client.crt&quot;</span><span class="p">,</span>
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="p">:</span><span class="w">            </span><span class="s">&quot;/path/to/client.key&quot;</span><span class="p">,</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="p">:</span><span class="w">             </span><span class="s">&quot;/path/to/ca.crt&quot;</span><span class="p">,</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">}</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeNone</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="p">:</span><span class="w">            </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="p">:</span><span class="w">           </span><span class="s">&quot;/path/to/client.crt&quot;</span><span class="p">,</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="p">:</span><span class="w">            </span><span class="s">&quot;/path/to/client.key&quot;</span><span class="p">,</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="p">:</span><span class="w">             </span><span class="s">&quot;/path/to/ca.crt&quot;</span><span class="p">,</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="p">}</span>
 </span></code></pre></div>
 
 
@@ -2655,7 +2622,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="September 12, 2025 03:26:26 UTC">September 12, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="December 20, 2025 18:55:49 UTC">December 20, 2025</span>
   </span>
 
     
