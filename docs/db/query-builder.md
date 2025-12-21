@@ -339,15 +339,20 @@ func whereExamples() {
     
     // Pattern matching
     condition6 := qb.Like("name", "John%")
-    condition7 := qb.ILike("email", "%@EXAMPLE.COM") // Case-insensitive
-    
+    condition7 := qb.NotLike("email", "%spam%")
+
     // NULL checks
     condition8 := qb.IsNull("deleted_at")
     condition9 := qb.IsNotNull("confirmed_at")
-    
-    // IN clauses
-    condition10 := qb.In("status", []any{"active", "pending"})
-    condition11 := qb.NotIn("role", []any{"admin", "super_admin"})
+
+    // IN clauses (variadic arguments)
+    condition10 := qb.In("status", "active", "pending")
+
+    // BETWEEN clause
+    condition11 := qb.Between("age", 18, 65)
+
+    // Field-to-field comparison
+    condition12 := qb.Compare("updated_at", ">", "created_at")
 }
 ```
 
@@ -444,27 +449,6 @@ func useRawExpressions(builder *qb.SqlBuilder) error {
             "rank": qb.Raw("rank + 1"),
         }).
         Where(qb.Eq("active", true))
-    
-    sql, args, err := updateBuilder.Build()
-    return executeSQL(sql, args)
-}
-```
-
-### Subqueries
-
-```go
-func updateWithSubquery(builder *qb.SqlBuilder) error {
-    // Subquery to get average score
-    avgSubquery := builder.SqlBuilder().
-        Select("AVG(score)").
-        From("users").
-        Where(qb.Eq("department", "engineering"))
-    
-    updateBuilder := builder.Update("users", &User{}).
-        FieldsValues(map[string]any{
-            "performance_rating": qb.Subquery(avgSubquery),
-        }).
-        Where(qb.Eq("id", 123))
     
     sql, args, err := updateBuilder.Build()
     return executeSQL(sql, args)

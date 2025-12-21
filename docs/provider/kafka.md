@@ -33,7 +33,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	logger := log.NewLogger("kafka-example")
+	logger := log.New("kafka-example")
     
     // Configure the producer
 	producerCfg := &kafka.ProducerConfig{
@@ -72,8 +72,8 @@ func main() {
         logger.Error(err, "Failed to write message", nil)
     }
     
-    // Write with a key
-	err = producer.Write(ctx, []byte("Message with key"), []byte("user-123"))
+    // Write with a key (use WriteWithKey for keyed messages)
+	err = producer.WriteWithKey(ctx, []byte("Message with key"), []byte("user-123"))
 	if err != nil {
         logger.Error(err, "Failed to write message with key", nil)
     }
@@ -123,7 +123,7 @@ import (
 )
 
 func main() {
-	logger := log.NewLogger("kafka-consumer")
+	logger := log.New("kafka-consumer")
     
     // Configure the consumer
 	consumerCfg := &kafka.ConsumerConfig{
@@ -246,15 +246,15 @@ Writes a message with a specific key for partitioning.
 
 ### WriteWithHeaders
 ```go
-func (p *Producer) WriteWithHeaders(ctx context.Context, value []byte, key []byte, headers map[string]string) error
+func (p *Producer) WriteWithHeaders(ctx context.Context, value []byte, key []byte, headers []kafka.Header) error
 ```
-Writes a message with custom headers.
+Writes a message with custom headers using kafka.Header structs.
 
 **Example:**
 ```go
-headers := map[string]string{
-    "correlation-id": "abc-123",
-    "content-type":   "application/json",
+headers := []kafka.Header{
+    {Key: "correlation-id", Value: []byte("abc-123")},
+    {Key: "content-type", Value: []byte("application/json")},
 }
 err := producer.WriteWithHeaders(ctx, []byte(`{"event":"user_created"}`), []byte("user-1"), headers)
 ```
