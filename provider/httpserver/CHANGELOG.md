@@ -4,7 +4,7 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [v0.8.5]
+## [v0.8.6]
 
 ### Fixed
 
@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - CSRF token validation hardened against timing attacks
 - CSP nonce generation improved to use cryptographically random bytes
 - Session encryption errors now fail explicitly instead of falling back to plaintext storage
+
+## [v0.8.5]
+
+### Changed
+- Fixed issue with `ValidateJSON` where json fields were being named using the struct name, instead of the json tag name
+
 
 ## [v0.8.4]
 
