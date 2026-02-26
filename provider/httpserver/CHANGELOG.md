@@ -4,10 +4,25 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.6]
+
+### Fixed
+
+- Fixed CSRF token comparison to use constant-time comparison (`crypto/subtle`) preventing timing attacks
+- CSP nonce generation now uses `crypto/rand` instead of UUID for proper opaque nonces per W3C spec
+- Fixed potential deadlock in session `StopCleanup()` when cleanup goroutine is mid-operation
+- Fixed swallowed encryption error in session `Set()` that could silently store unencrypted session data
+
+### Security
+
+- CSRF token validation hardened against timing attacks
+- CSP nonce generation improved to use cryptographically random bytes
+- Session encryption errors now fail explicitly instead of falling back to plaintext storage
+
 ## [v0.8.5]
 
 ### Changed
-- Fixed issue with `ValidateJSON` where json fields were being named using the struct name, instead of the json tag name 
+- Fixed issue with `ValidateJSON` where json fields were being named using the struct name, instead of the json tag name
 
 
 ## [v0.8.4]

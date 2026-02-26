@@ -4,6 +4,13 @@ All notable changes to the Blueprint JWT provider will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1]
+
+### Fixed
+
+- Fixed RWMutex lock promotion race in `IsTokenRevoked()` that could cause data races under concurrent access
+- Fixed potential deadlock in `MemoryRevocationBackend.Close()` when cleanup goroutine is active
+
 ## [v0.8.0]
 
 ### Added

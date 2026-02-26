@@ -1,6 +1,9 @@
 package security
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/oddbit-project/blueprint/provider/httpserver/response"
@@ -100,7 +103,7 @@ func SecurityMiddleware(config *SecurityConfig) gin.HandlerFunc {
 
 		// Generate CSP nonce if enabled
 		if config.UseCSPNonce && config.CSP != "" {
-			nonce := uuid.New().String()
+			nonce := generateCSPNonce()
 			c.Set("csp-nonce", nonce)
 			csp := strings.Replace(config.CSP, "{nonce}", nonce, -1)
 			c.Header("Content-Security-Policy", csp)
@@ -136,8 +139,8 @@ func CSRFProtection() gin.HandlerFunc {
 		if token == "" {
 			token = c.PostForm("_csrf")
 		}
-		// ParseToken token (in a real implementation, this would validate against a stored token)
-		if token == "" || token != expected {
+		// Constant-time comparison to prevent timing attacks
+		if token == "" || expected == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
 			response.Http403(c)
 			return
 		}
@@ -154,4 +157,15 @@ func CSRFProtection() gin.HandlerFunc {
 // GenerateCSRFToken generates a CSRF token for the current session
 func GenerateCSRFToken(c *gin.Context) string {
 	return uuid.New().String()
+}
+
+// generateCSPNonce generates a cryptographically random base64-encoded nonce
+// for Content Security Policy headers, per W3C CSP specification.
+func generateCSPNonce() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to UUID if crypto/rand fails (should never happen)
+		return uuid.New().String()
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
 }

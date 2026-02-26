@@ -15,6 +15,18 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.5]
+
+### Added
+- **runner** (/runner): a simple manager for periodic tasks with configurable intervals and error handling
+
+### Fixed
+
+- **batchwriter**: Fixed flush goroutine race where `Stop()` could return while flush operations were still in progress
+- **batchwriter**: Fixed `drainAndStop()` premature exit that could lose buffered records during shutdown
+- **types/collections**: Fixed missing `defer` on mutex unlock in `Map` operations that could deadlock on panic
+- **runner**: Added panic recovery in `PeriodicRunner` to prevent application crash from user-supplied function panics
+
 ## [v0.8.4]
 
 ### Changed

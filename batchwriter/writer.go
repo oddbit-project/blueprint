@@ -241,23 +241,20 @@ func (b *BatchWriter) run(ctx context.Context) {
 
 // drainAndStop processes any remaining items and performs final flush
 func (b *BatchWriter) drainAndStop() {
-	// Process any remaining items in the channel (non-blocking)
 	if b.logger != nil {
 		b.logger.Infof("Shutting down, processing remaining items...")
 	}
-	for {
-		select {
-		case record, ok := <-b.inputChan:
-			if !ok {
-				break
-			}
-			b.add(record)
-		default:
-			// No more items in the channel
-			b.flush()
-			return
+	// Drain all remaining items from the channel.
+	// Read until the channel is empty, without a default case that could
+	// exit prematurely due to goroutine scheduling.
+	for len(b.inputChan) > 0 {
+		record, ok := <-b.inputChan
+		if !ok {
+			break
 		}
+		b.add(record)
 	}
+	b.flush()
 }
 
 // add inserts a record into the buffer and flushes if buffer is full
@@ -323,6 +320,7 @@ func (b *BatchWriter) flushLocked() {
 
 	// Use a separate goroutine to perform the actual flush
 	// This prevents blocking the main loop but still maintains proper lock handling
+	b.wg.Add(1)
 	go func() {
 		defer func() {
 			// Recovery mechanism
@@ -348,6 +346,7 @@ func (b *BatchWriter) flushLocked() {
 
 			// Always unlock the flush mutex at the end
 			b.fmx.Unlock()
+			b.wg.Done()
 		}()
 
 		if b.logger != nil {
