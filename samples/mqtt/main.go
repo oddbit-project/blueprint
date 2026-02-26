@@ -17,6 +17,9 @@ func main() {
 	cfg.Protocol = "tcp"
 	cfg.Retain = false
 	cfg.TLSEnable = true
+	// WARNING: TLSInsecureSkipVerify disables certificate verification.
+	// This is acceptable for local development with self-signed certs,
+	// but must NEVER be used in production as it enables MITM attacks.
 	cfg.TLSInsecureSkipVerify = true
 	cfg.TLSCA = "../../infra/mosquitto/config/certs/ca.crt"
 	cfg.TLSCert = "../../infra/mosquitto/config/certs/client.crt"

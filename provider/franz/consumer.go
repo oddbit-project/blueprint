@@ -74,10 +74,11 @@ func (c *Consumer) Poll(ctx context.Context) (*FetchResult, error) {
 		c.mu.RUnlock()
 		return nil, ErrClientClosed
 	}
-	client := c.client
+	// Hold the read lock during PollFetches to prevent Close() from
+	// shutting down the client while a poll is in progress (TOCTOU fix).
+	fetches := c.client.PollFetches(ctx)
 	c.mu.RUnlock()
 
-	fetches := client.PollFetches(ctx)
 	return fetchesToResult(fetches), nil
 }
 
@@ -92,10 +93,11 @@ func (c *Consumer) PollRecords(ctx context.Context, maxRecords int) ([]ConsumedR
 		c.mu.RUnlock()
 		return nil, ErrClientClosed
 	}
-	client := c.client
+	// Hold the read lock during PollRecords to prevent Close() from
+	// shutting down the client while a poll is in progress (TOCTOU fix).
+	fetches := c.client.PollRecords(ctx, maxRecords)
 	c.mu.RUnlock()
 
-	fetches := client.PollRecords(ctx, maxRecords)
 	result := fetchesToResult(fetches)
 
 	if result.HasErrors() {
@@ -301,25 +303,23 @@ func (c *Consumer) ConsumeChannel(ctx context.Context, ch chan<- ConsumedRecord)
 // CommitOffsets commits the current offsets for all consumed partitions
 func (c *Consumer) CommitOffsets(ctx context.Context) error {
 	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	if c.closed {
-		c.mu.RUnlock()
 		return ErrClientClosed
 	}
-	client := c.client
-	c.mu.RUnlock()
 
-	return client.CommitUncommittedOffsets(ctx)
+	return c.client.CommitUncommittedOffsets(ctx)
 }
 
 // CommitRecord commits the offset for a specific record
 func (c *Consumer) CommitRecord(ctx context.Context, record ConsumedRecord) error {
 	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	if c.closed {
-		c.mu.RUnlock()
 		return ErrClientClosed
 	}
-	client := c.client
-	c.mu.RUnlock()
 
 	// Create a kgo.Record to commit
 	kgoRecord := &kgo.Record{
@@ -329,7 +329,7 @@ func (c *Consumer) CommitRecord(ctx context.Context, record ConsumedRecord) erro
 		LeaderEpoch: record.LeaderEpoch,
 	}
 
-	return client.CommitRecords(ctx, kgoRecord)
+	return c.client.CommitRecords(ctx, kgoRecord)
 }
 
 // CommitBatch commits offsets for all records in a batch

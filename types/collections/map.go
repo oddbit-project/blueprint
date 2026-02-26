@@ -25,14 +25,14 @@ func (m *Map[K, V]) Contains(key K) bool {
 
 func (m *Map[K, V]) Add(key K, value V) {
 	m.Lock()
+	defer m.Unlock()
 	m.data[key] = value
-	m.Unlock()
 }
 
 func (m *Map[K, V]) Get(key K) (V, error) {
 	m.RLock()
+	defer m.RUnlock()
 	result, ok := m.data[key]
-	m.RUnlock()
 	if ok {
 		return result, nil
 	}
@@ -51,24 +51,24 @@ func (m *Map[K, V]) MustGet(key K) V {
 
 func (m *Map[K, V]) GetKeys() []K {
 	m.RLock()
+	defer m.RUnlock()
 	keys := make([]K, 0, len(m.data))
 	for key := range m.data {
 		keys = append(keys, key)
 	}
-	m.RUnlock()
 	return keys
 }
 
 func (m *Map[K, V]) Delete(key K) {
 	m.Lock()
+	defer m.Unlock()
 	delete(m.data, key)
-	m.Unlock()
 }
 
 func (m *Map[K, V]) Purge() {
 	m.Lock()
+	defer m.Unlock()
 	m.data = make(map[K]V)
-	m.Unlock()
 }
 
 func (m *Map[K, V]) Len() int {

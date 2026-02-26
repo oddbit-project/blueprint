@@ -4,6 +4,12 @@ All notable changes to the franz Kafka provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.8.1]
+
+### Fixed
+
+- Fixed TOCTOU race in consumer `Poll`/`PollRecords`/`CommitOffsets`/`CommitRecord` where client could be closed mid-operation
+
 ## [v0.8.0]
 
 ### Added

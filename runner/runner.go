@@ -40,6 +40,12 @@ func (u *PeriodicRunner) Start(ctx context.Context) error {
 	u.wg.Add(1)
 	go func() {
 		defer u.wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				u.logger.Warnf("Recovered from panic in runner: %v", r)
+				u.status.Store(0)
+			}
+		}()
 		if err := u.run(runCtx); err != nil {
 			u.logger.Error(err, "runner error")
 		}
@@ -82,9 +88,16 @@ func (u *PeriodicRunner) run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := u.runFn(ctx); err != nil {
-				u.logger.Error(err, "runner function error")
-			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						u.logger.Warnf("Recovered from panic in runner function: %v", r)
+					}
+				}()
+				if err := u.runFn(ctx); err != nil {
+					u.logger.Error(err, "runner function error")
+				}
+			}()
 		}
 	}
 }

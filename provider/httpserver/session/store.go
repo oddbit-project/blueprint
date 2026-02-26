@@ -52,7 +52,7 @@ func NewStore(config *Config, backend kv.KV, logger *log.Logger) (*Store, error)
 	return &Store{
 		backend:      backend,
 		config:       config,
-		stopCleanup:  make(chan bool),
+		stopCleanup:  make(chan bool, 1),
 		logger:       logger,
 		cleanupMutex: sync.Mutex{},
 		crypt:        enc,
@@ -132,6 +132,9 @@ func (s *Store) Set(id string, session *SessionData) error {
 	// encrypt data if crypt is configured
 	if s.crypt != nil {
 		data, err = s.crypt.Encrypt(data)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Save with expiration
@@ -191,14 +194,15 @@ func (s *Store) StartCleanup() {
 // StopCleanup stops the cleanup goroutine
 func (s *Store) StopCleanup() {
 	s.cleanupMutex.Lock()
-	defer s.cleanupMutex.Unlock()
-
-	if !s.cleanupRunning {
-		return
-	}
-
-	s.stopCleanup <- true
+	wasRunning := s.cleanupRunning
 	s.cleanupRunning = false
+	s.cleanupMutex.Unlock()
+
+	// Signal outside the lock to avoid deadlock if the cleanup goroutine
+	// is currently executing backend.Prune() (which may block)
+	if wasRunning {
+		s.stopCleanup <- true
+	}
 }
 
 // Close closes the store

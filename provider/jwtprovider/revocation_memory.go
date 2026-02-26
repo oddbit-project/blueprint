@@ -51,25 +51,21 @@ func (m *MemoryRevocationBackend) RevokeToken(tokenID string, expiresAt time.Tim
 // IsTokenRevoked checks if a token is revoked
 func (m *MemoryRevocationBackend) IsTokenRevoked(tokenID string) bool {
 	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	now := time.Now()
 	revokedToken, exists := m.revokedTokens[tokenID]
-
-	// Constant-time check: always perform the same operations
 	isRevoked := exists && !now.After(revokedToken.ExpiresAt)
+	isExpired := exists && now.After(revokedToken.ExpiresAt)
+	m.mutex.RUnlock()
 
-	// Cleanup expired tokens (if needed) after the timing-sensitive check
-	if exists && now.After(revokedToken.ExpiresAt) {
-		// Promote to write lock for cleanup
-		m.mutex.RUnlock()
+	// Cleanup expired token outside the read lock; let the background
+	// cleanup handle it to avoid lock promotion races
+	if isExpired {
 		m.mutex.Lock()
 		// Double-check after acquiring write lock
-		if token, stillExists := m.revokedTokens[tokenID]; stillExists && now.After(token.ExpiresAt) {
+		if token, stillExists := m.revokedTokens[tokenID]; stillExists && time.Now().After(token.ExpiresAt) {
 			delete(m.revokedTokens, tokenID)
 		}
 		m.mutex.Unlock()
-		m.mutex.RLock() // Reacquire read lock for defer
 	}
 
 	return isRevoked
@@ -183,17 +179,21 @@ func (m *MemoryRevocationBackend) removeUserToken(userID, tokenID string) {
 // Close stops the cleanup process and releases resources
 func (m *MemoryRevocationBackend) Close() error {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	wasRunning := m.cleanupRunning
+	m.cleanupRunning = false
+	m.mutex.Unlock()
 
-	if m.cleanupRunning {
+	// Signal outside the lock to avoid deadlock with cleanup goroutine
+	if wasRunning {
 		m.stopCleanup <- true
-		m.cleanupRunning = false
 	}
 
 	// Clear all data
+	m.mutex.Lock()
 	m.revokedTokens = make(map[string]*RevokedToken)
 	m.userTokens = make(map[string][]string)
 	m.tokenMetadata = make(map[string]*TokenMetadata)
+	m.mutex.Unlock()
 
 	return nil
 }
