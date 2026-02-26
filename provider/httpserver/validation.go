@@ -3,12 +3,14 @@ package httpserver
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	cv "github.com/oddbit-project/blueprint/provider/httpserver/request/validator"
 	"github.com/oddbit-project/blueprint/provider/httpserver/response"
-	"reflect"
 )
 
 const (
@@ -394,6 +396,19 @@ func ValidateQuery(c *gin.Context, obj interface{}) bool {
 func init() {
 	// Register custom validators with Gin's validator instance
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		// Register tag name function to use JSON field names in error messages
+		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+			name := fld.Tag.Get("json")
+			if name == "" || name == "-" {
+				return fld.Name
+			}
+			// Handle "fieldname,omitempty" case
+			if idx := strings.Index(name, ","); idx != -1 {
+				name = name[:idx]
+			}
+			return name
+		})
+
 		if err := v.RegisterValidation("securepassword", cv.ValidateSecurePassword); err != nil {
 			panic(err)
 		}

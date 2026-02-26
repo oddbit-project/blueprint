@@ -91,6 +91,7 @@ nav:
     - Authentication: provider/httpserver/auth.md
     - Security & Headers: provider/httpserver/security.md
     - Session Management: provider/httpserver/session.md
+    - Request Validation: provider/httpserver/validation.md
     - Request Utilities: provider/httpserver/request.md
     - Integration Examples: provider/httpserver/examples.md
     - Troubleshooting Guide: provider/httpserver/troubleshooting.md
