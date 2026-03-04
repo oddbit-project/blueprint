@@ -19,7 +19,7 @@ type Config struct {
 func NewConfig() *Config {
 	cfg := httpserver.NewServerConfig()
 	cfg.Port = DefaultPort
-	cfg.Options["serverName"] = serverName
+	cfg.ServerName = serverName
 
 	return &Config{
 		Enabled:      true,
