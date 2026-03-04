@@ -11,6 +11,10 @@ const (
 	// HTTP request tracing headers
 	HeaderRequestID = "X-Request-ID"
 	HeaderTraceID   = "X-Trace-ID"
+
+	// Context keys for request tracing
+	ContextTraceID   = "trace_id"
+	ContextRequestID = "request_id"
 )
 
 func NewHTTPLogger(moduleName string) *log.Logger {
@@ -39,7 +43,7 @@ func HTTPLogMiddleware(logger *log.Logger) gin.HandlerFunc {
 			logger = NewHTTPLogger("server")
 		}
 
-		logger.WithTraceID(traceID).
+		reqLogger := logger.WithTraceID(traceID).
 			WithField("request_id", requestID).
 			WithField("method", c.Request.Method).
 			WithField("path", c.Request.URL.Path).
@@ -47,12 +51,12 @@ func HTTPLogMiddleware(logger *log.Logger) gin.HandlerFunc {
 			WithField("user_agent", c.Request.UserAgent())
 
 		// Store logger in context
-		ctx := logger.WithContext(c.Request.Context())
+		ctx := reqLogger.WithContext(c.Request.Context())
 		c.Request = c.Request.WithContext(ctx)
 
 		// Store trace ID in Gin context for easy access
-		c.Set("trace_id", traceID)
-		c.Set("request_id", requestID)
+		c.Set(ContextTraceID, traceID)
+		c.Set(ContextRequestID, requestID)
 
 		// Start timer
 		start := time.Now()
@@ -80,13 +84,13 @@ func HTTPLogMiddleware(logger *log.Logger) gin.HandlerFunc {
 		msg := c.Request.Method + " " + c.Request.URL.Path
 
 		if len(c.Errors) > 0 {
-			logger.Error(nil, msg, fields)
+			reqLogger.Error(nil, msg, fields)
 		} else if statusCode >= 500 {
-			logger.Error(nil, msg, fields)
+			reqLogger.Error(nil, msg, fields)
 		} else if statusCode >= 400 {
-			logger.Warn(msg, fields)
+			reqLogger.Warn(msg, fields)
 		} else {
-			logger.Info(msg, fields)
+			reqLogger.Info(msg, fields)
 		}
 	}
 }
@@ -99,7 +103,7 @@ func GetRequestLogger(c *gin.Context) *log.Logger {
 
 // GetRequestTraceID retrieves the trace ID from the gin.Context
 func GetRequestTraceID(c *gin.Context) string {
-	if traceID, exists := c.Get("trace_id"); exists {
+	if traceID, exists := c.Get(ContextTraceID); exists {
 		if id, ok := traceID.(string); ok {
 			return id
 		}
@@ -109,7 +113,7 @@ func GetRequestTraceID(c *gin.Context) string {
 
 // GetRequestID retrieves the request ID from the gin.Context
 func GetRequestID(c *gin.Context) string {
-	if requestID, exists := c.Get("request_id"); exists {
+	if requestID, exists := c.Get(ContextRequestID); exists {
 		if id, ok := requestID.(string); ok {
 			return id
 		}

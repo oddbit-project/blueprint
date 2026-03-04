@@ -164,7 +164,7 @@ func (g *Generator) Generate(c *gin.Context) *DeviceFingerprint {
 
 	// Geolocation
 	if g.config.IncludeGeolocation {
-		country := getCountryFromIP(fingerprint.IPAddress)
+		country := g.geoResolver(fingerprint.IPAddress)
 		fingerprint.Location = country
 		components = append(components, "country:"+country)
 	}
@@ -344,27 +344,14 @@ func calculateIPSubnet(ipAddress string) string {
 
 // getCountryFromIP performs basic country detection from IP address
 func getCountryFromIP(ipAddress string) string {
-	// Basic detection for private/local IPs
-	if strings.HasPrefix(ipAddress, "192.168.") ||
-		strings.HasPrefix(ipAddress, "10.") ||
-		strings.HasPrefix(ipAddress, "172.16.") ||
-		strings.HasPrefix(ipAddress, "172.17.") ||
-		strings.HasPrefix(ipAddress, "172.18.") ||
-		strings.HasPrefix(ipAddress, "172.19.") ||
-		strings.HasPrefix(ipAddress, "172.20.") ||
-		strings.HasPrefix(ipAddress, "172.21.") ||
-		strings.HasPrefix(ipAddress, "172.22.") ||
-		strings.HasPrefix(ipAddress, "172.23.") ||
-		strings.HasPrefix(ipAddress, "172.24.") ||
-		strings.HasPrefix(ipAddress, "172.25.") ||
-		strings.HasPrefix(ipAddress, "172.26.") ||
-		strings.HasPrefix(ipAddress, "172.27.") ||
-		strings.HasPrefix(ipAddress, "172.28.") ||
-		strings.HasPrefix(ipAddress, "172.29.") ||
-		strings.HasPrefix(ipAddress, "172.30.") ||
-		strings.HasPrefix(ipAddress, "172.31.") ||
-		ipAddress == "127.0.0.1" ||
-		ipAddress == "::1" {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return "UNKNOWN"
+	}
+
+	// Covers 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7,
+	// 100.64.0.0/10 (carrier-grade NAT), 169.254.0.0/16 (link-local)
+	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return "LOCAL"
 	}
 

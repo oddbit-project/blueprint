@@ -26,10 +26,16 @@ func NewAuthSession(gobIdentityTypes ...any) Provider {
 // CanAccess returns true if current session has a stored identity
 func (i *authSession) CanAccess(c *gin.Context) bool {
 	identity, exists := GetSessionIdentity(c)
-	if exists {
-		return identity != nil
+	if !exists || identity == nil {
+		return false
 	}
-	return false
+	sess := c.MustGet(session.ContextSessionKey).(*session.SessionData)
+	c.Set(ContextAuthIdentity, &AuthIdentity{
+		Method: "session",
+		ID:     sess.ID,
+		Extra:  identity,
+	})
+	return true
 }
 
 func GetSessionIdentity(c *gin.Context) (any, bool) {

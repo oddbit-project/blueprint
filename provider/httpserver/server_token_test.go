@@ -17,16 +17,15 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		options        map[string]string
+		options        []OptionsFunc
 		requestHeaders map[string]string
 		expectedStatus int
 		testEndpoint   string
 	}{
 		{
 			name: "Valid auth token",
-			options: map[string]string{
-				OptAuthTokenHeader: "X-Test-VerifyUser",
-				OptAuthTokenSecret: "test-secret",
+			options: []OptionsFunc{
+				WithAuthToken("X-Test-VerifyUser", "test-secret"),
 			},
 			requestHeaders: map[string]string{
 				"X-Test-VerifyUser": "test-secret",
@@ -36,9 +35,8 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 		},
 		{
 			name: "Invalid auth token",
-			options: map[string]string{
-				OptAuthTokenHeader: "X-Test-VerifyUser",
-				OptAuthTokenSecret: "test-secret",
+			options: []OptionsFunc{
+				WithAuthToken("X-Test-VerifyUser", "test-secret"),
 			},
 			requestHeaders: map[string]string{
 				"X-Test-VerifyUser": "wrong-secret",
@@ -48,9 +46,8 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 		},
 		{
 			name: "Missing auth token",
-			options: map[string]string{
-				OptAuthTokenHeader: "X-Test-VerifyUser",
-				OptAuthTokenSecret: "test-secret",
+			options: []OptionsFunc{
+				WithAuthToken("X-Test-VerifyUser", "test-secret"),
 			},
 			requestHeaders: map[string]string{},
 			expectedStatus: http.StatusUnauthorized,
@@ -58,8 +55,8 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 		},
 		{
 			name: "Default header name",
-			options: map[string]string{
-				OptAuthTokenSecret: "test-secret",
+			options: []OptionsFunc{
+				WithAuthToken("", "test-secret"),
 			},
 			requestHeaders: map[string]string{
 				"X-API-Key": "test-secret",
@@ -71,16 +68,15 @@ func TestServer_ProcessOptions_AuthToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create server config with test options
+			// Create server config
 			config := NewServerConfig()
-			config.Options = tt.options
 
 			// Create server
 			server, err := NewServer(config, logger)
 			assert.NoError(t, err)
 
 			// Process options to set up auth middleware
-			err = server.ProcessOptions()
+			err = server.ProcessOptions(tt.options...)
 			assert.NoError(t, err)
 
 			// Add a test endpoint

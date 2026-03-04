@@ -9,14 +9,14 @@ import (
 
 // Manager manages sessions and provides middleware for Gin
 type Manager struct {
-	store  *Store
+	store  SessionStore
 	config *Config
 	logger *log.Logger
 }
 
 type ManagerOpt func(*Manager) error
 
-func ManagerWithStore(store *Store) ManagerOpt {
+func ManagerWithStore(store SessionStore) ManagerOpt {
 	return func(sessionManager *Manager) error {
 		sessionManager.store = store
 		return nil
@@ -45,7 +45,7 @@ func NewManager(config *Config, opts ...ManagerOpt) (*Manager, error) {
 	}
 
 	if manager.config == nil {
-		config = NewConfig()
+		manager.config = NewConfig()
 	}
 
 	if manager.logger == nil {
@@ -54,7 +54,7 @@ func NewManager(config *Config, opts ...ManagerOpt) (*Manager, error) {
 
 	if manager.store == nil {
 		var err error
-		manager.store, err = NewStore(config, kv.NewMemoryKV(), manager.logger)
+		manager.store, err = NewStore(manager.config, kv.NewMemoryKV(), manager.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -121,6 +121,7 @@ func (m *Manager) Middleware() gin.HandlerFunc {
 
 // setSessionCookie sets the session cookie on the response
 func (m *Manager) setSessionCookie(c *gin.Context, sessionID string) {
+	c.SetSameSite(http.SameSite(m.config.SameSite))
 	c.SetCookie(
 		m.config.CookieName,
 		sessionID,
@@ -130,23 +131,6 @@ func (m *Manager) setSessionCookie(c *gin.Context, sessionID string) {
 		m.config.Secure,
 		m.config.HttpOnly,
 	)
-
-	// Set SameSite attribute using header (since gin.SetCookie doesn't support SameSite)
-	ss := http.SameSite(m.config.SameSite)
-	if ss != http.SameSiteDefaultMode {
-		var sameSiteValue string
-		switch ss {
-		case http.SameSiteStrictMode:
-			sameSiteValue = "Strict"
-		case http.SameSiteLaxMode:
-			sameSiteValue = "Lax"
-		case http.SameSiteNoneMode:
-			sameSiteValue = "None"
-		default:
-			sameSiteValue = "Lax"
-		}
-		c.Header("Set-Cookie", c.Writer.Header().Get("Set-Cookie")+"; SameSite="+sameSiteValue)
-	}
 }
 
 // Get returns the session from the context
@@ -196,6 +180,7 @@ func (m *Manager) Clear(c *gin.Context) {
 	}
 
 	// Clear the cookie
+	c.SetSameSite(http.SameSite(m.config.SameSite))
 	c.SetCookie(
 		m.config.CookieName,
 		"",

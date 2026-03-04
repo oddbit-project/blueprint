@@ -62,5 +62,9 @@ func (a *BasicAuthProvider) CanAccess(c *gin.Context) bool {
 	}
 	logger.Infof("BasicAuthProvider: user '%s' authenticated", u)
 	c.Set(gin.AuthUserKey, u)
+	c.Set(ContextAuthIdentity, &AuthIdentity{
+		Method: "basic",
+		ID:     u,
+	})
 	return true
 }

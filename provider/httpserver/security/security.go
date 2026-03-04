@@ -11,6 +11,11 @@ import (
 	"strings"
 )
 
+const (
+	// ContextCSPNonce is the context key for the CSP nonce value
+	ContextCSPNonce = "csp-nonce"
+)
+
 // SecurityConfig contains configuration for security headers
 type SecurityConfig struct {
 	// Content Security Policy
@@ -39,12 +44,6 @@ type SecurityConfig struct {
 
 	// Generate and add CSP nonce to requests
 	UseCSPNonce bool
-
-	// Rate limiting enabled
-	EnableRateLimit bool
-
-	// Rate limit per minute
-	RateLimit int
 }
 
 // DefaultSecurityConfig returns security configuration with sane defaults
@@ -59,8 +58,6 @@ func DefaultSecurityConfig() *SecurityConfig {
 		FeaturePolicy:      "camera=(), microphone=(), geolocation=()",
 		CacheControl:       "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
 		UseCSPNonce:        true,
-		EnableRateLimit:    true,
-		RateLimit:          60, // 60 requests per minute
 	}
 }
 
@@ -104,7 +101,7 @@ func SecurityMiddleware(config *SecurityConfig) gin.HandlerFunc {
 		// Generate CSP nonce if enabled
 		if config.UseCSPNonce && config.CSP != "" {
 			nonce := generateCSPNonce()
-			c.Set("csp-nonce", nonce)
+			c.Set(ContextCSPNonce, nonce)
 			csp := strings.Replace(config.CSP, "{nonce}", nonce, -1)
 			c.Header("Content-Security-Policy", csp)
 		} else if config.CSP != "" {

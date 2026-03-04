@@ -1,8 +1,8 @@
 package httpserver
 
 const (
-	ServerDefaultReadTimeout  = 600
-	ServerDefaultWriteTimeout = 600
+	ServerDefaultReadTimeout  = 30
+	ServerDefaultWriteTimeout = 60
 	ServerDefaultPort         = 5000
 	ServerDefaultName         = "http"
 )

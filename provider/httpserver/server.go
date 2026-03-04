@@ -4,35 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
-	"github.com/oddbit-project/blueprint/crypt/secure"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/log/writer"
-	"github.com/oddbit-project/blueprint/provider/hmacprovider"
 	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	httplog "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
-	"net/http"
-	"strings"
-	"time"
-)
-
-const (
-	// misc server options
-	OptAuthTokenHeader        = "authTokenHeader"
-	OptAuthTokenSecret        = "authTokenSecret"
-	OptDefaultSecurityHeaders = "defaultSecurityHeaders"
-	OptHMACSecret             = "hmacSecret"
 )
 
 type ServerConfig struct {
-	Host           string            `json:"host"`
-	Port           int               `json:"port"`
-	ReadTimeout    int               `json:"readTimeout"`
-	WriteTimeout   int               `json:"writeTimeout"`
-	Debug          bool              `json:"debug"`
-	Options        map[string]string `json:"options"`
-	TrustedProxies []string          `json:"trustedProxies"`
+	Host           string   `json:"host"`
+	Port           int      `json:"port"`
+	ReadTimeout    int      `json:"readTimeout"`
+	WriteTimeout   int      `json:"writeTimeout"`
+	Debug          bool     `json:"debug"`
+	ServerName     string   `json:"serverName"`
+	TrustedProxies []string `json:"trustedProxies"`
 	tlsProvider.ServerConfig
 }
 
@@ -52,7 +42,7 @@ func NewServerConfig() *ServerConfig {
 		ReadTimeout:    ServerDefaultReadTimeout,
 		WriteTimeout:   ServerDefaultWriteTimeout,
 		Debug:          false,
-		Options:        make(map[string]string),
+		ServerName:     ServerDefaultName,
 		TrustedProxies: make([]string, 0),
 		ServerConfig: tlsProvider.ServerConfig{
 			TLSCert: "",
@@ -72,29 +62,6 @@ func NewServerConfig() *ServerConfig {
 	}
 }
 
-// GetOption retrieves the value associated with the specified key from the Options map of the ServerConfig.
-// If the key exists, the corresponding value is returned. Otherwise, the defaultValue is returned.
-// The Options map is defined as map[string]string in the ServerConfig struct.
-// Example usage:
-//
-//	serverConfig := ServerConfig{
-//	  // initialize other fields
-//	  Options: map[string]string{
-//	    "key1": "value1",
-//	    "key2": "value2",
-//	  },
-//	}
-//	option := serverConfig.GetOption("key1", "default")
-//	// option is "value1"
-//	option := serverConfig.GetOption("key3", "default")
-//	// option is "default"
-func (c *ServerConfig) GetOption(key string, defaultValue string) string {
-	if v, ok := c.Options[key]; ok {
-		return v
-	}
-	return defaultValue
-}
-
 // GetUrl build http url from config
 func (c *ServerConfig) GetUrl() string {
 	if c.TLSEnable {
@@ -104,6 +71,22 @@ func (c *ServerConfig) GetUrl() string {
 }
 
 func (c *ServerConfig) Validate() error {
+	serverName := c.ServerName
+	if serverName == "" {
+		serverName = ServerDefaultName
+	}
+	if c.Port == 0 {
+		c.Port = ServerDefaultPort
+	}
+	if c.Port > 65535 {
+		return errors.New("port must be less than 65535")
+	}
+	if c.ReadTimeout <= 0 {
+		c.ReadTimeout = ServerDefaultReadTimeout
+	}
+	if c.WriteTimeout <= 0 {
+		c.WriteTimeout = ServerDefaultWriteTimeout
+	}
 	return nil
 }
 
@@ -150,16 +133,15 @@ func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	serverName := cfg.GetOption("serverName", ServerDefaultName)
 	if logger == nil {
-		logger = httplog.NewHTTPLogger(serverName)
+		logger = httplog.NewHTTPLogger(cfg.ServerName)
 	}
 
 	tlsConfig, err := cfg.TLSConfig()
 	if err != nil {
 		return nil, err
 	}
-	router := NewRouter(serverName, cfg.Debug, logger)
+	router := NewRouter(cfg.ServerName, cfg.Debug, logger)
 
 	if len(cfg.TrustedProxies) > 0 {
 		if err = router.SetTrustedProxies(cfg.TrustedProxies); err != nil {
@@ -184,37 +166,28 @@ func NewServer(cfg *ServerConfig, logger *log.Logger) (*Server, error) {
 	return result, nil
 }
 
-// ProcessOptions process default options for server
-func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
-
-	// security headers
-	if v, ok := s.Config.Options[OptDefaultSecurityHeaders]; ok {
-		if strings.ToLower(v) == "true" || v == "1" {
-			s.UseDefaultSecurityHeaders()
-		}
+// WithDefaultSecurityHeaders returns an OptionsFunc that enables default security headers
+func WithDefaultSecurityHeaders() OptionsFunc {
+	return func(s *Server) error {
+		s.UseDefaultSecurityHeaders()
+		return nil
 	}
+}
 
-	// hmac auth
-	if rawSecret, ok := s.Config.Options[OptHMACSecret]; ok {
-		secret, err := secure.NewCredential([]byte(rawSecret), secure.RandomKey32(), false)
-		if err != nil {
-			return err
-		}
-		provider := hmacprovider.NewHmacProvider(hmacprovider.NewSingleKeyProvider("", secret))
-		s.UseAuth(auth.NewHMACAuthProvider(provider))
-	}
-
-	// auth token
-	if secret, ok := s.Config.Options[OptAuthTokenSecret]; ok {
-		var headerName string
-		if headerName, ok = s.Config.Options[OptAuthTokenHeader]; !ok {
+// WithAuthToken returns an OptionsFunc that enables token-based authentication.
+// If headerName is empty, auth.DefaultTokenAuthHeader is used.
+func WithAuthToken(headerName, secret string) OptionsFunc {
+	return func(s *Server) error {
+		if headerName == "" {
 			headerName = auth.DefaultTokenAuthHeader
 		}
-		authToken := auth.NewAuthToken(headerName, secret)
-		s.UseAuth(authToken)
+		s.UseAuth(auth.NewAuthToken(headerName, secret))
+		return nil
 	}
+}
 
-	// auth user
+// ProcessOptions applies functional options to the server
+func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error {
 	for _, withOption := range withOptions {
 		if err := withOption(s); err != nil {
 			return err

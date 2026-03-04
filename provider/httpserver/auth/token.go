@@ -35,7 +35,14 @@ func NewAuthToken(headerName string, key string) Provider {
 // CanAccess returns true if request is valid
 // Note: this method supports empty keys as a means to disable authentication
 func (a *authToken) CanAccess(c *gin.Context) bool {
-	return subtle.ConstantTimeCompare([]byte(c.Request.Header.Get(a.headerName)), []byte(a.key)) == 1
+	if subtle.ConstantTimeCompare([]byte(c.Request.Header.Get(a.headerName)), []byte(a.key)) != 1 {
+		return false
+	}
+	c.Set(ContextAuthIdentity, &AuthIdentity{
+		Method: "token",
+		ID:     "authenticated",
+	})
+	return true
 }
 
 // NewAuthTokenList create simple auth token provider
@@ -56,6 +63,10 @@ func (a *authTokenList) CanAccess(c *gin.Context) bool {
 	key := c.Request.Header.Get(a.headerName)
 	for _, existingKey := range a.keyList {
 		if subtle.ConstantTimeCompare([]byte(key), []byte(existingKey)) == 1 {
+			c.Set(ContextAuthIdentity, &AuthIdentity{
+				Method: "token",
+				ID:     "authenticated",
+			})
 			return true
 		}
 	}

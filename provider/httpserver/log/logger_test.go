@@ -31,8 +31,8 @@ func setupTestHTTPRouter(t *testing.T) (*gin.Engine, *bytes.Buffer) {
 		// Use a custom middleware that places our test logger in the context
 		ctx := logger.WithContext(c.Request.Context())
 		c.Request = c.Request.WithContext(ctx)
-		c.Set("trace_id", "test-trace-id")
-		c.Set("request_id", "test-request-id")
+		c.Set(ContextTraceID, "test-trace-id")
+		c.Set(ContextRequestID, "test-request-id")
 		c.Next()
 	})
 
