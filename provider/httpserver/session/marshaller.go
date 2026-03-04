@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"sync"
 )
 
 type Marshaller interface {
@@ -13,7 +14,24 @@ type Marshaller interface {
 
 type gobMarshaller struct{}
 
+var gobTypesOnce sync.Once
+
+// RegisterGobTypes registers session-related types with the gob encoder.
+// Safe to call multiple times via sync.Once.
+func RegisterGobTypes() {
+	gobTypesOnce.Do(func() {
+		gob.Register(&SessionData{})
+		gob.Register(map[string]interface{}{})
+		gob.Register(map[string]int{})
+		gob.Register(map[string]string{})
+		gob.Register([]string{})
+		gob.Register([]int{})
+		gob.Register([]interface{}{})
+	})
+}
+
 func NewGobMarshaller() Marshaller {
+	RegisterGobTypes()
 	return &gobMarshaller{}
 }
 
@@ -57,13 +75,3 @@ func (g *jsonMarshaller) UnmarshalSession(data []byte) (*SessionData, error) {
 	return result, nil
 }
 
-func init() {
-	// register type to be used with session data
-	gob.Register(&SessionData{})
-	gob.Register(map[string]interface{}{})
-	gob.Register(map[string]int{})
-	gob.Register(map[string]string{})
-	gob.Register([]string{})
-	gob.Register([]int{})
-	gob.Register([]interface{}{})
-}

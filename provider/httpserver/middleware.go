@@ -29,16 +29,20 @@ func (s *Server) UseCSRFProtection() {
 	s.AddMiddleware(security.CSRFProtection())
 }
 
-// UseRateLimiting adds rate limiting middleware to the server
-// ratePerMinute specifies the allowed requests per minute
-func (s *Server) UseRateLimiting(ratePerMinute int) {
+// UseRateLimiting adds rate limiting middleware to the server.
+// ratePerMinute specifies the allowed requests per minute.
+// Returns the underlying ClientRateLimiter for lifecycle management;
+// callers should call Stop() during shutdown.
+func (s *Server) UseRateLimiting(ratePerMinute int) *security.ClientRateLimiter {
 	// Convert rate per minute to rate per second
 	r := rate.Limit(float64(ratePerMinute) / 60.0)
 
 	// Allow bursts of up to 5 requests
 	b := 5
 
-	s.AddMiddleware(security.RateLimitMiddleware(r, b))
+	handler, limiter := security.RateLimitMiddleware(r, b)
+	s.AddMiddleware(handler)
+	return limiter
 }
 
 // UseSession adds session middleware with provided storage

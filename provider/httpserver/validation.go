@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -12,6 +13,33 @@ import (
 	cv "github.com/oddbit-project/blueprint/provider/httpserver/request/validator"
 	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 )
+
+var validatorOnce sync.Once
+
+// registerValidators registers custom validators and tag name function
+// with Gin's validator engine. Safe to call multiple times via sync.Once.
+func registerValidators() {
+	validatorOnce.Do(func() {
+		if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+			// Register tag name function to use JSON field names in error messages
+			v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+				name := fld.Tag.Get("json")
+				if name == "" || name == "-" {
+					return fld.Name
+				}
+				// Handle "fieldname,omitempty" case
+				if idx := strings.Index(name, ","); idx != -1 {
+					name = name[:idx]
+				}
+				return name
+			})
+
+			if err := v.RegisterValidation("securepassword", cv.ValidateSecurePassword); err != nil {
+				panic(err)
+			}
+		}
+	})
+}
 
 const (
 	fieldErrMsg = "Error: Field validation failed on the '%s' validator"
@@ -81,6 +109,21 @@ func validateNested(obj interface{}, path string) error {
 		}
 	}
 
+	return validateNestedFields(obj, path)
+}
+
+// validateNestedFields recurses into struct fields, slices, arrays, and maps
+// without calling the top-level Validator check on obj itself.
+// This is used when the caller has already invoked Validate() on the object
+// (e.g. via a pointer receiver) to avoid double-validation.
+func validateNestedFields(obj interface{}, path string) error {
+	val := reflect.ValueOf(obj)
+
+	// Skip nil pointers entirely
+	if val.Kind() == reflect.Ptr && val.IsNil() {
+		return nil
+	}
+
 	// Dereference pointer for struct field iteration
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
@@ -117,17 +160,29 @@ func validateNested(obj interface{}, path string) error {
 
 			// Check if field value or pointer to field implements Validator
 			fieldInterface := field.Interface()
+			ptrValidated := false
 			if field.CanAddr() {
 				// Try pointer to field first (for pointer receiver methods)
 				if v, ok := field.Addr().Interface().(Validator); ok {
 					if err := v.Validate(); err != nil {
 						return &FieldError{Field: fieldPath, Err: err}
 					}
+					ptrValidated = true
 				}
 			}
 
-			if err := validateNested(fieldInterface, fieldPath); err != nil {
-				return err
+			// Only recurse if the pointer-receiver Validate wasn't already called,
+			// to avoid double-validating fields with pointer-receiver methods.
+			// When ptrValidated is true, we still recurse into struct fields
+			// but skip the top-level Validator check inside validateNested.
+			if ptrValidated {
+				if err := validateNestedFields(fieldInterface, fieldPath); err != nil {
+					return err
+				}
+			} else {
+				if err := validateNested(fieldInterface, fieldPath); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -140,17 +195,25 @@ func validateNested(obj interface{}, path string) error {
 			elemPath := fmt.Sprintf("%s[%d]", path, i)
 
 			// Check if element or pointer to element implements Validator
+			ptrValidated := false
 			if elem.CanAddr() {
 				// Try pointer to element first (for pointer receiver methods)
 				if v, ok := elem.Addr().Interface().(Validator); ok {
 					if err := v.Validate(); err != nil {
 						return &FieldError{Field: elemPath, Err: err}
 					}
+					ptrValidated = true
 				}
 			}
 
-			if err := validateNested(elem.Interface(), elemPath); err != nil {
-				return err
+			if ptrValidated {
+				if err := validateNestedFields(elem.Interface(), elemPath); err != nil {
+					return err
+				}
+			} else {
+				if err := validateNested(elem.Interface(), elemPath); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -304,6 +367,8 @@ func handleValidationError(err error) []ValidationError {
 //	    // Continue with valid request
 //	}
 func ValidateJSON(c *gin.Context, obj interface{}) bool {
+	registerValidators()
+
 	// Stage 1: Binding validation using `binding` tags
 	if err := c.ShouldBindJSON(obj); err != nil {
 		var validationErrors []ValidationError
@@ -363,6 +428,8 @@ func ValidateJSON(c *gin.Context, obj interface{}) bool {
 //	    // Continue with valid request
 //	}
 func ValidateQuery(c *gin.Context, obj interface{}) bool {
+	registerValidators()
+
 	// Stage 1: Binding validation using `binding` tags
 	if err := c.ShouldBindQuery(obj); err != nil {
 		var validationErrors []ValidationError
@@ -393,24 +460,3 @@ func ValidateQuery(c *gin.Context, obj interface{}) bool {
 	return true
 }
 
-func init() {
-	// Register custom validators with Gin's validator instance
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		// Register tag name function to use JSON field names in error messages
-		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
-			name := fld.Tag.Get("json")
-			if name == "" || name == "-" {
-				return fld.Name
-			}
-			// Handle "fieldname,omitempty" case
-			if idx := strings.Index(name, ","); idx != -1 {
-				name = name[:idx]
-			}
-			return name
-		})
-
-		if err := v.RegisterValidation("securepassword", cv.ValidateSecurePassword); err != nil {
-			panic(err)
-		}
-	}
-}

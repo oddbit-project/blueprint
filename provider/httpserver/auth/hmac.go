@@ -106,6 +106,14 @@ func (h *hmacAuthProvider) CanAccess(c *gin.Context) bool {
 	c.Set(HMACKeyId, keyId)
 	c.Set(HMACTimestamp, timestamp)
 	c.Set(HMACNonce, nonce)
+	c.Set(ContextAuthIdentity, &AuthIdentity{
+		Method: "hmac",
+		ID:     keyId,
+		Extra: map[string]string{
+			"timestamp": timestamp,
+			"nonce":     nonce,
+		},
+	})
 
 	return true
 }

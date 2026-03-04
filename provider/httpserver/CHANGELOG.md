@@ -4,6 +4,41 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.0]
+
+### Breaking Changes
+
+- **`ServerConfig.Options` field removed** along with `GetOption()` method and `OptAuthTokenHeader`, `OptAuthTokenSecret`, `OptDefaultSecurityHeaders`, `OptHMACSecret` constants. Use `ServerConfig.ServerName` for server name, and `WithAuthToken()`/`WithDefaultSecurityHeaders()` via `ProcessOptions()` for middleware setup.
+- **`RateLimitMiddleware()` return type changed** from `gin.HandlerFunc` to `(gin.HandlerFunc, *ClientRateLimiter)` for lifecycle management.
+- **`SecurityConfig.EnableRateLimit` and `SecurityConfig.RateLimit` fields removed**. These were never read by `SecurityMiddleware`; rate limiting is handled independently by `RateLimitMiddleware`.
+- **Default server timeouts changed** from 600s to 30s read / 60s write.
+- **`init()` functions removed** from `validation.go`, `session/marshaller.go`, and `fingerprint/middleware.go`. Registration is now lazy via `sync.Once`. Only affects code that imports packages purely for side effects without calling their API.
+
+### Added
+
+- `AuthIdentity` struct and `GetAuthIdentity()` for unified identity retrieval across all auth providers (JWT, HMAC, basic auth, session, token). All providers now store identity in context under `ContextAuthIdentity`.
+- `WithAuthToken(headerName, secret)` and `WithDefaultSecurityHeaders()` typed `OptionsFunc` constructors replacing string-based options.
+- `ServerConfig.ServerName` field replacing `Options["serverName"]`.
+- `SessionStore` interface in session package, enabling custom session store implementations (Redis, SQL, etc.). `ManagerWithStore()` now accepts `SessionStore` instead of `*Store`; existing `*Store` satisfies the interface.
+- `FingerprintStore` interface and `FingerprintMiddleware()` for storage-agnostic fingerprint validation. `SessionFingerprintStore` provided as default implementation.
+- `RegisterGobTypes()` exported functions in session and fingerprint packages for explicit gob type registration.
+- `registerValidators()` lazy registration for Gin custom validators via `sync.Once`.
+- `UseRateLimiting()` now returns `*security.ClientRateLimiter` for lifecycle management (call `Stop()` on shutdown).
+- Context key constants: `log.ContextTraceID`, `log.ContextRequestID`, `security.ContextCSPNonce`, replacing bare string literals.
+
+### Fixed
+
+- Rate limiter IP spoofing: replaced manual `X-Forwarded-For` parsing with `c.ClientIP()` which respects Gin's trusted proxies configuration.
+- Rate limiter unbounded memory growth: added `clientEntry` tracking with `lastAccess`, selective eviction, `DefaultMaxClients` cap (10000), and `Stop()` method.
+- Session cookie `SameSite` attribute: replaced string concatenation with `c.SetSameSite()` called before `c.SetCookie()`.
+- Session `NewManager` nil-config bug: fixed assignment to local variable instead of `manager.config`.
+- Fingerprint `GetFingerprint` now reads from session data instead of gin context.
+- Fingerprint `Generate()` now uses the configured `geoResolver` instead of hardcoded `getCountryFromIP`.
+- Logger middleware now captures return value of immutable builder chain (`WithTraceID`/`WithField`).
+- `validateNested` no longer double-calls `Validate()` on structs with pointer-receiver methods.
+- `getCountryFromIP` rewritten to use `net.IP.IsPrivate()`/`IsLoopback()`/`IsLinkLocalUnicast()`/`IsLinkLocalMulticast()` covering all RFC private ranges.
+- `CorsConfig` struct tag typo fixed (`json:"corsEnabled""` to `json:"corsEnabled"`).
+
 ## [v0.8.6]
 
 ### Fixed

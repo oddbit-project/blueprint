@@ -12,7 +12,7 @@ import (
 )
 
 type CorsConfig struct {
-	CorsEnabled      bool     `json:"corsEnabled""`
+	CorsEnabled      bool     `json:"corsEnabled"`
 	AllowOrigins     []string `json:"allowOrigins"`
 	AllowMethods     []string `json:"allowMethods"`
 	AllowHeaders     []string `json:"allowHeaders"`

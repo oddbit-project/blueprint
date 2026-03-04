@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+// SessionStore defines the interface for session storage backends.
+// Implement this interface to provide custom session storage (e.g. Redis, SQL).
+type SessionStore interface {
+	Get(id string) (*SessionData, error)
+	Set(id string, session *SessionData) error
+	Delete(id string) error
+	Generate() (*SessionData, string)
+	StartCleanup()
+	Close()
+}
+
 type Store struct {
 	backend        kv.KV
 	config         *Config

@@ -4,30 +4,42 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/provider/httpserver/response"
 	"golang.org/x/time/rate"
-	"net"
-	"strings"
 	"sync"
 	"time"
 )
 
+const (
+	// DefaultMaxClients is the maximum number of tracked clients before forced eviction
+	DefaultMaxClients = 10000
+)
+
+// clientEntry tracks a rate limiter and its last access time
+type clientEntry struct {
+	limiter    *rate.Limiter
+	lastAccess time.Time
+}
+
 // ClientRateLimiter manages per-client rate limiters
 type ClientRateLimiter struct {
-	limiters map[string]*rate.Limiter
-	mu       sync.RWMutex
+	clients map[string]*clientEntry
+	mu      sync.RWMutex
 	// Configuration
 	rate         rate.Limit    // Rate is limit per second
 	burst        int           // Burst is maximum token bucket size
 	cleanupTimer *time.Timer   // Timer for cleanup
 	clientExpiry time.Duration // How long to keep a client limiter around
+	maxClients   int           // Maximum tracked clients before forced eviction
+	stopped      bool          // Whether the limiter has been stopped
 }
 
 // NewClientRateLimiter creates a new ClientRateLimiter
 func NewClientRateLimiter(r rate.Limit, b int) *ClientRateLimiter {
 	rl := &ClientRateLimiter{
-		limiters:     make(map[string]*rate.Limiter),
+		clients:      make(map[string]*clientEntry),
 		rate:         r,
 		burst:        b,
 		clientExpiry: 1 * time.Hour,
+		maxClients:   DefaultMaxClients,
 	}
 
 	// Start cleanup routine
@@ -38,55 +50,72 @@ func NewClientRateLimiter(r rate.Limit, b int) *ClientRateLimiter {
 
 // GetLimiter returns a rate limiter for the specified IP address
 func (rl *ClientRateLimiter) GetLimiter(ip string) *rate.Limiter {
-	rl.mu.RLock()
-	limiter, exists := rl.limiters[ip]
-	rl.mu.RUnlock()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 
-	if !exists {
-		rl.mu.Lock()
-		// Double check after obtaining write lock
-		limiter, exists = rl.limiters[ip]
-		if !exists {
-			limiter = rate.NewLimiter(rl.rate, rl.burst)
-			rl.limiters[ip] = limiter
-		}
-		rl.mu.Unlock()
+	if entry, exists := rl.clients[ip]; exists {
+		entry.lastAccess = time.Now()
+		return entry.limiter
 	}
 
-	return limiter
+	// Enforce max clients cap
+	if len(rl.clients) >= rl.maxClients {
+		rl.evictExpired()
+	}
+
+	entry := &clientEntry{
+		limiter:    rate.NewLimiter(rl.rate, rl.burst),
+		lastAccess: time.Now(),
+	}
+	rl.clients[ip] = entry
+	return entry.limiter
 }
 
-// cleanup removes old limiters
+// evictExpired removes entries older than clientExpiry.
+// Must be called with write lock held.
+func (rl *ClientRateLimiter) evictExpired() {
+	cutoff := time.Now().Add(-rl.clientExpiry)
+	for ip, entry := range rl.clients {
+		if entry.lastAccess.Before(cutoff) {
+			delete(rl.clients, ip)
+		}
+	}
+}
+
+// cleanup periodically removes stale client entries
 func (rl *ClientRateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	// In a more sophisticated implementation, we would track last access time
-	// for each limiter and remove those that haven't been used recently
-	// For now, we just reset the map periodically
-	rl.limiters = make(map[string]*rate.Limiter)
+	if rl.stopped {
+		return
+	}
+
+	rl.evictExpired()
 
 	// Reschedule cleanup
 	rl.cleanupTimer.Reset(rl.clientExpiry)
 }
 
-// RateLimitMiddleware creates a Gin middleware for rate limiting
-func RateLimitMiddleware(r rate.Limit, b int) gin.HandlerFunc {
+// Stop stops the cleanup timer and releases resources
+func (rl *ClientRateLimiter) Stop() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.stopped = true
+	if rl.cleanupTimer != nil {
+		rl.cleanupTimer.Stop()
+	}
+}
+
+// RateLimitMiddleware creates a Gin middleware for rate limiting.
+// Returns the middleware handler and the underlying ClientRateLimiter for lifecycle management.
+// Callers should call Stop() on the returned limiter during shutdown.
+func RateLimitMiddleware(r rate.Limit, b int) (gin.HandlerFunc, *ClientRateLimiter) {
 	limiter := NewClientRateLimiter(r, b)
 
-	return func(c *gin.Context) {
-		// Get client IP
-		ip, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-		if err != nil {
-			ip = c.Request.RemoteAddr
-		}
-
-		// Use X-Forwarded-For if behind proxy
-		if c.GetHeader("X-Forwarded-For") != "" {
-			ips := c.GetHeader("X-Forwarded-For")
-			ipList := strings.Split(ips, ",")
-			ip = strings.TrimSpace(ipList[0])
-		}
+	handler := func(c *gin.Context) {
+		// Use Gin's ClientIP() which respects trusted proxies configuration
+		ip := c.ClientIP()
 
 		// Get the rate limiter for this IP
 		clientLimiter := limiter.GetLimiter(ip)
@@ -99,4 +128,6 @@ func RateLimitMiddleware(r rate.Limit, b int) gin.HandlerFunc {
 
 		c.Next()
 	}
+
+	return handler, limiter
 }

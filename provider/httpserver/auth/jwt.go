@@ -31,6 +31,11 @@ func (a *authJWT) CanAccess(c *gin.Context) bool {
 	}
 
 	c.Set(ContextJwtClaims, claims)
+	c.Set(ContextAuthIdentity, &AuthIdentity{
+		Method: "jwt",
+		ID:     claims.ID,
+		Extra:  claims,
+	})
 	return true
 }
 
