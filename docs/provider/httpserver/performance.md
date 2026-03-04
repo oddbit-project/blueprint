@@ -113,7 +113,9 @@ func efficientRateLimiting(server *httpserver.Server) {
     r := rate.Every(time.Second / 100) // 100 requests per second
     burst := 50                        // Allow bursts
     
-    server.AddMiddleware(security.RateLimitMiddleware(r, burst))
+    handler, limiter := security.RateLimitMiddleware(r, burst)
+    defer limiter.Stop()
+    server.AddMiddleware(handler)
     
     // For high-traffic scenarios, consider Redis-based rate limiting
     // with connection pooling and distributed counters

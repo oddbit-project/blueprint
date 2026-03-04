@@ -114,7 +114,9 @@ func main() {
     server.Route().Use(security.CSRFProtection())
     
     // Apply rate limiting
-    server.Route().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    rlHandler, rlLimiter := security.RateLimitMiddleware(rate.Every(time.Second), 10)
+    defer rlLimiter.Stop()
+    server.Route().Use(rlHandler)
     
     // Routes
     setupRoutes(server)
@@ -194,14 +196,14 @@ func setupRoutes(server *httpserver.Server) {
 
 ```go
 type ServerConfig struct {
-    Host         string            `json:"host"`         // Server host (default: "localhost")
-    Port         int               `json:"port"`         // Server port (default: 8080)
-    CertFile     string            `json:"certFile"`     // TLS certificate file
-    CertKeyFile  string            `json:"certKeyFile"`  // TLS private key file
-    ReadTimeout  int               `json:"readTimeout"`  // Read timeout in seconds
-    WriteTimeout int               `json:"writeTimeout"` // Write timeout in seconds
-    Debug        bool              `json:"debug"`        // Enable debug mode
-    Options      map[string]string `json:"options"`      // Additional options
+    Host           string   `json:"host"`           // Server bind address (default: "")
+    Port           int      `json:"port"`            // Server port (default: 5000)
+    ReadTimeout    int      `json:"readTimeout"`     // Read timeout in seconds (default: 30)
+    WriteTimeout   int      `json:"writeTimeout"`    // Write timeout in seconds (default: 60)
+    Debug          bool     `json:"debug"`           // Enable debug mode (default: false)
+    ServerName     string   `json:"serverName"`      // Server name identifier (default: "http")
+    TrustedProxies []string `json:"trustedProxies"`  // List of trusted proxy IPs/CIDRs
+    tlsProvider.ServerConfig                          // TLS configuration
 }
 ```
 

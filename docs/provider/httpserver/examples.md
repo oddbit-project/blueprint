@@ -907,12 +907,22 @@ func createServerFromEnv() (*httpserver.Server, error) {
         config.TLSEnable = true
     }
     
-    // Options from environment
-    config.Options[httpserver.OptAuthTokenSecret] = os.Getenv("API_SECRET")
-    config.Options[httpserver.OptDefaultSecurityHeaders] = "true"
-    
     logger := log.New("app")
-    return httpserver.NewServer(config, logger)
+    server, err := httpserver.NewServer(config, logger)
+    if err != nil {
+        return nil, err
+    }
+
+    // Apply options via functional constructors
+    err = server.ProcessOptions(
+        httpserver.WithDefaultSecurityHeaders(),
+        httpserver.WithAuthToken("", os.Getenv("API_SECRET")),
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    return server, nil
 }
 ```
 

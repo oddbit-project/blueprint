@@ -11,7 +11,7 @@ The session system consists of five main components:
 
 - **SessionData** (`session_data.go`): Core data structure with typed accessors and identity management
 - **SessionManager** (`middleware.go`): Gin middleware for automatic session lifecycle management
-- **Store** (`store.go`): Backend storage abstraction with encryption and automatic cleanup
+- **SessionStore** (`store.go`): Interface for session storage backends; `Store` is the built-in implementation with encryption and automatic cleanup
 - **Config** (`config.go`): Comprehensive configuration with security defaults and validation
 - **Marshaller** (`marshaller.go`): Pluggable serialization interface supporting GOB and JSON formats
 
@@ -163,6 +163,37 @@ func setupSessionWithJSONMarshaller(server *httpserver.Server, logger *log.Logge
 
     server.Route().Use(sessionManager.Middleware())
 }
+```
+
+## SessionStore Interface
+
+The `SessionStore` interface allows custom session storage implementations (e.g., Redis, SQL database). The built-in `Store` struct satisfies this interface.
+
+```go
+type SessionStore interface {
+    Get(id string) (*SessionData, error)
+    Set(id string, session *SessionData) error
+    Delete(id string) error
+    Generate() (*SessionData, string)
+    StartCleanup()
+    Close()
+}
+```
+
+`ManagerWithStore()` accepts any `SessionStore` implementation:
+
+```go
+// Use built-in Store
+sessionStore, _ := session.NewStore(config, backend, logger)
+manager, _ := session.NewManager(config,
+    session.ManagerWithStore(sessionStore), // *Store satisfies SessionStore
+    session.ManagerWithLogger(logger))
+
+// Or use a custom implementation
+customStore := &MyCustomSessionStore{db: database}
+manager, _ := session.NewManager(config,
+    session.ManagerWithStore(customStore),
+    session.ManagerWithLogger(logger))
 ```
 
 ## Session Configuration
@@ -756,7 +787,9 @@ func main() {
     server.Route().Use(security.CSRFProtection())
 
     // Rate limiting
-    server.Route().Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    rlHandler, rlLimiter := security.RateLimitMiddleware(rate.Every(time.Second), 10)
+    defer rlLimiter.Stop()
+    server.Route().Use(rlHandler)
 
     // Routes
     setupRoutes(server, sessionManager)

@@ -20,9 +20,43 @@ request access permissions.
 
 - **Provider Interface**: Unified authentication contract
 - **Concrete Providers**: Basic, JWT, Token, HMAC, Session authentication
+- **AuthIdentity**: Unified identity struct populated by all providers after successful authentication
 - **Middleware Integration**: Seamless Gin framework integration
 - **Context Storage**: Authentication data available throughout request lifecycle
 - **Utility Functions**: Helper methods for extracting authentication information
+
+## Unified Auth Identity
+
+All authentication providers store a unified `AuthIdentity` in the gin context after successful authentication. This allows downstream handlers to retrieve the authenticated identity regardless of which auth method was used.
+
+```go
+type AuthIdentity struct {
+    Method string // "jwt", "hmac", "basic", "session", "token"
+    ID     string // User/entity identifier
+    Extra  any    // Provider-specific data (e.g., JWT claims, session identity)
+}
+
+const ContextAuthIdentity = "authIdentity"
+```
+
+**Retrieving the identity:**
+```go
+func protectedHandler(c *gin.Context) {
+    identity, ok := auth.GetAuthIdentity(c)
+    if !ok {
+        response.Http401(c)
+        return
+    }
+
+    fmt.Printf("Authenticated via %s as %s\n", identity.Method, identity.ID)
+
+    // Access provider-specific data
+    if identity.Method == "jwt" {
+        claims := identity.Extra.(*jwtprovider.Claims)
+        // use claims...
+    }
+}
+```
 
 ## Authentication Providers
 
@@ -700,7 +734,9 @@ type HMACConfig struct {
 5. **Rate Limiting**: Combine with rate limiting for auth endpoints
    ```go
    authGroup := router.Group("/auth")
-   authGroup.Use(security.RateLimitMiddleware(rate.Every(time.Minute/5), 2))
+   handler, limiter := security.RateLimitMiddleware(rate.Every(time.Minute/5), 2)
+   defer limiter.Stop()
+   authGroup.Use(handler)
    ```
 
 ### Common Security Patterns

@@ -317,23 +317,31 @@ server.UseRateLimiting(100) // 100 per minute
 // Or use custom rate limiting
 r := rate.Every(time.Second / 10) // 10 requests per second
 burst := 20
-server.AddMiddleware(security.RateLimitMiddleware(r, burst))
+handler, limiter := security.RateLimitMiddleware(r, burst)
+defer limiter.Stop()
+server.AddMiddleware(handler)
 ```
 
 2. **Different limits for different endpoints:**
 ```go
 func setupDifferentialRateLimiting(server *httpserver.Server) {
     // Strict limits for auth endpoints
+    authHandler, authLimiter := security.RateLimitMiddleware(rate.Every(time.Minute/5), 2)
+    defer authLimiter.Stop()
     auth := server.Group("/auth")
-    auth.Use(security.RateLimitMiddleware(rate.Every(time.Minute/5), 2))
-    
+    auth.Use(authHandler)
+
     // Moderate limits for API
+    apiHandler, apiLimiter := security.RateLimitMiddleware(rate.Every(time.Second), 10)
+    defer apiLimiter.Stop()
     api := server.Group("/api")
-    api.Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
-    
+    api.Use(apiHandler)
+
     // Lenient limits for static content
+    staticHandler, staticLimiter := security.RateLimitMiddleware(rate.Every(time.Second/10), 50)
+    defer staticLimiter.Stop()
     static := server.Group("/static")
-    static.Use(security.RateLimitMiddleware(rate.Every(time.Second/10), 50))
+    static.Use(staticHandler)
 }
 ```
 
@@ -497,13 +505,10 @@ func debugServerConfig(config *httpserver.ServerConfig) {
         "host", config.Host,
         "port", config.Port,
         "debug", config.Debug,
+        "serverName", config.ServerName,
         "readTimeout", config.ReadTimeout,
         "writeTimeout", config.WriteTimeout,
         "tlsEnabled", config.TLSEnable)
-    
-    for key, value := range config.Options {
-        log.Info("Server option", "key", key, "value", value)
-    }
 }
 ```
 
