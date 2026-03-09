@@ -10,14 +10,14 @@ Configuration structure for HTTP server settings:
 
 ```go
 type ServerConfig struct {
-    Host           string            `json:"host"`           // Server bind address (default: "")
-    Port           int               `json:"port"`           // Server port (default: 5000)
-    ReadTimeout    int               `json:"readTimeout"`    // Read timeout in seconds (default: 600)
-    WriteTimeout   int               `json:"writeTimeout"`   // Write timeout in seconds (default: 600)
-    Debug          bool              `json:"debug"`          // Enable debug mode (default: false)
-    Options        map[string]string `json:"options"`        // Additional server options
-    TrustedProxies []string          `json:"trustedProxies"` // List of trusted proxy IPs/CIDRs
-    tlsProvider.ServerConfig                                 // TLS configuration
+    Host           string   `json:"host"`           // Server bind address (default: "")
+    Port           int      `json:"port"`           // Server port (default: 5000)
+    ReadTimeout    int      `json:"readTimeout"`    // Read timeout in seconds (default: 30)
+    WriteTimeout   int      `json:"writeTimeout"`   // Write timeout in seconds (default: 60)
+    Debug          bool     `json:"debug"`          // Enable debug mode (default: false)
+    ServerName     string   `json:"serverName"`     // Server name identifier (default: "http")
+    TrustedProxies []string `json:"trustedProxies"` // List of trusted proxy IPs/CIDRs
+    tlsProvider.ServerConfig                         // TLS configuration
 }
 ```
 
@@ -29,14 +29,9 @@ func NewServerConfig() *ServerConfig
 Creates a new server configuration with default values.
 
 ```go
-func (c *ServerConfig) GetOption(key string, defaultValue string) string
-```
-Retrieves option value by key, returns defaultValue if not found.
-
-```go
 func (c *ServerConfig) Validate() error
 ```
-Validates the server configuration (currently returns nil).
+Validates the server configuration. Checks port range (1-65535), sets default timeouts if zero, and sets default server name if empty.
 
 ```go
 func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error)
@@ -47,37 +42,39 @@ Creates a new server instance using this configuration.
 
 ```go
 const (
-    ServerDefaultReadTimeout  = 600   // 10 minutes
-    ServerDefaultWriteTimeout = 600   // 10 minutes
+    ServerDefaultReadTimeout  = 30    // 30 seconds
+    ServerDefaultWriteTimeout = 60    // 60 seconds
     ServerDefaultPort         = 5000  // Default port
     ServerDefaultName         = "http" // Default server name
 )
 ```
 
-#### Configuration Options
+#### Functional Options
 
-The `Options` map supports these predefined keys:
+Server behavior is configured through typed `OptionsFunc` constructors passed to `ProcessOptions()`:
 
 ```go
-const (
-    OptAuthTokenHeader        = "authTokenHeader"        // Custom auth header name
-    OptAuthTokenSecret        = "authTokenSecret"        // Auth token secret
-    OptDefaultSecurityHeaders = "defaultSecurityHeaders" // Enable default security headers
-    OptHMACSecret             = "hmacSecret"             // HMAC secret for request signing
-)
-```
-> Note: 'authTokenHeader' and 'authTokenSecret' will be used to configure automatically 
-> simple token-based auth if ProcessOptions() is called; if no 'authTokenHeader' is specified, a default value is used
+// WithDefaultSecurityHeaders returns an OptionsFunc that enables default security headers.
+func WithDefaultSecurityHeaders() OptionsFunc
 
+// WithAuthToken returns an OptionsFunc that configures token-based authentication.
+// If headerName is empty, auth.DefaultTokenAuthHeader is used.
+func WithAuthToken(headerName, secret string) OptionsFunc
+```
 
 **Example:**
 ```go
 config := NewServerConfig()
 config.Host = "localhost"
 config.Port = 8080
+config.ServerName = "my-api"
 config.Debug = true
-config.Options["authTokenSecret"] = "my-secret-key"
-config.Options["defaultSecurityHeaders"] = "true"
+
+server, _ := NewServer(config, logger)
+server.ProcessOptions(
+    WithDefaultSecurityHeaders(),
+    WithAuthToken("X-API-Key", "my-secret-key"),
+)
 ```
 
 ### Server
@@ -227,20 +224,15 @@ server.AddMiddleware(cors.Default())
 ```go
 func (s *Server) ProcessOptions(withOptions ...OptionsFunc) error
 ```
-Processes server options and applies configuration-based middleware.
-
-**Automatic Processing:**
-- `OptDefaultSecurityHeaders`: Applies default security headers if "true" or "1"
-- `OptAuthTokenSecret`: Sets up token authentication with optional custom header
+Processes functional options and applies the corresponding middleware to the server.
 
 **Example:**
 ```go
-config.Options["defaultSecurityHeaders"] = "true"
-config.Options["authTokenSecret"] = "my-api-key"
-config.Options["authTokenHeader"] = "X-API-Key"
-
 server, _ := NewServer(config, logger)
-err := server.ProcessOptions() // Applies security headers and auth
+err := server.ProcessOptions(
+    WithDefaultSecurityHeaders(),
+    WithAuthToken("X-API-Key", "my-api-key"),
+)
 ```
 
 ### Router Creation
@@ -322,18 +314,22 @@ server.UseCSRFProtection()
 ### Rate Limiting
 
 ```go
-func (s *Server) UseRateLimiting(ratePerMinute int)
+func (s *Server) UseRateLimiting(ratePerMinute int) *security.ClientRateLimiter
 ```
-Adds rate limiting middleware.
+Adds rate limiting middleware and returns the rate limiter for lifecycle management.
 
 **Parameters:**
 - `ratePerMinute`: Maximum requests per minute per IP
 - Uses burst size of 5 requests
 
+**Returns:**
+- `*security.ClientRateLimiter`: Rate limiter instance. Call `Stop()` on shutdown to release cleanup resources.
+
 **Example:**
 ```go
 // Allow 60 requests per minute
-server.UseRateLimiting(60)
+limiter := server.UseRateLimiting(60)
+defer limiter.Stop() // Stop cleanup goroutine on shutdown
 ```
 
 ### Session Management

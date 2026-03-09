@@ -28,6 +28,7 @@ type Repository interface {
 	db.Counter
 	db.GridOps
 	Conn() clickhouse.Conn
+	InsertAsync(record any) error
 }
 
 type repository struct {

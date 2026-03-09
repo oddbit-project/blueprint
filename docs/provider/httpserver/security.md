@@ -49,8 +49,6 @@ securityConfig := &security.SecurityConfig{
     FeaturePolicy:      "camera 'none'; microphone 'none'",
     CacheControl:       "no-store, must-revalidate",
     UseCSPNonce:        true,
-    EnableRateLimit:    true,
-    RateLimit:          100, // requests per minute
 }
 
 router.Use(security.SecurityMiddleware(securityConfig))
@@ -90,7 +88,7 @@ router.Use(security.SecurityMiddleware(config))
 ```go
 func pageHandler(c *gin.Context) {
     // Get the CSP nonce
-    nonce, exists := c.Get("csp-nonce")
+    nonce, exists := c.Get(security.ContextCSPNonce)
     if !exists {
         nonce = ""
     }
@@ -217,7 +215,9 @@ import (
 rateLimit := rate.Every(time.Minute / 60) // 1 request per second
 burstSize := 10
 
-router.Use(security.RateLimitMiddleware(rateLimit, burstSize))
+handler, limiter := security.RateLimitMiddleware(rateLimit, burstSize)
+defer limiter.Stop() // Stop cleanup goroutine on shutdown
+router.Use(handler)
 ```
 
 ### Different Rate Limits for Different Routes
@@ -226,26 +226,32 @@ router.Use(security.RateLimitMiddleware(rateLimit, burstSize))
 func setupRateRoutes(router *gin.Engine) {
     // Strict rate limiting for auth endpoints
     authLimit := rate.Every(time.Minute / 5) // 5 requests per minute
+    authHandler, authLimiter := security.RateLimitMiddleware(authLimit, 2)
+    defer authLimiter.Stop()
     auth := router.Group("/auth")
-    auth.Use(security.RateLimitMiddleware(authLimit, 2))
+    auth.Use(authHandler)
     {
         auth.POST("/login", loginHandler)
         auth.POST("/register", registerHandler)
     }
-    
+
     // Moderate rate limiting for API
     apiLimit := rate.Every(time.Second) // 1 request per second
+    apiHandler, apiLimiter := security.RateLimitMiddleware(apiLimit, 10)
+    defer apiLimiter.Stop()
     api := router.Group("/api")
-    api.Use(security.RateLimitMiddleware(apiLimit, 10))
+    api.Use(apiHandler)
     {
         api.GET("/data", getDataHandler)
         api.POST("/data", createDataHandler)
     }
-    
+
     // Lenient rate limiting for static content
     staticLimit := rate.Every(time.Second / 10) // 10 requests per second
+    staticHandler, staticLimiter := security.RateLimitMiddleware(staticLimit, 50)
+    defer staticLimiter.Stop()
     static := router.Group("/static")
-    static.Use(security.RateLimitMiddleware(staticLimit, 50))
+    static.Use(staticHandler)
     {
         static.Static("/", "./static")
     }
@@ -294,7 +300,9 @@ func setupSecureServer() *gin.Engine {
     
     // 2. Rate Limiting (apply early)
     generalRateLimit := rate.Every(time.Second / 2) // 2 requests per second
-    router.Use(security.RateLimitMiddleware(generalRateLimit, 10))
+    generalHandler, generalLimiter := security.RateLimitMiddleware(generalRateLimit, 10)
+    defer generalLimiter.Stop()
+    router.Use(generalHandler)
     
     // 3. Session Management
     sessionConfig := session.NewConfig()
@@ -328,7 +336,9 @@ func setupProtectedRoutes(router *gin.Engine) {
     {
         // Stricter rate limit for API
         apiRateLimit := rate.Every(time.Second) // 1 request per second
-        api.Use(security.RateLimitMiddleware(apiRateLimit, 5))
+        apiRLHandler, apiRLLimiter := security.RateLimitMiddleware(apiRateLimit, 5)
+        defer apiRLLimiter.Stop()
+        api.Use(apiRLHandler)
         
         api.GET("/user/profile", getProfileHandler)
         api.PUT("/user/profile", updateProfileHandler)
@@ -341,7 +351,9 @@ func setupProtectedRoutes(router *gin.Engine) {
     {
         // Very strict rate limit for admin
         adminRateLimit := rate.Every(time.Minute / 10) // 10 requests per minute
-        admin.Use(security.RateLimitMiddleware(adminRateLimit, 2))
+        adminRLHandler, adminRLLimiter := security.RateLimitMiddleware(adminRateLimit, 2)
+        defer adminRLLimiter.Stop()
+        admin.Use(adminRLHandler)
         
         admin.GET("/users", listUsersHandler)
         admin.DELETE("/users/:id", deleteUserHandler)
@@ -1190,10 +1202,8 @@ Expected output:
        if os.Getenv("ENV") == "production" {
            config.HSTS = "max-age=63072000; includeSubDomains; preload"
            config.FrameOptions = "DENY"
-           config.RateLimit = 60 // Stricter in production
        } else {
            config.HSTS = "" // No HSTS in development
-           config.RateLimit = 1000 // More lenient in development
        }
        
        return config
@@ -1331,7 +1341,9 @@ func setupSecureAPI() *gin.Engine {
     router.Use(security.SecurityMiddleware(security.DefaultSecurityConfig()))
     
     // Rate limiting
-    router.Use(security.RateLimitMiddleware(rate.Every(time.Second), 10))
+    rlHandler, rlLimiter := security.RateLimitMiddleware(rate.Every(time.Second), 10)
+    defer rlLimiter.Stop()
+    router.Use(rlHandler)
     
     // Authentication
     jwtAuth := auth.NewAuthJWT(jwtProvider)
@@ -1374,7 +1386,9 @@ func setupSecureWebApp() *gin.Engine {
     router.Use(security.CSRFProtection())
     
     // Rate limiting
-    router.Use(security.RateLimitMiddleware(rate.Every(time.Second/2), 5))
+    rlHandler2, rlLimiter2 := security.RateLimitMiddleware(rate.Every(time.Second/2), 5)
+    defer rlLimiter2.Stop()
+    router.Use(rlHandler2)
     
     // Routes
     router.GET("/", homeHandler)

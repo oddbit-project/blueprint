@@ -284,7 +284,8 @@ server.AddMiddleware(RequestIDMiddleware())
 
 ### 3. Rate Limiting
 ```go
-server.UseRateLimiting(100)
+limiter := server.UseRateLimiting(100)
+defer limiter.Stop() // Stop cleanup goroutine on shutdown
 ```
 
 ### 4. Session Management
@@ -318,7 +319,8 @@ func setupMiddleware(server *httpserver.Server, logger *log.Logger) {
     server.AddMiddleware(RequestIDMiddleware())
     
     // 3. Rate limiting (early to prevent abuse)
-    server.UseRateLimiting(100)
+    limiter := server.UseRateLimiting(100)
+    defer limiter.Stop()
     
     // 4. Sessions (before CSRF and auth)
     backend := kv.NewMemoryKV()
