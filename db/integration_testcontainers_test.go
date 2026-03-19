@@ -94,7 +94,9 @@ func (s *DBIntegrationTestSuite) SetupSuite() {
 		postgres.WithUsername("blueprint"),
 		postgres.WithPassword("password"),
 		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(60*time.Second),
 		),
 	)
 	require.NoError(s.T(), err, "Failed to start PostgreSQL container")
