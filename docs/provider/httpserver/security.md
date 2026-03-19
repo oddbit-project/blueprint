@@ -33,7 +33,7 @@ router.Use(security.SecurityMiddleware(securityConfig))
 - **X-Frame-Options**: Clickjacking prevention  
 - **Strict-Transport-Security**: HTTPS enforcement
 - **Referrer-Policy**: Referrer information control
-- **Feature-Policy/Permissions-Policy**: Browser feature restrictions
+- **Permissions-Policy**: Browser feature restrictions
 - **Cache-Control**: Sensitive data caching prevention
 
 ### Custom Security Configuration
@@ -46,7 +46,7 @@ securityConfig := &security.SecurityConfig{
     ReferrerPolicy:     "no-referrer",
     HSTS:               "max-age=63072000; includeSubDomains; preload",
     FrameOptions:       "SAMEORIGIN",
-    FeaturePolicy:      "camera 'none'; microphone 'none'",
+    FeaturePolicy:      "camera=(), microphone=()",
     CacheControl:       "no-store, must-revalidate",
     UseCSPNonce:        true,
 }
@@ -127,17 +127,11 @@ Blueprint provides built-in CSRF (Cross-Site Request Forgery) protection.
 ```go
 import "github.com/oddbit-project/blueprint/provider/httpserver/security"
 
-// Apply CSRF protection to all routes
+// Apply CSRF protection to all routes (requires session middleware)
 router.Use(security.CSRFProtection())
-
-// Generate CSRF tokens in handlers
-router.GET("/form", func(c *gin.Context) {
-    csrfToken := security.GenerateCSRFToken(c)
-    c.HTML(200, "form.html", gin.H{
-        "csrfToken": csrfToken,
-    })
-})
 ```
+
+The CSRF middleware automatically seeds a token in the session on the first GET/HEAD/OPTIONS request and returns it in the `X-CSRF-Token` response header. Subsequent state-changing requests (POST, PUT, DELETE, etc.) must include this token.
 
 ### CSRF Token Usage
 
@@ -146,7 +140,7 @@ router.GET("/form", func(c *gin.Context) {
 <form method="POST" action="/submit">
     <!-- Include CSRF token as hidden field -->
     <input type="hidden" name="_csrf" value="{{ .csrfToken }}">
-    
+
     <input type="text" name="data" required>
     <button type="submit">Submit</button>
 </form>
@@ -154,7 +148,8 @@ router.GET("/form", func(c *gin.Context) {
 
 **In AJAX Requests:**
 ```javascript
-// Include CSRF token in header
+// The CSRF token is returned in the X-CSRF-Token response header
+// on any GET request. Capture it and include it in subsequent requests.
 fetch('/api/data', {
     method: 'POST',
     headers: {
@@ -165,33 +160,24 @@ fetch('/api/data', {
 });
 ```
 
-**Getting CSRF Token via API:**
-```go
-router.GET("/csrf-token", func(c *gin.Context) {
-    token := security.GenerateCSRFToken(c)
-    c.JSON(200, gin.H{"csrf_token": token})
-})
-```
-
 ### CSRF with Sessions
 
-Combine CSRF with session management for enhanced security:
+CSRF protection requires session middleware to be registered first:
 
 ```go
 // Setup session middleware first
 sessionManager := session.NewManager(store, sessionConfig, logger)
 router.Use(sessionManager.Middleware())
 
-// Then add CSRF protection
+// Then add CSRF protection (tokens are automatically seeded on GET requests)
 router.Use(security.CSRFProtection())
 
 func formHandler(c *gin.Context) {
-    // Generate CSRF token (stored in session)
-    csrfToken := security.GenerateCSRFToken(c)
-    
-    // Get session for other data
+    // The CSRF token is already seeded in the session by the middleware.
+    // Read it from the session to pass to templates.
     sess := session.Get(c)
-    
+    csrfToken, _ := sess.GetString("_csrf")
+
     c.HTML(200, "form.html", gin.H{
         "csrfToken": csrfToken,
         "user":      sess.GetString("user_id"),
@@ -268,9 +254,10 @@ limiter := security.NewClientRateLimiter(
 )
 
 // The rate limiter automatically:
-// - Tracks per-IP limits
-// - Handles proxy headers (X-Forwarded-For)
-// - Cleans up old limiters
+// - Tracks per-IP limits (up to DefaultMaxClients, currently 10000)
+// - Uses Gin's ClientIP() which respects trusted proxies
+// - Evicts expired and oldest entries when at capacity
+// - Cleans up old limiters periodically
 // - Returns 429 Too Many Requests when exceeded
 ```
 

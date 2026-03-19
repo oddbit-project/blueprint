@@ -232,6 +232,43 @@ func (f *FilterRequest) Validate() error {
 }
 ```
 
+## Single-Field Error Responses
+
+Use `FieldValidationError()` to build and send a validation error response for a single field outside of the `ValidateJSON`/`ValidateQuery` flow. This produces the same response format as validation failures:
+
+```go
+func CreateHandler(c *gin.Context) {
+    var req CreateRequest
+    if !httpserver.ValidateJSON(c, &req) {
+        return
+    }
+
+    // Check business rule after validation
+    if exists, _ := userRepo.EmailExists(req.Email); exists {
+        httpserver.FieldValidationError(c, "email", "email is already registered")
+        return
+    }
+
+    // Continue...
+}
+```
+
+This returns:
+```json
+{
+    "success": false,
+    "error": {
+        "message": "request validation failed",
+        "requestError": [
+            {
+                "field": "email",
+                "message": "email is already registered"
+            }
+        ]
+    }
+}
+```
+
 ## Error Response Format
 
 ### JSON Request Errors
