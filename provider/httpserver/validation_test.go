@@ -1036,6 +1036,42 @@ func TestBackwardCompatibility(t *testing.T) {
 	}
 }
 
+// TestFieldValidationError ensures FieldValidationError produces the same format as ValidateJSON
+func TestFieldValidationError(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/", nil)
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	FieldValidationError(c, "email", "invalid email address")
+
+	var resp mockResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Success {
+		t.Error("expected success=false")
+	}
+
+	errs := resp.getErrors()
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error, got %d", len(errs))
+	}
+
+	if errs[0].Field != "email" {
+		t.Errorf("expected field 'email', got '%s'", errs[0].Field)
+	}
+
+	if errs[0].Message != "invalid email address" {
+		t.Errorf("expected message 'invalid email address', got '%s'", errs[0].Message)
+	}
+
+	if w.Code != 400 {
+		t.Errorf("expected status 400, got %d", w.Code)
+	}
+}
+
 // Query validation test types
 type SearchRequest struct {
 	Query    string `form:"q" binding:"required,min=3"`
