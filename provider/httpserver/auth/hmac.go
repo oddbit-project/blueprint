@@ -124,7 +124,11 @@ func GetHMACIdentity(c *gin.Context) (string, bool) {
 	if !exists {
 		return "", false
 	}
-	return keyId.(string), true
+	s, ok := keyId.(string)
+	if !ok {
+		return "", false
+	}
+	return s, true
 }
 
 // GetHMACDetails fetch hmac details
@@ -142,5 +146,17 @@ func GetHMACDetails(c *gin.Context) (string, string, string, bool) {
 	if !exists {
 		return "", "", "", false
 	}
-	return keyId.(string), ts.(string), nonce.(string), true
+	k, ok := keyId.(string)
+	if !ok {
+		return "", "", "", false
+	}
+	t, ok := ts.(string)
+	if !ok {
+		return "", "", "", false
+	}
+	n, ok := nonce.(string)
+	if !ok {
+		return "", "", "", false
+	}
+	return k, t, n, true
 }

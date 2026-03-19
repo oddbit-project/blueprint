@@ -426,6 +426,25 @@ func ValidationError(ctx *gin.Context, errors interface{})
 ```
 Generates 400 Bad Request response for validation failures.
 
+### Field Validation Error
+
+```go
+func FieldValidationError(c *gin.Context, field string, message string)
+```
+Builds and sends a single-field validation error response in the same format as `ValidateJSON` failures.
+
+**Parameters:**
+- `c`: Gin context
+- `field`: Field name to report the error on
+- `message`: Error message
+
+**Example:**
+```go
+httpserver.FieldValidationError(c, "email", "email is already registered")
+```
+
+### Success Response
+
 ```go
 func Success(ctx *gin.Context, data any)
 ```

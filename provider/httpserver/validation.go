@@ -318,6 +318,14 @@ func handleValidationError(err error) []ValidationError {
 	return validationErrors
 }
 
+// FieldValidationError builds and sends a validation error response for a single field
+func FieldValidationError(c *gin.Context, field string, message string) {
+	response.ValidationError(c, []ValidationError{{
+		Field:   field,
+		Message: message,
+	}})
+}
+
 // ValidateJSON validates an incoming JSON request against a struct with validation tags
 // It performs two-stage validation:
 // 1. Binding validation using `binding` tags

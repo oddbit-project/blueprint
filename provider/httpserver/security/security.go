@@ -82,8 +82,6 @@ func SecurityMiddleware(config *SecurityConfig) gin.HandlerFunc {
 		}
 
 		if config.FeaturePolicy != "" {
-			c.Header("Feature-Policy", config.FeaturePolicy)
-			// Modern alternative
 			c.Header("Permissions-Policy", config.FeaturePolicy)
 		}
 
@@ -119,6 +117,15 @@ func CSRFProtection() gin.HandlerFunc {
 		if c.Request.Method == "GET" ||
 			c.Request.Method == "HEAD" ||
 			c.Request.Method == "OPTIONS" {
+			// Seed CSRF token if not present
+			sess := session.Get(c)
+			if sess != nil {
+				if existing, _ := sess.GetString("_csrf"); existing == "" {
+					token := GenerateCSRFToken(c)
+					sess.Set("_csrf", token)
+					c.Header("X-CSRF-Token", token)
+				}
+			}
 			c.Next()
 			return
 		}

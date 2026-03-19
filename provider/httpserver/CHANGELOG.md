@@ -4,6 +4,25 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.1]
+
+### Added
+
+- `FieldValidationError(c, field, message)` helper to build and send a single-field validation error response matching the same format as `ValidateJSON` failures.
+
+### Fixed
+
+- **HMAC type assertion panic**: `GetHMACIdentity()` and `GetHMACDetails()` now use comma-ok type assertions instead of bare casts, preventing panics on unexpected context value types.
+- **CSRF token not seeded on first request**: `CSRFProtection()` now generates and stores a `_csrf` token in the session on GET/HEAD/OPTIONS if one does not exist, so the first POST can succeed.
+- **Double abort in AuthMiddleware**: removed redundant `c.Abort()` call after `response.Http401()` which already calls `c.AbortWithStatusJSON()`.
+- **Fingerprint not stored on first visit**: `FingerprintMiddleware` now generates and stores a fingerprint when none exists, instead of being a no-op until someone else stores one.
+- **Rate limiter exceeds maxClients**: when evicting expired entries frees no space, the oldest entry is now evicted to stay within the configured cap.
+- **Session save error silently ignored**: post-request `m.store.Set()` errors in session middleware are now logged.
+- **auth/session.go MustGet panic**: replaced `c.MustGet()` with safe `c.Get()` + type assertion in `authSession.CanAccess()`.
+- **Port validation error message**: corrected from "less than 65535" to "at most 65535".
+- **Deprecated Feature-Policy header**: `SecurityMiddleware` now only sets `Permissions-Policy`, no longer emits the deprecated `Feature-Policy` header.
+- **JSON marshaller comments**: fixed copy-paste comments on `jsonMarshaller` methods that incorrectly said "use gob".
+
 ## [v0.9.0]
 
 ### Breaking Changes

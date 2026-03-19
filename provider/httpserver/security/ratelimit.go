@@ -61,6 +61,10 @@ func (rl *ClientRateLimiter) GetLimiter(ip string) *rate.Limiter {
 	// Enforce max clients cap
 	if len(rl.clients) >= rl.maxClients {
 		rl.evictExpired()
+		// If still at capacity after eviction, evict oldest entry
+		if len(rl.clients) >= rl.maxClients {
+			rl.evictOldest()
+		}
 	}
 
 	entry := &clientEntry{
@@ -79,6 +83,24 @@ func (rl *ClientRateLimiter) evictExpired() {
 		if entry.lastAccess.Before(cutoff) {
 			delete(rl.clients, ip)
 		}
+	}
+}
+
+// evictOldest removes the oldest client entry.
+// Must be called with write lock held.
+func (rl *ClientRateLimiter) evictOldest() {
+	var oldestIP string
+	var oldestTime time.Time
+	first := true
+	for ip, entry := range rl.clients {
+		if first || entry.lastAccess.Before(oldestTime) {
+			oldestIP = ip
+			oldestTime = entry.lastAccess
+			first = false
+		}
+	}
+	if oldestIP != "" {
+		delete(rl.clients, oldestIP)
 	}
 }
 
