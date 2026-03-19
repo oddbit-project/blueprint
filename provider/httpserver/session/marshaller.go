@@ -61,12 +61,12 @@ func NewJSONMarshaller() Marshaller {
 	return &jsonMarshaller{}
 }
 
-// MarshalSession use gob to marshal session
+// MarshalSession use json to marshal session
 func (g *jsonMarshaller) MarshalSession(session *SessionData) ([]byte, error) {
 	return json.Marshal(session)
 }
 
-// UnmarshalSession use gob to unmarshal session
+// UnmarshalSession use json to unmarshal session
 func (g *jsonMarshaller) UnmarshalSession(data []byte) (*SessionData, error) {
 	result := &SessionData{}
 	if err := json.Unmarshal(data, result); err != nil {

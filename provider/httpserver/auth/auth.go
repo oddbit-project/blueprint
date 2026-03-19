@@ -41,6 +41,5 @@ func AuthMiddleware(auth Provider) gin.HandlerFunc {
 			return
 		}
 		response.Http401(c)
-		c.Abort()
 	}
 }

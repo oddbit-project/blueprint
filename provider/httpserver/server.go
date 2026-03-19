@@ -79,7 +79,7 @@ func (c *ServerConfig) Validate() error {
 		c.Port = ServerDefaultPort
 	}
 	if c.Port > 65535 {
-		return errors.New("port must be less than 65535")
+		return errors.New("port must be at most 65535")
 	}
 	if c.ReadTimeout <= 0 {
 		c.ReadTimeout = ServerDefaultReadTimeout

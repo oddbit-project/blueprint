@@ -60,6 +60,7 @@ func (s *SessionFingerprintStore) Save(c *gin.Context, fp *DeviceFingerprint) {
 
 // FingerprintMiddleware creates a middleware that validates device fingerprints
 // using the provided store for loading existing fingerprints.
+// On first visit, generates and stores the fingerprint for future validation.
 func FingerprintMiddleware(generator *Generator, store FingerprintStore, strict bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		existing := store.Load(c)
@@ -69,6 +70,10 @@ func FingerprintMiddleware(generator *Generator, store FingerprintStore, strict 
 				response.Http401(c)
 				return
 			}
+		} else {
+			// First visit: generate and store fingerprint
+			fp := generator.Generate(c)
+			store.Save(c, fp)
 		}
 
 		c.Next()

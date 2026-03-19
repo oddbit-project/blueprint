@@ -110,7 +110,9 @@ func (m *Manager) Middleware() gin.HandlerFunc {
 		if exists && modifiedSession != nil {
 			// Update the session in the store
 			if s, ok := modifiedSession.(*SessionData); ok {
-				m.store.Set(sessionID, s)
+				if err := m.store.Set(sessionID, s); err != nil {
+					m.logger.Error(err, "Failed to save session after request")
+				}
 			}
 		} else {
 			// session does not exist, delete the session

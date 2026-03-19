@@ -29,7 +29,14 @@ func (i *authSession) CanAccess(c *gin.Context) bool {
 	if !exists || identity == nil {
 		return false
 	}
-	sess := c.MustGet(session.ContextSessionKey).(*session.SessionData)
+	raw, ok := c.Get(session.ContextSessionKey)
+	if !ok {
+		return false
+	}
+	sess, ok := raw.(*session.SessionData)
+	if !ok {
+		return false
+	}
 	c.Set(ContextAuthIdentity, &AuthIdentity{
 		Method: "session",
 		ID:     sess.ID,
