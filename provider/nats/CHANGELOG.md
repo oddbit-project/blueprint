@@ -4,7 +4,7 @@ All notable changes to the Blueprint NATS provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.8.1]
 
 ### Added
 - JetStream support via new `JSProducer` and `JSConsumer` types
