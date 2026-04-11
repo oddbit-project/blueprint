@@ -55,6 +55,7 @@ func (s *NATSIntegrationTestSuite) SetupSuite() {
 		"nats:2.10-alpine",
 		nats.WithUsername("testuser"),
 		nats.WithPassword("testpassword"),
+		testcontainers.WithCmdArgs("-js"), // enable JetStream for JS tests
 		testcontainers.WithWaitStrategy(
 			wait.ForListeningPort("4222/tcp").WithStartupTimeout(60*time.Second),
 		),

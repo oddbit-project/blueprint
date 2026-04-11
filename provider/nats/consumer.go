@@ -92,77 +92,35 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		return nil, err
 	}
 
-	var key []byte
-	var credential *secure.Credential
-	var password string
-	var err error
-
-	if cfg.AuthType == AuthTypeBasic {
-		key, err = secure.GenerateKey()
-		if err != nil {
-			return nil, err
-		}
-		if credential, err = secure.CredentialFromConfig(cfg.DefaultCredentialConfig, key, true); err != nil {
-			return nil, err
-		}
-		password, err = credential.Get()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if cfg.ConsumerName == "" {
 		cfg.ConsumerName = "natsConsumer"
 	}
-
-	// Configure connection options
-	opts := nats.Options{
-		Url:            cfg.URL,
-		AllowReconnect: true,
-		MaxReconnect:   DefaultConnectRetry,
-		ReconnectWait:  DefaultTimeout,
-		Name:           cfg.ConsumerName,
-	}
-
-	// Apply authentication
-	switch cfg.AuthType {
-	case AuthTypeBasic:
-		opts.User = cfg.Username
-		opts.Password = password
-	case AuthTypeToken:
-		opts.Token = password
-	}
-
-	// Apply TLS settings
-	if tls, err := cfg.TLSConfig(); err != nil {
-		return nil, err
-	} else if tls != nil {
-		opts.TLSConfig = tls
-	}
-
-	// Apply additional options
-	cfg.ConsumerOptions.ApplyOptions(&opts)
 
 	// Create logger if not provided
 	if logger == nil {
 		logger = NewConsumerLogger(cfg.Subject, cfg.QueueGroup)
 	} else {
-		ConsumerLogger(logger, cfg.Subject, cfg.QueueGroup)
+		logger = ConsumerLogger(logger, cfg.Subject, cfg.QueueGroup)
 	}
 
-	// Connect to NATS
-	conn, err := opts.Connect()
+	// Connect to NATS via shared helper
+	conn, err := connect(connectParams{
+		URL:          cfg.URL,
+		Name:         cfg.ConsumerName,
+		AuthType:     cfg.AuthType,
+		Username:     cfg.Username,
+		Cred:         cfg.DefaultCredentialConfig,
+		TLS:          cfg.ClientConfig,
+		PingInterval: cfg.ConsumerOptions.PingInterval,
+		MaxPingsOut:  cfg.ConsumerOptions.MaxPingsOut,
+		Timeout:      cfg.ConsumerOptions.Timeout,
+	})
 	if err != nil {
 		logger.Error(err, "Failed to connect to NATS", log.KV{
 			"url":     cfg.URL,
 			"subject": cfg.Subject,
 		})
 		return nil, err
-	}
-
-	// Clean up credentials from memory if used
-	if credential != nil {
-		credential.Clear()
 	}
 
 	return &Consumer{
