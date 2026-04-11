@@ -88,8 +88,15 @@ func (s *PGIntegrationTestSuite) SetupSuite() {
 		postgres.WithDatabase("blueprint"),
 		postgres.WithUsername("blueprint"),
 		postgres.WithPassword("password"),
+		// The postgres:alpine image restarts once during first-run init:
+		// it binds 5432, runs initdb, then restarts. wait.ForListeningPort
+		// alone catches the first transient bind and races the restart,
+		// causing intermittent "connection reset by peer" failures. Wait
+		// for the "ready" log line to appear twice (init + real startup).
 		testcontainers.WithWaitStrategy(
-			wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second),
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(60*time.Second),
 		),
 	)
 	require.NoError(s.T(), err, "Failed to start PostgreSQL container")
