@@ -1,13 +1,13 @@
 module github.com/oddbit-project/blueprint/provider/sqlite
 
-go 1.23.0
+go 1.24.0
 
 require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/oddbit-project/blueprint v0.8.0
 	github.com/stretchr/testify v1.11.1
-	modernc.org/sqlite v1.47.0
+	modernc.org/sqlite v1.43.0
 )
 
 require (
