@@ -18,4 +18,5 @@ use (
 	./provider/redis
 	./provider/s3
 	./provider/smtp
+	./provider/sqlite
 )
