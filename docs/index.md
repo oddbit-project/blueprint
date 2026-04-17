@@ -58,6 +58,7 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [etcd](provider/etcd.md)
 - [PostgreSQL](provider/pgsql.md)
 - [Redis](provider/redis.md)
+- [SQLite](provider/sqlite.md)
 - [S3 Storage](provider/s3.md)
 
 ### Web & HTTP

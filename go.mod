@@ -26,6 +26,7 @@ require (
 	github.com/oddbit-project/blueprint/provider/pgsql v0.8.0
 	github.com/oddbit-project/blueprint/provider/prometheus v0.8.0
 	github.com/oddbit-project/blueprint/provider/s3 v0.8.0
+	github.com/oddbit-project/blueprint/provider/sqlite v0.8.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
@@ -197,4 +198,5 @@ replace (
 	github.com/oddbit-project/blueprint/provider/redis => ./provider/redis
 	github.com/oddbit-project/blueprint/provider/s3 => ./provider/s3
 	github.com/oddbit-project/blueprint/provider/smtp => ./provider/smtp
+	github.com/oddbit-project/blueprint/provider/sqlite => ./provider/sqlite
 )
