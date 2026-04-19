@@ -473,6 +473,17 @@ func TestCORSMiddleware_SameOriginNotBlocked(t *testing.T) {
 	}
 }
 
+func TestCORSMiddleware_InvalidConfigPanics(t *testing.T) {
+	assert.Panics(t, func() {
+		CORSMiddleware(&CorsConfig{
+			CorsEnabled:      true,
+			AllowOrigins:     []string{"*"},
+			AllowCredentials: true, // invalid with wildcard
+			MaxAge:           3600,
+		})
+	})
+}
+
 func TestCORSMiddleware_CaseInsensitiveMethods(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
