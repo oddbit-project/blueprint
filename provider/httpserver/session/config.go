@@ -32,6 +32,9 @@ const (
 	// ContextSessionKey is the key used to store the session in the gin.Context
 	ContextSessionKey = "session"
 
+	// ContextSessionIDKey is the key used to store the current session ID in the gin.Context
+	ContextSessionIDKey = "sessionID"
+
 	ErrInvalidExpirationSeconds      = utils.Error("session expiration seconds must be a positive integer")
 	ErrInvalidIdleTimeoutSeconds     = utils.Error("session idle timeout seconds must be a positive integer")
 	ErrInvalidSameSite               = utils.Error("invalid sameSite value")

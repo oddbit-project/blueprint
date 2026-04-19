@@ -15,6 +15,16 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.6]
+
+### Fixed
+
+- **Shutdown skips destructors on fatal error**: `Shutdown()` now runs registered destructors before calling `log.Fatal()`, ensuring cleanup always executes regardless of shutdown reason.
+- **Startup failure bypasses destructor cleanup**: `Container.Run()` now calls `AbortFatal()` instead of `Terminate()` when a `RuntimeFn` returns an error, ensuring destructors registered by earlier startup steps are properly invoked.
+- **CSRF protection silent no-op without session**: `CSRFProtection()` middleware now returns 403 instead of passing through when no session is available on unsafe HTTP methods.
+- **ServerConfig.Validate() loses default server name**: `Validate()` now writes the default server name back to the config struct instead of a local variable.
+- **Integration tests run without Docker**: `db/integration_testcontainers_test.go` now has `//go:build integration` tag to prevent failures during plain `go test ./...`.
+
 ## [v0.8.5]
 
 ### Added

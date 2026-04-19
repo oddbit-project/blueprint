@@ -100,6 +100,20 @@ func TestIsJSONRequest_WithCaseSensitivity(t *testing.T) {
 	assert.False(t, IsJSONRequest(ctx))
 }
 
+func TestIsJSONRequest_WithCharset(t *testing.T) {
+	ctx := setupTestContext(t, map[string]string{
+		HeaderContentType: "application/json; charset=utf-8",
+	})
+	assert.True(t, IsJSONRequest(ctx))
+}
+
+func TestIsJSONRequest_WithMultipleAcceptValues(t *testing.T) {
+	ctx := setupTestContext(t, map[string]string{
+		HeaderAccept: "application/json, text/plain, */*",
+	})
+	assert.True(t, IsJSONRequest(ctx))
+}
+
 func TestContentTypeConstants(t *testing.T) {
 	// Test that constants are defined correctly
 	assert.Equal(t, "text/html", ContentTypeHtml)

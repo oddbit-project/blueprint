@@ -68,6 +68,10 @@ func CORSMiddleware(cfg *CorsConfig) gin.HandlerFunc {
 		}
 	}
 
+	if err := cfg.Validate(); err != nil {
+		panic(fmt.Sprintf("invalid CORS configuration: %s", err.Error()))
+	}
+
 	// Normalize allowed methods to uppercase for case-insensitive comparison
 	normalizedMethods := make([]string, len(cfg.AllowMethods))
 	for i, method := range cfg.AllowMethods {
@@ -105,8 +109,8 @@ func CORSMiddleware(cfg *CorsConfig) gin.HandlerFunc {
 				return
 			}
 
-			// Validate request method is allowed
-			if !slices.Contains(normalizedMethods, strings.ToUpper(c.Request.Method)) {
+			// Validate request method is allowed (only for CORS requests)
+			if origin != "" && !slices.Contains(normalizedMethods, strings.ToUpper(c.Request.Method)) {
 				c.AbortWithStatus(405)
 				return
 			}
@@ -137,8 +141,9 @@ func CORSMiddleware(cfg *CorsConfig) gin.HandlerFunc {
 				return
 			}
 
-			// Validate request method is allowed
-			if !slices.Contains(normalizedMethods, strings.ToUpper(c.Request.Method)) {
+			// Validate request method is allowed (only for CORS requests)
+			origin := c.Request.Header.Get("Origin")
+			if origin != "" && !slices.Contains(normalizedMethods, strings.ToUpper(c.Request.Method)) {
 				c.AbortWithStatus(405)
 				return
 			}
@@ -150,7 +155,8 @@ func CORSMiddleware(cfg *CorsConfig) gin.HandlerFunc {
 	// Production middleware
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		if slices.Contains(cfg.AllowOrigins, origin) {
+		originAllowed := slices.Contains(cfg.AllowOrigins, origin)
+		if originAllowed {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", allowCredentials)
 			c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
@@ -172,8 +178,8 @@ func CORSMiddleware(cfg *CorsConfig) gin.HandlerFunc {
 			return
 		}
 
-		// Validate request method is allowed
-		if !slices.Contains(normalizedMethods, strings.ToUpper(c.Request.Method)) {
+		// Validate request method is allowed (only for CORS requests with allowed origin)
+		if originAllowed && !slices.Contains(normalizedMethods, strings.ToUpper(c.Request.Method)) {
 			c.AbortWithStatus(405)
 			return
 		}

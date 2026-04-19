@@ -133,7 +133,7 @@ func TestSessionRegenerate(t *testing.T) {
 	// Verify the session ID changed
 	assert.NotEqual(t, oldSessionCookie.Value, newSessionCookie.Value)
 
-	// Verify the session data is still accessible
+	// Verify the session data is still accessible with the new cookie
 	w3 := httptest.NewRecorder()
 	req3, _ := http.NewRequest("GET", "/get", nil)
 	if newSessionCookie != nil {
@@ -143,6 +143,11 @@ func TestSessionRegenerate(t *testing.T) {
 
 	// The value should still be accessible
 	assert.Equal(t, "value", w3.Body.String())
+
+	// Verify the old session ID is no longer valid in the store
+	oldSession, err := store.Get(oldSessionCookie.Value)
+	assert.Error(t, err)
+	assert.Nil(t, oldSession)
 }
 
 func TestClearSession(t *testing.T) {

@@ -133,8 +133,7 @@ func CSRFProtection() gin.HandlerFunc {
 		// get session
 		sess := session.Get(c)
 		if sess == nil {
-			// no session, skip CSRF
-			c.Next()
+			response.Http403(c)
 			return
 		}
 		expected, _ := sess.GetString("_csrf")

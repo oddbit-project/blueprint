@@ -45,6 +45,7 @@ func NewBasicAuthProvider(b backend.Authenticator, opts ...BasicAuthProviderOpti
 func (a *BasicAuthProvider) CanAccess(c *gin.Context) bool {
 	u, p, ok := c.Request.BasicAuth()
 	if !ok || len(u) == 0 || len(p) == 0 {
+		c.Header("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, a.realm))
 		return false
 	}
 

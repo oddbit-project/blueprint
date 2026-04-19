@@ -47,8 +47,12 @@ func (i *authSession) CanAccess(c *gin.Context) bool {
 
 func GetSessionIdentity(c *gin.Context) (any, bool) {
 	sessionData, exists := c.Get(session.ContextSessionKey)
-	if exists {
-		return sessionData.(*session.SessionData).GetIdentity()
+	if !exists {
+		return nil, false
 	}
-	return nil, false
+	sess, ok := sessionData.(*session.SessionData)
+	if !ok {
+		return nil, false
+	}
+	return sess.GetIdentity()
 }

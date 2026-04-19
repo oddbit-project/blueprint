@@ -4,6 +4,26 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.2]
+
+### Fixed
+
+- **Session fixation via regeneration bypass**: `Regenerate()` now tracks the new session ID in context so the middleware's post-request save writes to the correct ID instead of resurrecting the old session.
+- **CORS middleware blocks same-origin traffic**: `CORSMiddleware` no longer enforces the `AllowMethods` restriction on requests without an `Origin` header or with a disallowed origin. Method enforcement now only applies to actual cross-origin requests.
+- **JSON detection misses common headers**: `IsJSONRequest()` now uses substring matching instead of exact equality, correctly detecting headers like `application/json; charset=utf-8` and `application/json, text/plain, */*`.
+- **Panic in `GetSessionIdentity`**: replaced bare type assertion with comma-ok form to prevent panics when the context value has an unexpected type.
+- **Basic Auth missing `WWW-Authenticate` challenge**: `BasicAuthProvider.CanAccess()` now sets the `WWW-Authenticate` header on all rejection paths, including missing or empty credentials, per RFC 7235.
+- **JWT Bearer scheme case-sensitive**: `GetJWTToken()` now uses case-insensitive comparison for the `Bearer` scheme prefix per RFC 7235.
+- **Session config never validated**: `NewStore()` now calls `Config.Validate()`, rejecting invalid expiration, idle timeout, cleanup interval, and SameSite values at setup instead of panicking or misbehaving at runtime.
+- **CORS config never validated**: `CORSMiddleware()` now calls `CorsConfig.Validate()` at initialization, panicking on invalid configurations (e.g. wildcard origins with credentials) instead of silently misbehaving.
+- **Negative port accepted by `ServerConfig.Validate()`**: port validation now rejects negative values alongside ports above 65535.
+
+### Security
+
+- Session fixation protection now correctly invalidates old session IDs after regeneration
+- CSRF/auth flows that depend on `GetSessionIdentity` no longer panic on unexpected context state
+- Basic Auth endpoints now always issue proper authentication challenges
+
 ## [v0.9.1]
 
 ### Added

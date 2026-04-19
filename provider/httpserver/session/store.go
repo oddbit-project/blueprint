@@ -38,6 +38,10 @@ func NewStore(config *Config, backend kv.KV, logger *log.Logger) (*Store, error)
 		config = NewConfig()
 	}
 
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
 	if backend == nil {
 		backend = kv.NewMemoryKV()
 	}

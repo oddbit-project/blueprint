@@ -71,15 +71,14 @@ func (c *ServerConfig) GetUrl() string {
 }
 
 func (c *ServerConfig) Validate() error {
-	serverName := c.ServerName
-	if serverName == "" {
-		serverName = ServerDefaultName
+	if c.ServerName == "" {
+		c.ServerName = ServerDefaultName
 	}
 	if c.Port == 0 {
 		c.Port = ServerDefaultPort
 	}
-	if c.Port > 65535 {
-		return errors.New("port must be at most 65535")
+	if c.Port < 0 || c.Port > 65535 {
+		return errors.New("port must be between 0 and 65535")
 	}
 	if c.ReadTimeout <= 0 {
 		c.ReadTimeout = ServerDefaultReadTimeout

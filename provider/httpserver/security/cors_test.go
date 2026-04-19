@@ -428,6 +428,51 @@ func TestCORSMiddleware_EmptyExposeHeaders(t *testing.T) {
 	assert.Empty(t, w.Header().Get("Access-Control-Expose-Headers"))
 }
 
+func TestCORSMiddleware_SameOriginNotBlocked(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name   string
+		config *CorsConfig
+	}{
+		{
+			name: "wildcard origin config",
+			config: &CorsConfig{
+				CorsEnabled:  true,
+				AllowOrigins: []string{"*"},
+				AllowMethods: []string{"GET"}, // DELETE not listed
+				MaxAge:       3600,
+			},
+		},
+		{
+			name: "specific origin config",
+			config: &CorsConfig{
+				CorsEnabled:  true,
+				AllowOrigins: []string{"https://example.com"},
+				AllowMethods: []string{"GET"}, // DELETE not listed
+				MaxAge:       3600,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(CORSMiddleware(tt.config))
+			router.DELETE("/test", func(c *gin.Context) {
+				c.String(200, "ok")
+			})
+
+			// Same-origin request (no Origin header) should not be blocked
+			req := httptest.NewRequest("DELETE", "/test", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, 200, w.Code)
+		})
+	}
+}
+
 func TestCORSMiddleware_CaseInsensitiveMethods(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

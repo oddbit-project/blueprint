@@ -163,9 +163,10 @@ func TestBasicAuthProvider_CanAccess(t *testing.T) {
 				t.Error("ValidateUser should not be called with missing credentials")
 				return false, nil
 			},
-			wantAccess:        false,
-			wantAuthHeader:    false,
-			wantUserInContext: false,
+			wantAccess:         false,
+			wantAuthHeader:     true,
+			wantAuthHeaderText: `Basic realm="restricted"`,
+			wantUserInContext:  false,
 		},
 		{
 			name: "Empty username",
@@ -176,9 +177,10 @@ func TestBasicAuthProvider_CanAccess(t *testing.T) {
 				t.Error("ValidateUser should not be called with empty username")
 				return false, nil
 			},
-			wantAccess:        false,
-			wantAuthHeader:    false,
-			wantUserInContext: false,
+			wantAccess:         false,
+			wantAuthHeader:     true,
+			wantAuthHeaderText: `Basic realm="restricted"`,
+			wantUserInContext:  false,
 		},
 		{
 			name: "Empty password",
@@ -189,9 +191,10 @@ func TestBasicAuthProvider_CanAccess(t *testing.T) {
 				t.Error("ValidateUser should not be called with empty password")
 				return false, nil
 			},
-			wantAccess:        false,
-			wantAuthHeader:    false,
-			wantUserInContext: false,
+			wantAccess:         false,
+			wantAuthHeader:     true,
+			wantAuthHeaderText: `Basic realm="restricted"`,
+			wantUserInContext:  false,
 		},
 		{
 			name: "Backend validation error",
