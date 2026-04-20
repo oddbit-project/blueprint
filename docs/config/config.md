@@ -9,6 +9,7 @@ The blueprint configuration system provides flexible configuration management th
 - **JsonProvider**: Reads configuration from JSON files, streams, or raw data
 - **EnvProvider**: Reads configuration from environment variables with advanced features
 - **Default Values**: Both providers support default values via struct tags
+- **Nested Pointer Support**: Defaults and recursive loading work for nested `*struct` config fields
 - **Thread Safety**: EnvProvider and JsonProvider include thread-safe concurrent access
 - **Nested Structures**: Full support for complex nested configuration structures
 
@@ -87,10 +88,12 @@ func main() {
 		panic(err)
 	}
 	
-	// appConfig.Server.Host will be "localhost" if not in JSON
-	// appConfig.Server.Port will be 8080 if not in JSON
+// appConfig.Server.Host will be "localhost" if not in JSON
+// appConfig.Server.Port will be 8080 if not in JSON
 }
 ```
+
+Invalid `default:` tags now return `config.ErrInvalidDefault` instead of being ignored silently. Treat malformed defaults as configuration errors and fail fast during startup.
 
 ### Multiple Data Sources
 
@@ -169,10 +172,12 @@ func main() {
 	
 	// serverConfig.Host = "production.example.com" (from env var)
 	// serverConfig.Port = 9090 (from env var)
-	// serverConfig.Debug = false (from default tag)
-	// serverConfig.ReadTimeout = 30 (from default tag)
+// serverConfig.Debug = false (from default tag)
+// serverConfig.ReadTimeout = 30 (from default tag)
 }
 ```
+
+Invalid `default:` tags also return `config.ErrInvalidDefault` for environment-backed configs.
 
 ### Nested Structures
 
@@ -214,6 +219,17 @@ func main() {
 	// config.Server.Host = "api.example.com" (from APP_SERVER_HOST)
 }
 ```
+
+Pointer-nested configs are supported as well:
+
+```golang
+type AppConfig struct {
+	Database *DatabaseConfig `env:"DATABASE"`
+	Server   *ServerConfig   `env:"SERVER"`
+}
+```
+
+If `APP_DATABASE_*` or `APP_SERVER_*` variables are present, Blueprint allocates the nested structs and fills them recursively. Any missing nested fields continue to use their `default:` tags.
 
 ### CamelCase Conversion
 
@@ -351,6 +367,8 @@ type Config struct {
 // All fields will use their default values
 ```
 
+Defaults are applied recursively to nested value structs and nested `*struct` fields. If a default cannot be parsed into the target field type, the provider returns `config.ErrInvalidDefault`.
+
 ## Using Wrappers
 
 ### StrOrFile
@@ -366,6 +384,20 @@ import "github.com/oddbit-project/blueprint/config"
 myPass := config.StrOrFile("some password") // myPass = "some password"
 myPass := config.StrOrFile("./credentials.txt") // myPass = contents of credentials.txt
 ```
+
+### StrOrFileIfExists
+
+`StrOrFileIfExists()` is the explicit helper for cases where plain relative paths should also be treated as files. It reads the contents of any existing regular file path and otherwise returns the original string unchanged.
+
+```golang
+import "github.com/oddbit-project/blueprint/config"
+
+myPass := config.StrOrFileIfExists("some password")      // "some password"
+myPass := config.StrOrFileIfExists("credentials.txt")    // contents of credentials.txt, if it exists
+myPass := config.StrOrFileIfExists("./credentials.txt")  // contents of credentials.txt
+```
+
+Use `StrOrFile()` when you want the old conservative behavior, and `StrOrFileIfExists()` when you want relative-path support without changing existing callers.
 
 This is particularly useful for secrets management:
 
@@ -444,4 +476,3 @@ func main() {
 	}
 }
 ```
-

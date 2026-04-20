@@ -8,6 +8,13 @@ import (
 	"time"
 
 	"github.com/oddbit-project/blueprint/log"
+	"github.com/oddbit-project/blueprint/utils"
+)
+
+const (
+	ErrInvalidInterval = utils.Error("interval must be positive")
+	ErrNilRunnerFn     = utils.Error("runner function must not be nil")
+	ErrNilLogger       = utils.Error("logger must not be nil")
 )
 
 type RunnerFn func(ctx context.Context) error
@@ -21,12 +28,21 @@ type PeriodicRunner struct {
 	wg          sync.WaitGroup
 }
 
-func NewUpdater(updateInterval time.Duration, updateFn RunnerFn, logger *log.Logger) *PeriodicRunner {
+func NewUpdater(updateInterval time.Duration, updateFn RunnerFn, logger *log.Logger) (*PeriodicRunner, error) {
+	if updateInterval <= 0 {
+		return nil, ErrInvalidInterval
+	}
+	if updateFn == nil {
+		return nil, ErrNilRunnerFn
+	}
+	if logger == nil {
+		return nil, ErrNilLogger
+	}
 	return &PeriodicRunner{
 		runInterval: updateInterval,
 		runFn:       updateFn,
 		logger:      logger,
-	}
+	}, nil
 }
 
 func (u *PeriodicRunner) Start(ctx context.Context) error {
@@ -40,10 +56,10 @@ func (u *PeriodicRunner) Start(ctx context.Context) error {
 	u.wg.Add(1)
 	go func() {
 		defer u.wg.Done()
+		defer u.status.Store(0)
 		defer func() {
 			if r := recover(); r != nil {
 				u.logger.Warnf("Recovered from panic in runner: %v", r)
-				u.status.Store(0)
 			}
 		}()
 		if err := u.run(runCtx); err != nil {
@@ -56,7 +72,7 @@ func (u *PeriodicRunner) Start(ctx context.Context) error {
 }
 
 func (u *PeriodicRunner) Stop(ctx context.Context) error {
-	if !u.status.CompareAndSwap(1, 0) {
+	if u.status.Load() == 0 {
 		return errors.New("not running")
 	}
 

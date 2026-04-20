@@ -23,7 +23,10 @@ func TestNewUpdater(t *testing.T) {
 	interval := 100 * time.Millisecond
 	fn := func(ctx context.Context) error { return nil }
 
-	runner := NewUpdater(interval, fn, logger)
+	runner, err := NewUpdater(interval, fn, logger)
+	if err != nil {
+		t.Fatalf("NewUpdater returned error: %v", err)
+	}
 
 	if runner == nil {
 		t.Fatal("NewUpdater returned nil")
@@ -42,10 +45,43 @@ func TestNewUpdater(t *testing.T) {
 	}
 }
 
+func TestNewUpdater_InvalidInputs(t *testing.T) {
+	logger := testLogger(t)
+	fn := func(ctx context.Context) error { return nil }
+
+	t.Run("zero interval", func(t *testing.T) {
+		_, err := NewUpdater(0, fn, logger)
+		if !errors.Is(err, ErrInvalidInterval) {
+			t.Errorf("expected ErrInvalidInterval, got: %v", err)
+		}
+	})
+
+	t.Run("negative interval", func(t *testing.T) {
+		_, err := NewUpdater(-time.Second, fn, logger)
+		if !errors.Is(err, ErrInvalidInterval) {
+			t.Errorf("expected ErrInvalidInterval, got: %v", err)
+		}
+	})
+
+	t.Run("nil function", func(t *testing.T) {
+		_, err := NewUpdater(100*time.Millisecond, nil, logger)
+		if !errors.Is(err, ErrNilRunnerFn) {
+			t.Errorf("expected ErrNilRunnerFn, got: %v", err)
+		}
+	})
+
+	t.Run("nil logger", func(t *testing.T) {
+		_, err := NewUpdater(100*time.Millisecond, fn, nil)
+		if !errors.Is(err, ErrNilLogger) {
+			t.Errorf("expected ErrNilLogger, got: %v", err)
+		}
+	})
+}
+
 func TestStart_Success(t *testing.T) {
 	logger := testLogger(t)
 	fn := func(ctx context.Context) error { return nil }
-	runner := NewUpdater(100*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(100*time.Millisecond, fn, logger)
 
 	ctx := context.Background()
 	err := runner.Start(ctx)
@@ -66,7 +102,7 @@ func TestStart_Success(t *testing.T) {
 func TestStart_AlreadyRunning(t *testing.T) {
 	logger := testLogger(t)
 	fn := func(ctx context.Context) error { return nil }
-	runner := NewUpdater(100*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(100*time.Millisecond, fn, logger)
 
 	ctx := context.Background()
 	err := runner.Start(ctx)
@@ -92,7 +128,7 @@ func TestStart_AlreadyRunning(t *testing.T) {
 func TestStop_Success(t *testing.T) {
 	logger := testLogger(t)
 	fn := func(ctx context.Context) error { return nil }
-	runner := NewUpdater(100*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(100*time.Millisecond, fn, logger)
 
 	ctx := context.Background()
 	err := runner.Start(ctx)
@@ -115,7 +151,7 @@ func TestStop_Success(t *testing.T) {
 func TestStop_NotRunning(t *testing.T) {
 	logger := testLogger(t)
 	fn := func(ctx context.Context) error { return nil }
-	runner := NewUpdater(100*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(100*time.Millisecond, fn, logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -137,7 +173,7 @@ func TestPeriodicExecution(t *testing.T) {
 		return nil
 	}
 
-	runner := NewUpdater(50*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(50*time.Millisecond, fn, logger)
 
 	ctx := context.Background()
 	err := runner.Start(ctx)
@@ -170,7 +206,7 @@ func TestContextCancellation(t *testing.T) {
 		return nil
 	}
 
-	runner := NewUpdater(50*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(50*time.Millisecond, fn, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	err := runner.Start(ctx)
@@ -207,7 +243,7 @@ func TestRunFnError(t *testing.T) {
 		return expectedErr
 	}
 
-	runner := NewUpdater(50*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(50*time.Millisecond, fn, logger)
 
 	ctx := context.Background()
 	err := runner.Start(ctx)
@@ -243,7 +279,7 @@ func TestStopTimeout(t *testing.T) {
 		return nil
 	}
 
-	runner := NewUpdater(10*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(10*time.Millisecond, fn, logger)
 
 	ctx := context.Background()
 	err := runner.Start(ctx)
@@ -274,7 +310,7 @@ func TestStartStopRestart(t *testing.T) {
 		return nil
 	}
 
-	runner := NewUpdater(50*time.Millisecond, fn, logger)
+	runner, _ := NewUpdater(50*time.Millisecond, fn, logger)
 
 	// First start
 	ctx := context.Background()

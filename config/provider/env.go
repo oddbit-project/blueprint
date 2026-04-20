@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"fmt"
 	"github.com/gobeam/stringy"
 	"github.com/oddbit-project/blueprint/config"
 	"os"
@@ -21,6 +22,47 @@ type EnvProvider struct {
 }
 
 var DefaultSeparator = CommaSeparator
+
+func setFieldValueFromString(fieldValue reflect.Value, val string, strict bool) error {
+	switch fieldValue.Kind() {
+	case reflect.String:
+		fieldValue.SetString(val)
+	case reflect.Int:
+		intVal, err := strconv.Atoi(val)
+		if err != nil {
+			if strict {
+				return fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
+			}
+			return nil
+		}
+		fieldValue.SetInt(int64(intVal))
+	case reflect.Bool:
+		boolVal, err := strconv.ParseBool(val)
+		if err != nil {
+			if strict {
+				return fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
+			}
+			return nil
+		}
+		fieldValue.SetBool(boolVal)
+	case reflect.Float64:
+		floatVal, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			if strict {
+				return fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
+			}
+			return nil
+		}
+		fieldValue.SetFloat(floatVal)
+	case reflect.Slice:
+		sliceVal := reflect.MakeSlice(fieldValue.Type(), 0, 0)
+		for _, s := range strings.Split(val, DefaultSeparator) {
+			sliceVal = reflect.Append(sliceVal, reflect.ValueOf(strings.TrimSpace(s)))
+		}
+		fieldValue.Set(sliceVal)
+	}
+	return nil
+}
 
 // NewEnvProvider builds a new config.ConfigProvider object from system Environment variables.
 // The parameter prefix defines the key prefix to use. All existing Environment variables matching the prefix are loaded on creation.
@@ -128,39 +170,19 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 		}
 
 		val, ok := e.configData[envKey]
+		isDefault := false
 		if !ok {
 			// Check for default value in struct tag
 			if defaultVal := field.Tag.Get("default"); defaultVal != "" {
 				val = defaultVal
 				ok = true
+				isDefault = true
 			}
 		}
 
 		if ok {
-			switch fieldValue.Kind() {
-			case reflect.String:
-				fieldValue.SetString(val)
-			case reflect.Int:
-				intVal, err := strconv.Atoi(val)
-				if err == nil {
-					fieldValue.SetInt(int64(intVal))
-				}
-			case reflect.Bool:
-				boolVal, err := strconv.ParseBool(val)
-				if err == nil {
-					fieldValue.SetBool(boolVal)
-				}
-			case reflect.Float64:
-				floatVal, err := strconv.ParseFloat(val, 64)
-				if err == nil {
-					fieldValue.SetFloat(floatVal)
-				}
-			case reflect.Slice:
-				sliceVal := reflect.MakeSlice(fieldValue.Type(), 0, 0)
-				for _, s := range strings.Split(val, DefaultSeparator) {
-					sliceVal = reflect.Append(sliceVal, reflect.ValueOf(strings.TrimSpace(s)))
-				}
-				fieldValue.Set(sliceVal)
+			if err := setFieldValueFromString(fieldValue, val, isDefault); err != nil {
+				return err
 			}
 		} else {
 			// if its struct, recurse
@@ -169,6 +191,13 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 					if err := e.readPrefixedStruct(envKey, fieldValue.Addr().Interface()); err != nil {
 						return err
 					}
+				}
+			} else if fieldValue.Kind() == reflect.Ptr && fieldValue.Type().Elem().Kind() == reflect.Struct {
+				if fieldValue.IsNil() {
+					fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+				}
+				if err := e.readPrefixedStruct(envKey, fieldValue.Interface()); err != nil {
+					return err
 				}
 			}
 		}

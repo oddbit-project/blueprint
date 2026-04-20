@@ -47,6 +47,7 @@ const (
 	// ErrIncompatibleVersion is returned by ComparePasswordAndHash if the
 	// provided hash was created using a different version of Argon2.
 	ErrIncompatibleVersion = utils.Error("argon2id: incompatible version of argon2")
+	ErrInvalidConfig       = utils.Error("argon2id: invalid configuration")
 )
 
 // Argon2Config holds the parameters for Argon2id password hashing.
@@ -89,6 +90,17 @@ func NewArgon2IdConfig() *Argon2Config {
 	}
 }
 
+// Validate checks if the Argon2 configuration is safe and usable.
+func (c *Argon2Config) Validate() error {
+	if c == nil {
+		return ErrInvalidConfig
+	}
+	if c.Memory == 0 || c.Iterations == 0 || c.Parallelism == 0 || c.SaltLength == 0 || c.KeyLength == 0 {
+		return ErrInvalidConfig
+	}
+	return nil
+}
+
 // Argon2IdNeedsRehash checks if a hash was created with different
 // parameters than the current default configuration. This is useful
 // for upgrading hashes when security parameters are updated.
@@ -106,6 +118,9 @@ func Argon2IdNeedsRehash(c *Argon2Config) bool {
 // The function generates a cryptographically secure random salt and
 // includes all parameters in the hash for self-contained verification.
 func Argon2IdCreateHash(c *Argon2Config, password string) (string, error) {
+	if err := c.Validate(); err != nil {
+		return "", err
+	}
 	salt, err := utils.GenerateRandomBytes(c.SaltLength)
 	if err != nil {
 		return "", err

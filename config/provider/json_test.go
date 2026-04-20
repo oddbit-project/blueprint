@@ -414,3 +414,55 @@ func TestJsonProvider_DefaultValues(t *testing.T) {
 		t.Error("Timeout should use default value")
 	}
 }
+
+func TestJsonProvider_DefaultValues_PointerNestedStruct(t *testing.T) {
+	type NestedDefaults struct {
+		Host string `json:"host" default:"localhost"`
+		Port int    `json:"port" default:"5432"`
+	}
+
+	type ConfigWithPointerNestedDefaults struct {
+		Database *NestedDefaults `json:"database"`
+	}
+
+	cfg, err := NewJsonProvider([]byte(`{}`))
+	if err != nil {
+		t.Fatal("NewJsonProvider():", err)
+	}
+
+	out := &ConfigWithPointerNestedDefaults{}
+	err = cfg.Get(out)
+	if err != nil {
+		t.Fatal("JsonProvider Get():", err)
+	}
+
+	if out.Database == nil {
+		t.Fatal("expected database defaults to allocate nested pointer")
+	}
+	if out.Database.Host != "localhost" {
+		t.Error("Host should use default value")
+	}
+	if out.Database.Port != 5432 {
+		t.Error("Port should use default value")
+	}
+}
+
+func TestJsonProvider_DefaultValues_InvalidDefault(t *testing.T) {
+	type InvalidDefaultConfig struct {
+		Port int `json:"port" default:"not-a-number"`
+	}
+
+	cfg, err := NewJsonProvider([]byte(`{}`))
+	if err != nil {
+		t.Fatal("NewJsonProvider():", err)
+	}
+
+	out := &InvalidDefaultConfig{}
+	err = cfg.Get(out)
+	if err == nil {
+		t.Fatal("expected invalid default error")
+	}
+	if !errors.Is(err, config.ErrInvalidDefault) {
+		t.Fatal("expected ErrInvalidDefault")
+	}
+}

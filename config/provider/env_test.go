@@ -50,6 +50,14 @@ type ConfigWithDefaults struct {
 	Timeout string `env:"TIMEOUT" default:"30s"`
 }
 
+type PointerNestedEnvConfig struct {
+	Database *ConfigWithDefaults
+}
+
+type InvalidDefaultEnvConfig struct {
+	Port int `default:"not-a-number"`
+}
+
 var envVars = map[string]string{
 	"TEST_STRING":            envStrValue,
 	"TEST_BOOL":              envBoolValue,
@@ -469,4 +477,34 @@ func TestEnvProvider_DefaultValues(t *testing.T) {
 	// Check that defaults were applied
 	assert.Equal(t, false, config.Debug)
 	assert.Equal(t, "30s", config.Timeout)
+}
+
+func TestEnvProvider_Get_PointerNestedStruct(t *testing.T) {
+	testVars := map[string]string{
+		"TEST_DATABASE_HOST": "db.internal",
+		"TEST_DATABASE_PORT": "6543",
+	}
+
+	setEnvVars(t, testVars)
+	defer resetEnvVars(testVars)
+
+	cfg := NewEnvProvider("TEST_", false)
+	out := &PointerNestedEnvConfig{}
+
+	err := cfg.Get(out)
+	require.NoError(t, err)
+	require.NotNil(t, out.Database)
+	assert.Equal(t, "db.internal", out.Database.Host)
+	assert.Equal(t, 6543, out.Database.Port)
+	assert.Equal(t, false, out.Database.Debug)
+	assert.Equal(t, "30s", out.Database.Timeout)
+}
+
+func TestEnvProvider_DefaultValues_InvalidDefault(t *testing.T) {
+	cfg := NewEnvProvider("TEST_", false)
+	out := &InvalidDefaultEnvConfig{}
+
+	err := cfg.Get(out)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, config.ErrInvalidDefault)
 }

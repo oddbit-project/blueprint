@@ -106,3 +106,45 @@ func TestArgon2IdStrictDecoding(t *testing.T) {
 	assert.Error(t, err, "Hash validation should fail")
 	assert.False(t, ok, "Hash validation should fail")
 }
+
+func TestArgon2IdConfigValidate(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  *Argon2Config
+		err  error
+	}{
+		{name: "nil config", cfg: nil, err: ErrInvalidConfig},
+		{name: "zero memory", cfg: &Argon2Config{Memory: 0, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32}, err: ErrInvalidConfig},
+		{name: "zero iterations", cfg: &Argon2Config{Memory: 64 * 1024, Iterations: 0, Parallelism: 1, SaltLength: 16, KeyLength: 32}, err: ErrInvalidConfig},
+		{name: "zero parallelism", cfg: &Argon2Config{Memory: 64 * 1024, Iterations: 1, Parallelism: 0, SaltLength: 16, KeyLength: 32}, err: ErrInvalidConfig},
+		{name: "zero salt length", cfg: &Argon2Config{Memory: 64 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 0, KeyLength: 32}, err: ErrInvalidConfig},
+		{name: "zero key length", cfg: &Argon2Config{Memory: 64 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 0}, err: ErrInvalidConfig},
+		{name: "valid", cfg: NewArgon2IdConfig(), err: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Validate()
+			assert.ErrorIs(t, err, tt.err)
+		})
+	}
+}
+
+func TestArgon2IdCreateHashRejectsInvalidConfig(t *testing.T) {
+	invalidConfigs := []*Argon2Config{
+		nil,
+		{Memory: 0, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 0, Parallelism: 1, SaltLength: 16, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 1, Parallelism: 0, SaltLength: 16, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 0, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 0},
+	}
+
+	for i, cfg := range invalidConfigs {
+		t.Run(fmt.Sprintf("invalid-%d", i), func(t *testing.T) {
+			hash, err := Argon2IdCreateHash(cfg, "password")
+			assert.ErrorIs(t, err, ErrInvalidConfig)
+			assert.Empty(t, hash)
+		})
+	}
+}

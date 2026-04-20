@@ -19,11 +19,26 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Fixed
 
+- **Argon2 config validation in `crypt/hashing`**: invalid Argon2 parameters now return `ErrInvalidConfig` instead of panicking or producing hashes with unsafe zero-value settings.
+- **Credential state handling in `crypt/secure`**: updating a credential from empty to non-empty now restores the stored secret correctly instead of leaving the credential permanently marked empty.
+- **Credential lifecycle safety in `crypt/secure`**: calling `Update()` after `Clear()` now returns `ErrCredentialCleared` instead of crashing with a nil-pointer panic.
+- **Base64 token input validation in `crypt/token`**: negative byte lengths now return `ErrInvalidByteLength` instead of panicking.
 - **Shutdown skips destructors on fatal error**: `Shutdown()` now runs registered destructors before calling `log.Fatal()`, ensuring cleanup always executes regardless of shutdown reason.
 - **Startup failure bypasses destructor cleanup**: `Container.Run()` now calls `AbortFatal()` instead of `Terminate()` when a `RuntimeFn` returns an error, ensuring destructors registered by earlier startup steps are properly invoked.
 - **CSRF protection silent no-op without session**: `CSRFProtection()` middleware now returns 403 instead of passing through when no session is available on unsafe HTTP methods.
 - **ServerConfig.Validate() loses default server name**: `Validate()` now writes the default server name back to the config struct instead of a local variable.
 - **Integration tests run without Docker**: `db/integration_testcontainers_test.go` now has `//go:build integration` tag to prevent failures during plain `go test ./...`.
+- **runner: Stop() goroutine leak on timeout**: `Stop()` no longer resets status before the goroutine exits, preventing concurrent `Start()` from launching a second goroutine while the first is still running.
+- **runner: NewUpdater accepts invalid inputs**: `NewUpdater()` now validates interval, function, and logger parameters, returning an error instead of panicking at runtime. Signature changed to `(*PeriodicRunner, error)`.
+- **threadpool: worker counter uses mutex on hot path**: `Worker.requestCounter` replaced with `atomic.Uint64`, removing per-job mutex overhead. `WorkerGroup.RequestCount()` simplified to sequential iteration.
+- **threadpool: dispatch methods don't check if pool is started**: `Dispatch()` panics, `TryDispatch()`/`DispatchWithTimeout()` return false, and `DispatchWithContext()` returns `ErrPoolNotStarted` when the pool has not been started.
+- **Config default validation**: `config/provider/env` and `config/provider/json` now return `config.ErrInvalidDefault` when a `default:` tag cannot be parsed into the target field type instead of silently leaving zero values in place.
+- **Nested pointer config loading**: `config/provider/env` now allocates and fills nested `*struct` fields during recursive env loading, including applying nested defaults.
+- **Nested pointer JSON defaults**: `config/provider/json` now applies defaults recursively through nested `*struct` fields instead of skipping pointer-backed sub-configs.
+
+### Added
+
+- **Explicit file-or-string helper**: `config.StrOrFileIfExists()` reads any existing regular file path, including plain relative paths, while preserving the original `StrOrFile()` behavior for existing callers.
 
 ## [v0.8.5]
 
