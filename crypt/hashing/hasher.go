@@ -36,6 +36,9 @@ func NewArgon2Hasher(cfg *Argon2Config) (PasswordHasher, error) {
 	if cfg == nil {
 		cfg = NewArgon2IdConfig()
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 	return &a2Hasher{
 		cfg: cfg,
 	}, nil

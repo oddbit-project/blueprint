@@ -155,6 +155,9 @@ func (t *ThreadPool) Stop() error {
 //
 // Note: This function is blocking if jobQueue is full
 func (t *ThreadPool) Dispatch(j Job) {
+	if t.workers == nil {
+		panic("Dispatch called on stopped or unstarted ThreadPool")
+	}
 	t.jobQueue <- j
 }
 
@@ -168,6 +171,9 @@ func (t *ThreadPool) Dispatch(j Job) {
 //	  // Handle job rejection (queue full)
 //	}
 func (t *ThreadPool) TryDispatch(j Job) bool {
+	if t.workers == nil {
+		return false
+	}
 	select {
 	case t.jobQueue <- j:
 		return true
@@ -186,6 +192,9 @@ func (t *ThreadPool) TryDispatch(j Job) bool {
 //	  // Handle job timeout
 //	}
 func (t *ThreadPool) DispatchWithTimeout(j Job, timeout time.Duration) bool {
+	if t.workers == nil {
+		return false
+	}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
@@ -210,6 +219,9 @@ func (t *ThreadPool) DispatchWithTimeout(j Job, timeout time.Duration) bool {
 //	  // Handle dispatch error (context canceled or deadline exceeded)
 //	}
 func (t *ThreadPool) DispatchWithContext(ctx context.Context, j Job) error {
+	if t.workers == nil {
+		return ErrPoolNotStarted
+	}
 	select {
 	case t.jobQueue <- j:
 		return nil

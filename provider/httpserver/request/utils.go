@@ -1,6 +1,8 @@
 package request
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +17,6 @@ const (
 
 // IsJSONRequest returns true if request is a JSON request
 func IsJSONRequest(ctx *gin.Context) bool {
-	return ctx.Request.Header.Get(HeaderAccept) == ContentTypeJson ||
-		ctx.Request.Header.Get(HeaderContentType) == ContentTypeJson
+	return strings.Contains(ctx.Request.Header.Get(HeaderAccept), ContentTypeJson) ||
+		strings.Contains(ctx.Request.Header.Get(HeaderContentType), ContentTypeJson)
 }

@@ -4,6 +4,17 @@ All notable changes to the Blueprint ClickHouse provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.2]
+
+### Security
+
+- Upgraded Go from 1.24.0 to 1.26.3, fixing 15 stdlib vulnerabilities.
+- Upgraded `github.com/jackc/pgx/v5` from v5.7.6 to v5.9.2.
+- Upgraded `golang.org/x/net` to v0.54.0, fixing HTTP/2 DoS (GO-2026-4918).
+- Upgraded `go.opentelemetry.io/otel/sdk` to v1.43.0, fixing PATH hijacking (CVE-2026-24051, CVE-2026-39883).
+- Upgraded `go.opentelemetry.io/otel` to v1.43.0, fixing baggage header DoS (CVE-2026-29181).
+- Upgraded `filippo.io/edwards25519` from v1.1.0 to v1.1.1, fixing incorrect `MultiScalarMult` results (CVE-2026-26958).
+
 ## [v0.8.1]
 
 ### Added

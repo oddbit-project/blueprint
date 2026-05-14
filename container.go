@@ -84,7 +84,7 @@ func (c *Container) Run(mainFn ...RuntimeFn) {
 
 	for _, fn := range mainFn {
 		if err := fn(c); err != nil {
-			c.Terminate(err)
+			c.AbortFatal(err)
 		}
 	}
 

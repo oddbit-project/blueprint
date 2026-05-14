@@ -99,24 +99,33 @@ func (m *Manager) Middleware() gin.HandlerFunc {
 			m.setSessionCookie(c, sessionID)
 		}
 
-		// Store the session in the context
+		// Store the session and its ID in the context
 		c.Set(ContextSessionKey, session)
+		c.Set(ContextSessionIDKey, sessionID)
 
 		// Process the request
 		c.Next()
+
+		// Read the current session ID (may have been updated by Regenerate)
+		currentID := sessionID
+		if id, exists := c.Get(ContextSessionIDKey); exists {
+			if s, ok := id.(string); ok {
+				currentID = s
+			}
+		}
 
 		// After the request is processed, save any changes to the session
 		modifiedSession, exists := c.Get(ContextSessionKey)
 		if exists && modifiedSession != nil {
 			// Update the session in the store
 			if s, ok := modifiedSession.(*SessionData); ok {
-				if err := m.store.Set(sessionID, s); err != nil {
+				if err := m.store.Set(currentID, s); err != nil {
 					m.logger.Error(err, "Failed to save session after request")
 				}
 			}
 		} else {
 			// session does not exist, delete the session
-			_ = m.store.Delete(sessionID)
+			_ = m.store.Delete(currentID)
 		}
 	}
 }
@@ -160,8 +169,9 @@ func (m *Manager) Regenerate(c *gin.Context) {
 	// Save the new session
 	m.store.Set(newSessionID, newSession)
 
-	// Set the new session in context
+	// Set the new session and ID in context
 	c.Set(ContextSessionKey, newSession)
+	c.Set(ContextSessionIDKey, newSessionID)
 
 	// Set the new cookie
 	m.setSessionCookie(c, newSessionID)

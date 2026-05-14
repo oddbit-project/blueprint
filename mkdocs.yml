@@ -113,6 +113,7 @@ nav:
     - JWT Provider: provider/jwtprovider.md
     - HMAC Provider: provider/hmacprovider.md
     - Htpasswd Provider: provider/htpasswd.md
+    - Sqlite: provider/sqlite.md
 
   - Logging:
     - Overview: log/logging.md

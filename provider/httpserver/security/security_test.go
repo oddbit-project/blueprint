@@ -135,3 +135,20 @@ func TestCSRFProtection_POSTWithoutToken(t *testing.T) {
 
 	assert.Equal(t, 403, w.Code)
 }
+
+func TestCSRFProtection_POSTWithoutSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	// No session middleware
+	router.Use(CSRFProtection())
+	router.POST("/test", func(c *gin.Context) {
+		c.String(200, "ok")
+	})
+
+	req := httptest.NewRequest("POST", "/test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, 403, w.Code)
+}

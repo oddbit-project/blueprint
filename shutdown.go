@@ -27,13 +27,13 @@ func Shutdown(arg error) {
 	if appDestructors == nil {
 		return
 	}
+	if err := appDestructors.Run(false); err != nil {
+		log.Error().Err(err).Msg("Error while shutting down")
+	}
+	appDestructors = nil
 	if arg != nil {
 		log.Fatal().Err(arg).Msg("Fatal error")
 	}
-	if err := appDestructors.Run(false); err != nil {
-		log.Fatal().Err(arg).Msg("Fatal error while shutting down")
-	}
-	appDestructors = nil
 }
 
 func init() {

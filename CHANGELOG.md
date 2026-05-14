@@ -15,6 +15,47 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.7]
+
+### Security
+
+- **Go 1.26.3**: Upgraded from Go 1.24.7, fixing 15 stdlib vulnerabilities including XSS in `html/template`, DoS in `net/http` (HTTP/2), panics in `crypto/x509`, and parsing issues in `net/url` and `net/mail`.
+- **github.com/jackc/pgx/v5**: Upgraded from v5.7.5/v5.7.6 to v5.9.2.
+- **golang.org/x/net**: Upgraded from v0.48.0 to v0.54.0, fixing HTTP/2 infinite loop DoS (GO-2026-4918).
+- **github.com/quic-go/quic-go**: Upgraded from v0.54.1 to v0.59.1, fixing HTTP/3 QPACK header expansion DoS (GO-2025-4233).
+- **go.opentelemetry.io/otel**: Upgraded from v1.39.0 to v1.43.0, fixing baggage header amplification DoS (CVE-2026-29181).
+- **go.opentelemetry.io/otel/sdk**: Upgraded from v1.39.0 to v1.43.0, fixing PATH hijacking on macOS/BSD (CVE-2026-24051, CVE-2026-39883).
+- **filippo.io/edwards25519**: Upgraded from v1.1.0 to v1.1.1, fixing incorrect `MultiScalarMult` results (CVE-2026-26958).
+
+### Fixed
+
+- **provider/tls**: Fixed `%q` format verb on `uint16` TLS version values that became a build error under Go 1.26.3 stricter vet checks.
+
+## [v0.8.6]
+
+### Fixed
+
+- **Argon2 config validation in `crypt/hashing`**: invalid Argon2 parameters now return `ErrInvalidConfig` instead of panicking or producing hashes with unsafe zero-value settings.
+- **Credential state handling in `crypt/secure`**: updating a credential from empty to non-empty now restores the stored secret correctly instead of leaving the credential permanently marked empty.
+- **Credential lifecycle safety in `crypt/secure`**: calling `Update()` after `Clear()` now returns `ErrCredentialCleared` instead of crashing with a nil-pointer panic.
+- **Base64 token input validation in `crypt/token`**: negative byte lengths now return `ErrInvalidByteLength` instead of panicking.
+- **Shutdown skips destructors on fatal error**: `Shutdown()` now runs registered destructors before calling `log.Fatal()`, ensuring cleanup always executes regardless of shutdown reason.
+- **Startup failure bypasses destructor cleanup**: `Container.Run()` now calls `AbortFatal()` instead of `Terminate()` when a `RuntimeFn` returns an error, ensuring destructors registered by earlier startup steps are properly invoked.
+- **CSRF protection silent no-op without session**: `CSRFProtection()` middleware now returns 403 instead of passing through when no session is available on unsafe HTTP methods.
+- **ServerConfig.Validate() loses default server name**: `Validate()` now writes the default server name back to the config struct instead of a local variable.
+- **Integration tests run without Docker**: `db/integration_testcontainers_test.go` now has `//go:build integration` tag to prevent failures during plain `go test ./...`.
+- **runner: Stop() goroutine leak on timeout**: `Stop()` no longer resets status before the goroutine exits, preventing concurrent `Start()` from launching a second goroutine while the first is still running.
+- **runner: NewUpdater accepts invalid inputs**: `NewUpdater()` now validates interval, function, and logger parameters, returning an error instead of panicking at runtime. Signature changed to `(*PeriodicRunner, error)`.
+- **threadpool: worker counter uses mutex on hot path**: `Worker.requestCounter` replaced with `atomic.Uint64`, removing per-job mutex overhead. `WorkerGroup.RequestCount()` simplified to sequential iteration.
+- **threadpool: dispatch methods don't check if pool is started**: `Dispatch()` panics, `TryDispatch()`/`DispatchWithTimeout()` return false, and `DispatchWithContext()` returns `ErrPoolNotStarted` when the pool has not been started.
+- **Config default validation**: `config/provider/env` and `config/provider/json` now return `config.ErrInvalidDefault` when a `default:` tag cannot be parsed into the target field type instead of silently leaving zero values in place.
+- **Nested pointer config loading**: `config/provider/env` now allocates and fills nested `*struct` fields during recursive env loading, including applying nested defaults.
+- **Nested pointer JSON defaults**: `config/provider/json` now applies defaults recursively through nested `*struct` fields instead of skipping pointer-backed sub-configs.
+
+### Added
+
+- **Explicit file-or-string helper**: `config.StrOrFileIfExists()` reads any existing regular file path, including plain relative paths, while preserving the original `StrOrFile()` behavior for existing callers.
+
 ## [v0.8.5]
 
 ### Added

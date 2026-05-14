@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/oddbit-project/blueprint/config"
 	"github.com/oddbit-project/blueprint/utils"
 	"io"
@@ -72,6 +73,32 @@ func (j *JsonProvider) fromFile(fname string) error {
 	return j.fromReader(f)
 }
 
+func setDefaultFieldValue(fieldValue reflect.Value, defaultVal string) error {
+	switch fieldValue.Kind() {
+	case reflect.String:
+		fieldValue.SetString(defaultVal)
+	case reflect.Int:
+		intVal, err := strconv.Atoi(defaultVal)
+		if err != nil {
+			return fmt.Errorf("%w: %q", config.ErrInvalidDefault, defaultVal)
+		}
+		fieldValue.SetInt(int64(intVal))
+	case reflect.Bool:
+		boolVal, err := strconv.ParseBool(defaultVal)
+		if err != nil {
+			return fmt.Errorf("%w: %q", config.ErrInvalidDefault, defaultVal)
+		}
+		fieldValue.SetBool(boolVal)
+	case reflect.Float64:
+		floatVal, err := strconv.ParseFloat(defaultVal, 64)
+		if err != nil {
+			return fmt.Errorf("%w: %q", config.ErrInvalidDefault, defaultVal)
+		}
+		fieldValue.SetFloat(floatVal)
+	}
+	return nil
+}
+
 // applyDefaults applies default values to struct fields that have zero values
 func applyDefaults(dest interface{}) error {
 	v := reflect.ValueOf(dest)
@@ -88,28 +115,24 @@ func applyDefaults(dest interface{}) error {
 
 		// Check if field has a default value and is zero
 		if defaultVal := field.Tag.Get("default"); defaultVal != "" && fieldValue.IsZero() {
-			switch fieldValue.Kind() {
-			case reflect.String:
-				fieldValue.SetString(defaultVal)
-			case reflect.Int:
-				if intVal, err := strconv.Atoi(defaultVal); err == nil {
-					fieldValue.SetInt(int64(intVal))
-				}
-			case reflect.Bool:
-				if boolVal, err := strconv.ParseBool(defaultVal); err == nil {
-					fieldValue.SetBool(boolVal)
-				}
-			case reflect.Float64:
-				if floatVal, err := strconv.ParseFloat(defaultVal, 64); err == nil {
-					fieldValue.SetFloat(floatVal)
-				}
+			if err := setDefaultFieldValue(fieldValue, defaultVal); err != nil {
+				return err
 			}
 		}
 
 		// Recursively apply defaults to nested structs
 		if fieldValue.Kind() == reflect.Struct {
 			if fieldValue.CanAddr() {
-				applyDefaults(fieldValue.Addr().Interface())
+				if err := applyDefaults(fieldValue.Addr().Interface()); err != nil {
+					return err
+				}
+			}
+		} else if fieldValue.Kind() == reflect.Ptr && fieldValue.Type().Elem().Kind() == reflect.Struct {
+			if fieldValue.IsNil() {
+				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+			}
+			if err := applyDefaults(fieldValue.Interface()); err != nil {
+				return err
 			}
 		}
 	}

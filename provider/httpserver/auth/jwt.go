@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/provider/jwtprovider"
 )
@@ -42,7 +44,7 @@ func (a *authJWT) CanAccess(c *gin.Context) bool {
 // GetJWTToken helper to get JWT token from gin context
 func GetJWTToken(c *gin.Context) (string, bool) {
 	authHeader := c.GetHeader("Authorization")
-	if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+	if len(authHeader) < 7 || !strings.EqualFold(authHeader[:6], "bearer") || authHeader[6] != ' ' {
 		return "", false
 	}
 	return authHeader[7:], true

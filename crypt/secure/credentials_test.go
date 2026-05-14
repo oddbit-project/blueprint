@@ -95,13 +95,40 @@ func TestCredential_Lifecycle(t *testing.T) {
 		t.Errorf("Get() after Clear() should return empty string without error: %v", err)
 	}
 
-	// Test Update() with empty value
+	// Cleared credentials should not be reusable.
 	err = credential.Update("")
+	if err != ErrCredentialCleared {
+		t.Errorf("Update after Clear() should return ErrCredentialCleared, got: %v", err)
+	}
+
+	// Test empty-to-non-empty transitions on a live credential instance.
+	credential2, err := NewCredential([]byte("seed"), key, false)
+	if err != nil {
+		t.Fatalf("Failed to create second credential: %v", err)
+	}
+
+	err = credential2.Update("")
 	if err != nil {
 		t.Errorf("Update with empty value should not return error: %v", err)
 	}
-	if !credential.IsEmpty() {
+	if !credential2.IsEmpty() {
 		t.Errorf("Credential should be empty after Update with empty value")
+	}
+
+	// Updating from empty to non-empty should restore accessibility
+	err = credential2.Update("repopulated-secret")
+	if err != nil {
+		t.Errorf("Update after empty should not return error: %v", err)
+	}
+	if credential2.IsEmpty() {
+		t.Errorf("Credential should not remain empty after non-empty update")
+	}
+	value, err = credential2.Get()
+	if err != nil {
+		t.Errorf("Get() after repopulating should not fail: %v", err)
+	}
+	if value != "repopulated-secret" {
+		t.Errorf("Expected repopulated secret, got %q", value)
 	}
 }
 

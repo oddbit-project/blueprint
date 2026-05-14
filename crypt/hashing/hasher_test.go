@@ -68,6 +68,22 @@ func TestNewArgon2Hasher(t *testing.T) {
 	}
 }
 
+func TestNewArgon2HasherRejectsInvalidConfig(t *testing.T) {
+	invalidConfigs := []*Argon2Config{
+		{Memory: 0, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 0, Parallelism: 1, SaltLength: 16, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 1, Parallelism: 0, SaltLength: 16, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 0, KeyLength: 32},
+		{Memory: 64 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 0},
+	}
+
+	for _, cfg := range invalidConfigs {
+		hasher, err := NewArgon2Hasher(cfg)
+		assert.ErrorIs(t, err, ErrInvalidConfig)
+		assert.Nil(t, hasher)
+	}
+}
+
 func TestPasswordHasher_Generate(t *testing.T) {
 	hasher, err := NewArgon2Hasher(nil)
 	require.NoError(t, err)

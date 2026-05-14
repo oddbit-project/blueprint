@@ -20,6 +20,7 @@ var (
 	ErrDecryption          = errors.New("decryption error")
 	ErrInvalidKey          = errors.New("invalid encryption key")
 	ErrEmptyCredential     = errors.New("empty credential")
+	ErrCredentialCleared   = errors.New("credential has been cleared")
 	ErrSecretsFileNotFound = errors.New("secrets file not found")
 )
 
@@ -91,6 +92,9 @@ func (sc *Credential) GetBytes() ([]byte, error) {
 	if sc.data == nil {
 		return nil, ErrEmptyCredential
 	}
+	if sc.aes == nil {
+		return nil, ErrCredentialCleared
+	}
 
 	buf, err := sc.aes.Decrypt(sc.data)
 	if err != nil {
@@ -107,6 +111,13 @@ func (sc *Credential) Update(plaintext string) error {
 
 // UpdateBytes updates the credential with a new value
 func (sc *Credential) UpdateBytes(data []byte) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.aes == nil {
+		return ErrCredentialCleared
+	}
+
 	// clear previous data
 	if sc.data != nil {
 		for i := range sc.data {
@@ -120,12 +131,14 @@ func (sc *Credential) UpdateBytes(data []byte) error {
 		return nil
 	}
 
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
-
 	var err error
 	sc.data, err = sc.aes.Encrypt(data)
-	return err
+	if err != nil {
+		sc.empty = true
+		return err
+	}
+	sc.empty = false
+	return nil
 }
 
 // Clear zeroes out all sensitive data
@@ -224,6 +237,9 @@ func RandomKey32() []byte {
 
 // RandomCredential create a secure credential using random bytes
 func RandomCredential(l int) (*Credential, error) {
+	if l < 0 {
+		return nil, ErrEmptyCredential
+	}
 	secret := make([]byte, l)
 	_, err := io.ReadFull(rand.Reader, secret)
 	if err != nil {

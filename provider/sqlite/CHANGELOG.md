@@ -4,6 +4,14 @@ All notable changes to the Blueprint SQLite provider will be documented in this 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1]
+
+### Security
+
+- Upgraded Go from 1.24.7 to 1.26.3, fixing 15 stdlib vulnerabilities.
+- Upgraded `github.com/jackc/pgx/v5` from v5.7.6 to v5.9.2.
+- Upgraded `golang.org/x/net` to v0.54.0, fixing HTTP/2 DoS (GO-2026-4918).
+
 ## [v0.8.0]
 
 ### Added

@@ -4,6 +4,12 @@ All notable changes to the franz Kafka provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.8.2]
+
+### Security
+
+- Upgraded Go from 1.24.0 to 1.26.3, fixing 15 stdlib vulnerabilities.
+
 ## [v0.8.1]
 
 ### Fixed

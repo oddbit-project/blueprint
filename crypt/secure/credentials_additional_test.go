@@ -93,6 +93,14 @@ func TestRandomCredential(t *testing.T) {
 		t.Error("RandomCredential with zero length should return nil credential")
 	}
 
+	credNeg, err := RandomCredential(-1)
+	if err != ErrEmptyCredential {
+		t.Errorf("RandomCredential with negative length should return ErrEmptyCredential, got: %v", err)
+	}
+	if credNeg != nil {
+		t.Error("RandomCredential with negative length should return nil credential")
+	}
+
 	// Test that different calls return different credentials
 	cred4, err := RandomCredential(32)
 	if err != nil {
@@ -116,6 +124,25 @@ func TestRandomCredential(t *testing.T) {
 	}
 	if identical {
 		t.Error("RandomCredential should generate different credentials on successive calls")
+	}
+}
+
+func TestCredential_UpdateAfterClear(t *testing.T) {
+	key, err := GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+
+	cred, err := NewCredential([]byte("secret"), key, false)
+	if err != nil {
+		t.Fatalf("Failed to create credential: %v", err)
+	}
+
+	cred.Clear()
+
+	err = cred.Update("new-secret")
+	if !errors.Is(err, ErrCredentialCleared) {
+		t.Fatalf("expected ErrCredentialCleared, got %v", err)
 	}
 }
 

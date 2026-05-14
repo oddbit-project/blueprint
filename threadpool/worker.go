@@ -2,17 +2,16 @@ package threadpool
 
 import (
 	"context"
-	"github.com/oddbit-project/blueprint/log"
 	"sync"
+	"sync/atomic"
+
+	"github.com/oddbit-project/blueprint/log"
 )
 
 type Worker struct {
 	jobQueue       chan Job
 	ctx            context.Context
-	requestCounter uint64
-	counterMutex   sync.Mutex
-	// Could add a logger field for panic logging
-	// logger         *log.Logger
+	requestCounter atomic.Uint64
 }
 
 type WorkerGroup struct {
@@ -25,9 +24,8 @@ type WorkerGroup struct {
 
 func NewWorker(jobQueue chan Job, ctx context.Context) *Worker {
 	return &Worker{
-		jobQueue:       jobQueue,
-		ctx:            ctx,
-		requestCounter: 0,
+		jobQueue: jobQueue,
+		ctx:      ctx,
 	}
 }
 
@@ -51,10 +49,7 @@ func (w *Worker) Start(wg *sync.WaitGroup, logger *log.Logger) {
 					job.Run(w.ctx)
 				}()
 
-				// Update counter after job completion
-				w.counterMutex.Lock()
-				w.requestCounter++
-				w.counterMutex.Unlock()
+				w.requestCounter.Add(1)
 
 			case <-w.ctx.Done():
 				return
@@ -64,9 +59,7 @@ func (w *Worker) Start(wg *sync.WaitGroup, logger *log.Logger) {
 }
 
 func (w *Worker) RequestCounter() uint64 {
-	w.counterMutex.Lock()
-	defer w.counterMutex.Unlock()
-	return w.requestCounter
+	return w.requestCounter.Load()
 }
 
 // NewWorkerGroup creates a new group of workers
@@ -97,23 +90,11 @@ func NewWorkerGroup(workerCount int, jobQueue chan Job, parentCtx context.Contex
 }
 
 func (w *WorkerGroup) RequestCount() uint64 {
-	var totalRequests uint64
-	// Use a lock to ensure consistent reading of values across all workers
-	var mutex sync.Mutex
-	var wg sync.WaitGroup
-
-	wg.Add(len(w.workers))
+	var total uint64
 	for _, worker := range w.workers {
-		go func(worker *Worker) {
-			defer wg.Done()
-			count := worker.RequestCounter()
-			mutex.Lock()
-			totalRequests += count
-			mutex.Unlock()
-		}(worker)
+		total += worker.RequestCounter()
 	}
-	wg.Wait()
-	return totalRequests
+	return total
 }
 
 func (w *WorkerGroup) Stop() {

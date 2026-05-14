@@ -17,3 +17,19 @@ func StrOrFile(value string) string {
 	}
 	return value
 }
+
+// StrOrFileIfExists reads and returns the contents of value if it points to an existing regular file.
+// If value is not an existing file, the original string is returned unchanged.
+func StrOrFileIfExists(value string) string {
+	info, err := os.Stat(value)
+	if err != nil || info.IsDir() {
+		return value
+	}
+
+	content, err := os.ReadFile(value)
+	if err != nil {
+		return value
+	}
+
+	return strings.TrimSuffix(string(content), "\n")
+}
