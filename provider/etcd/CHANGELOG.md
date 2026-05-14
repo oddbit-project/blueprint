@@ -4,6 +4,14 @@ All notable changes to the Blueprint ETCD provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.4]
+
+### Security
+
+- Upgraded Go from 1.24.0 to 1.26.3, fixing 15 stdlib vulnerabilities.
+- Upgraded `go.opentelemetry.io/otel` to v1.43.0, fixing baggage header DoS (CVE-2026-29181).
+- Upgraded `filippo.io/edwards25519` from v1.1.0 to v1.1.1, fixing incorrect `MultiScalarMult` results (CVE-2026-26958).
+
 ## [v0.8.3]
 
 ### Changed

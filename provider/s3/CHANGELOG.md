@@ -4,6 +4,14 @@ All notable changes to the Blueprint S3 provider will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1]
+
+### Security
+
+- Upgraded Go from 1.23.0 to 1.26.3, fixing 15 stdlib vulnerabilities.
+- Upgraded `go.opentelemetry.io/otel/sdk` to v1.43.0, fixing PATH hijacking (CVE-2026-24051, CVE-2026-39883).
+- Upgraded `go.opentelemetry.io/otel` to v1.43.0, fixing baggage header DoS (CVE-2026-29181).
+
 ## [v0.8.0]
 
 ### Added

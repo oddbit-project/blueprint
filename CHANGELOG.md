@@ -15,6 +15,22 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.8.7]
+
+### Security
+
+- **Go 1.26.3**: Upgraded from Go 1.24.7, fixing 15 stdlib vulnerabilities including XSS in `html/template`, DoS in `net/http` (HTTP/2), panics in `crypto/x509`, and parsing issues in `net/url` and `net/mail`.
+- **github.com/jackc/pgx/v5**: Upgraded from v5.7.5/v5.7.6 to v5.9.2.
+- **golang.org/x/net**: Upgraded from v0.48.0 to v0.54.0, fixing HTTP/2 infinite loop DoS (GO-2026-4918).
+- **github.com/quic-go/quic-go**: Upgraded from v0.54.1 to v0.59.1, fixing HTTP/3 QPACK header expansion DoS (GO-2025-4233).
+- **go.opentelemetry.io/otel**: Upgraded from v1.39.0 to v1.43.0, fixing baggage header amplification DoS (CVE-2026-29181).
+- **go.opentelemetry.io/otel/sdk**: Upgraded from v1.39.0 to v1.43.0, fixing PATH hijacking on macOS/BSD (CVE-2026-24051, CVE-2026-39883).
+- **filippo.io/edwards25519**: Upgraded from v1.1.0 to v1.1.1, fixing incorrect `MultiScalarMult` results (CVE-2026-26958).
+
+### Fixed
+
+- **provider/tls**: Fixed `%q` format verb on `uint16` TLS version values that became a build error under Go 1.26.3 stricter vet checks.
+
 ## [v0.8.6]
 
 ### Fixed
