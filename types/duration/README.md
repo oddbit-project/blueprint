@@ -4,7 +4,7 @@ A JSON-friendly duration type that stores values as whole seconds (`int64`). Ser
 
 ## Overview
 
-`duration.Duration` wraps an `int64` representing seconds. Because the underlying type is `int64`, the standard `encoding/json` codec handles marshal/unmarshal without a custom marshaler — config files contain readable integers like `900` instead of Go-style strings like `"15m0s"`.
+`duration.Seconds` wraps an `int64` representing seconds. Because the underlying type is `int64`, the standard `encoding/json` codec handles marshal/unmarshal without a custom marshaler — config files contain readable integers like `900` instead of Go-style strings like `"15m0s"`.
 
 ## Quick Start
 
@@ -12,8 +12,8 @@ A JSON-friendly duration type that stores values as whole seconds (`int64`). Ser
 import "github.com/oddbit-project/blueprint/types/duration"
 
 type Config struct {
-    AccessTokenTTL  duration.Duration `json:"accessTokenTtl"`
-    RefreshTokenTTL duration.Duration `json:"refreshTokenTtl"`
+    AccessTokenTTL  duration.Seconds `json:"accessTokenTtl"`
+    RefreshTokenTTL duration.Seconds `json:"refreshTokenTtl"`
 }
 
 cfg := Config{
@@ -26,7 +26,6 @@ cfg := Config{
 
 | Function | Description | Example |
 |---|---|---|
-| `Seconds(n)` | Duration of n seconds | `Seconds(30)` → 30 |
 | `Minutes(n)` | Duration of n minutes | `Minutes(15)` → 900 |
 | `Hours(n)` | Duration of n hours | `Hours(2)` → 7200 |
 | `Days(n)` | Duration of n days (24h, no DST) | `Days(7)` → 604800 |

@@ -9,7 +9,7 @@ import (
 func TestDuration_Constructors(t *testing.T) {
 	tests := []struct {
 		name string
-		got  Duration
+		got  Seconds
 		want time.Duration
 	}{
 		{"Seconds(30)", Seconds(30), 30 * time.Second},
@@ -35,8 +35,8 @@ func TestDuration_FromStd_TruncatesSubSecond(t *testing.T) {
 
 func TestDuration_JSONMarshal_PlainInteger(t *testing.T) {
 	type cfg struct {
-		AccessTokenTTL  Duration `json:"accessTokenTtl"`
-		RefreshTokenTTL Duration `json:"refreshTokenTtl"`
+		AccessTokenTTL  Seconds `json:"accessTokenTtl"`
+		RefreshTokenTTL Seconds `json:"refreshTokenTtl"`
 	}
 	c := cfg{
 		AccessTokenTTL:  Minutes(15),
@@ -54,7 +54,7 @@ func TestDuration_JSONMarshal_PlainInteger(t *testing.T) {
 
 func TestDuration_JSONUnmarshal_AcceptsInteger(t *testing.T) {
 	type cfg struct {
-		AccessTokenTTL Duration `json:"accessTokenTtl"`
+		AccessTokenTTL Seconds `json:"accessTokenTtl"`
 	}
 	var c cfg
 	if err := json.Unmarshal([]byte(`{"accessTokenTtl":900}`), &c); err != nil {
