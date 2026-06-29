@@ -13,3 +13,25 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# IDE / editor / tooling
+.idea/
+.codex
+
+# Python tooling (docs/site build, not part of the Go project)
+/.python-version
+/Pipfile
+/Pipfile.lock
+/pyproject.toml
+/uv.lock
+/main.py
+/.venv/
+
+# MkDocs build output
+/site/
+
+# Built sample binaries
+/samples/mqtt/mqtt
+
+# Stray local files
+/580220
