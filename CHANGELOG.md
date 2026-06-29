@@ -15,6 +15,12 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [Unreleased]
+
+### Added
+
+- **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
+
 ## [v0.8.7]
 
 ### Security
