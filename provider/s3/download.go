@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/minio/minio-go/v7"
@@ -40,15 +41,21 @@ func (b *Bucket) GetObjectRange(ctx context.Context, objectName string, start, e
 
 	// Create MinIO get options with range
 	opts := minio.GetObjectOptions{}
-	if start >= 0 && end >= start {
-		// Range from start to end (inclusive) - MinIO SetRange follows HTTP range spec
-		opts.SetRange(start, end)
-	} else if start >= 0 && end < 0 {
-		// Range from start to end of file
-		opts.SetRange(start, 0)
-	} else if start < 0 && end >= 0 {
+	switch {
+	case start >= 0 && end >= start:
+		// Range from start to end (inclusive)
+		if err := opts.SetRange(start, end); err != nil {
+			return nil, err
+		}
+	case start >= 0 && end < 0:
+		// Range from start to end of file. SetRange(start, 0) only works for
+		// start > 0; set the header directly so start == 0 reads the whole object.
+		opts.Set("Range", fmt.Sprintf("bytes=%d-", start))
+	case start < 0 && end >= 0:
 		// Range from beginning of file to end byte (inclusive)
-		opts.SetRange(0, end)
+		if err := opts.SetRange(0, end); err != nil {
+			return nil, err
+		}
 	}
 
 	obj, err := b.minioClient.GetObject(ctx, b.bucketName, objectName, opts)

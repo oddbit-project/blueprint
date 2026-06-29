@@ -462,6 +462,30 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 			assert.Equal(t, expected, data, "Range data should match expected slice")
 			assert.Equal(t, 10, len(data), "Should get exactly 10 bytes")
 		})
+
+		t.Run("RangeFromOffsetToEOF", func(t *testing.T) {
+			// Open-ended range from offset 10 to end of object
+			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 10, -1)
+			assert.NoError(t, err)
+			require.NotNil(t, rangeReader)
+			defer rangeReader.Close()
+
+			data, err := io.ReadAll(rangeReader)
+			assert.NoError(t, err)
+			assert.Equal(t, testData[10:], data, "Should read from offset 10 to EOF")
+		})
+
+		t.Run("RangeFromZeroToEOF", func(t *testing.T) {
+			// Regression: start=0, end<0 previously returned a single byte
+			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 0, -1)
+			assert.NoError(t, err)
+			require.NotNil(t, rangeReader)
+			defer rangeReader.Close()
+
+			data, err := io.ReadAll(rangeReader)
+			assert.NoError(t, err)
+			assert.Equal(t, testData, data, "Should read the whole object")
+		})
 	})
 
 	t.Run("GetObjectAdvanced", func(t *testing.T) {

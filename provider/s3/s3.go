@@ -30,6 +30,18 @@ const (
 
 	// Customer-provided encryption algorithm
 	SSECAlgorithmAES256 = "AES256"
+
+	// Object Lock retention modes (WORM)
+	RetentionGovernance = "GOVERNANCE"
+	RetentionCompliance = "COMPLIANCE"
+
+	// Legal hold statuses
+	LegalHoldEnabled  = "ON"
+	LegalHoldDisabled = "OFF"
+
+	// Bucket object-lock default retention validity units
+	ValidityDays  = "DAYS"
+	ValidityYears = "YEARS"
 )
 
 // Error constants
@@ -62,6 +74,11 @@ type ObjectInfo struct {
 	ETag         string
 	StorageClass string
 	ContentType  string
+	// Versioning fields (populated when listing with Versions enabled or on
+	// version-enabled buckets)
+	VersionID      string
+	IsLatest       bool
+	IsDeleteMarker bool
 }
 
 // ListOptions represents options for listing objects
@@ -70,6 +87,7 @@ type ListOptions struct {
 	Delimiter  string
 	MaxKeys    int32
 	StartAfter string
+	Versions   bool // list all object versions (including delete markers)
 }
 
 // ObjectOptions represents options for object operations
@@ -83,19 +101,56 @@ type ObjectOptions struct {
 	Tags               map[string]string
 	StorageClass       string
 	// Server-Side Encryption options
-	ServerSideEncryption    string            // AES256, aws:kms, aws:kms:dsse
+	ServerSideEncryption    string            // AES256 or aws:kms (aws:kms:dsse is not supported)
 	SSEKMSKeyId             string            // KMS key ID for SSE-KMS
 	SSEKMSEncryptionContext map[string]string // KMS encryption context
 	SSECustomerAlgorithm    string            // Customer-provided encryption algorithm (AES256)
 	SSECustomerKey          string            // Customer-provided encryption key (base64)
 	SSECustomerKeyMD5       string            // MD5 digest of customer key
 	BucketKeyEnabled        *bool             // Enable S3 Bucket Key for cost optimization
+	// SourceSSECustomerKey decrypts an SSE-C encrypted source on CopyObject
+	// (base64-encoded key); ignored by other operations.
+	SourceSSECustomerKey string
+	// Object Lock / WORM options (require an object-lock-enabled bucket)
+	LockMode        string    // RetentionGovernance or RetentionCompliance
+	RetainUntilDate time.Time // retain-until date for LockMode
+	LegalHold       string    // LegalHoldEnabled or LegalHoldDisabled
 }
 
 // BucketOptions represents options for bucket operations
 type BucketOptions struct {
-	Region string
-	ACL    string
+	Region        string
+	ACL           string
+	ObjectLocking bool // enable Object Lock (WORM) at bucket creation; cannot be changed later
+}
+
+// DeleteOptions represents options for deleting an object
+type DeleteOptions struct {
+	VersionID        string // delete a specific object version
+	GovernanceBypass bool   // bypass GOVERNANCE retention (requires s3:BypassGovernanceRetention)
+	ForceDelete      bool   // MinIO extension: force delete of a WORM-locked object
+}
+
+// RetentionOptions represents options for setting object retention (WORM)
+type RetentionOptions struct {
+	Mode             string    // RetentionGovernance or RetentionCompliance
+	RetainUntilDate  time.Time // date until which the object is locked
+	GovernanceBypass bool      // bypass governance mode to shorten/remove retention
+	VersionID        string    // optional object version
+}
+
+// ObjectRetention represents the retention state of an object
+type ObjectRetention struct {
+	Mode            string
+	RetainUntilDate time.Time
+}
+
+// ObjectLockConfig represents a bucket's Object Lock configuration
+type ObjectLockConfig struct {
+	Enabled  bool   // Object Lock enabled on the bucket
+	Mode     string // default retention mode, empty if no default set
+	Validity uint   // default retention validity
+	Unit     string // ValidityDays or ValidityYears
 }
 
 // DownloadOptions provides options for download operations
@@ -134,30 +189,47 @@ type ClientInterface interface {
 	BucketExists(ctx context.Context, bucket string) (bool, error)
 }
 
+// BucketInterface is the set of operations provided by *Bucket. All operations
+// act on the bucket the *Bucket was created for.
 type BucketInterface interface {
 	// Object operations
-	PutObject(ctx context.Context, bucket, key string, reader io.Reader, size int64, opts ...ObjectOptions) error
-	GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, error)
-	DeleteObject(ctx context.Context, bucket, key string) error
-	ListObjects(ctx context.Context, bucket string, opts ...ListOptions) ([]ObjectInfo, error)
-	ObjectExists(ctx context.Context, bucket, key string) (bool, error)
-	HeadObject(ctx context.Context, bucket, key string) (*ObjectInfo, error)
+	PutObject(ctx context.Context, name string, reader io.Reader, size int64, opts ...ObjectOptions) error
+	GetObject(ctx context.Context, name string, versionID ...string) (io.ReadCloser, error)
+	DeleteObject(ctx context.Context, name string, opts ...DeleteOptions) error
+	ListObjects(ctx context.Context, opts ...ListOptions) ([]ObjectInfo, error)
+	ObjectExists(ctx context.Context, name string) (bool, error)
+	HeadObject(ctx context.Context, name string, versionID ...string) (*ObjectInfo, error)
 
 	// Advanced operations
-	PutObjectStream(ctx context.Context, bucket, key string, reader io.Reader, opts ...ObjectOptions) error
-	GetObjectStream(ctx context.Context, bucket, key string, writer io.Writer) error
-	CopyObject(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string, opts ...ObjectOptions) error
+	PutObjectStream(ctx context.Context, name string, reader io.Reader, opts ...ObjectOptions) error
+	GetObjectStream(ctx context.Context, name string, writer io.Writer) error
+	CopyObject(ctx context.Context, srcName, dstBucket, dstName string, opts ...ObjectOptions) error
 
 	// Advanced download operations
-	GetObjectRange(ctx context.Context, bucket, key string, start, end int64) (io.ReadCloser, error)
-	GetObjectStreamRange(ctx context.Context, bucket, key string, writer io.Writer, start, end int64) error
-	GetObjectAdvanced(ctx context.Context, bucket, key string, writer io.Writer, opts DownloadOptions) error
+	GetObjectRange(ctx context.Context, name string, start, end int64) (io.ReadCloser, error)
+	GetObjectStreamRange(ctx context.Context, name string, writer io.Writer, start, end int64) error
+	GetObjectAdvanced(ctx context.Context, name string, writer io.Writer, opts DownloadOptions) error
 
 	// Multipart upload operations
-	PutObjectMultipart(ctx context.Context, bucket, key string, reader io.Reader, size int64, opts ...ObjectOptions) error
-	PutObjectAdvanced(ctx context.Context, bucket, key string, reader io.Reader, size int64, opts UploadOptions) error
+	PutObjectMultipart(ctx context.Context, name string, reader io.Reader, size int64, opts ...ObjectOptions) error
+	PutObjectAdvanced(ctx context.Context, name string, reader io.Reader, size int64, opts UploadOptions) error
 
 	// Pre-signed URLs
-	PresignGetObject(ctx context.Context, bucket, key string, expiry time.Duration) (string, error)
-	PresignPutObject(ctx context.Context, bucket, key string, expiry time.Duration, opts ...ObjectOptions) (string, error)
+	PresignGetObject(ctx context.Context, name string, expiry time.Duration) (string, error)
+	PresignPutObject(ctx context.Context, name string, expiry time.Duration, opts ...ObjectOptions) (string, error)
+	PresignHeadObject(ctx context.Context, name string, expiry time.Duration) (string, error)
+
+	// Object Lock / WORM operations
+	SetObjectRetention(ctx context.Context, name string, opts RetentionOptions) error
+	GetObjectRetention(ctx context.Context, name string, versionID ...string) (*ObjectRetention, error)
+	SetObjectLegalHold(ctx context.Context, name string, enabled bool) error
+	GetObjectLegalHold(ctx context.Context, name string, versionID ...string) (bool, error)
+	SetObjectLockConfig(ctx context.Context, mode string, validity uint, unit string) error
+	GetObjectLockConfig(ctx context.Context) (*ObjectLockConfig, error)
 }
+
+// Compile-time assertions that the concrete types satisfy the interfaces.
+var (
+	_ ClientInterface = (*Client)(nil)
+	_ BucketInterface = (*Bucket)(nil)
+)

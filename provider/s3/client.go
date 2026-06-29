@@ -81,19 +81,17 @@ func (c *Client) Connect(ctx context.Context) error {
 		secretKey, err = c.config.DefaultCredentialConfig.Fetch()
 		if err != nil {
 			// Log the credential fetch error for debugging
-			c.logger.Error(err, "Failed to fetch secret key from Blueprint credential system", log.KV{
-				"env_var": c.config.DefaultCredentialConfig.PasswordEnvVar,
-			})
+			if c.logger != nil {
+				c.logger.Error(err, "Failed to fetch secret key from Blueprint credential system", log.KV{
+					"env_var": c.config.DefaultCredentialConfig.PasswordEnvVar,
+				})
+			}
 			connectionError = err
 			return err
 		}
-
-		// Clear secret key after use
-		defer func() {
-			for i := range secretKey {
-				[]byte(secretKey)[i] = 0
-			}
-		}()
+		// Note: secretKey is a Go string and cannot be reliably zeroed; the
+		// credential is held by the configured credentials provider for the
+		// lifetime of the client.
 	}
 
 	// Create MinIO client options
@@ -119,6 +117,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	if c.config.UseSSL {
 		tlsConfig, err := c.config.TLSConfig()
 		if err != nil {
+			connectionError = err
 			return err
 		}
 		transport.TLSClientConfig = tlsConfig

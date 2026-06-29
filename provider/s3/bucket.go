@@ -64,6 +64,9 @@ func (b *Bucket) Create(ctx context.Context, opts ...BucketOptions) error {
 	options := minio.MakeBucketOptions{
 		Region: region,
 	}
+	if len(opts) > 0 {
+		options.ObjectLocking = opts[0].ObjectLocking
+	}
 
 	err = b.minioClient.MakeBucket(ctx, b.bucketName, options)
 	if err != nil {
