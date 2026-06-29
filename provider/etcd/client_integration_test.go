@@ -80,7 +80,7 @@ func TestNewClient(t *testing.T) {
 			name: "Valid config",
 			config: &Config{
 				Endpoints:   []string{endpoint},
-				DialTimeout: 5 * time.Second,
+				DialTimeout: 5,
 			},
 			wantErr: false,
 		},
@@ -88,7 +88,7 @@ func TestNewClient(t *testing.T) {
 			name: "With encryption",
 			config: &Config{
 				Endpoints:        []string{endpoint},
-				DialTimeout:      5 * time.Second,
+				DialTimeout:      5,
 				EnableEncryption: true,
 				EncryptionKey:    []byte("test-encryption-key-32-bytes-abc"),
 			},
@@ -1095,7 +1095,7 @@ func TestRequestTimeout(t *testing.T) {
 
 	config := DefaultConfig()
 	config.Endpoints = []string{endpoint}
-	config.RequestTimeout = 100 * time.Millisecond
+	config.RequestTimeout = 1
 
 	client, err := NewClient(config)
 	require.NoError(t, err)

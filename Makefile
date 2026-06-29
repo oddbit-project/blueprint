@@ -3,7 +3,11 @@ SBOM_FILE=sbom.json
 # Provider modules list
 PROVIDERS := franz kafka nats mqtt redis s3 etcd pgsql clickhouse httpserver metrics smtp htpasswd hmacprovider
 
-.PHONY: help sbom sbom-clean install-sbom-tool test test-unit test-integration test-all test-providers test-pgsql test-clickhouse test-kafka test-franz test-nats test-mqtt test-s3 test-db test-coverage test-coverage-unit clean-test benchmark-s3
+# Build tags enabling integration tests gated behind //go:build integration (db, etcd).
+# Most integration suites instead gate on testing.Short() and run without any tag.
+INTEGRATION_TAGS ?= integration
+
+.PHONY: help sbom sbom-clean install-sbom-tool test test-unit test-integration test-all test-providers test-pgsql test-clickhouse test-kafka test-franz test-nats test-mqtt test-s3 test-db test-etcd test-coverage test-coverage-unit clean-test benchmark-s3
 .PHONY: build build-all build-providers tidy tidy-all tidy-providers update-deps tag-version
 
 # Default target
@@ -47,15 +51,15 @@ test-unit:
 # Run all integration tests with testcontainers and race detector
 test-integration:
 	@echo "Running all integration tests with testcontainers and race detector..."
-	@go test -v -race ./...
+	@go test -v -race -tags=$(INTEGRATION_TAGS) ./...
 
 # Run all tests (unit + integration) with race detector
 test-all:
 	@echo "Running all tests (unit + integration) with race detector..."
-	@go test -v -race ./...
+	@go test -v -race -tags=$(INTEGRATION_TAGS) ./...
 	@for provider in $(PROVIDERS); do \
 		echo "Testing provider/$$provider..."; \
-		(cd provider/$$provider && go test -v -race ./...) || exit 1; \
+		(cd provider/$$provider && go test -v -race -tags=$(INTEGRATION_TAGS) ./...) || exit 1; \
 	done
 
 # Test only provider modules
@@ -63,7 +67,7 @@ test-providers:
 	@echo "Running tests for all provider modules..."
 	@for provider in $(PROVIDERS); do \
 		echo "Testing provider/$$provider..."; \
-		(cd provider/$$provider && go test -v -race ./...) || exit 1; \
+		(cd provider/$$provider && go test -v -race -tags=$(INTEGRATION_TAGS) ./...) || exit 1; \
 	done
 
 # Individual provider tests with race detector
@@ -73,7 +77,11 @@ test-pgsql:
 
 test-db:
 	@echo "Running database integration tests with testcontainers and race detector..."
-	@go test -v -race ./db/...
+	@go test -v -race -tags=$(INTEGRATION_TAGS) ./db/...
+
+test-etcd:
+	@echo "Running etcd provider integration tests with testcontainers and race detector..."
+	@cd provider/etcd && go test -v -race -tags=$(INTEGRATION_TAGS) ./...
 
 test-clickhouse:
 	@echo "Running ClickHouse integration tests with testcontainers and race detector..."
