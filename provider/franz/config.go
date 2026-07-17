@@ -317,6 +317,12 @@ type ConsumerConfig struct {
 	// Offset management
 	AutoCommit         bool          `json:"autoCommit"`         // Default: true
 	AutoCommitInterval time.Duration `json:"autoCommitInterval"` // Default: 5s
+	// AutoCommitMarks, when true (with AutoCommit), makes the background committer
+	// commit ONLY offsets marked via Consumer.MarkCommitOffsets/MarkCommitRecords,
+	// instead of all polled offsets. This lets a consumer keep offset commits off
+	// the hot path while guaranteeing an offset is only committed after its records
+	// are durably processed (mark-after-processing). Requires AutoCommit=true.
+	AutoCommitMarks bool `json:"autoCommitMarks"`
 }
 
 // Validate validates consumer configuration
@@ -381,6 +387,10 @@ func (c *ConsumerConfig) buildOpts() ([]kgo.Opt, error) {
 		if c.AutoCommit {
 			if c.AutoCommitInterval > 0 {
 				opts = append(opts, kgo.AutoCommitInterval(c.AutoCommitInterval))
+			}
+			// Commit only marked offsets in the background (mark-after-processing).
+			if c.AutoCommitMarks {
+				opts = append(opts, kgo.AutoCommitMarks())
 			}
 		} else {
 			opts = append(opts, kgo.DisableAutoCommit())

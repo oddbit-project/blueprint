@@ -228,6 +228,7 @@ type ConsumerConfig struct {
     // Offset management
     AutoCommit         bool          // Default: true
     AutoCommitInterval time.Duration // Default: 5s
+    AutoCommitMarks    bool          // Commit only marked offsets (default: false)
 }
 ```
 
@@ -405,6 +406,38 @@ err := consumer.Consume(ctx, func(ctx context.Context, record franz.ConsumedReco
 // Or commit all consumed offsets at once
 if err := consumer.CommitOffsets(ctx); err != nil {
     logger.Error(err, "Failed to commit offsets")
+}
+```
+
+### Mark-then-autocommit
+
+For durability with less overhead than a synchronous commit per batch, keep
+auto-commit enabled but restrict it to *marked* offsets with `AutoCommitMarks`.
+The background committer then commits only what you have marked, so an offset is
+never committed before its records are durably processed — while the commit
+round-trip stays off the hot path. Marking is an in-memory operation (no broker
+round-trip), and marks are also committed on a graceful `Close()`.
+
+```go
+cfg := &franz.ConsumerConfig{
+    // ...
+    AutoCommit:         true,
+    AutoCommitMarks:    true,
+    AutoCommitInterval: time.Second,
+}
+
+consumer, _ := franz.NewConsumer(cfg, logger)
+
+for {
+    result, err := consumer.Poll(ctx)
+    if err != nil {
+        break
+    }
+    records := result.Records()
+    if err := processRecords(records); err != nil { // durable processing
+        continue // not marked -> re-delivered later
+    }
+    consumer.MarkCommitOffsets(records) // mark only after durable processing
 }
 ```
 

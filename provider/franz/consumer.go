@@ -312,6 +312,34 @@ func (c *Consumer) CommitOffsets(ctx context.Context) error {
 	return c.client.CommitUncommittedOffsets(ctx)
 }
 
+// MarkCommitOffsets marks the given records' offsets as ready to be committed by
+// the background committer (requires AutoCommitMarks). It marks offset+1 of the
+// highest offset seen per partition. Marking is an in-memory operation with no
+// broker round-trip; the marked offsets are committed asynchronously on the
+// auto-commit interval and on graceful close.
+func (c *Consumer) MarkCommitOffsets(records []ConsumedRecord) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.closed || len(records) == 0 {
+		return
+	}
+
+	marks := make(map[string]map[int32]kgo.EpochOffset)
+	for _, r := range records {
+		parts := marks[r.Topic]
+		if parts == nil {
+			parts = make(map[int32]kgo.EpochOffset)
+			marks[r.Topic] = parts
+		}
+		next := kgo.EpochOffset{Epoch: r.LeaderEpoch, Offset: r.Offset + 1}
+		if cur, ok := parts[r.Partition]; !ok || next.Offset > cur.Offset {
+			parts[r.Partition] = next
+		}
+	}
+	c.client.MarkCommitOffsets(marks)
+}
+
 // CommitRecord commits the offset for a specific record
 func (c *Consumer) CommitRecord(ctx context.Context, record ConsumedRecord) error {
 	c.mu.RLock()

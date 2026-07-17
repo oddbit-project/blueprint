@@ -4,6 +4,14 @@ All notable changes to the franz Kafka provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.8.3]
+
+### Added
+
+#### Consumer
+- `ConsumerConfig.AutoCommitMarks`: when enabled (with `AutoCommit`), the background committer commits only offsets marked via `MarkCommitOffsets`, instead of all polled offsets.
+- `Consumer.MarkCommitOffsets(records)`: marks the highest offset per partition (offset+1) for background commit. Enables mark-then-autocommit — offsets are committed only after their records are durably processed, keeping the commit round-trip off the hot path.
+
 ## [v0.8.2]
 
 ### Security
