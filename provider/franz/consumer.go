@@ -325,6 +325,12 @@ func (c *Consumer) MarkCommitOffsets(records []ConsumedRecord) {
 		return
 	}
 
+	c.client.MarkCommitOffsets(commitMarks(records))
+}
+
+// commitMarks builds the per-topic/partition offset map to mark for commit: the
+// highest offset seen per partition, plus one (the next offset to consume).
+func commitMarks(records []ConsumedRecord) map[string]map[int32]kgo.EpochOffset {
 	marks := make(map[string]map[int32]kgo.EpochOffset)
 	for _, r := range records {
 		parts := marks[r.Topic]
@@ -337,7 +343,7 @@ func (c *Consumer) MarkCommitOffsets(records []ConsumedRecord) {
 			parts[r.Partition] = next
 		}
 	}
-	c.client.MarkCommitOffsets(marks)
+	return marks
 }
 
 // CommitRecord commits the offset for a specific record

@@ -4,6 +4,16 @@ All notable changes to the franz Kafka provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.8.4]
+
+### Added
+
+- Test coverage for mark-then-autocommit: unit tests for the offset-mark map construction and a broker integration test verifying marked offsets are committed by the background committer (no redelivery to a fresh group member).
+
+### Changed
+
+- Extracted the offset-mark map construction in `MarkCommitOffsets` into an internal helper (no API change).
+
 ## [v0.8.3]
 
 ### Added
