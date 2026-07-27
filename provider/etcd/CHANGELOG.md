@@ -4,6 +4,26 @@ All notable changes to the Blueprint ETCD provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.0] - 2026-07-27
+
+Requires Blueprint core v0.9.0.
+
+### Security
+
+- Upgraded Go from 1.26.3 to 1.26.5, fixing stdlib vulnerabilities reachable from the client's TLS handshake and
+  certificate verification paths (GO-2026-5856, GO-2026-5039, GO-2026-5037).
+- Upgraded `google.golang.org/grpc` from v1.79.3 to v1.82.1, fixing xDS RBAC and HTTP/2 vulnerabilities
+  (GHSA-hrxh-6v49-42gf).
+- Upgraded `golang.org/x/text` from v0.38.0 to v0.40.0, fixing an infinite loop on invalid input (GO-2026-5970).
+
+### Fixed
+
+- **`Lock.TryLock()` reported a free lock as held**: it emulated a non-blocking attempt by calling the blocking
+  `Lock()` under a 1ms timeout, so any round-trip slower than that — routine on a loaded or containerized host —
+  returned `false, nil` as if another session held the lock. It now uses etcd's own `Mutex.TryLock()`, which detects
+  contention server-side, and `WithTTL` is no longer required to make it reliable: it now only bounds how long the
+  attempt may take, and defaults to the context's own deadline.
+
 ## [v0.8.4]
 
 ### Security

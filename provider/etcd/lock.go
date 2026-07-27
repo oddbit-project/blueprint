@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"context"
+	"errors"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"time"
 )
@@ -109,24 +110,32 @@ func (l *Lock) Close() error {
 // TryLock attempts to acquire the lock without blocking.
 // Returns true if the lock was successfully acquired, false if it's held by another process.
 // This is useful for implementing non-blocking lock acquisition patterns.
+// WithTTL bounds how long the attempt may take; by default only the context bounds it.
 func (l *Lock) TryLock(ctx context.Context, lockOptions ...LockOption) (bool, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	opts := &LockOptions{TTL: 1 * time.Millisecond}
+	opts := &LockOptions{}
 	for _, fn := range lockOptions {
 		fn(opts)
 	}
 
-	// Create a context with a very short timeout to make this non-blocking
-	tryCtx, cancel := context.WithTimeout(ctx, opts.TTL)
-	defer cancel()
+	if opts.TTL > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, opts.TTL)
+		defer cancel()
+	}
 
-	err := l.mutex.Lock(tryCtx)
+	err := l.mutex.TryLock(ctx)
 	if err != nil {
-		// If it's a timeout or cancellation, the lock is held by another process
-		if err == context.DeadlineExceeded || err == context.Canceled {
+		// The lock is held by another session
+		if errors.Is(err, concurrency.ErrLocked) {
+			return false, nil
+		}
+		// The attempt timed out or was cancelled; the etcd client may report the
+		// context error as a gRPC status, so check the context itself
+		if ctx.Err() != nil {
 			return false, nil
 		}
 		return false, err // Actual error
