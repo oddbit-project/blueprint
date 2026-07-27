@@ -17,9 +17,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
-### Added
-
-- **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
+## [v0.9.0] - 2026-07-27
 
 ### Breaking Changes
 
@@ -33,11 +31,24 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   `provider/kafka`, `provider/mqtt`, `provider/nats`, `provider/s3` and `provider/smtp`. Audit any deployment that
   sets `tlsInsecureSkipVerify` without a CA; if verification was actually wanted, drop the flag and configure `tlsCa`.
 
+### Added
+
+- **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
+
+### Build
+
+- **Integration test targets**: `make test-integration`, `test-all`, `test-providers` and `test-db` now pass
+  `-tags=integration` (overridable with `INTEGRATION_TAGS`), so the build-tag-gated suites in `db` and `provider/etcd`
+  actually run. Adds a `make test-etcd` target.
+
 ### Module Version Updates
 
+Provider modules are versioned independently and are tagged after this release, as they depend on it:
+
 - **`provider/smtp`**: TLS configuration support, conversation timeout, and fixes for `From`/`Bcc`, the default
-  authentication type, and credentials silently going unused. Includes breaking changes — see
-  `provider/smtp/CHANGELOG.md`.
+  authentication type, and credentials silently going unused. Requires this release for `types/duration` and for the
+  `provider/tls` fix above. Includes breaking changes — see `provider/smtp/CHANGELOG.md`.
+- **`provider/kafka`**, **`provider/nats`**: changelog and dependency updates only.
 
 ## [v0.8.7]
 
