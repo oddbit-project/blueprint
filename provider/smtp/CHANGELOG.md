@@ -4,7 +4,10 @@ All notable changes to the Blueprint SMTP provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.9.0] - 2026-07-27
+
+Requires Blueprint core v0.9.0, for `types/duration` and for the `provider/tls` fix that makes
+`tlsInsecureSkipVerify` effective without a CA.
 
 ### Added
 
