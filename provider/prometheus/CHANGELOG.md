@@ -4,6 +4,20 @@ All notable changes to the prometheus provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.9.2] - 2026-07-27
+
+### Security
+
+- Upgraded Go from 1.26.3 to 1.26.5, fixing stdlib vulnerabilities in `crypto/tls`, `net/textproto`, `crypto/x509`,
+  `mime` and `os` (GO-2026-5856, GO-2026-5039, GO-2026-5037, GO-2026-5038, GO-2026-4970).
+- Upgraded `golang.org/x/text` from v0.38.0 to v0.40.0, fixing an infinite loop on invalid input (GO-2026-5970).
+
+### Fixed
+
+- **The module did not build outside the workspace**: it required `provider/httpserver` v0.8.5, whose `ServerConfig`
+  predates the `ServerName` field `config.go` reads, so `go build` failed with `cfg.ServerName undefined` for anyone
+  consuming the published module. It now requires core v0.9.0 and `provider/httpserver` v0.9.3.
+
 ## [v0.9.1]
 
 ### Security
