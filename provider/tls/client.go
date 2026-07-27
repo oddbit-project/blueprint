@@ -49,11 +49,6 @@ func (c *ClientConfig) TLSConfig() (*tls.Config, error) {
 		return nil, nil
 	}
 
-	// empty config
-	if c.TLSCA == "" && c.TLSKey == "" && c.TLSCert == "" {
-		return &tls.Config{}, nil
-	}
-
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: c.TLSInsecureSkipVerify,
 	}

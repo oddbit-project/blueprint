@@ -96,6 +96,26 @@ func TestClientConfig_TLSConfig_EmptyConfig(t *testing.T) {
 	}
 }
 
+func TestClientConfig_TLSConfig_SkipVerifyWithoutCerts(t *testing.T) {
+	// Test that skipping verification is honoured without any certificate, as
+	// required to talk to a server with a self-signed certificate
+	config := &ClientConfig{
+		TLSEnable:             true,
+		TLSInsecureSkipVerify: true,
+	}
+
+	tlsConfig, err := config.TLSConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error with skip verify config: %v", err)
+	}
+	if tlsConfig == nil {
+		t.Fatal("Expected non-nil TLS config")
+	}
+	if !tlsConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify should be true")
+	}
+}
+
 func TestClientConfig_TLSConfig_WithCA(t *testing.T) {
 	skipCATests(t) // Skip until we have proper CA certificates for testing
 
