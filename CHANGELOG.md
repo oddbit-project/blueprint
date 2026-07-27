@@ -43,6 +43,10 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   A logger built from a configuration that is never passed to `Configure()` now formats timestamps with zerolog's
   default layout (RFC3339) rather than the configuration's `TimeFormat`; the caller and level behaviour is unchanged.
 
+- **`caller` field pointed at the logging wrapper**: with `IncludeCaller` enabled, `LogCallerSkipFrames` was one frame
+  short, so every entry reported `log/logger.go` instead of the code that called `Info`/`Error`/etc. The default is now
+  3. Applications that raised `CallerSkipFrames` to compensate should lower it by one.
+
 ### Added
 
 - **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.

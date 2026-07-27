@@ -211,30 +211,27 @@ func TestConfigLoggerLeavesGlobalSettings(t *testing.T) {
 	assert.Equal(t, originalLevel, zerolog.GlobalLevel())
 }
 
-// CallerSkipFrames is applied per logger, so two loggers configured with different
-// values report different frames
-func TestLoggerCallerSkipFrames(t *testing.T) {
-	originalLevel := zerolog.GlobalLevel()
-	t.Cleanup(func() { zerolog.SetGlobalLevel(originalLevel) })
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+// callerLogger returns a logger writing JSON to a temporary file, and a function
+// reading back the caller field of the entry it wrote
+func callerLogger(t *testing.T, skipFrames int) (*Logger, func() string) {
+	t.Helper()
 
-	logCaller := func(t *testing.T, skipFrames int) string {
+	logFile := filepath.Join(t.TempDir(), "caller.log")
+	cfg := NewDefaultConfig()
+	cfg.Level = "debug"
+	cfg.Format = LogFmtJson
+	cfg.FileFormat = LogFmtJson
+	cfg.IncludeCaller = true
+	cfg.CallerSkipFrames = skipFrames
+	cfg.OutputToFile = true
+	cfg.FileAppend = false
+	cfg.FilePath = logFile
+
+	logger, err := cfg.Logger()
+	assert.NoError(t, err)
+
+	return logger, func() string {
 		t.Helper()
-
-		logFile := filepath.Join(t.TempDir(), "caller.log")
-		cfg := NewDefaultConfig()
-		cfg.Format = LogFmtJson
-		cfg.FileFormat = LogFmtJson
-		cfg.IncludeCaller = true
-		cfg.CallerSkipFrames = skipFrames
-		cfg.OutputToFile = true
-		cfg.FileAppend = false
-		cfg.FilePath = logFile
-
-		logger, err := cfg.Logger()
-		assert.NoError(t, err)
-
-		logger.Info("caller test")
 
 		contents, err := os.ReadFile(logFile)
 		assert.NoError(t, err)
@@ -246,11 +243,38 @@ func TestLoggerCallerSkipFrames(t *testing.T) {
 		assert.True(t, ok, "caller field should be present, got %v", entry)
 		return caller
 	}
+}
 
-	// the default skip count reports the logging method itself
-	assert.Contains(t, logCaller(t, LogCallerSkipFrames), "log/logger.go:")
-	// one frame further out is this test, the actual call site
-	assert.Contains(t, logCaller(t, LogCallerSkipFrames+1), "logger_test.go:")
+// The default skip count reports the call site, not the Logger method that emitted
+// the entry; every logging method has the same call depth
+func TestLoggerCallerReportsCallSite(t *testing.T) {
+	originalLevel := zerolog.GlobalLevel()
+	t.Cleanup(func() { zerolog.SetGlobalLevel(originalLevel) })
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
+	logger, caller := callerLogger(t, LogCallerSkipFrames)
+	logger.Info("caller test")
+	assert.Contains(t, caller(), "logger_test.go:")
+
+	logger, caller = callerLogger(t, LogCallerSkipFrames)
+	logger.Errorf(errors.New("boom"), "caller test")
+	assert.Contains(t, caller(), "logger_test.go:")
+
+	logger, caller = callerLogger(t, LogCallerSkipFrames)
+	logger.Debugf("caller test")
+	assert.Contains(t, caller(), "logger_test.go:")
+}
+
+// CallerSkipFrames is applied per logger
+func TestLoggerCallerSkipFrames(t *testing.T) {
+	originalLevel := zerolog.GlobalLevel()
+	t.Cleanup(func() { zerolog.SetGlobalLevel(originalLevel) })
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
+	// one frame short of the call site is the logging method itself
+	logger, caller := callerLogger(t, LogCallerSkipFrames-1)
+	logger.Info("caller test")
+	assert.Contains(t, caller(), "log/logger.go:")
 }
 
 func TestNewDefaultConfig(t *testing.T) {

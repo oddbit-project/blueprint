@@ -17,12 +17,14 @@ import (
 // Configuration constants
 const (
 	// LogContextKey is used to store/retrieve logger from context
-	LogContextKey       = "logger"
-	LogTraceIDKey       = "trace_id"
-	LogModuleKey        = "module"
-	LogComponentKey     = "component"
-	LogTimestampFormat  = time.RFC3339Nano
-	LogCallerSkipFrames = 2
+	LogContextKey      = "logger"
+	LogTraceIDKey      = "trace_id"
+	LogModuleKey       = "module"
+	LogComponentKey    = "component"
+	LogTimestampFormat = time.RFC3339Nano
+	// LogCallerSkipFrames skips zerolog's own frames plus the Logger method, so the
+	// caller field reports the code that called it
+	LogCallerSkipFrames = 3
 
 	DefaultLogFile = "application.log"
 	LogFmtPretty   = "pretty"

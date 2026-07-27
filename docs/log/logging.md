@@ -147,6 +147,14 @@ if err != nil {
 }
 ```
 
+`log.Configure()` also applies process-wide zerolog settings (timestamp format and global level), which are not safe
+to change while other goroutines are logging — call it once, during startup. Building a logger with `cfg.Logger()` or
+`cfg.ModuleLogger()` has no process-wide effect, and such a logger uses zerolog's default timestamp layout rather than
+`cfg.TimeFormat`.
+
+With `IncludeCaller`, the `caller` field reports the code that called the logging method. `cfg.CallerSkipFrames`
+(default 3) controls that; raise it if you wrap the logger in helpers of your own, one per extra call level.
+
 ## Formatted Logging Methods
 
 In addition to the standard logging methods, the logger provides formatted variants that support printf-style formatting:
