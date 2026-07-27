@@ -56,6 +56,11 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **Integration test targets**: `make test-integration`, `test-all`, `test-providers` and `test-db` now pass
   `-tags=integration` (overridable with `INTEGRATION_TAGS`), so the build-tag-gated suites in `db` and `provider/etcd`
   actually run. Adds a `make test-etcd` target.
+- **Provider requirements refreshed**: the core module's `require` entries for the provider modules were behind their
+  released tags, in one case incompatibly — `provider/prometheus v0.8.0` does not compile against the `httpserver`
+  version selected alongside it, so `go build ./...` failed for anyone building the core module outside this
+  repository's workspace. Every provider is now required at its latest release, notably `provider/httpserver` v0.8.5 →
+  v0.9.3 and `provider/prometheus` v0.8.0 → v0.9.1.
 - **Dependencies tidied**: `go.mod`/`go.sum` had drifted from the module's actual imports. Tidying picks up the
   versions the module graph already selects, notably `testcontainers-go` v0.38.0 → v0.43.0 (matching the version the
   workspace unified on), `minio-go/v7` v7.0.95 → v7.2.1, `zerolog` v1.34.0 → v1.35.1, `go.step.sm/crypto` v0.73.0 →
