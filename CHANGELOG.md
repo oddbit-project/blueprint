@@ -40,6 +40,11 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **Integration test targets**: `make test-integration`, `test-all`, `test-providers` and `test-db` now pass
   `-tags=integration` (overridable with `INTEGRATION_TAGS`), so the build-tag-gated suites in `db` and `provider/etcd`
   actually run. Adds a `make test-etcd` target.
+- **Dependencies tidied**: `go.mod`/`go.sum` had drifted from the module's actual imports. Tidying picks up the
+  versions the module graph already selects, notably `testcontainers-go` v0.38.0 → v0.43.0 (matching the version the
+  workspace unified on), `minio-go/v7` v7.0.95 → v7.2.1, `zerolog` v1.34.0 → v1.35.1, `go.step.sm/crypto` v0.73.0 →
+  v0.84.1, `golang.org/x/crypto` v0.51.0 → v0.53.0 and `golang.org/x/net` v0.54.0 → v0.56.0. No dependency moved below
+  the versions pinned for the v0.8.7 security fixes.
 
 ### Module Version Updates
 
