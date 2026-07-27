@@ -18,21 +18,22 @@ import (
 )
 
 const (
-	ErrMissingHost      = utils.Error("SMTP host is required")
-	ErrMissingPort      = utils.Error("Port number is required")
-	ErrInvalidFrom      = utils.Error("From is not valid")
-	ErrInvalidTo        = utils.Error("To address is not valid")
-	ErrInvalidBcc       = utils.Error("BCC address is not valid")
-	ErrInvalidConfig    = utils.Error("Config is not valid")
-	ErrCreatingClient   = utils.Error("Error creating client")
-	ErrInvalidPassword  = utils.Error("Invalid Password")
-	ErrSMTPServer       = utils.Error("Failed to dial SMTP server")
-	ErrMessage          = utils.Error("Failed to send email message")
-	ErrInvalidAuthType  = utils.Error("Invalid auth type")
-	ErrInvalidTLSPolicy = utils.Error("Invalid TLS policy")
-	ErrInvalidTLSConfig = utils.Error("Invalid TLS configuration")
-	ErrTLSNotEnabled    = utils.Error("TLS settings require tlsEnable")
-	ErrInvalidTimeout   = utils.Error("Invalid timeout")
+	ErrMissingHost       = utils.Error("SMTP host is required")
+	ErrMissingPort       = utils.Error("Port number is required")
+	ErrInvalidFrom       = utils.Error("From is not valid")
+	ErrInvalidTo         = utils.Error("To address is not valid")
+	ErrInvalidBcc        = utils.Error("BCC address is not valid")
+	ErrInvalidConfig     = utils.Error("Config is not valid")
+	ErrCreatingClient    = utils.Error("Error creating client")
+	ErrInvalidPassword   = utils.Error("Invalid Password")
+	ErrSMTPServer        = utils.Error("Failed to dial SMTP server")
+	ErrMessage           = utils.Error("Failed to send email message")
+	ErrInvalidAuthType   = utils.Error("Invalid auth type")
+	ErrCredentialsUnused = utils.Error("Username configured without an auth type")
+	ErrInvalidTLSPolicy  = utils.Error("Invalid TLS policy")
+	ErrInvalidTLSConfig  = utils.Error("Invalid TLS configuration")
+	ErrTLSNotEnabled     = utils.Error("TLS settings require tlsEnable")
+	ErrInvalidTimeout    = utils.Error("Invalid timeout")
 )
 
 // TLS policy values for Config.TLSPolicy
@@ -48,7 +49,7 @@ const (
 // AuthTypeNone disables SMTP authentication; it is also assumed when Config.AuthType is empty
 const AuthTypeNone = "noauth"
 
-// DefaultTimeout is the connection timeout used when Config.Timeout is zero
+// DefaultTimeout is the deadline used when Config.Timeout is zero
 const DefaultTimeout = duration.Seconds(15)
 
 type Config struct {
@@ -62,10 +63,25 @@ type Config struct {
 	TLSPolicy string `json:"tlsPolicy"`
 	// SSLOnConnect enables implicit TLS (SMTPS, usually port 465) instead of STARTTLS
 	SSLOnConnect bool `json:"sslOnConnect"`
-	// Timeout is the connection timeout, in seconds; zero uses DefaultTimeout
+	// Timeout is the deadline for the SMTP conversation, in seconds; it covers the
+	// connection attempt, the greeting, STARTTLS and authentication, and is renewed
+	// for each message sent. Zero uses DefaultTimeout
 	Timeout duration.Seconds `json:"timeout"`
 	From    string           `json:"from"`
 	Bcc     string           `json:"bcc,omitempty"`
+}
+
+// parseAuthType converts a configured auth type to a go-mail SMTPAuthType; an empty
+// value means no authentication
+func parseAuthType(name string) (gomail.SMTPAuthType, error) {
+	authType := gomail.SMTPAuthNoAuth
+	if name == "" {
+		return authType, nil
+	}
+	if err := authType.UnmarshalString(name); err != nil {
+		return authType, ErrInvalidAuthType
+	}
+	return authType, nil
 }
 
 // parseTLSPolicy converts a configured policy name to a go-mail TLSPolicy
@@ -106,7 +122,16 @@ func (c *Config) Validate() error {
 	if c.Port < 1 {
 		return ErrMissingPort
 	}
-	if _, err := parseTLSPolicy(c.TLSPolicy); err != nil {
+	authType, err := parseAuthType(c.AuthType)
+	if err != nil {
+		return err
+	}
+	// go-mail skips authentication entirely for SMTPAuthNoAuth, so credentials
+	// configured without an auth type would be silently unused
+	if c.Username != "" && authType == gomail.SMTPAuthNoAuth {
+		return ErrCredentialsUnused
+	}
+	if _, err = parseTLSPolicy(c.TLSPolicy); err != nil {
 		return err
 	}
 	if c.Timeout < 0 {
@@ -114,7 +139,9 @@ func (c *Config) Validate() error {
 	}
 	// the certificate settings are only read when TLS is enabled; setting them without
 	// TLSEnable is a misconfiguration, as they would be silently ignored
-	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify) {
+	keyCredential := c.ClientConfig.TlsKeyCredential
+	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||
+		keyCredential.Password != "" || keyCredential.PasswordEnvVar != "" || keyCredential.PasswordFile != "") {
 		return ErrTLSNotEnabled
 	}
 	// From validation (if provided)
@@ -204,12 +231,9 @@ func NewMailer(cfg *Config, customAuth ...gomail.Option) (*Mailer, error) {
 		)
 	}
 
-	authType := gomail.SMTPAuthNoAuth
-
-	if cfg.AuthType != "" {
-		if err := authType.UnmarshalString(cfg.AuthType); err != nil {
-			return nil, ErrInvalidAuthType
-		}
+	authType, err := parseAuthType(cfg.AuthType)
+	if err != nil {
+		return nil, err
 	}
 
 	if authType == gomail.SMTPAuthCustom {
@@ -355,16 +379,27 @@ func (m *Mailer) SendWithContext(ctx context.Context, msg ...*gomail.Msg) error 
 		return fmt.Errorf("%w: %w", ErrSMTPServer, err)
 	}
 	defer func() {
-		_ = m.client.CloseWithSMTPClient(client)
+		// a failed QUIT leaves the socket open, as go-mail returns before closing it
+		if closeErr := m.client.CloseWithSMTPClient(client); closeErr != nil {
+			_ = client.Close()
+		}
 	}()
 
 	// sent one at a time; go-mail extends the connection deadline on each call
 	// and records the failure on the message itself
 	errs := make([]error, 0, len(messages))
 	for _, message := range messages {
-		if err = m.client.SendWithSMTPClient(client, message); err != nil {
-			errs = append(errs, err)
+		err = m.client.SendWithSMTPClient(client, message)
+		if err == nil {
+			continue
 		}
+		// a broken connection fails every remaining message; report it as such
+		// instead of as a per-message delivery failure
+		var sendErr *gomail.SendError
+		if errors.As(err, &sendErr) && sendErr.Reason == gomail.ErrConnCheck {
+			return fmt.Errorf("%w: %w", ErrSMTPServer, errors.Join(append(errs, err)...))
+		}
+		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("%w: %w", ErrMessage, errors.Join(errs...))

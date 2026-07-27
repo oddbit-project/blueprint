@@ -92,7 +92,10 @@ func TestClientConfig_TLSConfig_EmptyConfig(t *testing.T) {
 		t.Fatalf("Unexpected error with empty TLS config: %v", err)
 	}
 	if tlsConfig == nil {
-		t.Error("Expected non-nil TLS config")
+		t.Fatal("Expected non-nil TLS config")
+	}
+	if tlsConfig.InsecureSkipVerify {
+		t.Error("InsecureSkipVerify should be false")
 	}
 }
 

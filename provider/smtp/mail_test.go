@@ -12,20 +12,22 @@ import (
 
 // Helper function to create a valid test configuration
 func testConfig(authType string) *smtp.Config {
-	return &smtp.Config{
+	cfg := &smtp.Config{
 		Host:     "127.0.0.1",
 		Port:     1025,
-		Username: "user",
 		AuthType: authType,
-		DefaultCredentialConfig: secure.DefaultCredentialConfig{
-			Password: "pass",
-		},
 		ClientConfig: tls.ClientConfig{
 			TLSEnable: false,
 		},
 		From: "no-reply@example.com",
 		Bcc:  "",
 	}
+	// credentials are only valid with an authentication method
+	if authType != "" && authType != smtp.AuthTypeNone {
+		cfg.Username = "user"
+		cfg.DefaultCredentialConfig = secure.DefaultCredentialConfig{Password: "pass"}
+	}
+	return cfg
 }
 
 // Test creating a Mailer with valid config and plain auth
@@ -101,17 +103,39 @@ func TestNewMessageFromOverride(t *testing.T) {
 
 // Test validation: certificate settings without TLSEnable should return an error
 func TestInvalidConfigTLSNotEnabled(t *testing.T) {
-	for _, apply := range []func(cfg *smtp.Config){
-		func(cfg *smtp.Config) { cfg.TLSCA = "/path/to/ca.pem" },
-		func(cfg *smtp.Config) { cfg.TLSCert = "/path/to/cert.pem" },
-		func(cfg *smtp.Config) { cfg.TLSKey = "/path/to/key.pem" },
-		func(cfg *smtp.Config) { cfg.TLSInsecureSkipVerify = true },
-	} {
-		cfg := testConfig("noauth")
-		apply(cfg)
+	cases := map[string]func(cfg *smtp.Config){
+		"ca":             func(cfg *smtp.Config) { cfg.TLSCA = "/path/to/ca.pem" },
+		"cert":           func(cfg *smtp.Config) { cfg.TLSCert = "/path/to/cert.pem" },
+		"key":            func(cfg *smtp.Config) { cfg.TLSKey = "/path/to/key.pem" },
+		"skipVerify":     func(cfg *smtp.Config) { cfg.TLSInsecureSkipVerify = true },
+		"keyPassword":    func(cfg *smtp.Config) { cfg.TlsKeyCredential.Password = "secret" },
+		"keyPasswordEnv": func(cfg *smtp.Config) { cfg.TlsKeyCredential.PasswordEnvVar = "TLS_KEY_PWD" },
+		"keyPasswordFil": func(cfg *smtp.Config) { cfg.TlsKeyCredential.PasswordFile = "/secrets/key" },
+	}
 
-		_, err := smtp.NewMailer(cfg)
-		require.Equal(t, smtp.ErrTLSNotEnabled, err)
+	for name, apply := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := testConfig("noauth")
+			apply(cfg)
+
+			_, err := smtp.NewMailer(cfg)
+			require.Equal(t, smtp.ErrTLSNotEnabled, err)
+		})
+	}
+}
+
+// Test validation: credentials without an auth type should return an error, as
+// go-mail would never send them
+func TestInvalidConfigCredentialsWithoutAuth(t *testing.T) {
+	for _, authType := range []string{"", "noauth", "none"} {
+		t.Run(authType, func(t *testing.T) {
+			cfg := testConfig(authType)
+			cfg.Username = "user"
+			cfg.Password = "pass"
+
+			_, err := smtp.NewMailer(cfg)
+			require.Equal(t, smtp.ErrCredentialsUnused, err)
+		})
 	}
 }
 

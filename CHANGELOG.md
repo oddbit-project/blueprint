@@ -21,16 +21,23 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 - **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
 
-### Fixed
+### Breaking Changes
 
-- **`provider/tls`**: `ClientConfig.TLSConfig()` ignored `TLSInsecureSkipVerify` when no CA, certificate or key was
-  configured, returning an empty `tls.Config` that still verified the server certificate. Self-signed servers could not
-  be used without also supplying a CA bundle.
+- **`provider/tls` now honours `TLSInsecureSkipVerify` when no CA, certificate or key is configured.** `TLSConfig()`
+  short-circuited to an empty `tls.Config` in that case, so a configuration of `tlsEnable: true` +
+  `tlsInsecureSkipVerify: true` with no CA **still verified the server certificate**. That was the bug — self-signed
+  servers could not be used without also supplying a CA bundle — but the fix means such a deployment stops verifying
+  certificates after upgrading, where it silently verified them before.
+
+  This affects every consumer of `tls.ClientConfig`: `provider/clickhouse`, `provider/etcd`, `provider/franz`,
+  `provider/kafka`, `provider/mqtt`, `provider/nats`, `provider/s3` and `provider/smtp`. Audit any deployment that
+  sets `tlsInsecureSkipVerify` without a CA; if verification was actually wanted, drop the flag and configure `tlsCa`.
 
 ### Module Version Updates
 
-- **`provider/smtp`**: TLS configuration support, connection timeout, and fixes for `From`/`Bcc` and the default
-  authentication type. See `provider/smtp/CHANGELOG.md`.
+- **`provider/smtp`**: TLS configuration support, conversation timeout, and fixes for `From`/`Bcc`, the default
+  authentication type, and credentials silently going unused. Includes breaking changes — see
+  `provider/smtp/CHANGELOG.md`.
 
 ## [v0.8.7]
 

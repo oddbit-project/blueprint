@@ -20,10 +20,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   function, which also performs the TLS handshake when `sslOnConnect` is enabled.
 - **`Mailer.SendWithContext(ctx, ...)`**: sends with a caller-supplied context bounding the connection attempt.
   `Send` is unchanged and delegates to it with `context.Background()`.
-- **`ErrTLSNotEnabled`**: `Validate()` now rejects a configuration that sets `tlsCa`, `tlsCert`, `tlsKey` or
-  `tlsInsecureSkipVerify` while `tlsEnable` is false, as those settings would otherwise be silently ignored. Note that
-  `tlsEnable` does not by itself decide whether the connection is encrypted — that is `tlsPolicy`, which requires
-  STARTTLS by default.
+- **`ErrTLSNotEnabled`**: `Validate()` now rejects a configuration that sets `tlsCa`, `tlsCert`, `tlsKey`,
+  `tlsInsecureSkipVerify` or a TLS key password while `tlsEnable` is false, as those settings would otherwise be
+  silently ignored. Note that `tlsEnable` does not by itself decide whether the connection is encrypted — that is
+  `tlsPolicy`, which requires STARTTLS by default.
+- **`ErrCredentialsUnused`**: `Validate()` rejects a `username` configured without an authentication method. go-mail
+  performs no authentication at all for `noauth`, so such a configuration would connect and send mail unauthenticated
+  with the credentials never used.
 
 ### Changed
 
@@ -31,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   once, sends each message in turn and closes the connection at the end.
 - **Send error reporting**: connection failures (dial, TLS handshake, STARTTLS, authentication) now return
   `ErrSMTPServer`; failures while transferring a message return `ErrMessage`. Both wrap the underlying `go-mail` error.
+  A connection lost part-way through a batch is also reported as `ErrSMTPServer`, and aborts the remaining messages,
+  rather than being reported per message as a delivery failure.
 - **`Send` no longer stops at the first failing message**: the remaining messages are still attempted, and the failures
   are joined into a single `ErrMessage`. `go-mail` continues to record the failure on the message itself.
 - **Removed `ErrClient`**, which was declared but never returned; client creation failures return `ErrCreatingClient`.
@@ -45,6 +50,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Previously, enabling TLS built a `tls.Config` with only `InsecureSkipVerify` set, without `ServerName`; connections
   with certificate verification enabled failed with `tls: either ServerName or InsecureSkipVerify must be specified`.
 - Client creation and send errors now wrap the underlying error instead of discarding it.
+- A failed send leaked a socket: the only cleanup path was go-mail's `Quit()`, which returns before closing the
+  connection when the QUIT command itself fails. `Send` now closes the connection when the quit fails.
 - `Config.Bcc` was validated but never applied; the configured recipients are now added to every message created by
   `NewMessage`, after the message options, so they do not replace a BCC address set on the message itself.
 - `Config.From` was never applied; messages built without `WithFrom` had no From header. It is now set on every message
@@ -63,6 +70,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   exclusively through `WithFrom` are unaffected; callers that expected no From header need to clear `Config.From`.
 - Send errors are wrapped, so `err == smtp.ErrMessage` no longer matches. Use `errors.Is`.
 - Connection failures return `ErrSMTPServer` where they previously surfaced as `ErrMessage`.
+- A configuration with a `username` but no `authType` (or `noauth`) is now rejected with `ErrCredentialsUnused`. Such a
+  configuration never authenticated; set the authentication method the server expects, or drop the credentials.
+- The exported `ErrClient` was removed. It was never returned by anything, but code referencing it will fail to
+  compile; use `ErrCreatingClient`.
 
 ## [v0.8.2]
 

@@ -174,12 +174,21 @@ The SMTP provider supports multiple authentication methods:
 
 - **`"plain"`** - Plain text authentication (most common)
 - **`"login"`** - LOGIN authentication
-- **`"crammd5"`** - CRAM-MD5 authentication
-- **`"xoauth2"`** - XOAUTH2 for OAuth2 authentication
-- **`"scram-sha-1"`** - SCRAM-SHA-1 authentication
-- **`"scram-sha-256"`** - SCRAM-SHA-256 authentication
+- **`"crammd5"`** - CRAM-MD5 authentication (aliases: `"cram-md5"`, `"cram"`)
+- **`"xoauth2"`** - XOAUTH2 for OAuth2 authentication (alias: `"oauth2"`)
+- **`"scram-sha-1"`** / **`"scram-sha-256"`** - SCRAM authentication
+- **`"scram-sha-1-plus"`** / **`"scram-sha-256-plus"`** - SCRAM with channel binding (requires TLS)
+- **`"auto"`** - Pick the strongest mechanism the server advertises (aliases: `"autodiscover"`, `"autodiscovery"`)
 - **`"custom"`** - Custom authentication (requires custom auth option)
 - **`"noauth"`** - No authentication (for development/testing); also assumed when `AuthType` is empty
+  (aliases: `"none"`, `"no"`)
+
+`"plain-noenc"` and `"login-noenc"` are also accepted; they send the credentials over an unencrypted connection, which
+`"plain"` and `"login"` refuse to do. Do not use them outside a trusted network.
+
+Because go-mail performs no authentication at all for `noauth`, a configuration that sets `Username` without an
+authentication method would send unauthenticated mail with the credentials unused. `NewMailer` rejects that
+combination with `ErrCredentialsUnused`.
 
 ## Usage Examples
 
@@ -327,14 +336,18 @@ if err := mailer.Send(messages...); err != nil {
 }
 
 // Or with a caller-supplied context bounding the connection attempt
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
 if err := mailer.SendWithContext(ctx, messages...); err != nil {
 	log.Fatal("Failed to send batch emails:", err)
 }
 ```
 
 `Send` opens one connection for the whole batch and closes it when done. Connection failures — dial, TLS handshake,
-STARTTLS negotiation and authentication — are reported as `ErrSMTPServer`; failures while transferring a message are
-reported as `ErrMessage`. Both wrap the underlying `go-mail` error, so `errors.Is`/`errors.As` reach it.
+STARTTLS negotiation and authentication, and a connection lost part-way through a batch — are reported as
+`ErrSMTPServer`, and abort the remaining messages; failures while transferring a message are reported as `ErrMessage`,
+and the rest of the batch is still attempted. Both wrap the underlying `go-mail` error, so `errors.Is`/`errors.As` reach it.
 
 The `Timeout` setting is applied as a deadline over the whole conversation: it bounds the connection attempt, the
 server greeting, STARTTLS and authentication, and is renewed before each message is sent.
@@ -407,8 +420,6 @@ config.PasswordEnvVar = "SMTP_PASSWORD"
 
 // Use secure file storage
 config.PasswordFile = "/run/secrets/smtp_password"
-
-// Passwords are automatically cleared from memory after use
 ```
 
 ### TLS Configuration
@@ -658,7 +669,7 @@ config.TLSPolicy = smtp.TLSPolicyNone // MailHog does not offer STARTTLS
 
 - **Connection Reuse**: Each `Send` call uses a single connection for all the messages it is given
 - **Batch Sending**: Use batch sending for multiple emails
-- **Authentication Caching**: Credentials are cached during the session
+- **Authentication**: The password is resolved once, when the mailer is created
 - **TLS Overhead**: Consider TLS overhead for high-volume sending
 - **Message Size**: Be mindful of attachment sizes and message limits
 
@@ -721,6 +732,7 @@ config.SSLOnConnect = true
 ```go
 // Test SMTP connection
 config := smtp.NewConfig()
+config.TLSPolicy = smtp.TLSPolicyNone // local development server without STARTTLS
 mailer, err := smtp.NewMailer(config)
 if err != nil {
 	log.Printf("Configuration error: %v", err)
