@@ -21,6 +21,17 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 - **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
 
+### Fixed
+
+- **`provider/tls`**: `ClientConfig.TLSConfig()` ignored `TLSInsecureSkipVerify` when no CA, certificate or key was
+  configured, returning an empty `tls.Config` that still verified the server certificate. Self-signed servers could not
+  be used without also supplying a CA bundle.
+
+### Module Version Updates
+
+- **`provider/smtp`**: TLS configuration support, connection timeout, and fixes for `From`/`Bcc` and the default
+  authentication type. See `provider/smtp/CHANGELOG.md`.
+
 ## [v0.8.7]
 
 ### Security

@@ -1,8 +1,8 @@
 # SMTP Provider
 
 The SMTP provider offers a comprehensive email client implementation with support for various authentication methods,
-TLS encryption, attachments, and template-based message composition. Built on the powerful `go-mail` library, it
-provides a secure and feature-rich solution for sending emails.
+TLS encryption and attachments. Built on the powerful `go-mail` library, it provides a secure and feature-rich solution
+for sending emails.
 
 ## Features
 
@@ -13,7 +13,7 @@ provides a secure and feature-rich solution for sending emails.
 - **Rich Message Composition**: HTML and plain text bodies with attachments
 - **Email Validation**: Built-in email address validation
 - **BCC Support**: Automatic BCC functionality for compliance
-- **Template Support**: Flexible message building with functional options
+- **Message Options**: Flexible message building with functional options
 - **Connection Management**: Automatic connection handling and cleanup
 
 ## Installation
@@ -63,7 +63,10 @@ func main() {
     "from": "your-email@gmail.com",
     "bcc": "compliance@company.com",
     "tlsEnable": true,
-    "tlsInsecureSkipVerify": false
+    "tlsInsecureSkipVerify": false,
+    "tlsPolicy": "mandatory",
+    "sslOnConnect": false,
+    "timeout": 15
   }
 }
 ```
@@ -96,7 +99,44 @@ TLSCert:   "/path/to/client-cert.pem",
 TLSKey:    "/path/to/client-key.pem",
 TLSInsecureSkipVerify: false,
 }
+config.SSLOnConnect = true // implicit TLS on port 465
 ```
+
+`TLSEnable` controls whether the certificate settings above are used; when it is `false`, go-mail's own defaults apply
+(server name taken from the host, TLS 1.2 minimum, system trust store), and configuring any of `TLSCA`, `TLSCert`,
+`TLSKey` or `TLSInsecureSkipVerify` without it is rejected with `ErrTLSNotEnabled` rather than silently ignored.
+
+Note that `TLSEnable` does not, on its own, decide whether the connection is encrypted — that is the STARTTLS policy
+below, which requires TLS by default. The two are configured separately:
+
+```go
+// Self-signed or otherwise untrusted server certificate
+config.TLSEnable = true
+config.TLSInsecureSkipVerify = true
+
+// Private CA instead of skipping verification
+config.TLSEnable = true
+config.TLSCA = "/path/to/ca-cert.pem"
+
+// Plaintext server, e.g. a local mailhog instance
+config.TLSPolicy = smtp.TLSPolicyNone
+```
+
+### TLS Policy
+
+| Value             | Behaviour                                                              |
+|-------------------|------------------------------------------------------------------------|
+| `"mandatory"`     | STARTTLS is required; the connection fails if the server lacks it (default) |
+| `"opportunistic"` | STARTTLS is used when advertised, otherwise the connection stays plaintext |
+| `"none"`          | STARTTLS is never attempted                                            |
+
+The policy applies to STARTTLS only; with `SSLOnConnect` the connection is encrypted from the start and the policy is
+not used.
+
+> **Note**: with `SSLOnConnect` the provider performs the TLS dial itself, in order to apply the timeout to the whole
+> conversation. `go-mail` therefore does not see the connection as encrypted when auto-discovering the authentication
+> mechanism, and restricts its choice to SCRAM-SHA-256, SCRAM-SHA-1 and CRAM-MD5. Set an explicit `AuthType` instead of
+> `"auto"` when using implicit TLS with a server that only offers PLAIN or LOGIN.
 
 ## Configuration Options
 
@@ -108,11 +148,25 @@ TLSInsecureSkipVerify: false,
 | `Password`              | `string` | `""`                 | SMTP authentication password (embedded field)       |
 | `PasswordEnvVar`        | `string` | `""`                 | Environment variable for password                   |
 | `PasswordFile`          | `string` | `""`                 | File path containing password                       |
-| `AuthType`              | `string` | `""`                 | Authentication method (plain, login, crammd5, etc.) |
-| `From`                  | `string` | `"no-reply@acme.co"` | Default sender address                              |
-| `Bcc`                   | `string` | `""`                 | Comma-separated BCC addresses                       |
-| `TLSEnable`             | `bool`   | `false`              | Enable TLS encryption (embedded field)              |
-| `TLSInsecureSkipVerify` | `bool`   | `false`              | Skip TLS certificate verification                   |
+| `AuthType`              | `string` | `"noauth"`           | Authentication method (plain, login, crammd5, etc.) |
+| `From`                  | `string` | `"no-reply@acme.co"` | Sender address, applied to every message            |
+| `Bcc`                   | `string` | `""`                 | Comma-separated BCC addresses, added to every message |
+| `TLSEnable`             | `bool`   | `false`              | Apply the TLS certificate settings (embedded field) |
+| `TLSCA`                 | `string` | `""`                 | CA bundle used to verify the server certificate     |
+| `TLSCert`               | `string` | `""`                 | Client certificate                                  |
+| `TLSKey`                | `string` | `""`                 | Client certificate key                              |
+| `TLSInsecureSkipVerify` | `bool`   | `false`              | Skip TLS certificate verification (self-signed)     |
+| `TLSPolicy`             | `string` | `"mandatory"`        | STARTTLS policy: mandatory, opportunistic, none     |
+| `SSLOnConnect`          | `bool`   | `false`              | Implicit TLS (SMTPS, usually port 465)              |
+| `Timeout`               | `duration.Seconds` | `15`       | Timeout for the SMTP conversation, in seconds       |
+
+`Timeout` uses the `types/duration` package, which serializes as a plain integer number of seconds:
+
+```go
+import "github.com/oddbit-project/blueprint/types/duration"
+
+config.Timeout = duration.Seconds(30)
+```
 
 ## Authentication Types
 
@@ -125,7 +179,7 @@ The SMTP provider supports multiple authentication methods:
 - **`"scram-sha-1"`** - SCRAM-SHA-1 authentication
 - **`"scram-sha-256"`** - SCRAM-SHA-256 authentication
 - **`"custom"`** - Custom authentication (requires custom auth option)
-- **`"noauth"`** - No authentication (for development/testing)
+- **`"noauth"`** - No authentication (for development/testing); also assumed when `AuthType` is empty
 
 ## Usage Examples
 
@@ -267,11 +321,23 @@ for _, recipient := range recipients {
 	messages = append(messages, msg)
 }
 
-// Send all messages in batch
+// Send all messages in batch, over a single connection
 if err := mailer.Send(messages...); err != nil {
 	log.Fatal("Failed to send batch emails:", err)
 }
+
+// Or with a caller-supplied context bounding the connection attempt
+if err := mailer.SendWithContext(ctx, messages...); err != nil {
+	log.Fatal("Failed to send batch emails:", err)
+}
 ```
+
+`Send` opens one connection for the whole batch and closes it when done. Connection failures — dial, TLS handshake,
+STARTTLS negotiation and authentication — are reported as `ErrSMTPServer`; failures while transferring a message are
+reported as `ErrMessage`. Both wrap the underlying `go-mail` error, so `errors.Is`/`errors.As` reach it.
+
+The `Timeout` setting is applied as a deadline over the whole conversation: it bounds the connection attempt, the
+server greeting, STARTTLS and authentication, and is renewed before each message is sent.
 
 ### BCC Support
 
@@ -279,13 +345,16 @@ if err := mailer.Send(messages...); err != nil {
 // Configure automatic BCC
 config.Bcc = "compliance@company.com,audit@company.com"
 
-// All emails will automatically include these BCC recipients
+// All messages created by the mailer include these BCC recipients
 msg, err := mailer.NewMessage(
 	[]string{"customer@example.com"},
 	"Important Notice",
 	smtp.WithBody("This email will be BCC'd to compliance.", ""),
 )
 ```
+
+The configured recipients are added after the message options are applied, so they do not replace any BCC address set
+on the message itself.
 
 ## Message Options
 
@@ -519,19 +588,40 @@ if err != nil {
 		log.Printf("Unexpected error: %v", err)
 	}
 }
+```
 
-// Sending errors
+Sending errors wrap the underlying `go-mail` error, so they must be matched with `errors.Is` rather than compared
+directly:
+
+```go
 if err := mailer.Send(msg); err != nil {
-	switch err {
-	case smtp.ErrSMTPServer:
-		log.Println("Failed to connect to SMTP server")
-	case smtp.ErrMessage:
-		log.Println("Failed to send email message")
+	switch {
+	case errors.Is(err, smtp.ErrSMTPServer):
+		log.Println("Failed to connect to SMTP server:", err)
+	case errors.Is(err, smtp.ErrMessage):
+		log.Println("Failed to send email message:", err)
 	default:
 		log.Printf("Send error: %v", err)
 	}
 }
 ```
+
+`NewMailer` reports invalid configuration before any connection is attempted:
+
+| Error                 | Cause                                                                       |
+|-----------------------|-----------------------------------------------------------------------------|
+| `ErrInvalidConfig`    | Nil configuration                                                            |
+| `ErrMissingHost`      | Empty `Host`                                                                 |
+| `ErrMissingPort`      | `Port` below 1                                                               |
+| `ErrInvalidTLSPolicy` | `TLSPolicy` is not mandatory, opportunistic or none                          |
+| `ErrInvalidTimeout`   | Negative `Timeout`                                                           |
+| `ErrTLSNotEnabled`    | Certificate settings configured while `TLSEnable` is false                   |
+| `ErrInvalidFrom`      | `From` is not a valid address                                                |
+| `ErrInvalidBcc`       | `Bcc` contains an invalid address                                            |
+| `ErrInvalidAuthType`  | `AuthType` is not recognised, or `custom` without a custom auth option        |
+| `ErrInvalidTLSConfig` | The CA, certificate or key could not be loaded (wraps the underlying error)  |
+| `ErrInvalidPassword`  | The configured password could not be read                                    |
+| `ErrCreatingClient`   | `go-mail` rejected the client options (wraps the underlying error)           |
 
 ## Best Practices
 
@@ -561,12 +651,12 @@ config.Host = "127.0.0.1"
 config.Port = 1025
 config.AuthType = "noauth" // No authentication needed for MailHog
 config.From = "test@example.com"
-config.TLSEnable = false
+config.TLSPolicy = smtp.TLSPolicyNone // MailHog does not offer STARTTLS
 ```
 
 ## Performance Considerations
 
-- **Connection Reuse**: The mailer automatically manages connections
+- **Connection Reuse**: Each `Send` call uses a single connection for all the messages it is given
 - **Batch Sending**: Use batch sending for multiple emails
 - **Authentication Caching**: Credentials are cached during the session
 - **TLS Overhead**: Consider TLS overhead for high-volume sending
@@ -612,6 +702,16 @@ config.Username = "apikey"
 config.Password = "your-sendgrid-api-key"
 config.AuthType = "plain"
 config.TLSEnable = true
+```
+
+### Implicit TLS (SMTPS)
+
+```go
+config.Host = "smtp.example.com"
+config.Port = 465
+config.AuthType = "plain"
+config.TLSEnable = true
+config.SSLOnConnect = true
 ```
 
 ## Troubleshooting

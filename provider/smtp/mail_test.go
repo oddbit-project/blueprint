@@ -7,6 +7,7 @@ import (
 	"github.com/oddbit-project/blueprint/provider/smtp"
 	"github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/stretchr/testify/require"
+	gomail "github.com/wneessen/go-mail"
 )
 
 // Helper function to create a valid test configuration
@@ -20,8 +21,7 @@ func testConfig(authType string) *smtp.Config {
 			Password: "pass",
 		},
 		ClientConfig: tls.ClientConfig{
-			TLSEnable:             false,
-			TLSInsecureSkipVerify: true,
+			TLSEnable: false,
 		},
 		From: "no-reply@example.com",
 		Bcc:  "",
@@ -62,6 +62,96 @@ func TestNewMessage(t *testing.T) {
 	subjects := msg.GetGenHeader("Subject")
 	require.NotEmpty(t, subjects)
 	require.Equal(t, "Hello subject", subjects[0])
+}
+
+// Test the default configuration is usable
+func TestNewConfigIsValid(t *testing.T) {
+	mailer, err := smtp.NewMailer(smtp.NewConfig())
+	require.NoError(t, err)
+	require.NotNil(t, mailer)
+}
+
+// Test the configured sender is applied to every message
+func TestNewMessageWithConfiguredFrom(t *testing.T) {
+	cfg := testConfig("noauth")
+	cfg.From = "sender@example.com"
+
+	mailer, err := smtp.NewMailer(cfg)
+	require.NoError(t, err)
+
+	msg, err := mailer.NewMessage([]string{"receiver@example.com"}, "Hello subject")
+	require.NoError(t, err)
+	require.Equal(t, "<sender@example.com>", msg.GetFromString()[0])
+}
+
+// Test WithFrom overrides the configured sender
+func TestNewMessageFromOverride(t *testing.T) {
+	cfg := testConfig("noauth")
+	cfg.From = "sender@example.com"
+
+	mailer, err := smtp.NewMailer(cfg)
+	require.NoError(t, err)
+
+	msg, err := mailer.NewMessage([]string{"receiver@example.com"}, "Hello subject",
+		smtp.WithFrom("other@example.com"),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "<other@example.com>", msg.GetFromString()[0])
+}
+
+// Test validation: certificate settings without TLSEnable should return an error
+func TestInvalidConfigTLSNotEnabled(t *testing.T) {
+	for _, apply := range []func(cfg *smtp.Config){
+		func(cfg *smtp.Config) { cfg.TLSCA = "/path/to/ca.pem" },
+		func(cfg *smtp.Config) { cfg.TLSCert = "/path/to/cert.pem" },
+		func(cfg *smtp.Config) { cfg.TLSKey = "/path/to/key.pem" },
+		func(cfg *smtp.Config) { cfg.TLSInsecureSkipVerify = true },
+	} {
+		cfg := testConfig("noauth")
+		apply(cfg)
+
+		_, err := smtp.NewMailer(cfg)
+		require.Equal(t, smtp.ErrTLSNotEnabled, err)
+	}
+}
+
+// Test validation: an invalid sender should return an error
+func TestInvalidConfigFrom(t *testing.T) {
+	cfg := testConfig("noauth")
+	cfg.From = "not an address"
+
+	_, err := smtp.NewMailer(cfg)
+	require.Equal(t, smtp.ErrInvalidFrom, err)
+}
+
+// Test configured BCC recipients are added to every message
+func TestNewMessageWithConfiguredBcc(t *testing.T) {
+	cfg := testConfig("noauth")
+	cfg.Bcc = "compliance@example.com, audit@example.com"
+
+	mailer, err := smtp.NewMailer(cfg)
+	require.NoError(t, err)
+
+	msg, err := mailer.NewMessage([]string{"receiver@example.com"}, "Hello subject")
+	require.NoError(t, err)
+	require.Equal(t, []string{"<compliance@example.com>", "<audit@example.com>"}, msg.GetBccString())
+}
+
+// Test configured BCC recipients do not replace message specific ones
+func TestNewMessageBccKeepsMessageRecipients(t *testing.T) {
+	cfg := testConfig("noauth")
+	cfg.Bcc = "compliance@example.com"
+
+	mailer, err := smtp.NewMailer(cfg)
+	require.NoError(t, err)
+
+	msg, err := mailer.NewMessage([]string{"receiver@example.com"}, "Hello subject",
+		func(m *gomail.Msg) {
+			require.NoError(t, m.Bcc("archive@example.com"))
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, []string{"<archive@example.com>", "<compliance@example.com>"}, msg.GetBccString())
 }
 
 // Test validation: missing host should return an error
