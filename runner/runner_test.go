@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"errors"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,11 +11,17 @@ import (
 	"github.com/oddbit-project/blueprint/log"
 )
 
+// TestMain configures logging once; log.Configure() writes process-wide zerolog
+// settings, which must not happen while runner goroutines are still logging
+func TestMain(m *testing.M) {
+	if err := log.Configure(log.NewDefaultConfig()); err != nil {
+		panic(err)
+	}
+	os.Exit(m.Run())
+}
+
 func testLogger(t *testing.T) *log.Logger {
 	t.Helper()
-	if err := log.Configure(log.NewDefaultConfig()); err != nil {
-		t.Fatalf("failed to configure logger: %v", err)
-	}
 	return log.New("test-runner")
 }
 

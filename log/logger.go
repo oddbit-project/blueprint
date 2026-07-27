@@ -201,7 +201,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Logger returns a new logger instance based on the configuration
+// Logger returns a new logger instance based on the configuration.
+//
+// Process-wide zerolog settings are not modified here; they are applied by Configure().
+// A logger built from a configuration that was never passed to Configure() therefore
+// formats timestamps with zerolog's default layout instead of the configured TimeFormat.
 func (c *Config) Logger() (*Logger, error) {
 	hostname, _ := os.Hostname()
 
@@ -209,10 +213,6 @@ func (c *Config) Logger() (*Logger, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid log level: %s", c.Level)
 	}
-	zerolog.SetGlobalLevel(level)
-
-	// Configure timestamp format
-	zerolog.TimeFieldFormat = c.TimeFormat
 
 	// build output writer
 	var output io.Writer
@@ -229,8 +229,8 @@ func (c *Config) Logger() (*Logger, error) {
 	}
 
 	if c.IncludeCaller {
-		logger = logger.With().Caller().Logger()
-		zerolog.CallerSkipFrameCount = c.CallerSkipFrames
+		// per-logger skip count; the equivalent global is shared by every logger
+		logger = logger.With().CallerWithSkipFrameCount(c.CallerSkipFrames).Logger()
 	}
 
 	return &Logger{
@@ -254,12 +254,20 @@ func (c *Config) ModuleLogger(module string) (*Logger, error) {
 	}, nil
 }
 
-// Configure configures the global logger based on the provided configuration
+// Configure configures the global logger based on the provided configuration.
+//
+// This also applies the process-wide zerolog settings, which are not safe to change
+// while other goroutines are logging; call it once, during startup.
 func Configure(cfg *Config) error {
 	logger, err := cfg.Logger()
 	if err != nil {
 		return err
 	}
+
+	// cfg.Logger() has already validated the level
+	level, _ := zerolog.ParseLevel(cfg.Level)
+	zerolog.SetGlobalLevel(level)
+	zerolog.TimeFieldFormat = cfg.TimeFormat
 
 	// Set as global logger
 	log.Logger = logger.logger

@@ -7,8 +7,11 @@ import (
 	"errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // setupTestLogger creates a test logger that writes to a buffer
@@ -161,6 +164,93 @@ func TestConfigure(t *testing.T) {
 	cfg.Level = "invalid"
 	err = Configure(cfg)
 	assert.Error(t, err)
+}
+
+// Configure applies the process-wide zerolog settings
+func TestConfigureAppliesGlobalSettings(t *testing.T) {
+	original := zerolog.TimeFieldFormat
+	originalLevel := zerolog.GlobalLevel()
+	t.Cleanup(func() {
+		zerolog.TimeFieldFormat = original
+		zerolog.SetGlobalLevel(originalLevel)
+	})
+
+	cfg := NewDefaultConfig()
+	cfg.Level = "warn"
+	cfg.TimeFormat = time.RFC1123
+
+	assert.NoError(t, Configure(cfg))
+	assert.Equal(t, time.RFC1123, zerolog.TimeFieldFormat)
+	assert.Equal(t, zerolog.WarnLevel, zerolog.GlobalLevel())
+}
+
+// Building a logger does not touch the process-wide zerolog settings, which are not
+// safe to write while other goroutines are logging
+func TestConfigLoggerLeavesGlobalSettings(t *testing.T) {
+	original := zerolog.TimeFieldFormat
+	originalLevel := zerolog.GlobalLevel()
+	t.Cleanup(func() {
+		zerolog.TimeFieldFormat = original
+		zerolog.SetGlobalLevel(originalLevel)
+	})
+
+	cfg := NewDefaultConfig()
+	cfg.Level = "error"
+	cfg.TimeFormat = time.RFC822
+
+	logger, err := cfg.Logger()
+	assert.NoError(t, err)
+	assert.NotNil(t, logger)
+	assert.Equal(t, original, zerolog.TimeFieldFormat)
+	assert.Equal(t, originalLevel, zerolog.GlobalLevel())
+
+	moduleLogger, err := cfg.ModuleLogger("test")
+	assert.NoError(t, err)
+	assert.NotNil(t, moduleLogger)
+	assert.Equal(t, original, zerolog.TimeFieldFormat)
+	assert.Equal(t, originalLevel, zerolog.GlobalLevel())
+}
+
+// CallerSkipFrames is applied per logger, so two loggers configured with different
+// values report different frames
+func TestLoggerCallerSkipFrames(t *testing.T) {
+	originalLevel := zerolog.GlobalLevel()
+	t.Cleanup(func() { zerolog.SetGlobalLevel(originalLevel) })
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
+	logCaller := func(t *testing.T, skipFrames int) string {
+		t.Helper()
+
+		logFile := filepath.Join(t.TempDir(), "caller.log")
+		cfg := NewDefaultConfig()
+		cfg.Format = LogFmtJson
+		cfg.FileFormat = LogFmtJson
+		cfg.IncludeCaller = true
+		cfg.CallerSkipFrames = skipFrames
+		cfg.OutputToFile = true
+		cfg.FileAppend = false
+		cfg.FilePath = logFile
+
+		logger, err := cfg.Logger()
+		assert.NoError(t, err)
+
+		logger.Info("caller test")
+
+		contents, err := os.ReadFile(logFile)
+		assert.NoError(t, err)
+
+		entry := KV{}
+		assert.NoError(t, json.Unmarshal(contents, &entry))
+
+		caller, ok := entry["caller"].(string)
+		assert.True(t, ok, "caller field should be present, got %v", entry)
+		return caller
+	}
+
+	// the default skip count reports the logging method itself
+	assert.Contains(t, logCaller(t, LogCallerSkipFrames), "log/logger.go:")
+	// one frame further out is this test, the actual call site
+	assert.Contains(t, logCaller(t, LogCallerSkipFrames+1), "logger_test.go:")
 }
 
 func TestNewDefaultConfig(t *testing.T) {

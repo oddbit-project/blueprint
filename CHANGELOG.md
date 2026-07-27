@@ -31,6 +31,18 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   `provider/kafka`, `provider/mqtt`, `provider/nats`, `provider/s3` and `provider/smtp`. Audit any deployment that
   sets `tlsInsecureSkipVerify` without a CA; if verification was actually wanted, drop the flag and configure `tlsCa`.
 
+### Fixed
+
+- **Data race in `log`**: `Config.Logger()` wrote the process-wide `zerolog.TimeFieldFormat` and
+  `zerolog.CallerSkipFrameCount` as a side effect of building a logger, while every goroutine emitting a log line
+  reads them. Building a logger from a `Config` — or calling `Configure()` — while other goroutines were logging was a
+  data race, reported by `-race` in the `runner` test suite. Those settings are now applied only by `Configure()`,
+  which is documented as startup-only, and the caller skip count uses zerolog's per-logger
+  `CallerWithSkipFrameCount` instead of the global. `log.New()` was never affected.
+
+  A logger built from a configuration that is never passed to `Configure()` now formats timestamps with zerolog's
+  default layout (RFC3339) rather than the configuration's `TimeFormat`; the caller and level behaviour is unchanged.
+
 ### Added
 
 - **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
