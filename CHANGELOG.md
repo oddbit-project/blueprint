@@ -17,6 +17,33 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Security
+
+- **Go 1.26.5**: Upgraded from Go 1.26.3, fixing an Encrypted Client Hello privacy leak in `crypto/tls`
+  (GO-2026-5856), unescaped input in `net/textproto` errors (GO-2026-5039), quadratic candidate hostname parsing in
+  `crypto/x509` (GO-2026-5037), quadratic `WordDecoder.DecodeHeader` in `mime` (GO-2026-5038) and a root escape via
+  symlink in `os` (GO-2026-4970). The first three are reachable from provider code paths that perform a TLS handshake
+  or verify a certificate.
+- **google.golang.org/grpc**: Upgraded from v1.81.1 to v1.82.1, fixing xDS RBAC and HTTP/2 vulnerabilities
+  (GHSA-hrxh-6v49-42gf). Pulled in indirectly through the etcd client and OpenTelemetry.
+- **golang.org/x/text**: Upgraded from v0.38.0 to v0.40.0, fixing an infinite loop on invalid input (GO-2026-5970).
+
+### Build
+
+- **Provider module dependencies refreshed**: every provider module's `go.mod` had drifted from the graph the
+  workspace actually builds; `go mod tidy` brings them in line with core v0.9.0, notably `testcontainers-go` v0.38.0 →
+  v0.43.0, `zerolog` v1.34.0 → v1.35.1, `go.step.sm/crypto` v0.73.0 → v0.84.1 and `golang.org/x/crypto` v0.51.0 →
+  v0.53.0.
+- **`provider/prometheus` builds outside the workspace again**: it required `provider/httpserver` v0.8.5, whose
+  `ServerConfig` predates the `ServerName` field the provider reads, so `go build` failed for anyone consuming the
+  published module. It now requires core v0.9.0 and `provider/httpserver` v0.9.3.
+
+### Module Version Updates
+
+- **`provider/etcd` v0.9.0**: fixes `Lock.TryLock()` reporting a free lock as held; `WithTTL` is no longer needed to
+  make it reliable. Requires this release.
+- **`provider/prometheus` v0.9.2**: builds outside the workspace again; dependency updates only otherwise.
+
 ## [v0.9.0] - 2026-07-27
 
 ### Breaking Changes

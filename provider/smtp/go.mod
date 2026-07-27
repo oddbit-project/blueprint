@@ -1,6 +1,6 @@
 module github.com/oddbit-project/blueprint/provider/smtp
 
-go 1.26.3
+go 1.26.5
 
 require (
 	github.com/oddbit-project/blueprint v0.9.0
@@ -21,7 +21,7 @@ require (
 	go.step.sm/crypto v0.84.1 // indirect
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

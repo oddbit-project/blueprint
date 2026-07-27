@@ -1,9 +1,9 @@
 module github.com/oddbit-project/blueprint/provider/jwtprovider
 
-go 1.26.3
+go 1.26.5
 
 require (
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/oddbit-project/blueprint v0.8.0
 	github.com/stretchr/testify v1.11.1
 )
