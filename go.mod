@@ -13,7 +13,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/oddbit-project/blueprint/provider/clickhouse v0.8.2
-	github.com/oddbit-project/blueprint/provider/etcd v0.8.4
+	github.com/oddbit-project/blueprint/provider/etcd v0.9.0
 	github.com/oddbit-project/blueprint/provider/franz v0.8.4
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.2
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.2
@@ -24,7 +24,7 @@ require (
 	github.com/oddbit-project/blueprint/provider/mqtt v0.8.1
 	github.com/oddbit-project/blueprint/provider/nats v0.8.2
 	github.com/oddbit-project/blueprint/provider/pgsql v0.8.1
-	github.com/oddbit-project/blueprint/provider/prometheus v0.9.1
+	github.com/oddbit-project/blueprint/provider/prometheus v0.9.2
 	github.com/oddbit-project/blueprint/provider/s3 v0.8.0
 	github.com/oddbit-project/blueprint/provider/sqlite v0.8.1
 	github.com/prometheus/client_golang v1.23.2
