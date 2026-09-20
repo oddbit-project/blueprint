@@ -3,7 +3,7 @@ module github.com/oddbit-project/blueprint/provider/metrics
 go 1.26.5
 
 require (
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/prometheus/client_golang v1.23.2
 )
 

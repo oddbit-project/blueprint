@@ -4,6 +4,12 @@ All notable changes to the Blueprint SQLite provider will be documented in this 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.3] - 2026-09-20
+
+### Security
+
+- Requires Blueprint core v0.10.2, which upgrades `golang.org/x/crypto` to v0.57.0 (CVE-2026-56854) and `google.golang.org/grpc` to v1.83.2 (CVE-2026-84445, CVE-2026-84304).
+
 ## [v0.8.2] - 2026-09-20
 
 Requires Blueprint core v0.10.0.

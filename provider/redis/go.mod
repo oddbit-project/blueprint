@@ -3,7 +3,7 @@ module github.com/oddbit-project/blueprint/provider/redis
 go 1.26.5
 
 require (
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/redis/go-redis/v9 v9.14.0
 )
 

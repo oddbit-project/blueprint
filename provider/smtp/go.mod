@@ -3,7 +3,7 @@ module github.com/oddbit-project/blueprint/provider/smtp
 go 1.26.5
 
 require (
-	github.com/oddbit-project/blueprint v0.9.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/wneessen/go-mail v0.7.1
 )

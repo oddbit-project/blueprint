@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/stretchr/testify v1.11.1
 )
 

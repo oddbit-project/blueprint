@@ -3,7 +3,7 @@ module github.com/oddbit-project/blueprint/provider/franz
 go 1.26.5
 
 require (
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/twmb/franz-go v1.18.1
 	github.com/twmb/franz-go/pkg/kadm v1.15.0

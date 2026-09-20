@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.11.0
-	github.com/oddbit-project/blueprint v0.9.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/oddbit-project/blueprint/provider/httpserver v0.9.3
 	github.com/prometheus/client_golang v1.23.2
 )

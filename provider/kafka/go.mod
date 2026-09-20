@@ -3,7 +3,7 @@ module github.com/oddbit-project/blueprint/provider/kafka
 go 1.26.5
 
 require (
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.43.0

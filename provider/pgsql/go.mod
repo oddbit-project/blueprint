@@ -6,7 +6,7 @@ require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/oddbit-project/blueprint v0.10.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.43.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.38.0

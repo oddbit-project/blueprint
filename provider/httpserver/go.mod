@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/google/uuid v1.6.0
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.2
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.2
 	github.com/oddbit-project/blueprint/provider/jwtprovider v0.8.2

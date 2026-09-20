@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1
-	github.com/oddbit-project/blueprint v0.8.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.43.0
 )

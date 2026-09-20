@@ -4,6 +4,14 @@ All notable changes to the Blueprint ETCD provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.1] - 2026-09-20
+
+### Security
+
+- **golang.org/x/crypto**: upgraded from v0.53.0 to v0.57.0, fixing an authentication bypass in `golang.org/x/crypto/ssh` where source-address restrictions on an authorized key were not enforced (CVE-2026-56854).
+- **google.golang.org/grpc**: upgraded from v1.82.1 to v1.83.2, fixing a denial of service via malformed RPC requests (CVE-2026-84445) and CVE-2026-84304.
+- Requires Blueprint core v0.10.2, which carries the same upgrades.
+
 ## [v0.9.0] - 2026-07-27
 
 Requires Blueprint core v0.9.0.

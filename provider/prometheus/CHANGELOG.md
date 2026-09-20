@@ -4,6 +4,13 @@ All notable changes to the prometheus provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.9.3] - 2026-09-20
+
+### Security
+
+- **golang.org/x/crypto**: upgraded from v0.53.0 to v0.57.0, fixing an authentication bypass in `golang.org/x/crypto/ssh` where source-address restrictions on an authorized key were not enforced (CVE-2026-56854).
+- Requires Blueprint core v0.10.2, which carries the same upgrades.
+
 ## [v0.9.2] - 2026-07-27
 
 ### Security

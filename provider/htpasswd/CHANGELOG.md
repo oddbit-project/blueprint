@@ -4,6 +4,12 @@ All notable changes to the Blueprint HTPasswd provider will be documented in thi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.3] - 2026-09-20
+
+### Security
+
+- **golang.org/x/crypto**: upgraded from v0.53.0 to v0.57.0, fixing an authentication bypass in `golang.org/x/crypto/ssh` where source-address restrictions on an authorized key were not enforced (CVE-2026-56854).
+
 ## [v0.8.2]
 
 ### Security

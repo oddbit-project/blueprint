@@ -3,7 +3,7 @@ module github.com/oddbit-project/blueprint/provider/etcd
 go 1.26.5
 
 require (
-	github.com/oddbit-project/blueprint v0.9.0
+	github.com/oddbit-project/blueprint v0.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.43.0
 	go.etcd.io/etcd/client/v3 v3.6.5
