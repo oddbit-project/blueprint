@@ -15,7 +15,7 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
-## [Unreleased]
+## [v0.10.0] - 2026-09-20
 
 ### Added
 
@@ -48,6 +48,12 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Module Version Updates
 
+Provider modules are versioned independently and are tagged after this release, as they depend on it:
+
+- **`provider/pgsql` v0.8.2**, **`provider/sqlite` v0.8.2**, **`provider/clickhouse` v0.8.3**: migration manager fixes
+  -- see the fixed entry above and each provider's `CHANGELOG.md`. The ClickHouse release needs a manual repair on an
+  installation upgraded by an earlier version; see
+  [Repairing a table upgraded before this fix](docs/db/migrations.md#repairing-a-table-upgraded-before-this-fix).
 - **`provider/etcd` v0.9.0**: fixes `Lock.TryLock()` reporting a free lock as held; `WithTTL` is no longer needed to
   make it reliable. Requires this release.
 - **`provider/prometheus` v0.9.2**: builds outside the workspace again; dependency updates only otherwise.
