@@ -19,6 +19,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Added
 
+- **`db/migrations`: `Substitute(src, vars)`** wraps any `Source` and replaces `${name}` in each migration as it is read, so a deployment-specific identifier -- the role an application connects as, a schema, a tablespace -- can appear in DDL that is otherwise fixed. Three properties are deliberate and documented: the recorded `SHA2` stays the TEMPLATE's while `contents` records what actually ran, so renaming such a value does not make applied migrations look edited (the cost: re-hashing a stored `contents` will not reproduce its `sha2` for a migration that carried a placeholder); an unsupplied placeholder is `ErrMissingVar` rather than an empty string, since an unresolved name would otherwise reach the server as literal text inside a `GRANT` or an owner clause; and the braces are required, so `$1` parameters and `$$`-quoted bodies are untouched. Substitution is textual and has no conditionals or loops: the SQL that runs is the SQL that shipped, with its identifiers filled in.
 - **`types/duration` package**: a JSON-friendly `duration.Seconds` type (defined `int64` of whole seconds) that serializes as a plain integer, matching the OAuth/OIDC `expires_in` convention. Includes constructors `Minutes`/`Hours`/`Days`/`FromStd`, and `Std()`/`IsPositive()`/`String()` helpers for stdlib interop.
 
 ## [v0.8.7]

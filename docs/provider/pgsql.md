@@ -178,6 +178,10 @@ var migrationFiles embed.FS
 
 // Load migrations from embedded files
 src, err := migrations.NewEmbedSource(migrationFiles, "migrations")
+
+// Optional: fill deployment-specific identifiers into the DDL, e.g. the role
+// the application connects as. See db/migrations.md#substituted-source.
+src = migrations.Substitute(src, migrations.Vars{"appRole": cfg.AppRole})
 ```
 
 ### Migration Manager Interface

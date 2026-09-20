@@ -60,6 +60,10 @@ The Source interface abstracts migration storage:
 - **List()**: Returns available migration names
 - **Read()**: Reads a specific migration
 
+`Substitute(src Source, vars Vars) Source` wraps any of them to fill
+deployment-specific identifiers into the DDL as it is read; see
+[Substituted Source](#substituted-source).
+
 ### MigrationRecord
 
 ```go
@@ -164,6 +168,56 @@ func runMemoryMigrations(manager migrations.Manager) error {
     return manager.Run(context.Background(), source, migrations.DefaultProgressFn)
 }
 ```
+
+### Substituted Source
+
+Migrations are fixed text, but some identifiers are the deployment's: the role
+an application connects as, a schema, a tablespace. `Substitute` wraps any
+source and replaces `${name}` as each migration is read.
+
+```go
+func runMigrations(manager migrations.Manager, fsys embed.FS) error {
+    source, err := migrations.NewEmbedSource(fsys, "migrations")
+    if err != nil {
+        return err
+    }
+    // the DDL says: REVOKE DELETE ON audit_log FROM ${appRole};
+    source = migrations.Substitute(source, migrations.Vars{
+        "appRole": cfg.AppRole,
+    })
+    return manager.Run(context.Background(), source, migrations.DefaultProgressFn)
+}
+```
+
+**The recorded hash is the template's, not the substituted text's.** The
+contents stored in the migration table are what actually ran, but `SHA2` covers
+the file as shipped, so a deployment that renames its application role does not
+make its applied migrations look edited. The consequence, worth knowing when
+auditing an installation: re-hashing a stored `contents` will not reproduce its
+`sha2` for any migration that carried a placeholder.
+
+**An unsupplied placeholder is an error** (`ErrMissingVar`), not an empty
+string. An unresolved name would otherwise reach the server as literal text,
+usually inside a `GRANT` or an owner clause, and fail in a way that names
+nothing useful.
+
+**The braces are required**, so the form cannot collide with SQL's own uses of
+`$`: positional parameters (`$1`) and dollar-quoted bodies (`$$ ... $$`) pass
+through untouched.
+
+```go
+// unchanged by substitution
+DO $$ BEGIN
+    IF to_regclass('old_name') IS NOT NULL THEN
+        EXECUTE 'DELETE FROM thing WHERE id = $1';
+    END IF;
+END $$;
+```
+
+Substitution is textual and has no logic -- there is no way to express a
+condition or a loop -- so the SQL that runs is the SQL that was shipped with its
+identifiers filled in, and nothing else. A source wrapped with no vars, or a nil
+source, is returned unchanged.
 
 ## Provider Integration
 
@@ -423,6 +477,8 @@ func handleMigrationErrors(manager migrations.Manager, source migrations.Source)
                 log.Printf("Migration %s content has changed", migrationName)
             case errors.Is(err, migrations.ErrRegisterMigration):
                 log.Printf("Migration %s executed but registration failed", migrationName)
+            case errors.Is(err, migrations.ErrMissingVar):
+                log.Printf("Migration %s has a placeholder nothing supplied", migrationName)
             default:
                 log.Printf("Unexpected error in migration %s", migrationName)
             }
