@@ -4,6 +4,17 @@ All notable changes to the Blueprint PostgreSQL provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- `MigrationExists()` fetched a single record through a multi-row fetch, so it failed on every call with `expected slice but got struct`, which made `RunMigration()` and `RegisterMigration()` unusable. It now fetches a single record, and looks the migration up by name, so an already-applied migration is reported as such and one recorded under the same name with different contents returns `ErrMigrationNameHashMismatch`.
+- `Run()` no longer ignores the error from listing applied migrations; previously a failed lookup left the applied set empty and re-ran every migration.
+- `updateTable()` used `UPDATE TABLE ... SET module = ?`, which is not valid PostgreSQL and used an unsupported placeholder, and swallowed the resulting error; upgrading a pre-module migration table left `module` unset, so every migration re-ran. The backfill is now correct and runs unconditionally (`WHERE module IS NULL`), so a table left half-upgraded by an earlier version is repaired on the next run.
+- The `ALTER TABLE ... ADD COLUMN module` statement was issued through `QueryRowContext` and never scanned, holding the connection open; it now uses `ExecContext`.
+- A migration that ran but could not be registered now returns `ErrRegisterMigration` wrapping the cause, as documented; previously the raw repository error was returned and the documented error was never used.
+- The migration advisory lock now waits under the caller's context instead of `context.Background()`, so a cancelled or expired context aborts the wait; the lock is released with an uncancellable context, so a cancelled run still frees it.
+
 ## [v0.8.1]
 
 ### Security

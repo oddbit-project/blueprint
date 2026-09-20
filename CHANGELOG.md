@@ -17,6 +17,14 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Added
+
+- **`db/migrations`: `Substitute(src, vars)`** wraps any `Source` and replaces `${name}` in each migration as it is read, so a deployment-specific identifier -- an application role, a schema, a tablespace -- can appear in DDL that is otherwise fixed. The recorded `SHA2` stays the template's while `contents` records what actually ran; any unresolved placeholder -- including a name the substitution does not recognise, or one whose value is empty -- is `ErrMissingVar`; `$1` parameters and `$$`-quoted delimiters are untouched. See [Substituted Source](docs/db/migrations.md#substituted-source).
+
+### Fixed
+
+- **Migration managers (`pgsql`, `clickhouse`, `sqlite`)**: `MigrationExists()` failed on every call, making `RunMigration()` and `RegisterMigration()` unusable and `ErrMigrationNameHashMismatch` unreachable; `Run()` ignored the error from listing applied migrations and re-ran every migration when that lookup failed; a migration that ran but could not be registered returned a raw error instead of `ErrRegisterMigration`; and both `pgsql` and `clickhouse` left rows of a pre-module migration table invisible after an upgrade, re-running every historical migration. See the provider changelogs.
+
 ### Security
 
 - **Go 1.26.5**: Upgraded from Go 1.26.3, fixing an Encrypted Client Hello privacy leak in `crypto/tls`

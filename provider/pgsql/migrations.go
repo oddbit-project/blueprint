@@ -63,16 +63,17 @@ func (b *pgMigrationManager) updateTable(ctx context.Context) error {
 		// add column "module"
 		// old blueprint versions did not implement the module column
 		qry := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN module TEXT`, EngineMigrationTable)
-		result := b.client.Db().QueryRowContext(ctx, qry)
-		if result.Err() != nil {
-			return result.Err()
+		if _, err = b.client.Db().ExecContext(ctx, qry); err != nil {
+			return err
 		}
+	}
 
-		// set default value
-		qry = fmt.Sprintf(`UPDATE TABLE %s SET module = ?`, EngineMigrationTable)
-		if _, err = b.client.Db().ExecContext(ctx, qry, migrations.ModuleBase); err != nil {
-			return nil
-		}
+	// set default value; unconditional, because a version that added the column
+	// but failed to fill it leaves rows with a null module, and those rows are
+	// invisible to List()
+	qry := fmt.Sprintf(`UPDATE %s SET module = $1 WHERE module IS NULL`, EngineMigrationTable)
+	if _, err = b.client.Db().ExecContext(ctx, qry, migrations.ModuleBase); err != nil {
+		return err
 	}
 	return nil
 }
@@ -113,7 +114,10 @@ func (b *pgMigrationManager) List(ctx context.Context) ([]migrations.MigrationRe
 
 func (b *pgMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
-	err := b.repo.FetchWhere(db.FV{"module": b.module, "name": name, "sha2": sha2}, result)
+	// FetchRecord, not FetchWhere: the target is a single record, and the lookup
+	// is by name only, so that a migration recorded under the same name with a
+	// different hash is reported as a mismatch instead of looking absent
+	err := b.repo.FetchRecord(db.FV{"module": b.module, "name": name}, result)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -145,7 +149,12 @@ func (b *pgMigrationManager) runMigration(ctx context.Context, m *migrations.Mig
 	}
 
 	// register migration
-	return b.registerMigration(ctx, m)
+	// the migration itself succeeded; a failed registration is the documented
+	// ErrRegisterMigration case, and must be told apart from a failed migration
+	if err := b.registerMigration(ctx, m); err != nil {
+		return fmt.Errorf("%w: %w", migrations.ErrRegisterMigration, err)
+	}
+	return nil
 }
 
 // RunMigration applies and registers a single migration
@@ -158,7 +167,9 @@ func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.Mig
 	if err := lock.Lock(ctx); err != nil {
 		return err
 	}
-	defer lock.Unlock(ctx)
+	// the wait is cancellable, the release is not: unlocking with a cancelled
+	// context would leave the lock held for as long as the session survives
+	defer lock.Unlock(context.WithoutCancel(ctx))
 
 	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
@@ -179,10 +190,12 @@ func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migration
 		return err
 	}
 	defer lock.Close()
-	if err := lock.Lock(context.Background()); err != nil {
+	if err := lock.Lock(ctx); err != nil {
 		return err
 	}
-	defer lock.Unlock(context.Background())
+	// the wait is cancellable, the release is not: unlocking with a cancelled
+	// context would leave the lock held for as long as the session survives
+	defer lock.Unlock(context.WithoutCancel(ctx))
 
 	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
@@ -212,10 +225,12 @@ func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, con
 		return err
 	}
 	defer lock.Close()
-	if err := lock.Lock(context.Background()); err != nil {
+	if err := lock.Lock(ctx); err != nil {
 		return err
 	}
-	defer lock.Unlock(context.Background())
+	// the wait is cancellable, the release is not: unlocking with a cancelled
+	// context would leave the lock held for as long as the session survives
+	defer lock.Unlock(context.WithoutCancel(ctx))
 
 	files, err := src.List()
 	if err != nil {
@@ -223,6 +238,9 @@ func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, con
 	}
 
 	migList, err := b.List(ctx)
+	if err != nil {
+		return err
+	}
 	prevNames := make([]string, len(migList))
 	for i, r := range migList {
 		prevNames[i] = r.Name

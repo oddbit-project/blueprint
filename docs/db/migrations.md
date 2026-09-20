@@ -60,6 +60,10 @@ The Source interface abstracts migration storage:
 - **List()**: Returns available migration names
 - **Read()**: Reads a specific migration
 
+`Substitute(src Source, vars Vars) Source` wraps any of them to fill
+deployment-specific identifiers into the DDL as it is read; see
+[Substituted Source](#substituted-source).
+
 ### MigrationRecord
 
 ```go
@@ -148,7 +152,7 @@ func runMemoryMigrations(manager migrations.Manager) error {
     source := migrations.NewMemorySource()
     
     // Add migrations programmatically
-    source.AddMigration("001_create_users", `
+    source.Add("001_create_users.sql", `
         CREATE TABLE users (
             id SERIAL PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
@@ -157,13 +161,77 @@ func runMemoryMigrations(manager migrations.Manager) error {
         );
     `)
     
-    source.AddMigration("002_add_index", `
+    source.Add("002_add_index.sql", `
         CREATE INDEX idx_users_email ON users(email);
     `)
     
     return manager.Run(context.Background(), source, migrations.DefaultProgressFn)
 }
 ```
+
+### Substituted Source
+
+Migrations are fixed text, but some identifiers are the deployment's: the role
+an application connects as, a schema, a tablespace. `Substitute` wraps any
+source and replaces `${name}` as each migration is read.
+
+```go
+func runMigrations(manager migrations.Manager, fsys embed.FS, appRole string) error {
+    source, err := migrations.NewEmbedSource(fsys, "migrations")
+    if err != nil {
+        return err
+    }
+    // the DDL says: REVOKE DELETE ON audit_log FROM ${appRole};
+    source = migrations.Substitute(source, migrations.Vars{
+        "appRole": appRole,
+    })
+    return manager.Run(context.Background(), source, migrations.DefaultProgressFn)
+}
+```
+
+**The recorded hash is the template's, not the substituted text's.** The
+contents stored in the migration table are what actually ran, but `SHA2` covers
+the file as shipped, so a deployment that renames its application role does not
+make its applied migrations look edited. The consequence, worth knowing when
+auditing an installation: re-hashing a stored `contents` will not reproduce its
+`sha2` for any migration that carried a placeholder.
+
+**Changing a value does not re-run a migration that already ran.** Migrations
+are skipped by name, so a new value for `${appRole}` reaches only the migrations
+that have yet to run; giving an existing object to a renamed role needs a new
+migration.
+
+**A placeholder with no value is an error** (`ErrMissingVar`), not an empty
+string, and so is a placeholder whose value is empty. Every `${...}` in the file
+must be supplied -- including one that is misspelled, or written in a form the
+substitution does not otherwise recognise (`${app-role}`, `${1}`) -- because an
+unresolved name would otherwise reach the server as literal text, usually inside
+a `GRANT` or an owner clause, and fail in a way that names nothing useful.
+
+**Values are spliced in verbatim**, with no quoting or escaping, so a value must
+be a trusted identifier that the deployment owns. Substitution is not a way to
+pass data to a statement, and a value must never carry a secret: the substituted
+text is stored in the migration table, which is readable by anything that can
+read the schema, and travels into every backup and replica.
+
+**The braces are required**, so a `$` not followed by `{` is never a
+placeholder: positional parameters (`$1`) and the delimiters of dollar-quoted
+bodies (`$$ ... $$`, `$body$ ... $body$`) pass through untouched. Substitution
+is textual and does not track quoting, so a `${...}` written *inside* a
+dollar-quoted body or a string literal is substituted like any other.
+
+```go
+// unchanged by substitution
+DO $body$ BEGIN
+    IF to_regclass('old_name') IS NOT NULL THEN
+        EXECUTE 'DELETE FROM thing WHERE id = $1';
+    END IF;
+END $body$;
+```
+
+Substitution is textual and has no logic -- there is no way to express a
+condition or a loop -- so the SQL that runs is the SQL that was shipped with its
+identifiers filled in, and nothing else.
 
 ## Provider Integration
 
@@ -258,6 +326,25 @@ func runClickHouseMigrations() error {
 }
 ```
 
+#### Repairing a table upgraded before this fix
+
+Every ClickHouse provider up to v0.8.2 copied the rows of a pre-module migration
+table with an empty `module`, and `List()` matches on the module, so those rows
+are invisible and every historical migration runs again. Upgrades from now on
+write `base`, but an installation already upgraded by an older version has to be
+repaired by hand -- the table engine (`TinyLog`) supports no updates, so the
+table is rewritten:
+
+```sql
+CREATE TABLE db_migration_fixed (created DateTime, module String, name String, sha2 String, contents String) ENGINE = TinyLog;
+INSERT INTO db_migration_fixed SELECT created, if(module = '', 'base', module), name, sha2, contents FROM db_migration;
+DROP TABLE db_migration;
+RENAME TABLE db_migration_fixed TO db_migration;
+```
+
+Check for the condition with
+`SELECT count() FROM db_migration WHERE module = ''` before and after.
+
 ## Migration Workflow
 
 ### Basic Migration Execution
@@ -327,27 +414,16 @@ func validateMigrations(manager migrations.Manager, source migrations.Source) er
             return fmt.Errorf("failed to read migration %s: %w", name, err)
         }
         
-        // Check if migration exists with different content
+        // Check if migration exists, and whether its contents still match
         exists, err := manager.MigrationExists(ctx, migration.Name, migration.SHA2)
-        if err != nil {
+        switch {
+        case errors.Is(err, migrations.ErrMigrationNameHashMismatch):
+            return fmt.Errorf("migration %s exists but content has changed", name)
+        case err != nil:
             return fmt.Errorf("failed to check migration %s: %w", name, err)
-        }
-        
-        if exists {
+        case exists:
             log.Printf("Migration %s already executed", name)
-        } else {
-            // Check if migration name exists with different hash
-            executed, err := manager.List(ctx)
-            if err != nil {
-                return err
-            }
-            
-            for _, exec := range executed {
-                if exec.Name == migration.Name && exec.SHA2 != migration.SHA2 {
-                    return fmt.Errorf("migration %s exists but content has changed", name)
-                }
-            }
-            
+        default:
             log.Printf("Migration %s is pending", name)
         }
     }
@@ -417,10 +493,8 @@ func handleMigrationErrors(manager migrations.Manager, source migrations.Source)
             
             // Check specific error types
             switch {
-            case errors.Is(err, migrations.ErrMigrationExists):
-                log.Printf("Migration %s already exists", migrationName)
-            case errors.Is(err, migrations.ErrMigrationNameHashMismatch):
-                log.Printf("Migration %s content has changed", migrationName)
+            case errors.Is(err, migrations.ErrMissingVar):
+                log.Printf("Migration %s has a placeholder nothing supplied", migrationName)
             case errors.Is(err, migrations.ErrRegisterMigration):
                 log.Printf("Migration %s executed but registration failed", migrationName)
             default:
@@ -437,6 +511,23 @@ func handleMigrationErrors(manager migrations.Manager, source migrations.Source)
     return nil
 }
 ```
+
+`Run()` skips migrations it has already applied, by name, so a progress function
+sees only the errors of migrations it actually tries: `ErrMissingVar`, a failure
+of the SQL itself, and `ErrRegisterMigration` (the migration ran, recording it
+did not). The single-migration API reports the other two:
+
+```go
+switch err := manager.RunMigration(ctx, record); {
+case errors.Is(err, migrations.ErrMigrationExists):
+    // same name, same contents: already applied
+case errors.Is(err, migrations.ErrMigrationNameHashMismatch):
+    // same name, different contents: the file was edited or renamed
+case err != nil:
+    return err
+}
+```
+
 
 ### Recovery and Cleanup
 
@@ -508,7 +599,7 @@ func recoverFromFailedMigration(manager migrations.Manager, migrationName string
 func runLargeMigration(manager migrations.Manager) error {
     // For large data migrations, consider batching
     source := migrations.NewMemorySource()
-    source.AddMigration("large_migration", `
+    source.Add("large_migration.sql", `
         -- Process in batches to avoid long locks
         UPDATE users SET status = 'active' 
         WHERE id BETWEEN 1 AND 10000;

@@ -82,8 +82,10 @@ func (b *chMigrationManager) updateTable(ctx context.Context) error {
 		}
 
 		// copy from old to new
-		qry = "INSERT INTO %s (created, module, name, sha2, contents) SELECT created, '', name, sha2, contents FROM %s;"
-		qry = fmt.Sprintf(qry, newTable, MigrationTable)
+		// rows predating the module column belong to the base module; an empty
+		// module would be invisible to List(), and every migration would re-run
+		qry = "INSERT INTO %s (created, module, name, sha2, contents) SELECT created, '%s', name, sha2, contents FROM %s;"
+		qry = fmt.Sprintf(qry, newTable, migrations.ModuleBase, MigrationTable)
 		if err := b.client.Conn.Exec(ctx, qry); err != nil {
 			return err
 		}
@@ -139,7 +141,10 @@ func (b *chMigrationManager) List(ctx context.Context) ([]migrations.MigrationRe
 
 func (b *chMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
-	err := b.repo.FetchWhere(db.FV{"module": b.module, "name": name, "sha2": sha2}, result)
+	// FetchRecord, not FetchWhere: the target is a single record, and the lookup
+	// is by name only, so that a migration recorded under the same name with a
+	// different hash is reported as a mismatch instead of looking absent
+	err := b.repo.FetchRecord(db.FV{"module": b.module, "name": name}, result)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -160,7 +165,12 @@ func (b *chMigrationManager) runMigration(ctx context.Context, m *migrations.Mig
 		return err
 	}
 	// register migration
-	return b.registerMigration(ctx, m)
+	// the migration itself succeeded; a failed registration is the documented
+	// ErrRegisterMigration case, and must be told apart from a failed migration
+	if err := b.registerMigration(ctx, m); err != nil {
+		return fmt.Errorf("%w: %w", migrations.ErrRegisterMigration, err)
+	}
+	return nil
 }
 
 // RunMigration applies and registers a single migration
@@ -206,6 +216,9 @@ func (b *chMigrationManager) Run(ctx context.Context, src migrations.Source, con
 	}
 
 	migList, err := b.List(ctx)
+	if err != nil {
+		return err
+	}
 	prevNames := make([]string, len(migList))
 	for i, r := range migList {
 		prevNames[i] = r.Name
