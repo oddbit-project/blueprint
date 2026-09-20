@@ -5,6 +5,7 @@ on:
     branches: [ main, develop ]
     tags:
       - 'v*'
+      - 'provider/*/v*'
   workflow_dispatch:
 
 permissions:
@@ -37,9 +38,12 @@ jobs:
       - name: Generate SBOMs for Provider Modules
         run: |
           mkdir -p sbom-providers
-          for provider in kafka franz nats mqtt redis s3 etcd pgsql clickhouse httpserver metrics smtp htpasswd hmacprovider; do
+          # every module under provider/, so a new one is never silently skipped
+          for dir in provider/*/; do
+            [ -f "$dir/go.mod" ] || continue
+            provider=$(basename "$dir")
             echo "Generating SBOM for provider/$provider..."
-            (cd provider/$provider && cyclonedx-gomod mod -licenses -json -output ../../sbom-providers/sbom-$provider.json)
+            (cd "$dir" && cyclonedx-gomod mod -licenses -json -output "../../sbom-providers/sbom-$provider.json")
           done
 
       - name: Merge SBOMs
