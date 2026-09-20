@@ -15,6 +15,18 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.10.1] - 2026-09-20
+
+### Security
+
+- **golang.org/x/crypto**: upgraded from v0.53.0 to v0.57.0, fixing an authentication bypass in
+  `golang.org/x/crypto/ssh` where source-address restrictions on an authorized key were not enforced
+  (CVE-2026-56854).
+- **google.golang.org/grpc**: upgraded from v1.82.1 to v1.84.0, fixing a denial of service via malformed RPC requests
+  (CVE-2026-84445) and CVE-2026-84304. Pulled in indirectly through the etcd client and OpenTelemetry.
+
+Every provider module is upgraded to the same versions; the provider modules are tagged after this release.
+
 ## [v0.10.0] - 2026-09-20
 
 ### Added
