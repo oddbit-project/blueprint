@@ -105,7 +105,10 @@ func (b *sqliteMigrationManager) List(ctx context.Context) ([]migrations.Migrati
 
 func (b *sqliteMigrationManager) MigrationExists(ctx context.Context, name string, sha2 string) (bool, error) {
 	result := &migrations.MigrationRecord{}
-	err := b.repo.FetchWhere(db.FV{"module": b.module, "name": name, "sha2": sha2}, result)
+	// FetchRecord, not FetchWhere: the target is a single record, and the lookup
+	// is by name only, so that a migration recorded under the same name with a
+	// different hash is reported as a mismatch instead of looking absent
+	err := b.repo.FetchRecord(db.FV{"module": b.module, "name": name}, result)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -135,7 +138,12 @@ func (b *sqliteMigrationManager) runMigration(ctx context.Context, m *migrations
 		return err
 	}
 
-	return b.registerMigration(ctx, m)
+	// the migration itself succeeded; a failed registration is the documented
+	// ErrRegisterMigration case, and must be told apart from a failed migration
+	if err := b.registerMigration(ctx, m); err != nil {
+		return fmt.Errorf("%w: %w", migrations.ErrRegisterMigration, err)
+	}
+	return nil
 }
 
 // RunMigration applies and registers a single migration
@@ -177,6 +185,9 @@ func (b *sqliteMigrationManager) Run(ctx context.Context, src migrations.Source,
 	}
 
 	migList, err := b.List(ctx)
+	if err != nil {
+		return err
+	}
 	prevNames := make([]string, len(migList))
 	for i, r := range migList {
 		prevNames[i] = r.Name

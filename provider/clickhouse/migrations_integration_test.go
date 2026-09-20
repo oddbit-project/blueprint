@@ -8,6 +8,7 @@ import (
 
 	"github.com/oddbit-project/blueprint/db/migrations"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -262,4 +263,103 @@ func (s *ClickhouseMigrationTestSuite) TestSameNameMigrations() {
 
 	assert.NotEqual(s.T(), sysList[0].SHA2, moduleList[0].SHA2)
 	assert.NotEqual(s.T(), sysList[0].Module, moduleList[0].Module)
+}
+
+// Rows of a pre-module migration table belong to the base module; an empty
+// module would be invisible to List() and every migration would re-run.
+func (s *ClickhouseMigrationTestSuite) TestUpdateMigrationsKeepsLegacyRows() {
+	_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_ = s.client.Conn.Exec(s.ctx, "DROP TABLE IF EXISTS legacy_sample")
+	defer func() {
+		_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+		_ = s.client.Conn.Exec(s.ctx, "DROP TABLE IF EXISTS legacy_sample")
+	}()
+
+	qry := `CREATE TABLE IF NOT EXISTS %s (created DateTime, name String, sha2 String, contents String) ENGINE = TinyLog`
+	require.NoError(s.T(), s.client.Conn.Exec(s.ctx, fmt.Sprintf(qry, MigrationTable)))
+
+	src := migrations.NewMemorySource()
+	src.Add("sample1.sql", "create table legacy_sample(id Int32) engine=TinyLog;")
+	record, err := src.Read("sample1.sql")
+	require.NoError(s.T(), err)
+
+	// the migration as an old version would have recorded it
+	require.NoError(s.T(), s.client.Conn.Exec(s.ctx, fmt.Sprintf(
+		"INSERT INTO %s (created, name, sha2, contents) VALUES (now(), '%s', '%s', '%s')",
+		MigrationTable, record.Name, record.SHA2, record.Contents)))
+
+	mgr, err := NewMigrationManager(context.Background(), s.client)
+	require.NoError(s.T(), err)
+
+	list, err := mgr.List(context.Background())
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 1, len(list))
+	assert.Equal(s.T(), migrations.ModuleBase, list[0].Module)
+
+	// already applied: running again must not re-execute it
+	require.NoError(s.T(), mgr.Run(context.Background(), src, migrations.DefaultProgressFn))
+
+	exists, err := TableExists(s.ctx, s.client, "default", "legacy_sample")
+	require.NoError(s.T(), err)
+	assert.False(s.T(), exists)
+}
+
+func (s *ClickhouseMigrationTestSuite) TestMigrationExists() {
+	_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	defer func() {
+		_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	}()
+
+	src := migrations.NewMemorySource()
+	src.Add("sample1.sql", "select 1;")
+
+	mgr, err := NewMigrationManager(context.Background(), s.client)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), mgr.Run(context.Background(), src, migrations.DefaultProgressFn))
+
+	applied, err := mgr.List(context.Background())
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 1, len(applied))
+
+	exists, err := mgr.MigrationExists(context.Background(), "absent.sql", applied[0].SHA2)
+	assert.NoError(s.T(), err)
+	assert.False(s.T(), exists)
+
+	exists, err = mgr.MigrationExists(context.Background(), "sample1.sql", applied[0].SHA2)
+	assert.NoError(s.T(), err)
+	assert.True(s.T(), exists)
+
+	exists, err = mgr.MigrationExists(context.Background(), "sample1.sql", "not-the-recorded-hash")
+	assert.ErrorIs(s.T(), err, migrations.ErrMigrationNameHashMismatch)
+	assert.True(s.T(), exists)
+
+	record, err := src.Read("sample1.sql")
+	require.NoError(s.T(), err)
+	assert.ErrorIs(s.T(), mgr.RunMigration(context.Background(), record), migrations.ErrMigrationExists)
+}
+
+// A failed lookup of the applied set must abort the run: treating it as "nothing
+// applied" re-executes every migration.
+func (s *ClickhouseMigrationTestSuite) TestRunFailsWhenAppliedListIsUnreadable() {
+	_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_ = s.client.Conn.Exec(s.ctx, "DROP TABLE IF EXISTS unreadable_list")
+	defer func() {
+		_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+		_ = s.client.Conn.Exec(s.ctx, "DROP TABLE IF EXISTS unreadable_list")
+	}()
+
+	src := migrations.NewMemorySource()
+	src.Add("sample1.sql", "create table unreadable_list(id Int32) engine=TinyLog;")
+
+	mgr, err := NewMigrationManager(context.Background(), s.client)
+	require.NoError(s.T(), err)
+
+	// remove the migration table under the manager
+	require.NoError(s.T(), s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE %s", MigrationTable)))
+
+	assert.Error(s.T(), mgr.Run(context.Background(), src, migrations.DefaultProgressFn))
+
+	exists, err := TableExists(s.ctx, s.client, "default", "unreadable_list")
+	require.NoError(s.T(), err)
+	assert.False(s.T(), exists)
 }
