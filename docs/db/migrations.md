@@ -326,6 +326,25 @@ func runClickHouseMigrations() error {
 }
 ```
 
+#### Repairing a table upgraded before this fix
+
+Every ClickHouse provider up to v0.8.2 copied the rows of a pre-module migration
+table with an empty `module`, and `List()` matches on the module, so those rows
+are invisible and every historical migration runs again. Upgrades from now on
+write `base`, but an installation already upgraded by an older version has to be
+repaired by hand -- the table engine (`TinyLog`) supports no updates, so the
+table is rewritten:
+
+```sql
+CREATE TABLE db_migration_fixed (created DateTime, module String, name String, sha2 String, contents String) ENGINE = TinyLog;
+INSERT INTO db_migration_fixed SELECT created, if(module = '', 'base', module), name, sha2, contents FROM db_migration;
+DROP TABLE db_migration;
+RENAME TABLE db_migration_fixed TO db_migration;
+```
+
+Check for the condition with
+`SELECT count() FROM db_migration WHERE module = ''` before and after.
+
 ## Migration Workflow
 
 ### Basic Migration Execution
