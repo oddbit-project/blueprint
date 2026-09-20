@@ -15,6 +15,14 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [v0.10.2] - 2026-09-20
+
+### Security
+
+- **google.golang.org/grpc**: pinned to v1.83.2 instead of v1.84.0. The denial of service via malformed RPC requests
+  (CVE-2026-84445) is fixed in 1.82.2 and 1.83.2 but not in the 1.84 line, so v0.10.1 -- which upgraded to v1.84.0 --
+  still carried it. Use this release rather than v0.10.1.
+
 ## [v0.10.1] - 2026-09-20
 
 ### Security
@@ -22,8 +30,9 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **golang.org/x/crypto**: upgraded from v0.53.0 to v0.57.0, fixing an authentication bypass in
   `golang.org/x/crypto/ssh` where source-address restrictions on an authorized key were not enforced
   (CVE-2026-56854).
-- **google.golang.org/grpc**: upgraded from v1.82.1 to v1.84.0, fixing a denial of service via malformed RPC requests
-  (CVE-2026-84445) and CVE-2026-84304. Pulled in indirectly through the etcd client and OpenTelemetry.
+- **google.golang.org/grpc**: upgraded from v1.82.1 to v1.84.0, fixing CVE-2026-84304. Pulled in indirectly through
+  the etcd client and OpenTelemetry. This does **not** fix CVE-2026-84445, which is not fixed in the 1.84 line; see
+  v0.10.2.
 
 Every provider module is upgraded to the same versions; the provider modules are tagged after this release.
 
