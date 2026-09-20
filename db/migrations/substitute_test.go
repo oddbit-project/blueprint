@@ -1,96 +1,166 @@
 package migrations
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/oddbit-project/blueprint/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// source builds a memory source holding one migration.
-func source(t *testing.T, contents string) Source {
+const testMigration = "001_test.sql"
+
+// newTestSource builds a memory source holding one migration.
+func newTestSource(t *testing.T, name string, contents string) Source {
 	t.Helper()
 	src := NewMemorySource()
-	src.Add("001_test.sql", contents)
+	src.Add(name, contents)
 	return src
 }
 
-func read(t *testing.T, src Source) *MigrationRecord {
-	t.Helper()
-	record, err := src.Read("001_test.sql")
-	if err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	return record
+// failingSource fails every operation; it stands in for a source whose
+// underlying storage is unavailable.
+type failingSource struct {
+	err error
 }
 
-func TestSubstituteReplacesEveryPlaceholder(t *testing.T) {
-	src := Substitute(source(t, "GRANT SELECT ON ${table} TO ${role};"),
-		Vars{"table": "thing", "role": "app"})
+func (f *failingSource) List() ([]string, error)               { return nil, f.err }
+func (f *failingSource) Read(string) (*MigrationRecord, error) { return nil, f.err }
 
-	if got, want := read(t, src).Contents, "GRANT SELECT ON thing TO app;"; got != want {
-		t.Errorf("contents = %q, want %q", got, want)
+func TestSubstitute(t *testing.T) {
+	// the $body$ tag is what makes the braces load-bearing: without them,
+	// $body would be a placeholder name
+	const dollars = `DO $body$ BEGIN
+	IF to_regclass('old') IS NOT NULL THEN
+		EXECUTE 'DELETE FROM thing WHERE id = $1';
+	END IF;
+END $body$;`
+
+	tests := []struct {
+		name     string
+		contents string
+		vars     Vars
+		want     string
+		wantErr  string
+	}{
+		{
+			name:     "every placeholder is replaced",
+			contents: "GRANT SELECT ON ${table} TO ${role};",
+			vars:     Vars{"table": "thing", "role": "app"},
+			want:     "GRANT SELECT ON thing TO app;",
+		},
+		{
+			name:     "a repeated placeholder is replaced everywhere",
+			contents: "GRANT SELECT ON thing TO ${role}; REVOKE DELETE ON thing FROM ${role};",
+			vars:     Vars{"role": "app"},
+			want:     "GRANT SELECT ON thing TO app; REVOKE DELETE ON thing FROM app;",
+		},
+		{
+			name:     "SQL's own dollars are left alone",
+			contents: dollars + " GRANT SELECT ON thing TO ${role};",
+			vars:     Vars{"role": "app"},
+			want:     dollars + " GRANT SELECT ON thing TO app;",
+		},
+		{
+			name:     "a var with no placeholder is ignored",
+			contents: "SELECT 1;",
+			vars:     Vars{"role": "app"},
+			want:     "SELECT 1;",
+		},
+		{
+			name:     "an unsupplied placeholder is refused",
+			contents: "GRANT SELECT ON thing TO ${role};",
+			vars:     Vars{"other": "app"},
+			wantErr:  "migration 001_test.sql: ${role}",
+		},
+		{
+			name:     "no vars at all refuses too",
+			contents: "GRANT SELECT ON thing TO ${role};",
+			vars:     nil,
+			wantErr:  "migration 001_test.sql: ${role}",
+		},
+		{
+			name:     "an empty value counts as unsupplied",
+			contents: "GRANT SELECT ON thing TO ${role};",
+			vars:     Vars{"role": ""},
+			wantErr:  "migration 001_test.sql: ${role}",
+		},
+		{
+			name:     "a name the substitution does not support is refused, not shipped",
+			contents: "GRANT SELECT ON thing TO ${app-role};",
+			vars:     Vars{"appRole": "app"},
+			wantErr:  "migration 001_test.sql: ${app-role}",
+		},
+		{
+			name:     "an empty name is a placeholder too, and is refused",
+			contents: "GRANT SELECT ON thing TO ${};",
+			vars:     Vars{"role": "app"},
+			wantErr:  "migration 001_test.sql: ${}",
+		},
+		{
+			name:     "a placeholder inside a string literal is refused too",
+			contents: "COMMENT ON TABLE thing IS 'owned by ${1}';",
+			vars:     Vars{"role": "app"},
+			wantErr:  "migration 001_test.sql: ${1}",
+		},
+		{
+			name:     "every missing name is reported once, in order",
+			contents: "GRANT ${verb} ON ${table} TO ${role}; REVOKE ${verb} ON ${table} FROM ${role};",
+			vars:     Vars{"table": "thing"},
+			wantErr:  "migration 001_test.sql: ${role}, ${verb}",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			src := Substitute(newTestSource(t, testMigration, tc.contents), tc.vars)
+
+			record, err := src.Read(testMigration)
+			if tc.wantErr != "" {
+				require.ErrorIs(t, err, ErrMissingVar)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.Nil(t, record)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, record.Contents)
+		})
 	}
 }
 
 // The identity of a migration is the file as shipped, so a deployment that
 // changes one of these values does not make its applied migrations look edited.
 func TestSubstituteKeepsTheTemplateHash(t *testing.T) {
-	template := "REVOKE DELETE ON thing FROM ${role};"
-	plain := read(t, source(t, template))
+	const template = "REVOKE DELETE ON thing FROM ${role};"
 
-	first := read(t, Substitute(source(t, template), Vars{"role": "app"}))
-	second := read(t, Substitute(source(t, template), Vars{"role": "other_app"}))
+	plain, err := newTestSource(t, testMigration, template).Read(testMigration)
+	require.NoError(t, err)
 
-	if first.SHA2 != plain.SHA2 || second.SHA2 != plain.SHA2 {
-		t.Errorf("hash changed with the value: %s / %s, want %s",
-			first.SHA2, second.SHA2, plain.SHA2)
-	}
-	if first.Contents == second.Contents {
-		t.Error("contents did not change with the value")
-	}
-}
+	first, err := Substitute(newTestSource(t, testMigration, template), Vars{"role": "app"}).Read(testMigration)
+	require.NoError(t, err)
+	second, err := Substitute(newTestSource(t, testMigration, template), Vars{"role": "other_app"}).Read(testMigration)
+	require.NoError(t, err)
 
-// An unresolved name would otherwise reach the server as literal text.
-func TestSubstituteRefusesAnUnsuppliedPlaceholder(t *testing.T) {
-	_, err := Substitute(source(t, "GRANT SELECT ON thing TO ${role};"),
-		Vars{"other": "app"}).Read("001_test.sql")
-
-	if !errors.Is(err, ErrMissingVar) {
-		t.Fatalf("err = %v, want %v", err, ErrMissingVar)
-	}
-}
-
-// $1 and $$ are SQL's own; only ${...} is ours.
-func TestSubstituteLeavesOtherDollarsAlone(t *testing.T) {
-	const untouched = `DO $$ BEGIN
-	IF to_regclass('old') IS NOT NULL THEN
-		EXECUTE 'DELETE FROM thing WHERE id = $1';
-	END IF;
-END $$;`
-	src := Substitute(source(t, untouched), Vars{"role": "app"})
-
-	if got := read(t, src).Contents; got != untouched {
-		t.Errorf("contents = %q, want them unchanged", got)
-	}
-}
-
-// Wrapping is a no-op when there is nothing to substitute.
-func TestSubstituteWithoutVarsIsTheSourceItself(t *testing.T) {
-	src := source(t, "SELECT 1;")
-	if got := Substitute(src, nil); got != src {
-		t.Error("a source with no vars was wrapped anyway")
-	}
-	if got := Substitute(nil, Vars{"role": "app"}); got != nil {
-		t.Error("a nil source was wrapped")
-	}
+	assert.Equal(t, plain.SHA2, first.SHA2)
+	assert.Equal(t, plain.SHA2, second.SHA2)
+	assert.NotEqual(t, first.Contents, second.Contents)
 }
 
 // Names are the wrapped source's; only contents are rewritten.
 func TestSubstituteListsWhatItWraps(t *testing.T) {
-	names, err := Substitute(source(t, "SELECT 1;"), Vars{"role": "app"}).List()
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(names) != 1 || names[0] != "001_test.sql" {
-		t.Errorf("names = %v", names)
-	}
+	names, err := Substitute(newTestSource(t, testMigration, "SELECT 1;"), Vars{"role": "app"}).List()
+	require.NoError(t, err)
+	assert.Equal(t, []string{testMigration}, names)
+}
+
+// Failures of the wrapped source are the caller's to handle, unchanged.
+func TestSubstitutePropagatesSourceErrors(t *testing.T) {
+	const errSource = utils.Error("source unavailable")
+	src := Substitute(&failingSource{err: errSource}, Vars{"role": "app"})
+
+	_, err := src.List()
+	require.ErrorIs(t, err, errSource)
+
+	_, err = src.Read(testMigration)
+	require.ErrorIs(t, err, errSource)
 }

@@ -4,6 +4,14 @@ All notable changes to the Blueprint SQLite provider will be documented in this 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- `MigrationExists()` fetched a single record through a multi-row fetch, so it failed on every call with `expected slice but got struct`, which made `RunMigration()` and `RegisterMigration()` unusable. It now fetches a single record, and looks the migration up by name, so an already-applied migration is reported as such and one recorded under the same name with different contents returns `ErrMigrationNameHashMismatch`.
+- `Run()` no longer ignores the error from listing applied migrations; previously a failed lookup left the applied set empty and re-ran every migration.
+- A migration that ran but could not be registered now returns `ErrRegisterMigration` wrapping the cause, as documented; previously the raw repository error was returned and the documented error was never used.
+
 ## [v0.8.1]
 
 ### Security

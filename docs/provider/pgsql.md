@@ -180,9 +180,12 @@ var migrationFiles embed.FS
 src, err := migrations.NewEmbedSource(migrationFiles, "migrations")
 
 // Optional: fill deployment-specific identifiers into the DDL, e.g. the role
-// the application connects as. See db/migrations.md#substituted-source.
-src = migrations.Substitute(src, migrations.Vars{"appRole": cfg.AppRole})
+// the application connects as
+src = migrations.Substitute(src, migrations.Vars{"appRole": appRole})
 ```
+
+See [Substituted Source](../db/migrations.md#substituted-source) for what a
+substituted value may hold and how it is recorded.
 
 ### Migration Manager Interface
 
