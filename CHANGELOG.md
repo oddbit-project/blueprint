@@ -23,6 +23,13 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   (CVE-2026-84445) is fixed in 1.82.2 and 1.83.2 but not in the 1.84 line, so v0.10.1 -- which upgraded to v1.84.0 --
   still carried it. Use this release rather than v0.10.1.
 
+### Module Version Updates
+
+Every provider module is patch-released against this core version, so that a consumer pinning a provider alone also
+gets the fixed dependencies: `clickhouse` v0.8.4, `etcd` v0.9.1, `franz` v0.8.5, `hmacprovider` v0.8.3, `htpasswd`
+v0.8.3, `httpserver` v0.9.4, `jwtprovider` v0.8.3, `kafka` v0.8.4, `metrics` v0.8.2, `mqtt` v0.8.2, `nats` v0.8.3,
+`pgsql` v0.8.3, `prometheus` v0.9.3, `redis` v0.8.2, `s3` v0.8.3, `smtp` v0.9.1, `sqlite` v0.8.3.
+
 ## [v0.10.1] - 2026-09-20
 
 ### Security
