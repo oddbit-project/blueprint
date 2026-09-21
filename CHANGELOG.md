@@ -15,6 +15,34 @@ semantic versioning. This changelog tracks:
 
 For detailed changes in specific providers, see the individual CHANGELOG.md files in each provider directory.
 
+## [Unreleased]
+
+### Fixed
+
+- **`threadpool`: `Stop()` no longer discards queued jobs.** It cancelled the
+  workers' context and returned, so anything accepted but not yet started was
+  dropped with no error and no signal to the caller — who had every reason to
+  believe the work was handed over. The documentation already described the
+  behaviour this restores ("after they complete their current jobs"). Workers
+  now finish the queue before exiting, and run those jobs on a context that is
+  still live rather than one already cancelled.
+
+### Added
+
+- **`threadpool.ThreadPool.StopWithContext(ctx)`** — `Stop` with a bound, for a
+  shutdown that cannot be open-ended. It drains like `Stop`, and on the
+  context's expiry cancels the workers, abandons the queue and returns
+  `ctx.Err()` without waiting for a job that ignores its own context.
+- **`threadpool.WorkerGroup.Drain()`** — the graceful counterpart to `Stop()`
+  at the group level.
+
+### Documentation
+
+- `docs/threadpool/threadpool.md`: `Stop` semantics, `StopWithContext`, and a
+  note that `Dispatch` panics on a stopped pool while `DispatchWithContext`
+  reports `ErrPoolNotStarted` — the difference that matters on any path which
+  can race a shutdown.
+
 ## [v0.10.2] - 2026-09-20
 
 ### Security

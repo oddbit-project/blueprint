@@ -139,9 +139,43 @@ func (t *ThreadPool) Stop() error {
 	if t.logger != nil {
 		t.logger.Info("Shutting down threadpool...")
 	}
-	t.workers.Stop()
+	// a job that was accepted has been promised a run: the queue is finished
+	// before the workers leave, rather than being dropped on the floor
+	t.workers.Drain()
 	t.workers = nil
 	return nil
+}
+
+// StopWithContext stops the ThreadPool, finishing the jobs already queued, and
+// gives up on that if ctx is done first -- at which point the workers' context
+// is cancelled and only the jobs in flight are waited for. It is Stop with a
+// bound, for a shutdown that cannot be open-ended.
+func (t *ThreadPool) StopWithContext(ctx context.Context) error {
+	if t.workers == nil {
+		return ErrPoolNotStarted
+	}
+	if t.logger != nil {
+		t.logger.Info("Shutting down threadpool...")
+	}
+	workers := t.workers
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		workers.Drain()
+	}()
+	select {
+	case <-drained:
+		t.workers = nil
+		return nil
+	case <-ctx.Done():
+		// the workers' context is cancelled and the queue abandoned, but this
+		// does NOT wait for the drain to unwind: a job that ignores its context
+		// would otherwise hold the shutdown open for ever, which is the one
+		// thing a bounded stop exists to prevent
+		go workers.Stop()
+		t.workers = nil
+		return ctx.Err()
+	}
 }
 
 // Dispatch adds a new job to the jobQueue of the ThreadPool.
@@ -153,7 +187,9 @@ func (t *ThreadPool) Stop() error {
 //	job := MyJob{}
 //	threadPool.Dispatch(job)
 //
-// Note: This function is blocking if jobQueue is full
+// Note: This function is blocking if jobQueue is full, and it PANICS if the
+// pool was never started or has been stopped. Use DispatchWithContext (which
+// reports ErrPoolNotStarted) on any path that can race a shutdown.
 func (t *ThreadPool) Dispatch(j Job) {
 	if t.workers == nil {
 		panic("Dispatch called on stopped or unstarted ThreadPool")

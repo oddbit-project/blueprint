@@ -2,6 +2,8 @@ package threadpool
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -184,5 +186,124 @@ func TestThreadPool_PanicRecovery(t *testing.T) {
 		// Success, worker still alive
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Worker is not processing jobs after panic")
+	}
+}
+
+// A job that was accepted has been promised a run. Stop used to cancel the
+// workers' context and return, so anything sitting in the queue was discarded
+// with no signal to the caller, who believed the work was handed over.
+func TestStopFinishesQueuedJobs(t *testing.T) {
+	const queued = 16
+	pool, err := NewThreadPool(2, queued)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	var ran atomic.Int64
+	release := make(chan struct{})
+	started := make(chan struct{}, 2)
+	// occupy both workers so the rest of the jobs have to queue
+	for i := 0; i < 2; i++ {
+		pool.Dispatch(FuncRunner(func(context.Context) {
+			started <- struct{}{}
+			<-release
+			ran.Add(1)
+		}))
+	}
+	<-started
+	<-started
+	for i := 0; i < queued; i++ {
+		pool.Dispatch(FuncRunner(func(context.Context) { ran.Add(1) }))
+	}
+
+	stopped := make(chan error, 1)
+	go func() { close(release); stopped <- pool.Stop() }()
+	select {
+	case err = <-stopped:
+		if err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Stop never returned")
+	}
+
+	if got := ran.Load(); got != queued+2 {
+		t.Errorf("ran %d jobs, want %d: the queue was discarded", got, queued+2)
+	}
+}
+
+// The drain cannot be open-ended: a shutdown budget has to bound it, and what
+// is still queued when it expires is abandoned rather than holding the process.
+func TestStopWithContextGivesUpOnItsDeadline(t *testing.T) {
+	pool, err := NewThreadPool(1, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	defer close(release)
+	pool.Dispatch(FuncRunner(func(context.Context) {
+		close(started)
+		<-release
+	}))
+	<-started
+	pool.Dispatch(FuncRunner(func(context.Context) {}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err = pool.StopWithContext(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("StopWithContext = %v, want DeadlineExceeded", err)
+	}
+}
+
+// The negative: with nothing in flight, the bounded stop drains and reports no
+// error, so the deadline is a last resort rather than the normal path.
+func TestStopWithContextDrainsWhenItCan(t *testing.T) {
+	pool, err := NewThreadPool(2, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var ran atomic.Int64
+	for i := 0; i < 8; i++ {
+		pool.Dispatch(FuncRunner(func(context.Context) { ran.Add(1) }))
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err = pool.StopWithContext(ctx); err != nil {
+		t.Fatalf("StopWithContext: %v", err)
+	}
+	if got := ran.Load(); got != 8 {
+		t.Errorf("ran %d jobs, want 8", got)
+	}
+}
+
+// A dispatch racing a shutdown must be reportable rather than fatal: Dispatch
+// panics by design, so the shutdown-safe path is DispatchWithContext.
+func TestDispatchAfterStopIsReportable(t *testing.T) {
+	pool, err := NewThreadPool(1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.DispatchWithContext(context.Background(), FuncRunner(func(context.Context) {})); !errors.Is(err, ErrPoolNotStarted) {
+		t.Errorf("DispatchWithContext after Stop = %v, want ErrPoolNotStarted", err)
+	}
+	if pool.TryDispatch(FuncRunner(func(context.Context) {})) {
+		t.Error("TryDispatch after Stop reported success")
 	}
 }
