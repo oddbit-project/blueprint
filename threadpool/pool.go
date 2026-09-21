@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/utils"
+	"sync"
 	"time"
 )
 
@@ -24,6 +25,9 @@ type Pool interface {
 }
 
 type ThreadPool struct {
+	// mu guards workers: a dispatch and a stop race each other by nature, and
+	// the loser must be refused rather than handed a queue nobody reads.
+	mu          sync.Mutex
 	workers     *WorkerGroup
 	workerCount int
 	jobQueue    chan Job
@@ -80,10 +84,11 @@ func NewThreadPool(workerCount int, queueSize int, opts ...OptionsFn) (*ThreadPo
 // If the ThreadPool has not been started, it returns 0.
 // It internally calls the RequestCount method of the workers in the ThreadGroup to calculate the total number of requests.
 func (t *ThreadPool) GetRequestCount() uint64 {
-	if t.workers == nil {
+	workers := t.group()
+	if workers == nil {
 		return 0
 	}
-	return t.workers.RequestCount()
+	return workers.RequestCount()
 }
 
 // GetQueueLen returns the number of jobs currently in the jobQueue of the ThreadPool.
@@ -103,16 +108,19 @@ func (t *ThreadPool) GetQueueCapacity() int {
 // This count represents the number of workers that are actively processing jobs.
 // Note that this count does not include idle or terminated workers.
 func (t *ThreadPool) GetWorkerCount() int {
-	if t.workers == nil {
+	workers := t.group()
+	if workers == nil {
 		return 0
 	}
-	return len(t.workers.workers)
+	return len(workers.workers)
 }
 
 // Start starts the execution of the ThreadPool. It returns an error if the ThreadPool
 // has already been started. If the given context is nil, it will default to the background context.
 // It creates a new WorkerGroup with the specified workerCount
 func (t *ThreadPool) Start(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.workers != nil {
 		return ErrPoolAlreadyStarted
 	}
@@ -133,7 +141,8 @@ func (t *ThreadPool) Start(ctx context.Context) error {
 // their current jobs. After that, it cleans the worker list and sets the started flag to false.
 // Note: this function is blocking
 func (t *ThreadPool) Stop() error {
-	if t.workers == nil {
+	workers := t.take()
+	if workers == nil {
 		return ErrPoolNotStarted
 	}
 	if t.logger != nil {
@@ -141,9 +150,30 @@ func (t *ThreadPool) Stop() error {
 	}
 	// a job that was accepted has been promised a run: the queue is finished
 	// before the workers leave, rather than being dropped on the floor
-	t.workers.Drain()
-	t.workers = nil
+	workers.Drain()
 	return nil
+}
+
+// take claims the worker group and clears the field in one step, so a dispatch
+// racing a stop is refused rather than accepted into a queue nobody will read
+// again. Clearing it only AFTER the workers have gone left a window where
+// Dispatch and DispatchWithContext still saw a live pool and handed over a job
+// that was then silently discarded -- no error to the caller, no run, and for a
+// caller that acknowledges work elsewhere (a broker delivery, say) no way to
+// learn it never happened.
+// group reads the worker group under the lock.
+func (t *ThreadPool) group() *WorkerGroup {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.workers
+}
+
+func (t *ThreadPool) take() *WorkerGroup {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	workers := t.workers
+	t.workers = nil
+	return workers
 }
 
 // StopWithContext stops the ThreadPool, finishing the jobs already queued, and
@@ -151,13 +181,13 @@ func (t *ThreadPool) Stop() error {
 // is cancelled and only the jobs in flight are waited for. It is Stop with a
 // bound, for a shutdown that cannot be open-ended.
 func (t *ThreadPool) StopWithContext(ctx context.Context) error {
-	if t.workers == nil {
-		return ErrPoolNotStarted
-	}
 	if t.logger != nil {
 		t.logger.Info("Shutting down threadpool...")
 	}
-	workers := t.workers
+	workers := t.take()
+	if workers == nil {
+		return ErrPoolNotStarted
+	}
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
@@ -165,7 +195,6 @@ func (t *ThreadPool) StopWithContext(ctx context.Context) error {
 	}()
 	select {
 	case <-drained:
-		t.workers = nil
 		return nil
 	case <-ctx.Done():
 		// the workers' context is cancelled and the queue abandoned, but this
@@ -173,7 +202,6 @@ func (t *ThreadPool) StopWithContext(ctx context.Context) error {
 		// would otherwise hold the shutdown open for ever, which is the one
 		// thing a bounded stop exists to prevent
 		go workers.Stop()
-		t.workers = nil
 		return ctx.Err()
 	}
 }
@@ -191,7 +219,7 @@ func (t *ThreadPool) StopWithContext(ctx context.Context) error {
 // pool was never started or has been stopped. Use DispatchWithContext (which
 // reports ErrPoolNotStarted) on any path that can race a shutdown.
 func (t *ThreadPool) Dispatch(j Job) {
-	if t.workers == nil {
+	if t.group() == nil {
 		panic("Dispatch called on stopped or unstarted ThreadPool")
 	}
 	t.jobQueue <- j
@@ -207,7 +235,7 @@ func (t *ThreadPool) Dispatch(j Job) {
 //	  // Handle job rejection (queue full)
 //	}
 func (t *ThreadPool) TryDispatch(j Job) bool {
-	if t.workers == nil {
+	if t.group() == nil {
 		return false
 	}
 	select {
@@ -228,7 +256,7 @@ func (t *ThreadPool) TryDispatch(j Job) bool {
 //	  // Handle job timeout
 //	}
 func (t *ThreadPool) DispatchWithTimeout(j Job, timeout time.Duration) bool {
-	if t.workers == nil {
+	if t.group() == nil {
 		return false
 	}
 	timer := time.NewTimer(timeout)
@@ -255,7 +283,7 @@ func (t *ThreadPool) DispatchWithTimeout(j Job, timeout time.Duration) bool {
 //	  // Handle dispatch error (context canceled or deadline exceeded)
 //	}
 func (t *ThreadPool) DispatchWithContext(ctx context.Context, j Job) error {
-	if t.workers == nil {
+	if t.group() == nil {
 		return ErrPoolNotStarted
 	}
 	select {

@@ -36,6 +36,19 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **`threadpool.WorkerGroup.Drain()`** — the graceful counterpart to `Stop()`
   at the group level.
 
+### Changed
+
+- **`ThreadPool` guards its worker group with a mutex, and a stop claims it in
+  one step.** `Stop` previously cleared the field only after the workers had
+  gone, so for the length of a shutdown a dispatch still saw a live pool and was
+  accepted into a queue that, on the `StopWithContext` deadline path, nobody
+  would read again. `Start`, `Stop`, `StopWithContext` and the accessors now
+  agree on one lock. No regression test: with the drain above, a job accepted in
+  that window is run anyway, and on the hard-cancel path an accepted job is
+  abandoned by contract — so the change is not observable from outside, and a
+  test asserting otherwise would be asserting something the contract does not
+  promise.
+
 ### Documentation
 
 - `docs/threadpool/threadpool.md`: `Stop` semantics, `StopWithContext`, and a
