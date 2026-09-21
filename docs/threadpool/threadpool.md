@@ -155,6 +155,7 @@ Interface that must be implemented by all jobs submitted to the thread pool.
 type Pool interface {
     Start(ctx context.Context) error
     Stop() error
+    StopWithContext(ctx context.Context) error
     Dispatch(j Job)
     TryDispatch(j Job) bool
     DispatchWithTimeout(j Job, timeout time.Duration) bool
@@ -240,8 +241,31 @@ Returns `ErrPoolAlreadyStarted` if the pool has already been started.
 func (t *ThreadPool) Stop() error
 ```
 
-Gracefully stops all workers after they complete their current jobs.
-Returns `ErrPoolNotStarted` if the pool has not been started.
+Stops the pool, finishing the jobs already **queued** as well as the ones
+running: a job that was accepted has been promised a run, and dropping it loses
+work the caller believes was handed over. Returns `ErrPoolNotStarted` if the
+pool has not been started.
+
+Stop waits for as long as that takes. Where a shutdown has a budget, use
+`StopWithContext`.
+
+#### StopWithContext
+
+```go
+func (t *ThreadPool) StopWithContext(ctx context.Context) error
+```
+
+`Stop` with a bound. It finishes the queue like `Stop`, but if `ctx` is done
+first the workers' context is cancelled, whatever is still queued is abandoned,
+and `ctx.Err()` is returned. It does not wait for a job that ignores its own
+context — that is the case a bounded stop exists for.
+
+#### Dispatch and shutdown
+
+`Dispatch` **panics** on a pool that was never started or has been stopped. On
+any path that can race a shutdown — a broker callback, an HTTP handler —
+`DispatchWithContext` reports `ErrPoolNotStarted` instead, and `TryDispatch`
+returns false.
 
 #### Dispatch
 
