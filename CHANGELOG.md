@@ -17,6 +17,8 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.10.3] - 2026-09-21
+
 ### Fixed
 
 - **`threadpool`: `Stop()` no longer discards queued jobs.** It cancelled the
