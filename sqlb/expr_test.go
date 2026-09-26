@@ -118,6 +118,7 @@ func TestInExpansion(t *testing.T) {
 		{"json raw", Col("a").In(json.RawMessage(`{}`)), `"a" IN ($1)`, []any{json.RawMessage(`{}`)}},
 		{"net ip", Col("a").In(net.ParseIP("127.0.0.1")), `"a" IN ($1)`, []any{net.ParseIP("127.0.0.1")}},
 		{"valuer slice", Col("a").In(valuerSlice{1, 2}), `"a" IN ($1)`, []any{valuerSlice{1, 2}}},
+		{"int array", Col("a").In([2]int{1, 2}), `"a" IN ($1)`, []any{[2]int{1, 2}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
