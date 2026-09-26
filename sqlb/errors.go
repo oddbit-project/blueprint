@@ -33,4 +33,9 @@ const (
 	ErrUnknownField     = utils.Error("sqlb: field not found in record")
 	ErrDuplicateColumn  = utils.Error("sqlb: column set more than once")
 	ErrConflictTarget   = utils.Error("sqlb: DO UPDATE requires conflict columns")
+
+	ErrCompoundPart   = utils.Error("sqlb: a UNION member cannot have ORDER BY, LIMIT, OFFSET, WITH, SETTINGS or its own UNION")
+	ErrInvalidSample  = utils.Error("sqlb: SAMPLE ratio must be in (0, 1]")
+	ErrInvalidSetting = utils.Error("sqlb: invalid SETTINGS name")
+	ErrEmptyClause    = utils.Error("sqlb: clause requires at least one column")
 )

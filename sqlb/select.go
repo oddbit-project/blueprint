@@ -20,6 +20,24 @@ type SelectBuilder struct {
 	limit     uint64
 	hasOffset bool
 	offset    uint64
+
+	joins []join
+
+	ctes      []cte
+	recursive bool
+	unions    []unionMember
+
+	final          bool
+	hasSample      bool
+	sampleIsRows   bool
+	sampleRatio    float64
+	sampleRows     uint64
+	hasArrayJoin   bool
+	arrayJoinLeft  bool
+	arrayJoinCalls int
+	arrayJoin      []any
+	prewhere       []Expr
+	settings       []kv
 }
 
 var _ Statement = (*SelectBuilder)(nil)
@@ -43,6 +61,12 @@ func (s *SelectBuilder) clone() *SelectBuilder {
 	c.groupBy = append([]any(nil), s.groupBy...)
 	c.having = append([]Expr(nil), s.having...)
 	c.orderBy = append([]any(nil), s.orderBy...)
+	c.joins = append([]join(nil), s.joins...)
+	c.ctes = append([]cte(nil), s.ctes...)
+	c.unions = append([]unionMember(nil), s.unions...)
+	c.arrayJoin = append([]any(nil), s.arrayJoin...)
+	c.prewhere = append([]Expr(nil), s.prewhere...)
+	c.settings = append([]kv(nil), s.settings...)
 	return &c
 }
 
@@ -138,9 +162,41 @@ func (s *SelectBuilder) Build(d Dialect) (string, []any, error) {
 	return w.finish()
 }
 
-// renderSelect renders the SELECT statement into w. It is not named render
-// so *SelectBuilder does not satisfy Expr.
+// renderSelect renders the full SELECT statement (WITH, core, UNION
+// members, and the trailing ORDER BY/LIMIT/OFFSET/SETTINGS) into w. It is
+// not named render so *SelectBuilder does not satisfy Expr.
+//
+// On ClickHouse, a compound (a builder with UNION members) that also has
+// ORDER BY/LIMIT/OFFSET is wrapped as "SELECT * FROM (<with><core><unions>)
+// <tail>", because ClickHouse binds a trailing ORDER BY/LIMIT to the last
+// UNION member only. The CTE list stays inside the wrap parentheses.
 func (s *SelectBuilder) renderSelect(w *writer) {
+	ch := w.d.quote == quoteClickHouse
+	wrap := ch && len(s.unions) > 0 && (len(s.orderBy) > 0 || s.hasLimit || s.hasOffset)
+
+	if wrap {
+		w.keyword("SELECT * FROM (")
+	}
+	s.renderWith(w)
+	s.renderSelectCore(w)
+	for _, u := range s.unions {
+		if err := checkCompoundMember(u.query); err != nil {
+			w.fail(err)
+			return
+		}
+		renderUnionKeyword(w, u.kind, ch)
+		u.query.renderSelectCore(w)
+	}
+	if wrap {
+		w.keyword(")")
+	}
+	s.renderTail(w)
+}
+
+// renderSelectCore renders "SELECT ... [FROM ...] ... HAVING ..." — the
+// part shared by a top-level SELECT and a UNION member (which may not have
+// its own WITH, UNION, ORDER BY, LIMIT, OFFSET or SETTINGS).
+func (s *SelectBuilder) renderSelectCore(w *writer) {
 	w.keyword("SELECT ")
 	if s.distinct {
 		w.keyword("DISTINCT ")
@@ -163,6 +219,21 @@ func (s *SelectBuilder) renderSelect(w *writer) {
 	if s.fromSet {
 		w.keyword(" FROM ")
 		renderSource(w, s.from)
+		s.renderFinalSample(w)
+	}
+
+	s.renderArrayJoin(w)
+	for _, j := range s.joins {
+		renderJoin(w, j)
+	}
+
+	if len(s.prewhere) > 0 {
+		if !w.d.Has(FeatureClickHouse) {
+			w.fail(ErrUnsupported)
+			return
+		}
+		w.keyword(" PREWHERE ")
+		renderExpr(w, And(s.prewhere...))
 	}
 
 	if len(s.where) > 0 {
@@ -184,7 +255,11 @@ func (s *SelectBuilder) renderSelect(w *writer) {
 		w.keyword(" HAVING ")
 		renderExpr(w, And(s.having...))
 	}
+}
 
+// renderTail renders the ORDER BY/LIMIT/OFFSET/SETTINGS clauses, which
+// apply to the whole compound (see renderSelect).
+func (s *SelectBuilder) renderTail(w *writer) {
 	if len(s.orderBy) > 0 {
 		w.keyword(" ORDER BY ")
 		for i, o := range s.orderBy {
@@ -212,6 +287,7 @@ func (s *SelectBuilder) renderSelect(w *writer) {
 		}
 		w.keyword(" OFFSET " + strconv.FormatUint(s.offset, 10))
 	}
+	s.renderSettings(w)
 }
 
 // renderOrderItem renders o: an Order is used as-is, a string or Value is
