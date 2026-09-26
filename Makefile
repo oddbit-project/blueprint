@@ -1,7 +1,7 @@
 SBOM_FILE=sbom.json
 
 # Provider modules list
-PROVIDERS := franz kafka nats mqtt redis s3 etcd pgsql clickhouse httpserver metrics smtp htpasswd hmacprovider
+PROVIDERS := franz kafka nats mqtt redis s3 etcd pgsql sqlite clickhouse httpserver metrics smtp htpasswd hmacprovider
 
 # Build tags enabling integration tests gated behind //go:build integration (db, etcd).
 # Most integration suites instead gate on testing.Short() and run without any tag.
