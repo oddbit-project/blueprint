@@ -332,6 +332,7 @@ func TestGridSortDeterministic(t *testing.T) {
 	// aliases (a_zeta, m_mid, z_alpha) sort differently than db names
 	// (alpha, mid, zeta), so this also proves iteration is by alias.
 	assert.Contains(t, first, `"zeta" = $1 AND "mid" = $2 AND "alpha" = $3`)
+	assert.Contains(t, first, `ORDER BY "zeta" ASC, "mid" ASC, "alpha" DESC`)
 }
 
 func TestGridFilterFunc(t *testing.T) {
