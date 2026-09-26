@@ -231,6 +231,8 @@ func DialectOptions() *goqu.SQLDialectOptions {
 	do := goqu.DefaultDialectOptions()
 	do.PlaceHolderFragment = []byte("?")
 	do.IncludePlaceholderNum = false
+	// ClickHouse treats backslash as an escape character in string literals
+	do.EscapedRunes['\\'] = []byte(`\\`)
 	return do
 }
 

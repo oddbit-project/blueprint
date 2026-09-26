@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/doug-martin/goqu/v9"
+	"github.com/oddbit-project/blueprint/db"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -101,4 +103,38 @@ func TestRepositoryParameterValidation(t *testing.T) {
 	record := &TestRecord{ID: 1, Name: "test", Value: 100}
 	err = repo.InsertReturning(record, []string{"id"})
 	assert.Equal(t, ErrNotSupported, err)
+}
+
+func TestDialectEscapesBackslash(t *testing.T) {
+	qry := goqu.Dialect("clickhouse").From("t").Where(goqu.C("name").Eq(`x\' OR 1=1 --`))
+	sqlQry, args, err := qry.ToSQL()
+	assert.NoError(t, err)
+	assert.Empty(t, args)
+	assert.Equal(t, `SELECT * FROM "t" WHERE ("name" = 'x\\'' OR 1=1 --')`, sqlQry)
+}
+
+func TestRepositoryRejectsInvalidIdentifier(t *testing.T) {
+	repo := NewRepository(context.Background(), nil, "test_table")
+	bad := `a" = 1 OR "b`
+	var rows []TestRecord
+
+	assert.ErrorIs(t, repo.FetchRecord(map[string]any{bad: 1}, &TestRecord{}), db.ErrInvalidIdentifier)
+	assert.ErrorIs(t, repo.FetchByKey(bad, 1, &TestRecord{}), db.ErrInvalidIdentifier)
+	assert.ErrorIs(t, repo.FetchWhere(map[string]any{bad: 1}, &rows), db.ErrInvalidIdentifier)
+	assert.ErrorIs(t, repo.DeleteWhere(map[string]any{bad: 1}), db.ErrInvalidIdentifier)
+	assert.ErrorIs(t, repo.DeleteByKey(bad, 1), db.ErrInvalidIdentifier)
+
+	_, err := repo.Exists(bad, 1)
+	assert.ErrorIs(t, err, db.ErrInvalidIdentifier)
+	_, err = repo.Exists("name", 1, `a\`, 1)
+	assert.ErrorIs(t, err, db.ErrInvalidIdentifier)
+	_, err = repo.Exists("name", 1, 1, 1)
+	assert.ErrorIs(t, err, ErrInvalidParameters)
+	_, err = repo.CountWhere(map[string]any{bad: 1})
+	assert.ErrorIs(t, err, db.ErrInvalidIdentifier)
+}
+
+func TestRepositoryDeleteWhereEmptyMap(t *testing.T) {
+	repo := NewRepository(context.Background(), nil, "test_table")
+	assert.ErrorIs(t, repo.DeleteWhere(map[string]any{}), ErrInvalidParameters)
 }

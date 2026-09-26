@@ -308,6 +308,9 @@ func (r *repository) Count() (int64, error) {
 func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 	qry := r.SqlSelect().Select(goqu.L("COUNT(*)"))
 	for field, value := range fieldValues {
+		if !ValidIdentifier(field) {
+			return 0, ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return Count(r.ctx, r.conn, qry)
@@ -840,6 +843,9 @@ func (t *tx) Count() (int64, error) {
 func (t *tx) CountWhere(fieldValues map[string]any) (int64, error) {
 	qry := t.SqlSelect().Select(goqu.L("COUNT(*)"))
 	for field, value := range fieldValues {
+		if !ValidIdentifier(field) {
+			return 0, ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return Count(t.ctx, t.conn, qry)

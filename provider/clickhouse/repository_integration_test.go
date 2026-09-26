@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doug-martin/goqu/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -261,6 +262,53 @@ func (s *ClickhouseRepositoryTestSuite) TestRawExecution() {
 	assert.NoError(s.T(), err, "FetchByKey should find raw SQL inserted record")
 	assert.Equal(s.T(), "Raw SQL Record", record.Name)
 	assert.Equal(s.T(), uint64(500), record.Count)
+}
+
+// TestStringEscaping checks that values containing backslashes and quotes are matched literally,
+// and cannot end the string literal in the generated SQL
+func (s *ClickhouseRepositoryTestSuite) TestStringEscaping() {
+	s.setupComplexTable()
+	const payload = `x\' OR 1=1 --`
+	now := time.Now().Round(time.Second)
+	names := []string{`a\'b`, `a\nb`, `a\\b`, "plain"}
+	records := make([]any, 0, len(names))
+	for i, name := range names {
+		records = append(records, &ComplexTestRecord{ID: int32(i + 1), Name: name, Created: now, Updated: now})
+	}
+	s.Require().NoError(s.repo.Insert(records))
+
+	for _, name := range names {
+		var rows []ComplexTestRecord
+		s.Require().NoError(s.repo.FetchWhere(map[string]any{"name": name}, &rows), name)
+		s.Require().Len(rows, 1, name)
+		s.Equal(name, rows[0].Name)
+
+		count, err := s.repo.CountWhere(map[string]any{"name": name})
+		s.Require().NoError(err, name)
+		s.Equal(int64(1), count, name)
+	}
+
+	var rows []ComplexTestRecord
+	s.Require().NoError(s.repo.FetchWhere(map[string]any{"name": payload}, &rows))
+	s.Empty(rows)
+	s.Require().NoError(s.repo.Fetch(s.repo.SqlSelect().Where(goqu.C("name").Eq(payload)), &rows))
+	s.Empty(rows)
+	count, err := s.repo.CountWhere(map[string]any{"name": payload})
+	s.Require().NoError(err)
+	s.Equal(int64(0), count)
+	exists, err := s.repo.Exists("name", payload)
+	s.Require().NoError(err)
+	s.False(exists)
+
+	s.Require().NoError(s.repo.DeleteWhere(map[string]any{"name": payload}))
+	count, err = s.repo.Count()
+	s.Require().NoError(err)
+	s.Equal(int64(len(names)), count)
+
+	s.Require().NoError(s.repo.DeleteWhere(map[string]any{"name": `a\'b`}))
+	count, err = s.repo.Count()
+	s.Require().NoError(err)
+	s.Equal(int64(len(names)-1), count)
 }
 
 // Run the test suite

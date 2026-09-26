@@ -34,7 +34,7 @@ func Exec(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.SelectDataset)
 	if qry == nil {
 		return ErrInvalidParameters
 	}
-	sqlQry, args, err := qry.ToSQL()
+	sqlQry, args, err := qry.Prepared(true).ToSQL()
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func FetchOne(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDat
 		return ErrInvalidParameters
 	}
 	qry = qry.Limit(1)
-	sqlQry, args, err := qry.ToSQL()
+	sqlQry, args, err := qry.Prepared(true).ToSQL()
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func Fetch(ctx context.Context, conn SqlxReaderCtx, qry *goqu.SelectDataset, tar
 	if target == nil || qry == nil {
 		return ErrInvalidParameters
 	}
-	sqlQry, args, err := qry.ToSQL()
+	sqlQry, args, err := qry.Prepared(true).ToSQL()
 	if err != nil {
 		return err
 	}
@@ -69,6 +69,9 @@ func FetchRecord(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.Select
 		return ErrInvalidParameters
 	}
 	for field, value := range fieldValues {
+		if !ValidIdentifier(field) {
+			return ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return FetchOne(ctx, conn, qry, target)
@@ -78,6 +81,9 @@ func FetchByKey(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectD
 	if target == nil {
 		return ErrInvalidParameters
 	}
+	if !ValidIdentifier(keyField) {
+		return ErrInvalidIdentifier
+	}
 	return FetchOne(ctx, conn, qry.Where(goqu.C(keyField).Eq(value)), target)
 }
 
@@ -86,6 +92,9 @@ func FetchWhere(ctx context.Context, conn SqlxReaderCtx, qry *goqu.SelectDataset
 		return ErrInvalidParameters
 	}
 	for field, value := range fieldValues {
+		if !ValidIdentifier(field) {
+			return ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return Fetch(ctx, conn, qry, target)
@@ -93,14 +102,24 @@ func FetchWhere(ctx context.Context, conn SqlxReaderCtx, qry *goqu.SelectDataset
 
 func Exists(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset, fieldName string, fieldValue any, skip ...any) (bool, error) {
 	result := 0
+	if !ValidIdentifier(fieldName) {
+		return false, ErrInvalidIdentifier
+	}
 	qry = qry.Select(goqu.L("COUNT(*)")).Where(goqu.C(fieldName).Eq(fieldValue))
 	if len(skip) > 0 {
 		if len(skip) != 2 {
 			return false, ErrInvalidParameters
 		}
-		qry = qry.Where(goqu.C(skip[0].(string)).Neq(skip[1]))
+		skipField, ok := skip[0].(string)
+		if !ok {
+			return false, ErrInvalidParameters
+		}
+		if !ValidIdentifier(skipField) {
+			return false, ErrInvalidIdentifier
+		}
+		qry = qry.Where(goqu.C(skipField).Neq(skip[1]))
 	}
-	qrySql, args, err := qry.ToSQL()
+	qrySql, args, err := qry.Prepared(true).ToSQL()
 	if err != nil {
 		return false, err
 	}
@@ -115,7 +134,7 @@ func Delete(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDatase
 	if qry == nil {
 		return ErrInvalidParameters
 	}
-	sqlQry, args, err := qry.ToSQL()
+	sqlQry, args, err := qry.Prepared(true).ToSQL()
 	if err != nil {
 		return err
 	}
@@ -124,16 +143,22 @@ func Delete(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDatase
 }
 
 func DeleteWhere(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, fieldNameValue map[string]any) error {
-	if fieldNameValue == nil {
+	if len(fieldNameValue) == 0 {
 		return ErrInvalidParameters
 	}
 	for field, value := range fieldNameValue {
+		if !ValidIdentifier(field) {
+			return ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return Delete(ctx, conn, qry)
 }
 
 func DeleteByKey(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.DeleteDataset, keyField string, value any) error {
+	if !ValidIdentifier(keyField) {
+		return ErrInvalidIdentifier
+	}
 	qry = qry.Where(goqu.C(keyField).Eq(value))
 	return Delete(ctx, conn, qry)
 }
@@ -298,7 +323,7 @@ func Update(ctx context.Context, conn sqlx.ExecerContext, qry *goqu.UpdateDatase
 }
 
 func Count(ctx context.Context, conn sqlx.QueryerContext, qry *goqu.SelectDataset) (int64, error) {
-	sqlQry, values, err := qry.ToSQL()
+	sqlQry, values, err := qry.Prepared(true).ToSQL()
 	if err != nil {
 		return 0, err
 	}

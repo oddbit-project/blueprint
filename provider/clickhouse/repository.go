@@ -142,6 +142,9 @@ func (r *repository) FetchRecord(fieldValues map[string]any, target any) error {
 	}
 	qry := r.SqlSelect()
 	for field, value := range fieldValues {
+		if !db.ValidIdentifier(field) {
+			return db.ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return r.FetchOne(qry, target)
@@ -151,6 +154,9 @@ func (r *repository) FetchRecord(fieldValues map[string]any, target any) error {
 func (r *repository) FetchByKey(keyField string, value any, target any) error {
 	if target == nil {
 		return ErrInvalidParameters
+	}
+	if !db.ValidIdentifier(keyField) {
+		return db.ErrInvalidIdentifier
 	}
 	qry := r.SqlSelect().Where(goqu.C(keyField).Eq(value))
 	return r.FetchOne(qry, target)
@@ -163,6 +169,9 @@ func (r *repository) FetchWhere(fieldValues map[string]any, target any) error {
 	}
 	qry := r.SqlSelect()
 	for field, value := range fieldValues {
+		if !db.ValidIdentifier(field) {
+			return db.ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	return r.Fetch(qry, target)
@@ -195,13 +204,23 @@ func (r *repository) RawExec(sql string, args ...any) error {
 //	exists, err := repo.Exists("label", "record 4", "id_sample_table", 4)
 func (r *repository) Exists(fieldName string, fieldValue any, skip ...any) (bool, error) {
 	var result uint64
+	if !db.ValidIdentifier(fieldName) {
+		return false, db.ErrInvalidIdentifier
+	}
 	qry := r.SqlSelect()
 	qry = qry.Select(goqu.L("COUNT(*)")).Where(goqu.C(fieldName).Eq(fieldValue))
 	if len(skip) > 0 {
 		if len(skip) != 2 {
 			return false, ErrInvalidParameters
 		}
-		qry = qry.Where(goqu.C(skip[0].(string)).Neq(skip[1]))
+		skipField, ok := skip[0].(string)
+		if !ok {
+			return false, ErrInvalidParameters
+		}
+		if !db.ValidIdentifier(skipField) {
+			return false, db.ErrInvalidIdentifier
+		}
+		qry = qry.Where(goqu.C(skipField).Neq(skip[1]))
 	}
 	qrySql, args, err := qry.ToSQL()
 	if err != nil {
@@ -231,11 +250,14 @@ func (r *repository) Delete(qry *goqu.DeleteDataset) error {
 // DeleteWhere performs a conditional delete operation
 // Note:check limitations in https://clickhouse.com/docs/sql-reference/statements/delete
 func (r *repository) DeleteWhere(fieldNameValue map[string]any) error {
-	if fieldNameValue == nil {
+	if len(fieldNameValue) == 0 {
 		return ErrInvalidParameters
 	}
 	qry := r.SqlDelete()
 	for field, value := range fieldNameValue {
+		if !db.ValidIdentifier(field) {
+			return db.ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	sqlQry, args, err := qry.ToSQL()
@@ -248,6 +270,9 @@ func (r *repository) DeleteWhere(fieldNameValue map[string]any) error {
 // DeleteByKey performs a delete operation
 // Note:check limitations in https://clickhouse.com/docs/sql-reference/statements/delete
 func (r *repository) DeleteByKey(keyField string, value any) error {
+	if !db.ValidIdentifier(keyField) {
+		return db.ErrInvalidIdentifier
+	}
 	qry := r.SqlDelete().Where(goqu.C(keyField).Eq(value))
 	sqlQry, args, err := qry.ToSQL()
 	if err != nil {
@@ -348,6 +373,9 @@ func (r *repository) Count() (int64, error) {
 func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 	qry := r.SqlSelect().Select(goqu.L("COUNT(*)"))
 	for field, value := range fieldValues {
+		if !db.ValidIdentifier(field) {
+			return 0, db.ErrInvalidIdentifier
+		}
 		qry = qry.Where(goqu.C(field).Eq(value))
 	}
 	sqlQry, values, err := qry.ToSQL()
