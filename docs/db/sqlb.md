@@ -95,18 +95,22 @@ clause even to select every row); on PostgreSQL/SQLite the `WHERE` clause is omi
 
 `Raw(sql, args...)` renders `sql` text verbatim, substituting each `?` marker with the
 corresponding argument (bound, or rendered inline if it is itself an `Expr`); `??` writes a
-literal `?` without consuming an argument. `Raw`'s SQL text is trusted input and must never be
-built from request data.
+literal `?` without consuming an argument — needed because PostgreSQL itself uses a bare `?` as
+an operator (e.g. jsonb's key-exists operator, `data ? 'key'`), which would otherwise collide
+with `Raw`'s own placeholder syntax. `Raw`'s SQL text is trusted input and must never be built
+from request data.
 
 ```go
-sql, args, err := sqlb.Select(sqlb.Raw("age ?? 1 + ?", 5)).
-    From("users").
+sql, args, err := sqlb.Select().
+    From("docs").
+    Where(sqlb.Raw("data ?? ?", "owner")).
     Build(sqlb.Postgres())
-// SELECT (age ? 1 + $1) FROM "users" [5]
+// SELECT * FROM "docs" WHERE (data ? $1) [owner]
 ```
 
-(`ExampleRaw`.) Note the parentheses: a `Raw` used as a select column is always parenthesized
-(`SELECT (age ? 1 + $1) ...`), so it composes safely next to other columns. `??` is rejected
+(`ExampleRaw`.) Note the parentheses: a `Raw` expression is always parenthesized when it is
+rendered (`WHERE (data ? $1)` above; the same applies when a `Raw` is used as a select column,
+e.g. `SELECT (k + 1) ...`), so it composes safely next to other expressions. `??` is rejected
 outright on ClickHouse (`ErrRawPlaceholder`) — there is no literal `?` in ClickHouse `Raw` text.
 A `$` followed by a digit is also rejected everywhere (it would collide with PostgreSQL's own
 `$n` placeholder syntax).
@@ -158,7 +162,11 @@ and `$` followed by a digit (`ErrInvalidIdentifier`) — these would collide wit
 parameterized-query and settings placeholder syntax. Values are checked recursively: a map,
 struct, or a statement builder passed where a value is expected fails with `ErrUnsafeValue` /
 `ErrInvalidColumn` rather than being sent to the driver, since `clickhouse-go` does not bind
-these safely (verified against `clickhouse-go` v2.40.3).
+these safely (verified against `clickhouse-go` v2.40.3). ClickHouse's `LEFT JOIN` fills
+non-matching columns with each column's type default (`0`, `''`, etc.), not `NULL`, unless the
+`join_use_nulls = 1` setting is used — a `sqlb`-built `LEFT JOIN` sends valid SQL either way, but
+code that checks a joined column for `NULL` needs that setting set (via `.Settings(...)`) to see
+one.
 
 ## SQLite identifiers
 

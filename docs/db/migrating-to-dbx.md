@@ -82,12 +82,19 @@ not just its call syntax:
   input matches a literal `%`.
 - **Deterministic grid filter/sort order.** `dbx.Grid.Build` applies filters and sorts in sorted
   alias order, not map iteration order, so the same `GridQuery` always builds the same SQL.
-- **Only grid-flagged fields are addressable.** `db.Grid` could be coaxed into filtering/sorting
-  on any struct field; `dbx.Grid[T]` only recognizes fields tagged `grid:"sort"`/`"filter"`/
-  `"search"` — anything else answers "field is not valid", not a database error.
-- **`GridQuery.SearchType` is JSON key `searchType`**, not `search_type` — decoding itself is
-  case-insensitive (`encoding/json`'s usual behaviour), so this only matters for a client that
-  serializes the field name explicitly.
+- **A known-but-unflagged field now answers "field is not valid", not "not filterable"/"not
+  sortable".** `db.Grid` also enforced grid flags — an unflagged field was always rejected — but
+  it distinguished a struct field that exists without the right flag ("field is not
+  filterable"/"not sortable") from an alias that isn't a struct field at all ("field is not
+  valid"). `dbx.Grid[T]` collapses that distinction: only grid-flagged fields are addressable at
+  all, so *any* unaddressable alias — unflagged struct field or bogus name alike — answers
+  "field is not valid". This is a visible response change for a client that branches on the
+  `GridError.Message` text.
+- **`GridQuery.SearchType` is JSON key `searchType`**, not the old `SearchType` (the `db` package's
+  `GridQuery.SearchType` carried no `json` tag, so it serialized under the Go field name,
+  `SearchType`, capitalized). Decoding is case-insensitive either way (`encoding/json`'s usual
+  behaviour), so an old client sending `"SearchType"` still decodes correctly against the new
+  struct; only a client that reads the field back out of JSON by exact key needs to change.
 - **`ctx` on every call**, not a context stored at construction — a repository is no longer tied
   to one context/deadline for its whole lifetime.
 - **`Int(n)` for CASE constants.** A goqu integer literal bound as a value inside a `CASE` fed to
@@ -98,6 +105,35 @@ not just its call syntax:
   it. Rewrite `if n == 0 { ... }` logic that assumed a real count.
 - **`dbx` selects an explicit column list, never `SELECT *`.** A record type must map every
   column it selects; the old `SELECT *` tolerated a table column the struct didn't map.
+- **Record shapes that used to bind silently wrong data are now rejected outright.** An embedded
+  pointer struct, an unexported or `db`/`ch`-tagged embedded struct, an ambiguous promoted field
+  name, or the same column set more than once all fail at `NewRepository`/`Build` time
+  (`sqlb.ErrRecordShape`, `sqlb.ErrDuplicateColumn`) instead of building a statement. The old `qb`
+  path silently bound the wrong value for some of these shapes — most notably a duplicate
+  promoted field name, where one of the two fields silently won and the other was never written.
+- **Grid input limits.** `dbx.Grid` caps a `[]any` filter value at `dbx.MaxFilterValues` elements
+  and `SearchText` at `dbx.MaxSearchText` bytes, range-checks `SearchType` in `ValidQuery`, and
+  requires `Grid.Build` to start from a non-nil base query. `Limit == 0` still returns every row
+  unless `Grid.WithMaxLimit` is set, in which case `Limit == 0` (or a `Limit` over the cap) is
+  treated as the cap. Because `GridQuery` decodes from JSON, a numeric filter value always
+  arrives as `float64` — e.g. `{"id": 3.9}` matches `id = 3` on PostgreSQL (`pgx` truncates);
+  register a `GridFilterFunc` via `AddFilterFunc` on an integer column to reject non-integer
+  input if that matters.
+- **SQLite identifiers are quoted with backticks, not double quotes.** SQLite silently treats an
+  unrecognized double-quoted identifier as a string literal rather than raising an error; `sqlb`
+  avoids that failure mode entirely by never using double quotes on SQLite. SQLite's `LIKE` is
+  also ASCII case-insensitive (PostgreSQL, ClickHouse and Generic are case-sensitive; use
+  `ILIKE` there).
+- **ClickHouse-specific restrictions**: a literal `?` is rejected in identifiers and in `Raw`'s
+  `??` form; map, struct and named (driver-bound) values are rejected outright
+  (`sqlb.ErrUnsafeValue`) rather than sent to a driver that can't bind them safely; a `UNION`
+  with an outer `ORDER BY`/`LIMIT`/`OFFSET` is wrapped as `SELECT * FROM (<union>) ...`;
+  `Delete(t).All()` renders `... WHERE 1`; lightweight `DELETE` does not work on Distributed
+  tables or tables with projections; and a bound `time.Time` reaches the server at second
+  precision (a `clickhouse-go` v2.40.3 limitation, not a `dbx`/`sqlb` choice).
+- **PostgreSQL: a bound value alone in a select list may need `sqlb.Cast(...)`.** PostgreSQL
+  cannot always infer a parameter's type from context alone and fails with "could not determine
+  data type of parameter" — wrap the value in `sqlb.Cast(v, "type")` when that happens.
 
 ## Migrating incrementally
 

@@ -57,15 +57,18 @@ func ExampleDelete_requiresWhere() {
 	// [] sqlb: statement requires a WHERE clause; call All() to affect every row
 }
 
-// ExampleRaw shows Raw's two placeholder forms: `?` binds an argument in
-// position, `??` writes a literal `?` without consuming one.
+// ExampleRaw shows Raw's two placeholder forms with a real PostgreSQL
+// operator that itself uses `?`: jsonb's key-exists operator. `??` writes
+// a literal `?` (the operator) without consuming an argument; `?` binds
+// the argument in position.
 func ExampleRaw() {
-	sql, args, err := sqlb.Select(sqlb.Raw("age ?? 1 + ?", 5)).
-		From("users").
+	sql, args, err := sqlb.Select().
+		From("docs").
+		Where(sqlb.Raw("data ?? ?", "owner")).
 		Build(sqlb.Postgres())
 	fmt.Println(sql, args, err)
 	// Output:
-	// SELECT (age ? 1 + $1) FROM "users" [5] <nil>
+	// SELECT * FROM "docs" WHERE (data ? $1) [owner] <nil>
 }
 
 // ExampleSelectBuilder_Union shows the UNION keyword difference between
