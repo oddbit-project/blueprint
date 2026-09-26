@@ -2,6 +2,7 @@ package dbx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -20,6 +21,17 @@ import (
 )
 
 const dbxUsersDDL = `create table users(id serial primary key, name text not null, email text unique not null)`
+
+const gridRowsDDL = `create table grid_rows(id serial primary key, name text not null, email text not null, tag text not null, note text not null)`
+
+// gridRow is the record type for TestGridIntegration.
+type gridRow struct {
+	ID    int64  `db:"id,auto" json:"id" grid:"sort,filter"`
+	Name  string `db:"name" json:"name" grid:"search,sort"`
+	Email string `db:"email" json:"email" grid:"search"`
+	Tag   string `db:"tag" json:"tag" grid:"filter"`
+	Note  string `db:"note" json:"note"`
+}
 
 // dbxUser is the record type for the integration suite's "users" table.
 type dbxUser struct {
@@ -335,4 +347,76 @@ func (s *DbxIntegrationSuite) TestWithTxRollback() {
 	n, err := r.Count(s.ctx, nil)
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(0), n)
+}
+
+// TestGridIntegration exercises Grid[gridRow]/Repository.QueryGrid end to
+// end against PostgreSQL on all three client variants: literal LIKE
+// wildcards ("%", "_"), a filter+sort+paging combination, and a
+// JSON-decoded GridQuery (as it would arrive in an HTTP request body).
+func (s *DbxIntegrationSuite) TestGridIntegration() {
+	_, err := s.adminClient.Conn.ExecContext(s.ctx, gridRowsDDL)
+	require.NoError(s.T(), err, "failed to create grid_rows table")
+	defer func() {
+		_, err := s.adminClient.Conn.ExecContext(s.ctx, "DROP TABLE grid_rows")
+		require.NoError(s.T(), err, "failed to drop grid_rows table")
+	}()
+
+	for _, v := range s.clientVariants() {
+		s.Run(v.name, func() {
+			_, err := s.adminClient.Conn.ExecContext(s.ctx, "TRUNCATE grid_rows RESTART IDENTITY")
+			require.NoError(s.T(), err)
+
+			q := s.newQuerier(v.dsn)
+			s.assertSCS(q, v.scs)
+
+			r, err := NewRepository[gridRow](q, "grid_rows")
+			require.NoError(s.T(), err)
+
+			g, err := NewGrid[gridRow]()
+			require.NoError(s.T(), err)
+
+			names := []string{"50%", "50x", "a_b", "axb"}
+			for i, n := range names {
+				require.NoError(s.T(), r.Insert(s.ctx, &gridRow{Name: n, Email: fmt.Sprintf("u%d@x.com", i), Tag: "t"}), n)
+			}
+
+			// literal "%" is not a wildcard: only the row literally named
+			// "50%" matches, not "50x".
+			list, err := r.QueryGrid(s.ctx, g, &GridQuery{SearchType: SearchAny, SearchText: "50%"})
+			require.NoError(s.T(), err)
+			require.Len(s.T(), list, 1)
+			assert.Equal(s.T(), "50%", list[0].Name)
+
+			// literal "_" is not a single-char wildcard: only "a_b"
+			// matches, not "axb".
+			list, err = r.QueryGrid(s.ctx, g, &GridQuery{SearchType: SearchAny, SearchText: "a_b"})
+			require.NoError(s.T(), err)
+			require.Len(s.T(), list, 1)
+			assert.Equal(s.T(), "a_b", list[0].Name)
+
+			// filter + sort + paging: all four rows share tag "t"; sorted
+			// by id ascending, limit 2 offset 1 returns ids 2 and 3.
+			list, err = r.QueryGrid(s.ctx, g, &GridQuery{
+				FilterFields: map[string]any{"tag": "t"},
+				SortFields:   map[string]string{"id": "asc"},
+				Limit:        2,
+				Offset:       1,
+			})
+			require.NoError(s.T(), err)
+			require.Len(s.T(), list, 2)
+			assert.Equal(s.T(), []int64{2, 3}, []int64{list[0].ID, list[1].ID})
+
+			// a GridQuery decoded from a literal JSON request body, end to
+			// end: SearchAny "50" matches both "50%" and "50x", ordered by
+			// id ascending.
+			var jq GridQuery
+			body := []byte(`{"searchType":3,"searchText":"50","sortFields":{"id":"asc"}}`)
+			require.NoError(s.T(), json.Unmarshal(body, &jq))
+			list, err = r.QueryGrid(s.ctx, g, &jq)
+			require.NoError(s.T(), err)
+			require.Len(s.T(), list, 2)
+			assert.Equal(s.T(), "50%", list[0].Name)
+			assert.Equal(s.T(), "50x", list[1].Name)
+		})
+	}
 }

@@ -134,6 +134,16 @@ func (r *Repository[T]) List(ctx context.Context, q *sqlb.SelectBuilder) ([]*T, 
 	return out, nil
 }
 
+// QueryGrid builds r.Select() through g.Build(_, q) (which validates q
+// against g's spec) and runs the result through List.
+func (r *Repository[T]) QueryGrid(ctx context.Context, g *Grid[T], q *GridQuery) ([]*T, error) {
+	sel, err := g.Build(r.sel, q)
+	if err != nil {
+		return nil, err
+	}
+	return r.List(ctx, sel)
+}
+
 // GetBy is Get filtered by an equality match on fields, whose keys must all
 // be repository columns (else ErrUnknownColumn, checked before any query).
 func (r *Repository[T]) GetBy(ctx context.Context, fields map[string]any) (*T, error) {

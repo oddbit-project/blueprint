@@ -31,6 +31,13 @@ type userOpt struct {
 	Bio   *string `db:"bio" goqu:"omitnil"`
 }
 
+// gridUser is the record type for TestRepositoryQueryGrid.
+type gridUser struct {
+	ID    int64  `db:"id,auto" json:"id" grid:"sort,filter"`
+	Name  string `db:"name" json:"name" grid:"search,sort"`
+	Email string `db:"email" json:"email" grid:"filter"`
+}
+
 // --- shapes for TestNewRepositoryShapes ---
 
 type EmbeddedBase struct {
@@ -529,4 +536,37 @@ func TestRepositoryWithTx(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRepositoryQueryGrid(t *testing.T) {
+	q, mock := newMockQuerier(t)
+	r, err := NewRepository[gridUser](q, "users")
+	require.NoError(t, err)
+	g, err := NewGrid[gridUser]()
+	require.NoError(t, err)
+
+	mock.ExpectQuery(`SELECT "id", "name", "email" FROM "users" WHERE "email" = $1 ORDER BY "name" ASC`).
+		WithArgs("bob@x.com").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).AddRow(int64(1), "Bob", "bob@x.com"))
+
+	got, err := r.QueryGrid(context.Background(), g, &GridQuery{
+		FilterFields: map[string]any{"email": "bob@x.com"},
+		SortFields:   map[string]string{"name": "asc"},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "Bob", got[0].Name)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRepositoryQueryGridInvalidQueryNeverHitsDB(t *testing.T) {
+	cq := &countingQuerier{d: sqlb.Postgres()}
+	r, err := NewRepository[gridUser](cq, "users")
+	require.NoError(t, err)
+	g, err := NewGrid[gridUser]()
+	require.NoError(t, err)
+
+	_, err = r.QueryGrid(context.Background(), g, &GridQuery{FilterFields: map[string]any{"bogus": "x"}})
+	require.Error(t, err)
+	assert.Equal(t, 0, cq.calls)
 }
