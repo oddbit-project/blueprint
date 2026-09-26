@@ -197,6 +197,26 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxBackslashIdentifier() {
 	var out dbxBackslashCol
 	require.NoError(s.T(), q.Get(s.ctx, &out, sqlStr, args...))
 	assert.Equal(s.T(), "val1", out.Val)
+
+	// A trailing single backslash is the sharper case: dropping the \->\\
+	// escape here doesn't just fetch the wrong value, it makes the
+	// rendered identifier's closing quote look escaped ("d\" instead of
+	// "d\\"), so the statement fails to parse at all.
+	const table2 = "dbx_backslash_trailing"
+	err = s.client.Conn.Exec(s.ctx, `CREATE TABLE `+table2+` (id Int32, "d\\" String) ENGINE = MergeTree ORDER BY id`)
+	require.NoError(s.T(), err)
+	defer s.dropTable(table2)
+	require.NoError(s.T(), s.client.Conn.Exec(s.ctx, "INSERT INTO "+table2+" VALUES (?, ?)", 1, "val2"))
+
+	sqlStr2, args2, err := sqlb.Select(`d\`).From(table2).Where(sqlb.Col("id").Eq(1)).Build(q.Dialect())
+	require.NoError(s.T(), err)
+
+	type trailingCol struct {
+		Val string `ch:"d\\"`
+	}
+	var out2 trailingCol
+	require.NoError(s.T(), q.Get(s.ctx, &out2, sqlStr2, args2...))
+	assert.Equal(s.T(), "val2", out2.Val)
 }
 
 func (s *ClickhouseRepositoryTestSuite) TestDbxQuestionMarkRejected() {
