@@ -194,7 +194,7 @@ func (r *repository) RawExec(sql string, args ...any) error {
 //	// check if a record with label == "record 4" and id_sample_table<>4 exists
 //	exists, err := repo.Exists("label", "record 4", "id_sample_table", 4)
 func (r *repository) Exists(fieldName string, fieldValue any, skip ...any) (bool, error) {
-	var result int
+	var result uint64
 	qry := r.SqlSelect()
 	qry = qry.Select(goqu.L("COUNT(*)")).Where(goqu.C(fieldName).Eq(fieldValue))
 	if len(skip) > 0 {
@@ -337,11 +337,11 @@ func (r *repository) Count() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var count int64
+	var count uint64
 	if err = r.conn.QueryRow(r.ctx, sqlQry, values...).Scan(&count); err != nil {
 		return 0, err
 	}
-	return count, nil
+	return int64(count), nil
 }
 
 // CountWhere returns the number of rows matching the fieldValues map
@@ -354,11 +354,11 @@ func (r *repository) CountWhere(fieldValues map[string]any) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var count int64
+	var count uint64
 	if err = r.conn.QueryRow(r.ctx, sqlQry, values...).Scan(&count); err != nil {
 		return 0, err
 	}
-	return count, nil
+	return int64(count), nil
 }
 
 // InsertReturning is not supported

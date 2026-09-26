@@ -227,17 +227,21 @@ func (s *ClickhouseRepositoryTestSuite) TestCounters() {
 	err := s.repo.Insert(records)
 	assert.NoError(s.T(), err, "Insert should succeed")
 
-	// Direct count with SQL (workaround for type issue)
-	var totalCount uint64
-	err = s.client.Conn.QueryRow(s.ctx, "SELECT COUNT(*) FROM complex_test").Scan(&totalCount)
-	assert.NoError(s.T(), err, "Count query should succeed")
-	assert.Equal(s.T(), uint64(3), totalCount, "Should have 3 total records")
+	totalCount, err := s.repo.Count()
+	assert.NoError(s.T(), err, "Count should succeed")
+	assert.Equal(s.T(), int64(3), totalCount, "Should have 3 total records")
 
 	// Count with condition
-	var validCount uint64
-	err = s.client.Conn.QueryRow(s.ctx, "SELECT COUNT(*) FROM complex_test WHERE is_valid = 1").Scan(&validCount)
-	assert.NoError(s.T(), err, "Conditional count query should succeed")
-	assert.Equal(s.T(), uint64(2), validCount, "Should have 2 valid records")
+	validCount, err := s.repo.CountWhere(map[string]any{"is_valid": 1})
+	assert.NoError(s.T(), err, "CountWhere should succeed")
+	assert.Equal(s.T(), int64(2), validCount, "Should have 2 valid records")
+
+	exists, err := s.repo.Exists("name", "Record 3")
+	assert.NoError(s.T(), err, "Exists should succeed")
+	assert.True(s.T(), exists)
+	exists, err = s.repo.Exists("name", "Record 3", "id", int32(3))
+	assert.NoError(s.T(), err, "Exists with skip should succeed")
+	assert.False(s.T(), exists)
 }
 
 // Test raw SQL execution
