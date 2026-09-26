@@ -201,6 +201,46 @@ func (star) render(w *writer) { w.keyword("*") }
 // Star renders the unquoted `*`.
 func Star() Expr { return star{} }
 
+// Sub renders a scalar subquery: "(<select>)". It shares w with the outer
+// statement so placeholders keep counting across nesting.
+func Sub(q *SelectBuilder) Value {
+	return Value{fn: func(w *writer) {
+		if q == nil {
+			w.fail(ErrNilExpr)
+			return
+		}
+		w.keyword("(")
+		q.renderSelect(w)
+		w.keyword(")")
+	}}
+}
+
+// Exists renders "EXISTS (<select>)".
+func Exists(q *SelectBuilder) Value {
+	return Value{fn: func(w *writer) {
+		if q == nil {
+			w.fail(ErrNilExpr)
+			return
+		}
+		w.keyword("EXISTS (")
+		q.renderSelect(w)
+		w.keyword(")")
+	}}
+}
+
+// NotExists renders "NOT EXISTS (<select>)".
+func NotExists(q *SelectBuilder) Value {
+	return Value{fn: func(w *writer) {
+		if q == nil {
+			w.fail(ErrNilExpr)
+			return
+		}
+		w.keyword("NOT EXISTS (")
+		q.renderSelect(w)
+		w.keyword(")")
+	}}
+}
+
 // renderBoolList renders exprs joined by sep, wrapped in parentheses,
 // except when there is exactly one element (rendered bare) or none
 // (emptyLit, wrapped in parentheses).
@@ -378,13 +418,49 @@ func inExpr(v Value, values []any, negate bool) Value {
 	}
 }
 
+// subqueryInExpr renders "v IN (<select>)" / "v NOT IN (<select>)",
+// sharing w with the outer statement so placeholders keep counting across
+// nesting.
+func subqueryInExpr(v Value, sb *SelectBuilder, negate bool) Value {
+	return Value{fn: func(w *writer) {
+		if sb == nil {
+			w.fail(ErrNilExpr)
+			return
+		}
+		renderExpr(w, v)
+		if negate {
+			w.keyword(" NOT IN (")
+		} else {
+			w.keyword(" IN (")
+		}
+		sb.renderSelect(w)
+		w.keyword(")")
+	}}
+}
+
 // In renders "v IN (values...)", expanding a single slice argument. With
-// no values (after expansion) it renders 1=0.
-func (v Value) In(values ...any) Value { return inExpr(v, values, false) }
+// no values (after expansion) it renders 1=0. A single *SelectBuilder
+// argument renders "v IN (<select>)".
+func (v Value) In(values ...any) Value {
+	if len(values) == 1 {
+		if sb, ok := values[0].(*SelectBuilder); ok {
+			return subqueryInExpr(v, sb, false)
+		}
+	}
+	return inExpr(v, values, false)
+}
 
 // NotIn renders "v NOT IN (values...)", expanding a single slice
-// argument. With no values (after expansion) it renders 1=1.
-func (v Value) NotIn(values ...any) Value { return inExpr(v, values, true) }
+// argument. With no values (after expansion) it renders 1=1. A single
+// *SelectBuilder argument renders "v NOT IN (<select>)".
+func (v Value) NotIn(values ...any) Value {
+	if len(values) == 1 {
+		if sb, ok := values[0].(*SelectBuilder); ok {
+			return subqueryInExpr(v, sb, true)
+		}
+	}
+	return inExpr(v, values, true)
+}
 
 // Like renders "v LIKE p".
 func (v Value) Like(p any) Value { return compare(v, "LIKE", p) }

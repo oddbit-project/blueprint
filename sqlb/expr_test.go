@@ -278,6 +278,62 @@ func TestOrder(t *testing.T) {
 	assert.Equal(t, `"a" DESC NULLS LAST`, sql)
 }
 
+func TestInSubquery(t *testing.T) {
+	inner := Select("uid").From("x").Where(Col("k").Eq(1))
+	sql, args, err := render(Postgres(), Col("id").In(inner))
+	require.NoError(t, err)
+	assert.Equal(t, `"id" IN (SELECT "uid" FROM "x" WHERE "k" = $1)`, sql)
+	assert.Equal(t, []any{1}, args)
+
+	sql, args, err = render(Postgres(), Col("id").NotIn(inner))
+	require.NoError(t, err)
+	assert.Equal(t, `"id" NOT IN (SELECT "uid" FROM "x" WHERE "k" = $1)`, sql)
+	assert.Equal(t, []any{1}, args)
+
+	sql, args, err = render(ClickHouse(), Col("id").In(Select("uid").From("x")))
+	require.NoError(t, err)
+	assert.Equal(t, `"id" IN (SELECT "uid" FROM "x")`, sql)
+	assert.Equal(t, []any{}, args)
+
+	_, _, err = render(Postgres(), Col("id").In((*SelectBuilder)(nil)))
+	assert.True(t, errors.Is(err, ErrNilExpr))
+}
+
+func TestExists(t *testing.T) {
+	sql, args, err := render(Postgres(), Exists(Select(Int(1)).From("u")))
+	require.NoError(t, err)
+	assert.Equal(t, `EXISTS (SELECT 1 FROM "u")`, sql)
+	assert.Equal(t, []any{}, args)
+
+	sql, args, err = render(Postgres(), NotExists(Select(Int(1)).From("u")))
+	require.NoError(t, err)
+	assert.Equal(t, `NOT EXISTS (SELECT 1 FROM "u")`, sql)
+	assert.Equal(t, []any{}, args)
+
+	sql, args, err = render(ClickHouse(), Exists(Select(Int(1)).From("u")))
+	require.NoError(t, err)
+	assert.Equal(t, `EXISTS (SELECT 1 FROM "u")`, sql)
+	assert.Equal(t, []any{}, args)
+
+	_, _, err = render(Postgres(), Exists(nil))
+	assert.True(t, errors.Is(err, ErrNilExpr))
+}
+
+func TestSub(t *testing.T) {
+	sql, args, err := render(Postgres(), Col("a").Eq(Sub(Select(Max("a")).From("t"))))
+	require.NoError(t, err)
+	assert.Equal(t, `"a" = (SELECT MAX("a") FROM "t")`, sql)
+	assert.Equal(t, []any{}, args)
+
+	sql, args, err = render(ClickHouse(), Col("a").Eq(Sub(Select(Max("a")).From("t"))))
+	require.NoError(t, err)
+	assert.Equal(t, `"a" = (SELECT MAX("a") FROM "t")`, sql)
+	assert.Equal(t, []any{}, args)
+
+	_, _, err = render(Postgres(), Sub(nil))
+	assert.True(t, errors.Is(err, ErrNilExpr))
+}
+
 func TestValuesNeverInlined(t *testing.T) {
 	hostile := `x\' OR 1=1 --`
 	for _, dialect := range []Dialect{Postgres(), SQLite(), ClickHouse(), Generic()} {
