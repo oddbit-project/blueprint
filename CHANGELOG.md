@@ -17,6 +17,30 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Added
+
+- **`sqlb`**: a new SQL query builder where values are always bound and identifiers are always
+  quoted and escaped by construction, so the normal API cannot reintroduce SQL injection the way
+  goqu's inlined rendering did (fixed in `654df80`). It supports `SELECT`/`INSERT`/`UPDATE`/
+  `DELETE`, joins, CTEs, `UNION`/`UNION ALL`, and ClickHouse-specific clauses (`FINAL`, `SAMPLE`,
+  `ARRAY JOIN`, `PREWHERE`, `SETTINGS`) across the PostgreSQL, SQLite and ClickHouse dialects. See
+  [docs/db/sqlb.md](docs/db/sqlb.md).
+- **`dbx`**: typed generic repositories (`dbx.Repository[T]`) built entirely on `sqlb`, with a
+  `database/sql` adapter (`dbx.FromClient`), a transaction helper (`dbx.WithTx`), and a
+  data-grid system (`dbx.Grid[T]`) restricted to fields a struct explicitly flags with
+  `grid:"sort"`/`"filter"`/`"search"`. Every call takes a `context.Context`; `dbx.ErrNotFound` is
+  an alias for `sql.ErrNoRows`. See [docs/db/dbx.md](docs/db/dbx.md) and
+  [docs/db/migrating-to-dbx.md](docs/db/migrating-to-dbx.md) for a full `db`/goqu migration
+  mapping.
+- **`provider/clickhouse`: `Client.Querier()`** — returns a `dbx.Querier`/`dbx.BatchInserter`
+  bound to the client's native ClickHouse connection, so `dbx.Repository[T]` can run against
+  ClickHouse without `database/sql` (which ClickHouse's driver doesn't use).
+
+### Changed
+
+- **`make test`/`make test-all` now run `provider/sqlite`'s tests** as part of the provider test
+  loop.
+
 ## [v0.10.3] - 2026-09-21
 
 ### Fixed
