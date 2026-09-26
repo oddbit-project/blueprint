@@ -57,11 +57,13 @@ func (d *DeleteBuilder) Build(dl Dialect) (string, []any, error) {
 		w.fail(ErrUnknownDialect)
 		return w.finish()
 	}
-	d.render(w)
+	d.renderDelete(w)
 	return w.finish()
 }
 
-func (d *DeleteBuilder) render(w *writer) {
+// renderDelete renders the DELETE statement into w. It is not named render
+// so *DeleteBuilder does not satisfy Expr.
+func (d *DeleteBuilder) renderDelete(w *writer) {
 	w.keyword("DELETE FROM ")
 	switch t := d.table.(type) {
 	case string:

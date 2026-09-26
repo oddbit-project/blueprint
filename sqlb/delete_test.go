@@ -2,6 +2,7 @@ package sqlb
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -107,4 +108,9 @@ func TestDeleteClickHouse(t *testing.T) {
 
 	_, _, err = Delete("t").Where(Col("a").Eq(1)).Returning("id").Build(ClickHouse())
 	assert.True(t, errors.Is(err, ErrUnsupported))
+}
+
+func TestDeleteNotAnExpr(t *testing.T) {
+	exprType := reflect.TypeOf((*Expr)(nil)).Elem()
+	assert.False(t, reflect.TypeOf((*DeleteBuilder)(nil)).Implements(exprType))
 }
