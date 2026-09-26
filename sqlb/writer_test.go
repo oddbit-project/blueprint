@@ -146,6 +146,27 @@ func TestNestedSliceViaIn(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrUnsafeValue))
 }
 
+func TestArgRejectsBuilders(t *testing.T) {
+	builders := []any{
+		Select("a").From("t"),
+		Delete("t"),
+		Insert("t").Columns("a").Values(1),
+		Update("t").Set("a", 1).All(),
+		Select("a").From("t").As("s"),
+		Table("t"),
+	}
+	for _, d := range []Dialect{Postgres(), SQLite(), ClickHouse(), Generic()} {
+		for i, b := range builders {
+			t.Run(d.Name(), func(t *testing.T) {
+				w := &writer{d: d}
+				w.arg(b)
+				_, _, err := w.finish()
+				assert.True(t, errors.Is(err, ErrInvalidColumn), "case %d: got %v", i, err)
+			})
+		}
+	}
+}
+
 func TestTooManyArgs(t *testing.T) {
 	w := &writer{d: Generic()}
 	for i := 0; i < 1000; i++ {

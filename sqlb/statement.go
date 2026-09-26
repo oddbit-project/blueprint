@@ -54,6 +54,18 @@ func writeAlias(w *writer, alias string) {
 	w.ident(alias)
 }
 
+// renderAssignValue renders v as the right-hand side of a "col = v"
+// assignment: an Expr renders in place, unwrapped (unlike renderOperand,
+// there is no surrounding expression whose precedence needs protecting);
+// anything else is bound.
+func renderAssignValue(w *writer, v any) {
+	if e, ok := v.(Expr); ok {
+		e.render(w)
+		return
+	}
+	w.arg(v)
+}
+
 // renderColumn renders c: a string is a column name, an Expr is rendered
 // as-is, anything else fails with ErrInvalidColumn.
 func renderColumn(w *writer, c any) {

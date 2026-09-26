@@ -147,6 +147,11 @@ func (w *writer) arg(v any) {
 	if w.err != nil {
 		return
 	}
+	switch v.(type) {
+	case *SelectBuilder, *DeleteBuilder, *InsertBuilder, *UpdateBuilder, Subquery, TableRef:
+		w.fail(fmt.Errorf("%w: %T", ErrInvalidColumn, v))
+		return
+	}
 	if e, ok := v.(Expr); ok {
 		e.render(w)
 		return
