@@ -45,6 +45,18 @@ func TestInsertGolden(t *testing.T) {
 		{"from select sqlite upsert where true", SQLite(),
 			Insert("t").Columns("a").FromSelect(Select("x").From("s")).OnConflict("a").DoNothing(),
 			"INSERT INTO `t` (`a`) SELECT `x` FROM `s` WHERE true ON CONFLICT (`a`) DO NOTHING", []any{}},
+		{"from select union sqlite upsert where true on last member", SQLite(),
+			Insert("t").Columns("a").
+				FromSelect(Select("x").From("s").UnionAll(Select("y").From("u"))).
+				OnConflict("a").DoNothing(),
+			"INSERT INTO `t` (`a`) SELECT `x` FROM `s` UNION ALL SELECT `y` FROM `u` WHERE true ON CONFLICT (`a`) DO NOTHING",
+			[]any{}},
+		{"from select union sqlite upsert last member already has where", SQLite(),
+			Insert("t").Columns("a").
+				FromSelect(Select("x").From("s").UnionAll(Select("y").From("u").Where(Col("y").Gt(0)))).
+				OnConflict("a").DoNothing(),
+			"INSERT INTO `t` (`a`) SELECT `x` FROM `s` UNION ALL SELECT `y` FROM `u` WHERE `y` > ? ON CONFLICT (`a`) DO NOTHING",
+			[]any{0}},
 		{"do nothing with target", Postgres(),
 			Insert("t").Columns("a").Values(1).OnConflict("id").DoNothing(),
 			`INSERT INTO "t" ("a") VALUES ($1) ON CONFLICT ("id") DO NOTHING`, []any{1}},
@@ -114,6 +126,15 @@ func TestInsertImmutability(t *testing.T) {
 	ySQL, _, err := y.Build(Postgres())
 	require.NoError(t, err)
 	assert.Equal(t, `INSERT INTO "t" ("a") VALUES ($1) RETURNING "a"`, ySQL)
+
+	// The sqlite upsert WHERE-true rewrite must not mutate the
+	// *SelectBuilder the caller passed to FromSelect.
+	inner := Select("x").From("s").UnionAll(Select("y").From("u"))
+	_, _, err = Insert("t").Columns("a").FromSelect(inner).OnConflict("a").DoNothing().Build(SQLite())
+	require.NoError(t, err)
+	innerSQL, _, err := inner.Build(SQLite())
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT `x` FROM `s` UNION ALL SELECT `y` FROM `u`", innerSQL)
 }
 
 func TestInsertUnsupportedClickHouse(t *testing.T) {

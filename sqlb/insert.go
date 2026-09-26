@@ -378,8 +378,20 @@ func (b *InsertBuilder) renderInsert(w *writer) {
 			w.fail(ErrNoTable)
 			return
 		}
-		if w.d.name == "sqlite" && b.conflict != nil && len(q.where) == 0 {
-			q = q.Where(sqliteTrueCond)
+		if w.d.name == "sqlite" && b.conflict != nil {
+			// SQLite's upsert grammar is ambiguous unless the LAST select
+			// core before ON CONFLICT has a WHERE clause.
+			if len(q.unions) > 0 {
+				if last := q.unions[len(q.unions)-1].query; len(last.where) == 0 {
+					c := q.clone()
+					u := c.unions[len(c.unions)-1]
+					u.query = u.query.Where(sqliteTrueCond)
+					c.unions[len(c.unions)-1] = u
+					q = c
+				}
+			} else if len(q.where) == 0 {
+				q = q.Where(sqliteTrueCond)
+			}
 		}
 		q.renderSelect(w)
 	} else {
