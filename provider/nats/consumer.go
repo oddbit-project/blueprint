@@ -111,9 +111,9 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		Username:     cfg.Username,
 		Cred:         cfg.DefaultCredentialConfig,
 		TLS:          cfg.ClientConfig,
-		PingInterval: cfg.ConsumerOptions.PingInterval,
-		MaxPingsOut:  cfg.ConsumerOptions.MaxPingsOut,
-		Timeout:      cfg.ConsumerOptions.Timeout,
+		PingInterval: cfg.PingInterval,
+		MaxPingsOut:  cfg.MaxPingsOut,
+		Timeout:      cfg.Timeout,
 	})
 	if err != nil {
 		logger.Error(err, "Failed to connect to NATS", log.KV{
