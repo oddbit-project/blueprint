@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/oddbit-project/blueprint/db/field"
+	"github.com/oddbit-project/gohan/field"
 )
 
 // gridSpec is the compiled, per-type shape a Grid[T] needs: which aliases

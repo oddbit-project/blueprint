@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/oddbit-project/blueprint/db"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // row is the golden record type used across this file: normative aliases
@@ -23,8 +23,8 @@ type row struct {
 	Note  string `db:"note" json:"note"` // not addressable
 }
 
-func rowBase() *sqlb.SelectBuilder {
-	return sqlb.Select("id", "name", "email", "tag").From("rows")
+func rowBase() *gohan.SelectBuilder {
+	return gohan.Select("id", "name", "email", "tag").From("rows")
 }
 
 func buildRow(t *testing.T, q *GridQuery) (string, []any, error) {
@@ -35,7 +35,7 @@ func buildRow(t *testing.T, q *GridQuery) (string, []any, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return sb.Build(sqlb.Postgres())
+	return sb.Build(gohan.Postgres())
 }
 
 // --- Step 1: spec and types ---
@@ -294,23 +294,23 @@ func TestGridBuildGolden(t *testing.T) {
 func TestGridRejectsCompoundBase(t *testing.T) {
 	g, err := NewGrid[row]()
 	require.NoError(t, err)
-	compound := rowBase().Union(sqlb.Select("id", "name", "email", "tag").From("more_rows"))
+	compound := rowBase().Union(gohan.Select("id", "name", "email", "tag").From("more_rows"))
 	_, err = g.Build(compound, &GridQuery{})
 	require.Error(t, err)
 	var gerr GridError
 	require.True(t, errors.As(err, &gerr))
-	assert.Equal(t, GridError{Scope: "query", Message: "base query must not be a UNION; wrap it with sqlb.From(q.As(...))"}, gerr)
+	assert.Equal(t, GridError{Scope: "query", Message: "base query must not be a UNION; wrap it with gohan.From(q.As(...))"}, gerr)
 }
 
 func TestGridCompoundBaseWorkaround(t *testing.T) {
 	g, err := NewGrid[row]()
 	require.NoError(t, err)
-	compound := sqlb.Select("id", "name", "email", "tag").From("rows").
-		Union(sqlb.Select("id", "name", "email", "tag").From("more_rows"))
-	base := sqlb.From(compound.As("u"))
+	compound := gohan.Select("id", "name", "email", "tag").From("rows").
+		Union(gohan.Select("id", "name", "email", "tag").From("more_rows"))
+	base := gohan.From(compound.As("u"))
 	sb, err := g.Build(base, &GridQuery{FilterFields: map[string]any{"tag": "a"}})
 	require.NoError(t, err)
-	gotSQL, gotArgs, err := sb.Build(sqlb.Postgres())
+	gotSQL, gotArgs, err := sb.Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Equal(t,
 		`SELECT * FROM (SELECT "id", "name", "email", "tag" FROM "rows" UNION SELECT "id", "name", "email", "tag" FROM "more_rows") AS "u" WHERE "tag" = $1`,
@@ -319,14 +319,14 @@ func TestGridCompoundBaseWorkaround(t *testing.T) {
 }
 
 // TestGridBuildGoldenSQLite proves the SQLite-specific "LIMIT -1 OFFSET n"
-// rendering for an offset-only query, exercised through sqlb rather than
+// rendering for an offset-only query, exercised through gohan rather than
 // re-implemented in Build.
 func TestGridBuildGoldenSQLite(t *testing.T) {
 	g, err := NewGrid[row]()
 	require.NoError(t, err)
 	sb, err := g.Build(rowBase(), &GridQuery{Offset: 5})
 	require.NoError(t, err)
-	gotSQL, gotArgs, err := sb.Build(sqlb.SQLite())
+	gotSQL, gotArgs, err := sb.Build(gohan.SQLite())
 	require.NoError(t, err)
 	assert.Equal(t, "SELECT `id`, `name`, `email`, `tag` FROM `rows` LIMIT -1 OFFSET 5", gotSQL)
 	assert.Equal(t, []any{}, gotArgs)
@@ -340,7 +340,7 @@ func TestGridSortDeterministic(t *testing.T) {
 	}
 	g, err := NewGrid[multi]()
 	require.NoError(t, err)
-	base := sqlb.Select("zeta", "alpha", "mid").From("multi")
+	base := gohan.Select("zeta", "alpha", "mid").From("multi")
 	q := &GridQuery{
 		FilterFields: map[string]any{"a_zeta": float64(1), "z_alpha": float64(2), "m_mid": "x"},
 		SortFields:   map[string]string{"a_zeta": "asc", "z_alpha": "desc", "m_mid": "asc"},
@@ -351,7 +351,7 @@ func TestGridSortDeterministic(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		sb, err := g.Build(base, q)
 		require.NoError(t, err)
-		gotSQL, gotArgs, err := sb.Build(sqlb.Postgres())
+		gotSQL, gotArgs, err := sb.Build(gohan.Postgres())
 		require.NoError(t, err)
 		if i == 0 {
 			first = gotSQL
@@ -379,7 +379,7 @@ func TestGridFilterFunc(t *testing.T) {
 
 	sb, err := g.Build(rowBase(), &GridQuery{FilterFields: map[string]any{"tag": "yes"}})
 	require.NoError(t, err)
-	gotSQL, gotArgs, err := sb.Build(sqlb.Postgres())
+	gotSQL, gotArgs, err := sb.Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Equal(t, `SELECT "id", "name", "email", "tag" FROM "rows" WHERE "tag" = $1`, gotSQL)
 	assert.Equal(t, []any{true}, gotArgs)
@@ -423,19 +423,19 @@ func TestGridMaxLimit(t *testing.T) {
 
 	sb, err := g.Build(rowBase(), &GridQuery{})
 	require.NoError(t, err)
-	gotSQL, _, err := sb.Build(sqlb.Postgres())
+	gotSQL, _, err := sb.Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Contains(t, gotSQL, "LIMIT 5")
 
 	sb, err = g.Build(rowBase(), &GridQuery{Limit: 100})
 	require.NoError(t, err)
-	gotSQL, _, err = sb.Build(sqlb.Postgres())
+	gotSQL, _, err = sb.Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Contains(t, gotSQL, "LIMIT 5")
 
 	sb, err = g.Build(rowBase(), &GridQuery{Limit: 3})
 	require.NoError(t, err)
-	gotSQL, _, err = sb.Build(sqlb.Postgres())
+	gotSQL, _, err = sb.Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Contains(t, gotSQL, "LIMIT 3")
 }
@@ -468,10 +468,10 @@ func TestGridNoSearchableFields(t *testing.T) {
 	}
 	g, err := NewGrid[noSearch]()
 	require.NoError(t, err)
-	base := sqlb.Select("id", "tag").From("no_search")
+	base := gohan.Select("id", "tag").From("no_search")
 	sb, err := g.Build(base, &GridQuery{SearchType: SearchAny, SearchText: "x"})
 	require.NoError(t, err)
-	gotSQL, gotArgs, err := sb.Build(sqlb.Postgres())
+	gotSQL, gotArgs, err := sb.Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Equal(t, `SELECT "id", "tag" FROM "no_search"`, gotSQL)
 	assert.Equal(t, []any{}, gotArgs)

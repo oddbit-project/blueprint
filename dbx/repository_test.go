@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // --- shared record types ---
@@ -92,11 +92,11 @@ type shapeNoColumns struct {
 // ExpectationsWereMet does not detect unexpected calls, only unmet
 // expected ones). It implements neither TxQuerier nor TxBeginner.
 type countingQuerier struct {
-	d     sqlb.Dialect
+	d     gohan.Dialect
 	calls int
 }
 
-func (c *countingQuerier) Dialect() sqlb.Dialect { return c.d }
+func (c *countingQuerier) Dialect() gohan.Dialect { return c.d }
 func (c *countingQuerier) Exec(ctx context.Context, query string, args ...any) (int64, error) {
 	c.calls++
 	return 0, nil
@@ -137,7 +137,7 @@ var _ BatchInserter = (*batchInserterDouble)(nil)
 // --- helpers ---
 
 // chunkInsertSQL builds the literal SQL text an INSERT of n rows of cols
-// into table renders to, without going through sqlb, so tests pinning
+// into table renders to, without going through gohan, so tests pinning
 // chunk sizes are not tautological.
 func chunkInsertSQL(table string, cols []string, n int) string {
 	quoted := make([]string, len(cols))
@@ -171,7 +171,7 @@ func TestNewRepositoryNotStruct(t *testing.T) {
 func TestNewRepositoryInvalidTable(t *testing.T) {
 	q, _ := newMockQuerier(t)
 	_, err := NewRepository[user](q, "a\x00")
-	assert.True(t, errors.Is(err, sqlb.ErrInvalidIdentifier))
+	assert.True(t, errors.Is(err, gohan.ErrInvalidIdentifier))
 }
 
 func TestNewRepositoryShapes(t *testing.T) {
@@ -191,22 +191,22 @@ func TestNewRepositoryShapes(t *testing.T) {
 
 	t.Run("embedded pointer rejected", func(t *testing.T) {
 		_, err := NewRepository[shapePtrEmbed](q, "t")
-		assert.True(t, errors.Is(err, sqlb.ErrRecordShape), "got %v", err)
+		assert.True(t, errors.Is(err, gohan.ErrRecordShape), "got %v", err)
 	})
 
 	t.Run("unexported embedded struct rejected", func(t *testing.T) {
 		_, err := NewRepository[shapeUnexportedEmbed](q, "t")
-		assert.True(t, errors.Is(err, sqlb.ErrRecordShape), "got %v", err)
+		assert.True(t, errors.Is(err, gohan.ErrRecordShape), "got %v", err)
 	})
 
 	t.Run("tagged anonymous struct rejected", func(t *testing.T) {
 		_, err := NewRepository[shapeTaggedEmbed](q, "t")
-		assert.True(t, errors.Is(err, sqlb.ErrRecordShape), "got %v", err)
+		assert.True(t, errors.Is(err, gohan.ErrRecordShape), "got %v", err)
 	})
 
 	t.Run("duplicate column rejected", func(t *testing.T) {
 		_, err := NewRepository[shapeDupCols](q, "t")
-		assert.True(t, errors.Is(err, sqlb.ErrDuplicateColumn), "got %v", err)
+		assert.True(t, errors.Is(err, gohan.ErrDuplicateColumn), "got %v", err)
 	})
 
 	t.Run("no columns rejected", func(t *testing.T) {
@@ -235,7 +235,7 @@ func TestRepositorySelectColumns(t *testing.T) {
 	r, err := NewRepository[user](q, "users")
 	require.NoError(t, err)
 
-	sqlStr, args, err := r.Select().Build(sqlb.Postgres())
+	sqlStr, args, err := r.Select().Build(gohan.Postgres())
 	require.NoError(t, err)
 	assert.Equal(t, `SELECT "id", "name", "email" FROM "users"`, sqlStr)
 	assert.Empty(t, args)
@@ -250,7 +250,7 @@ func TestRepositoryGet(t *testing.T) {
 		WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).AddRow(int64(7), "Bob", "bob@x.com"))
 
-	got, err := r.Get(context.Background(), r.Select().Where(sqlb.Col("id").Eq(int64(7))))
+	got, err := r.Get(context.Background(), r.Select().Where(gohan.Col("id").Eq(int64(7))))
 	require.NoError(t, err)
 	assert.Equal(t, int64(7), got.ID)
 	assert.Equal(t, "Bob", got.Name)
@@ -288,7 +288,7 @@ func TestRepositoryListEmpty(t *testing.T) {
 }
 
 func TestRepositoryGetByUnknownColumn(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
@@ -306,7 +306,7 @@ func TestRepositoryCountAndExists(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT(*) FROM "users" WHERE "id" = $1`).
 		WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(3)))
-	n, err := r.Count(context.Background(), sqlb.Col("id").Eq(int64(7)))
+	n, err := r.Count(context.Background(), gohan.Col("id").Eq(int64(7)))
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), n)
 
@@ -315,14 +315,14 @@ func TestRepositoryCountAndExists(t *testing.T) {
 	mock.ExpectQuery(existsSQL).
 		WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(0)))
-	ok, err := r.Exists(context.Background(), sqlb.Col("id").Eq(int64(7)))
+	ok, err := r.Exists(context.Background(), gohan.Col("id").Eq(int64(7)))
 	require.NoError(t, err)
 	assert.False(t, ok)
 
 	mock.ExpectQuery(existsSQL).
 		WithArgs(int64(7)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(1)))
-	ok, err = r.Exists(context.Background(), sqlb.Col("id").Eq(int64(7)))
+	ok, err = r.Exists(context.Background(), gohan.Col("id").Eq(int64(7)))
 	require.NoError(t, err)
 	assert.True(t, ok)
 
@@ -350,7 +350,7 @@ func TestRepositoryInsertChunked(t *testing.T) {
 	require.NoError(t, err)
 	defer mockDB.Close()
 	conn := sqlx.NewDb(mockDB, "sqlmock")
-	q := NewSQL(conn, sqlb.Generic())
+	q := NewSQL(conn, gohan.Generic())
 	r, err := NewRepository[user](q, "users")
 	require.NoError(t, err)
 
@@ -377,7 +377,7 @@ func TestRepositoryInsertChunked(t *testing.T) {
 }
 
 func TestRepositoryInsertChunkedNoTx(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Generic()}
+	cq := &countingQuerier{d: gohan.Generic()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
@@ -392,7 +392,7 @@ func TestRepositoryInsertChunkedNoTx(t *testing.T) {
 }
 
 func TestRepositoryInsertBatchInserter(t *testing.T) {
-	bi := &batchInserterDouble{countingQuerier: countingQuerier{d: sqlb.Postgres()}}
+	bi := &batchInserterDouble{countingQuerier: countingQuerier{d: gohan.Postgres()}}
 	r, err := NewRepository[user](bi, "users")
 	require.NoError(t, err)
 
@@ -406,7 +406,7 @@ func TestRepositoryInsertBatchInserter(t *testing.T) {
 }
 
 func TestRepositoryInsertEmpty(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
@@ -416,51 +416,51 @@ func TestRepositoryInsertEmpty(t *testing.T) {
 }
 
 func TestRepositoryDeleteRequiresWhere(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
 	_, err = r.Delete(context.Background(), nil)
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere))
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere))
 	assert.Equal(t, 0, cq.calls)
 
-	_, err = r.Delete(context.Background(), sqlb.And())
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere), "got %v", err)
+	_, err = r.Delete(context.Background(), gohan.And())
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere), "got %v", err)
 	assert.Equal(t, 0, cq.calls)
 
-	_, err = r.Delete(context.Background(), sqlb.Col("id").NotIn())
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere), "got %v", err)
+	_, err = r.Delete(context.Background(), gohan.Col("id").NotIn())
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere), "got %v", err)
 	assert.Equal(t, 0, cq.calls)
 }
 
 func TestRepositoryUpdateRequiresWhere(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
 	_, err = r.UpdateFields(context.Background(), map[string]any{"name": "x"}, nil)
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere))
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere))
 	assert.Equal(t, 0, cq.calls)
 
-	_, err = r.UpdateFields(context.Background(), map[string]any{"name": "x"}, sqlb.And())
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere), "got %v", err)
+	_, err = r.UpdateFields(context.Background(), map[string]any{"name": "x"}, gohan.And())
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere), "got %v", err)
 	assert.Equal(t, 0, cq.calls)
 
-	_, err = r.UpdateFields(context.Background(), map[string]any{"name": "x"}, sqlb.Col("id").NotIn())
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere), "got %v", err)
+	_, err = r.UpdateFields(context.Background(), map[string]any{"name": "x"}, gohan.Col("id").NotIn())
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere), "got %v", err)
 	assert.Equal(t, 0, cq.calls)
 
 	_, err = r.Update(context.Background(), &user{Name: "x"}, nil)
-	assert.True(t, errors.Is(err, sqlb.ErrNoWhere))
+	assert.True(t, errors.Is(err, gohan.ErrNoWhere))
 	assert.Equal(t, 0, cq.calls)
 }
 
 func TestRepositoryUpdateFieldsUnknownColumn(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
-	_, err = r.UpdateFields(context.Background(), map[string]any{"bogus": "x"}, sqlb.Col("id").Eq(int64(1)))
+	_, err = r.UpdateFields(context.Background(), map[string]any{"bogus": "x"}, gohan.Col("id").Eq(int64(1)))
 	assert.True(t, errors.Is(err, ErrUnknownColumn))
 	assert.Equal(t, 0, cq.calls)
 }
@@ -480,7 +480,7 @@ func TestRepositoryUpsertOmittedNotUpdated(t *testing.T) {
 }
 
 func TestRepositoryUpsertUnknownColumn(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[user](cq, "users")
 	require.NoError(t, err)
 
@@ -560,7 +560,7 @@ func TestRepositoryQueryGrid(t *testing.T) {
 }
 
 func TestRepositoryQueryGridInvalidQueryNeverHitsDB(t *testing.T) {
-	cq := &countingQuerier{d: sqlb.Postgres()}
+	cq := &countingQuerier{d: gohan.Postgres()}
 	r, err := NewRepository[gridUser](cq, "users")
 	require.NoError(t, err)
 	g, err := NewGrid[gridUser]()

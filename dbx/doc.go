@@ -1,9 +1,9 @@
-// Package dbx provides typed generic repositories on top of sqlb, with a
+// Package dbx provides typed generic repositories on top of gohan, with a
 // database/sql adapter and transaction helper.
 //
 // Unlike db.Repository, dbx.Repository[T] returns *T / []*T from every read,
 // takes a context.Context per call instead of storing one at construction,
-// and builds every statement through sqlb: values are always bound and
+// and builds every statement through gohan: values are always bound and
 // identifiers are always escaped.
 //
 // # Not-found semantics
@@ -18,10 +18,10 @@
 // # No unfiltered DELETE/UPDATE
 //
 // Delete, Update and UpdateFields require a non-nil where expression and
-// return sqlb.ErrNoWhere without touching the database when where is nil.
+// return gohan.ErrNoWhere without touching the database when where is nil.
 // There is deliberately no "delete all" or "update all" method: a caller who
-// means it uses Exec with an explicit sqlb.Delete(table).All() (or
-// sqlb.Update(table).All()) statement.
+// means it uses Exec with an explicit gohan.Delete(table).All() (or
+// gohan.Update(table).All()) statement.
 //
 // # Caller obligations (nothing here can enforce these)
 //
@@ -31,7 +31,7 @@
 //     MaxOpenConns == 1 this deadlocks waiting for the only connection,
 //     which WithTx is already holding.
 //   - Custom queries passed to Get/List should start from r.Select(),
-//     not a bare sqlb.From(table): sqlb.From renders "SELECT *", which sqlx
+//     not a bare gohan.From(table): gohan.From renders "SELECT *", which sqlx
 //     rejects when the table has columns T does not map.
 //   - sqlx's default field-name mapper is assumed throughout; a repository
 //     bound to a *sqlx.DB with a custom mapper is not supported.

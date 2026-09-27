@@ -17,7 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/oddbit-project/blueprint/db"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 const dbxUsersDDL = `create table users(id serial primary key, name text not null, email text unique not null)`
@@ -173,23 +173,23 @@ func (s *DbxIntegrationSuite) TestRoundTrip() {
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(1), cnt)
 
-			exists, err := r.Exists(s.ctx, sqlb.Col("email").Eq("alice@x.com"))
+			exists, err := r.Exists(s.ctx, gohan.Col("email").Eq("alice@x.com"))
 			require.NoError(s.T(), err)
 			assert.True(s.T(), exists)
 
-			n, err := r.Update(s.ctx, &dbxUser{Name: "Alice2", Email: "alice@x.com"}, sqlb.Col("id").Eq(got.ID))
+			n, err := r.Update(s.ctx, &dbxUser{Name: "Alice2", Email: "alice@x.com"}, gohan.Col("id").Eq(got.ID))
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(1), n)
 
-			n, err = r.UpdateFields(s.ctx, map[string]any{"name": "Alice3"}, sqlb.Col("id").Eq(got.ID))
+			n, err = r.UpdateFields(s.ctx, map[string]any{"name": "Alice3"}, gohan.Col("id").Eq(got.ID))
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(1), n)
 
-			after, err := r.Get(s.ctx, r.Select().Where(sqlb.Col("id").Eq(got.ID)))
+			after, err := r.Get(s.ctx, r.Select().Where(gohan.Col("id").Eq(got.ID)))
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), "Alice3", after.Name)
 
-			n, err = r.Delete(s.ctx, sqlb.Col("id").Eq(got.ID))
+			n, err = r.Delete(s.ctx, gohan.Col("id").Eq(got.ID))
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(1), n)
 
@@ -227,7 +227,7 @@ func (s *DbxIntegrationSuite) TestInjectionPayload() {
 			require.NoError(s.T(), err)
 			assert.Len(s.T(), list, 0)
 
-			n, err := r.Delete(s.ctx, sqlb.Col("name").Eq(payload))
+			n, err := r.Delete(s.ctx, gohan.Col("name").Eq(payload))
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(0), n)
 		})
@@ -247,7 +247,7 @@ func (s *DbxIntegrationSuite) TestContainsLiteralWildcards() {
 			require.NoError(s.T(), r.Insert(s.ctx, &dbxUser{Name: "50%", Email: "a@x.com"}))
 			require.NoError(s.T(), r.Insert(s.ctx, &dbxUser{Name: "50x", Email: "b@x.com"}))
 
-			list, err := r.List(s.ctx, r.Select().Where(sqlb.Col("name").Contains("50%")))
+			list, err := r.List(s.ctx, r.Select().Where(gohan.Col("name").Contains("50%")))
 			require.NoError(s.T(), err)
 			require.Len(s.T(), list, 1)
 			assert.Equal(s.T(), "50%", list[0].Name)
@@ -269,9 +269,9 @@ func (s *DbxIntegrationSuite) TestCaseSumWithInt() {
 			require.NoError(s.T(), r.Insert(s.ctx, &dbxUser{Name: "other", Email: "b@x.com"}))
 			require.NoError(s.T(), r.Insert(s.ctx, &dbxUser{Name: "plain", Email: "c@x.com"}))
 
-			st := sqlb.Select(sqlb.Sum(sqlb.Case().
-				When(sqlb.Col("name").Eq("plain"), sqlb.Int(1)).
-				Else(sqlb.Int(0)))).From("users")
+			st := gohan.Select(gohan.Sum(gohan.Case().
+				When(gohan.Col("name").Eq("plain"), gohan.Int(1)).
+				Else(gohan.Int(0)))).From("users")
 			sqlStr, args, err := st.Build(q.Dialect())
 			require.NoError(s.T(), err)
 

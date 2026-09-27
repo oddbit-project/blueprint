@@ -13,7 +13,7 @@ import (
 
 	"github.com/oddbit-project/blueprint/dbx"
 	"github.com/oddbit-project/blueprint/provider/sqlite"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // User is the record type for the sample's users table.
@@ -78,7 +78,7 @@ func main() {
 	}
 	fmt.Printf("name=%s\n", alice.Name)
 
-	found, err := repo.List(ctx, repo.Select().Where(sqlb.Col("name").Contains("ali")))
+	found, err := repo.List(ctx, repo.Select().Where(gohan.Col("name").Contains("ali")))
 	if err != nil {
 		log.Fatal(err)
 	}

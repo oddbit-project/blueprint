@@ -4,11 +4,11 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // Repository is a typed, generic repository over T, backed by a Querier and
-// built entirely through sqlb (values always bound, identifiers always
+// built entirely through gohan (values always bound, identifiers always
 // escaped). See package doc for the ErrNotFound and no-unfiltered-write
 // semantics, and for caller obligations WithTx cannot enforce.
 type Repository[T any] struct {
@@ -16,14 +16,14 @@ type Repository[T any] struct {
 	table  string
 	cols   []string
 	colSet map[string]bool
-	sel    *sqlb.SelectBuilder
+	sel    *gohan.SelectBuilder
 }
 
 // NewRepository builds a Repository[T] bound to q, for table. T must be a
 // struct type (else ErrNotStruct); its columns are resolved via
-// sqlb.RecordColumns, which rejects field shapes db/field and sqlx would
-// disagree on (returned unchanged: sqlb.ErrRecordShape,
-// sqlb.ErrDuplicateColumn). A record type with zero mapped columns fails
+// gohan.RecordColumns, which rejects field shapes db/field and sqlx would
+// disagree on (returned unchanged: gohan.ErrRecordShape,
+// gohan.ErrDuplicateColumn). A record type with zero mapped columns fails
 // with ErrNoColumns. The base "SELECT <columns> FROM <table>" statement is
 // built once against q.Dialect(), so an invalid table name or unknown
 // dialect surfaces here, not at the first query.
@@ -32,7 +32,7 @@ func NewRepository[T any](q Querier, table string) (*Repository[T], error) {
 	if t.Kind() != reflect.Struct {
 		return nil, ErrNotStruct
 	}
-	cols, err := sqlb.RecordColumns(t)
+	cols, err := gohan.RecordColumns(t)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func NewRepository[T any](q Querier, table string) (*Repository[T], error) {
 		selCols[i] = c
 	}
 
-	sel := sqlb.Select(selCols...).From(table)
+	sel := gohan.Select(selCols...).From(table)
 	if _, _, err := sel.Build(q.Dialect()); err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (r *Repository[T]) With(q Querier) *Repository[T] {
 
 // Select returns "SELECT <T's columns> FROM <table>", the starting point
 // for custom queries passed to Get/List.
-func (r *Repository[T]) Select() *sqlb.SelectBuilder { return r.sel }
+func (r *Repository[T]) Select() *gohan.SelectBuilder { return r.sel }
 
 // checkColumns fails with ErrUnknownColumn for any name not in the
 // repository's column list.
@@ -101,7 +101,7 @@ func mapKeys(m map[string]any) []string {
 
 // Get runs q (r.Select() when nil) with an added Limit(1) and returns the
 // first matching row, or (nil, ErrNotFound) when none matches.
-func (r *Repository[T]) Get(ctx context.Context, q *sqlb.SelectBuilder) (*T, error) {
+func (r *Repository[T]) Get(ctx context.Context, q *gohan.SelectBuilder) (*T, error) {
 	if q == nil {
 		q = r.sel
 	}
@@ -119,7 +119,7 @@ func (r *Repository[T]) Get(ctx context.Context, q *sqlb.SelectBuilder) (*T, err
 
 // List runs q (r.Select() when nil) and returns every matching row. It
 // never returns a nil slice.
-func (r *Repository[T]) List(ctx context.Context, q *sqlb.SelectBuilder) ([]*T, error) {
+func (r *Repository[T]) List(ctx context.Context, q *gohan.SelectBuilder) ([]*T, error) {
 	if q == nil {
 		q = r.sel
 	}
@@ -150,7 +150,7 @@ func (r *Repository[T]) GetBy(ctx context.Context, fields map[string]any) (*T, e
 	if err := r.checkColumns(mapKeys(fields)); err != nil {
 		return nil, err
 	}
-	return r.Get(ctx, r.sel.Where(sqlb.Match(fields)))
+	return r.Get(ctx, r.sel.Where(gohan.Match(fields)))
 }
 
 // ListBy is List filtered by an equality match on fields, whose keys must
@@ -160,13 +160,13 @@ func (r *Repository[T]) ListBy(ctx context.Context, fields map[string]any) ([]*T
 	if err := r.checkColumns(mapKeys(fields)); err != nil {
 		return nil, err
 	}
-	return r.List(ctx, r.sel.Where(sqlb.Match(fields)))
+	return r.List(ctx, r.sel.Where(gohan.Match(fields)))
 }
 
 // Count returns "SELECT COUNT(*) FROM <table>[ WHERE ...]"; where == nil
 // counts every row.
-func (r *Repository[T]) Count(ctx context.Context, where sqlb.Expr) (int64, error) {
-	q := sqlb.Select(sqlb.CountAll()).From(r.table)
+func (r *Repository[T]) Count(ctx context.Context, where gohan.Expr) (int64, error) {
+	q := gohan.Select(gohan.CountAll()).From(r.table)
 	if where != nil {
 		q = q.Where(where)
 	}
@@ -183,13 +183,13 @@ func (r *Repository[T]) Count(ctx context.Context, where sqlb.Expr) (int64, erro
 // so QueryInt64 always reads a COUNT column: on ClickHouse, COUNT(*) returns
 // UInt64 but a bare SELECT 1 returns UInt8, and QueryInt64's scan target
 // only accepts the former.
-func (r *Repository[T]) Exists(ctx context.Context, where sqlb.Expr) (bool, error) {
-	inner := sqlb.Select(sqlb.Int(1)).From(r.table)
+func (r *Repository[T]) Exists(ctx context.Context, where gohan.Expr) (bool, error) {
+	inner := gohan.Select(gohan.Int(1)).From(r.table)
 	if where != nil {
 		inner = inner.Where(where)
 	}
 	inner = inner.Limit(1)
-	q := sqlb.Select(sqlb.CountAll()).From(inner.As("e"))
+	q := gohan.Select(gohan.CountAll()).From(inner.As("e"))
 	sqlStr, args, err := q.Build(r.q.Dialect())
 	if err != nil {
 		return false, err
@@ -220,7 +220,7 @@ func chunkRecords(rows []any, perChunk int) [][]any {
 // execInsertChunk builds and runs a single "INSERT INTO <table> ..." for
 // chunk against q.
 func (r *Repository[T]) execInsertChunk(ctx context.Context, q Querier, chunk []any) error {
-	st := sqlb.Insert(r.table).Rows(chunk...)
+	st := gohan.Insert(r.table).Rows(chunk...)
 	sqlStr, args, err := st.Build(q.Dialect())
 	if err != nil {
 		return err
@@ -237,7 +237,7 @@ func (r *Repository[T]) execInsertChunk(ctx context.Context, q Querier, chunk []
 // one chunk runs atomically through WithTx, which joins an existing
 // transaction, begins a new one, or fails with ErrTxUnsupported — Insert
 // never issues a silent non-atomic multi-statement write. Each chunk's
-// column set is decided independently by its first record (sqlb's
+// column set is decided independently by its first record (gohan's
 // ErrInconsistentOmit still applies within a chunk).
 func (r *Repository[T]) Insert(ctx context.Context, records ...*T) error {
 	if len(records) == 0 {
@@ -276,14 +276,14 @@ func (r *Repository[T]) Insert(ctx context.Context, records ...*T) error {
 }
 
 // InsertReturning inserts rec and scans every repository column back from
-// RETURNING into a new T. Dialects without sqlb's FeatureReturning fail
-// with sqlb.ErrUnsupported.
+// RETURNING into a new T. Dialects without gohan's FeatureReturning fail
+// with gohan.ErrUnsupported.
 func (r *Repository[T]) InsertReturning(ctx context.Context, rec *T) (*T, error) {
 	returning := make([]any, len(r.cols))
 	for i, c := range r.cols {
 		returning[i] = c
 	}
-	st := sqlb.Insert(r.table).Rows(rec).Returning(returning...)
+	st := gohan.Insert(r.table).Rows(rec).Returning(returning...)
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return nil, err
@@ -328,15 +328,15 @@ func (r *Repository[T]) Upsert(ctx context.Context, rec *T, conflict []string, u
 
 	updateCols := update
 	if len(updateCols) == 0 {
-		insCols, err := sqlb.InsertColumns(rec)
+		insCols, err := gohan.InsertColumns(rec)
 		if err != nil {
 			return err
 		}
 		updateCols = subtractStrings(insCols, conflict)
 	}
 
-	cb := sqlb.Insert(r.table).Rows(rec).OnConflict(conflict...)
-	var st *sqlb.InsertBuilder
+	cb := gohan.Insert(r.table).Rows(rec).OnConflict(conflict...)
+	var st *gohan.InsertBuilder
 	if len(updateCols) == 0 {
 		st = cb.DoNothing()
 	} else {
@@ -352,12 +352,12 @@ func (r *Repository[T]) Upsert(ctx context.Context, rec *T, conflict []string, u
 }
 
 // Update sets every non-auto field of rec (per opts) and requires a
-// non-nil where (else sqlb.ErrNoWhere, without touching the database).
-func (r *Repository[T]) Update(ctx context.Context, rec *T, where sqlb.Expr, opts ...sqlb.RecordOption) (int64, error) {
+// non-nil where (else gohan.ErrNoWhere, without touching the database).
+func (r *Repository[T]) Update(ctx context.Context, rec *T, where gohan.Expr, opts ...gohan.RecordOption) (int64, error) {
 	if where == nil {
-		return 0, sqlb.ErrNoWhere
+		return 0, gohan.ErrNoWhere
 	}
-	st := sqlb.Update(r.table).SetRecord(rec, opts...).Where(where)
+	st := gohan.Update(r.table).SetRecord(rec, opts...).Where(where)
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return 0, err
@@ -367,15 +367,15 @@ func (r *Repository[T]) Update(ctx context.Context, rec *T, where sqlb.Expr, opt
 
 // UpdateFields sets fields (whose keys must all be repository columns,
 // else ErrUnknownColumn) and requires a non-nil where (else
-// sqlb.ErrNoWhere). Both guards are checked before any query.
-func (r *Repository[T]) UpdateFields(ctx context.Context, fields map[string]any, where sqlb.Expr) (int64, error) {
+// gohan.ErrNoWhere). Both guards are checked before any query.
+func (r *Repository[T]) UpdateFields(ctx context.Context, fields map[string]any, where gohan.Expr) (int64, error) {
 	if where == nil {
-		return 0, sqlb.ErrNoWhere
+		return 0, gohan.ErrNoWhere
 	}
 	if err := r.checkColumns(mapKeys(fields)); err != nil {
 		return 0, err
 	}
-	st := sqlb.Update(r.table).SetMap(fields).Where(where)
+	st := gohan.Update(r.table).SetMap(fields).Where(where)
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return 0, err
@@ -383,16 +383,16 @@ func (r *Repository[T]) UpdateFields(ctx context.Context, fields map[string]any,
 	return r.q.Exec(ctx, sqlStr, args...)
 }
 
-// Delete requires a non-nil where (else sqlb.ErrNoWhere, without touching
-// the database). A trivially-true where (e.g. sqlb.And() or
-// Col(x).NotIn()) is rejected downstream by sqlb's own WHERE-clause check,
+// Delete requires a non-nil where (else gohan.ErrNoWhere, without touching
+// the database). A trivially-true where (e.g. gohan.And() or
+// Col(x).NotIn()) is rejected downstream by gohan's own WHERE-clause check,
 // not by this guard: there is deliberately no "delete all" method, so a
-// caller who means it uses Exec(ctx, sqlb.Delete(table).All()).
-func (r *Repository[T]) Delete(ctx context.Context, where sqlb.Expr) (int64, error) {
+// caller who means it uses Exec(ctx, gohan.Delete(table).All()).
+func (r *Repository[T]) Delete(ctx context.Context, where gohan.Expr) (int64, error) {
 	if where == nil {
-		return 0, sqlb.ErrNoWhere
+		return 0, gohan.ErrNoWhere
 	}
-	st := sqlb.Delete(r.table).Where(where)
+	st := gohan.Delete(r.table).Where(where)
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return 0, err
@@ -402,7 +402,7 @@ func (r *Repository[T]) Delete(ctx context.Context, where sqlb.Expr) (int64, err
 
 // Exec builds st against the repository's dialect and runs it, returning
 // the number of rows affected.
-func (r *Repository[T]) Exec(ctx context.Context, st sqlb.Statement) (int64, error) {
+func (r *Repository[T]) Exec(ctx context.Context, st gohan.Statement) (int64, error) {
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return 0, err

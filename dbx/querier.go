@@ -4,16 +4,16 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
-// Querier executes sqlb-built SQL and scans results back into Go values. It
+// Querier executes gohan-built SQL and scans results back into Go values. It
 // is the sole abstraction dbx.Repository depends on, so a repository can be
 // bound to a plain connection, a transaction, or (via BatchInserter) an
 // adapter with a bulk-insert fast path.
 type Querier interface {
-	// Dialect returns the sqlb.Dialect statements are built against.
-	Dialect() sqlb.Dialect
+	// Dialect returns the gohan.Dialect statements are built against.
+	Dialect() gohan.Dialect
 	// Exec runs query and returns the number of rows affected.
 	Exec(ctx context.Context, query string, args ...any) (int64, error)
 	// Get scans the first row of query into dest (a *T). It returns

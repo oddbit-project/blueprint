@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 func TestWithTxCommit(t *testing.T) {
@@ -62,7 +62,7 @@ type fakeQuerier struct {
 	calls int
 }
 
-func (f *fakeQuerier) Dialect() sqlb.Dialect { return sqlb.Postgres() }
+func (f *fakeQuerier) Dialect() gohan.Dialect { return gohan.Postgres() }
 func (f *fakeQuerier) Exec(ctx context.Context, query string, args ...any) (int64, error) {
 	f.calls++
 	return 0, nil

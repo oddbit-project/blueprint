@@ -11,7 +11,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/oddbit-project/blueprint/dbx"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // Querier adapts a ClickHouse connection to dbx.Querier and
@@ -41,9 +41,9 @@ func (c *Client) Querier() *Querier {
 	return NewQuerier(c.Conn)
 }
 
-// Dialect returns sqlb.ClickHouse().
-func (q *Querier) Dialect() sqlb.Dialect {
-	return sqlb.ClickHouse()
+// Dialect returns gohan.ClickHouse().
+func (q *Querier) Dialect() gohan.Dialect {
+	return gohan.ClickHouse()
 }
 
 // Exec runs query and always returns 0: ClickHouse does not report the
@@ -60,7 +60,7 @@ func (q *Querier) Exec(ctx context.Context, query string, args ...any) (int64, e
 //
 // Scanning goes through clickhouse-go's ScanStruct, which maps result
 // columns to dest's fields by the `ch` struct tag (falling back to the Go
-// field name), not the `db` tag sqlb/dbx build column lists from. A record
+// field name), not the `db` tag gohan/dbx build column lists from. A record
 // type used with this Querier needs `ch` tags equal to its `db` tags (or
 // only `ch` tags), or the mapping silently diverges.
 func (q *Querier) Get(ctx context.Context, dest any, query string, args ...any) error {
@@ -133,7 +133,7 @@ func (q *Querier) QueryInt64(ctx context.Context, query string, args ...any) (in
 // would fail with "missing destination name". Every row's InsertColumns
 // must match row 0's exactly (same columns, same order); a row whose
 // omitnil/omitempty-tagged fields are omitted or present differently from
-// row 0 fails with sqlb.ErrInconsistentOmit, since the batch's column list
+// row 0 fails with gohan.ErrInconsistentOmit, since the batch's column list
 // is fixed by row 0 and cannot vary per row.
 //
 // The driver's batch column-list parser strips quotes with a regex
@@ -144,7 +144,7 @@ func (q *Querier) QueryInt64(ctx context.Context, query string, args ...any) (in
 // tag yields the column name "a", never "a,b".
 //
 // The column list itself comes from each row's `db`/field tags via
-// sqlb.InsertColumns, but AppendStruct (clickhouse-go) writes each column
+// gohan.InsertColumns, but AppendStruct (clickhouse-go) writes each column
 // by matching the row's `ch` tag (falling back to the Go field name). A
 // record type used here needs `ch` tags equal to its `db` tags (or only
 // `ch` tags), or a column in the list has no matching struct field to read.
@@ -152,21 +152,21 @@ func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) err
 	if len(rows) == 0 {
 		return nil
 	}
-	tbl, err := sqlb.ClickHouse().QuoteIdent(table)
+	tbl, err := gohan.ClickHouse().QuoteIdent(table)
 	if err != nil {
 		return err
 	}
-	cols, err := sqlb.InsertColumns(rows[0])
+	cols, err := gohan.InsertColumns(rows[0])
 	if err != nil {
 		return err
 	}
 	for i := 1; i < len(rows); i++ {
-		rowCols, err := sqlb.InsertColumns(rows[i])
+		rowCols, err := gohan.InsertColumns(rows[i])
 		if err != nil {
 			return err
 		}
 		if !equalColumns(cols, rowCols) {
-			return fmt.Errorf("%w: row %d", sqlb.ErrInconsistentOmit, i)
+			return fmt.Errorf("%w: row %d", gohan.ErrInconsistentOmit, i)
 		}
 	}
 	quoted := make([]string, len(cols))
@@ -174,7 +174,7 @@ func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) err
 		if strings.ContainsAny(col, "\"\\(),") || strings.ContainsFunc(col, unicode.IsSpace) {
 			return fmt.Errorf("clickhouse: column %q cannot be used in a batch column list", col)
 		}
-		qc, err := sqlb.ClickHouse().QuoteIdent(col)
+		qc, err := gohan.ClickHouse().QuoteIdent(col)
 		if err != nil {
 			return err
 		}

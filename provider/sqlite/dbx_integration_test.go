@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/oddbit-project/blueprint/dbx"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // dbxSqliteItem is the record type for TestDbxRoundTrip.
@@ -63,15 +63,15 @@ func (s *SQLiteIntegrationTestSuite) TestDbxRoundTrip() {
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(1), cnt)
 
-	exists, err := r.Exists(s.ctx, sqlb.Col("id").Eq(got.ID))
+	exists, err := r.Exists(s.ctx, gohan.Col("id").Eq(got.ID))
 	require.NoError(s.T(), err)
 	assert.True(s.T(), exists)
 
-	n, err := r.Update(s.ctx, &dbxSqliteItem{Name: "alice2"}, sqlb.Col("id").Eq(got.ID))
+	n, err := r.Update(s.ctx, &dbxSqliteItem{Name: "alice2"}, gohan.Col("id").Eq(got.ID))
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(1), n)
 
-	n, err = r.UpdateFields(s.ctx, map[string]any{"name": "alice3"}, sqlb.Col("id").Eq(got.ID))
+	n, err = r.UpdateFields(s.ctx, map[string]any{"name": "alice3"}, gohan.Col("id").Eq(got.ID))
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(1), n)
 
@@ -95,7 +95,7 @@ func (s *SQLiteIntegrationTestSuite) TestDbxRoundTrip() {
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(2), cnt)
 
-	n, err = r.Delete(s.ctx, sqlb.Col("id").Eq(got.ID))
+	n, err = r.Delete(s.ctx, gohan.Col("id").Eq(got.ID))
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(1), n)
 
@@ -129,7 +129,7 @@ func (s *SQLiteIntegrationTestSuite) TestDbxValuesRoundTrip() {
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), list, 0)
 
-	n, err := r.Delete(s.ctx, sqlb.Col("name").Eq(payload))
+	n, err := r.Delete(s.ctx, gohan.Col("name").Eq(payload))
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(0), n)
 
@@ -138,7 +138,7 @@ func (s *SQLiteIntegrationTestSuite) TestDbxValuesRoundTrip() {
 	assert.Equal(s.T(), int64(len(names)), cnt)
 }
 
-// TestDbxUnknownColumnErrors proves sqlb's backtick-quoted SQLite
+// TestDbxUnknownColumnErrors proves gohan's backtick-quoted SQLite
 // identifiers defeat SQLite's double-quoted-string fallback: a Match on a
 // column that doesn't exist must fail the query, not silently match every
 // row (which is what would happen if the identifier were double-quoted
@@ -153,8 +153,8 @@ func (s *SQLiteIntegrationTestSuite) TestDbxUnknownColumnErrors() {
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), r.Insert(s.ctx, &dbxSqliteItem{Name: "alice"}))
 
-	sqlStr, args, err := sqlb.Select("id", "name").From(table).
-		Where(sqlb.Match(map[string]any{"does_not_exist": "alice"})).
+	sqlStr, args, err := gohan.Select("id", "name").From(table).
+		Where(gohan.Match(map[string]any{"does_not_exist": "alice"})).
 		Build(q.Dialect())
 	require.NoError(s.T(), err)
 
@@ -178,7 +178,7 @@ func (s *SQLiteIntegrationTestSuite) TestDbxContainsLiteral() {
 	}
 
 	for _, tc := range []string{"50%", "a_b", `c\d`} {
-		list, err := r.List(s.ctx, r.Select().Where(sqlb.Col("name").Contains(tc)))
+		list, err := r.List(s.ctx, r.Select().Where(gohan.Col("name").Contains(tc)))
 		require.NoError(s.T(), err, tc)
 		require.Len(s.T(), list, 1, tc)
 		assert.Equal(s.T(), tc, list[0].Name, tc)
@@ -205,7 +205,7 @@ func (s *SQLiteIntegrationTestSuite) TestDbxSQLiteSyntax() {
 	_, err = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("INSERT INTO %s (id, tag) VALUES (1,'x'),(2,'y'),(4,'z')", joinB))
 	require.NoError(s.T(), err)
 
-	countOf := func(sel *sqlb.SelectBuilder) int64 {
+	countOf := func(sel *gohan.SelectBuilder) int64 {
 		s.T().Helper()
 		sqlStr, args, err := sel.Build(q.Dialect())
 		require.NoError(s.T(), err)
@@ -216,25 +216,25 @@ func (s *SQLiteIntegrationTestSuite) TestDbxSQLiteSyntax() {
 
 	// Offset without Limit renders "LIMIT -1 OFFSET n" and executes.
 	assert.Equal(s.T(), int64(2), countOf(
-		sqlb.Select(sqlb.CountAll()).From(sqlb.Select("id").From(table).OrderBy("id").Offset(1).As("o"))))
+		gohan.Select(gohan.CountAll()).From(gohan.Select("id").From(table).OrderBy("id").Offset(1).As("o"))))
 
 	// Union renders plain UNION (dedup).
 	assert.Equal(s.T(), int64(3), countOf(
-		sqlb.Select(sqlb.CountAll()).From(
-			sqlb.Select("id").From(table).Union(sqlb.Select("id").From(table)).As("u"))))
+		gohan.Select(gohan.CountAll()).From(
+			gohan.Select("id").From(table).Union(gohan.Select("id").From(table)).As("u"))))
 
 	// WithRecursive: generate 1..3.
 	assert.Equal(s.T(), int64(3), countOf(
-		sqlb.Select(sqlb.CountAll()).From(
-			sqlb.Select("k").From("r").WithRecursive("r",
-				sqlb.Select(sqlb.Int(1).As("k")).UnionAll(
-					sqlb.Select(sqlb.Raw("k + 1")).From("r").Where(sqlb.Col("k").Lt(3)))).As("gen"))))
+		gohan.Select(gohan.CountAll()).From(
+			gohan.Select("k").From("r").WithRecursive("r",
+				gohan.Select(gohan.Int(1).As("k")).UnionAll(
+					gohan.Select(gohan.Raw("k + 1")).From("r").Where(gohan.Col("k").Lt(3)))).As("gen"))))
 
 	// FullJoin: id 3 has no match in joinB, joinB's id 4 has no match in
 	// table -> 4 rows (1,2 matched + 3 and 4 as one-sided NULLs).
-	fullJoinSel := sqlb.Select(sqlb.CountAll()).
-		From(sqlb.Table(table).As("t")).
-		FullJoin(sqlb.Table(joinB).As("j"), sqlb.Table("t").Col("id").Eq(sqlb.Table("j").Col("id")))
+	fullJoinSel := gohan.Select(gohan.CountAll()).
+		From(gohan.Table(table).As("t")).
+		FullJoin(gohan.Table(joinB).As("j"), gohan.Table("t").Col("id").Eq(gohan.Table("j").Col("id")))
 	assert.Equal(s.T(), int64(4), countOf(fullJoinSel))
 
 	// Upsert from FromSelect, plain select form.
@@ -242,8 +242,8 @@ func (s *SQLiteIntegrationTestSuite) TestDbxSQLiteSyntax() {
 	s.execDDL(fmt.Sprintf("CREATE TABLE %s (id INTEGER PRIMARY KEY, name TEXT, val INTEGER)", upsertTable))
 	defer s.dropTable(upsertTable)
 
-	plainSel := sqlb.Select(sqlb.Int(1).As("id"), sqlb.Val("x").As("name"), sqlb.Int(10).As("val"))
-	ins1 := sqlb.Insert(upsertTable).Columns("id", "name", "val").
+	plainSel := gohan.Select(gohan.Int(1).As("id"), gohan.Val("x").As("name"), gohan.Int(10).As("val"))
+	ins1 := gohan.Insert(upsertTable).Columns("id", "name", "val").
 		FromSelect(plainSel).OnConflict("id").DoUpdateExcluded("name", "val")
 	sqlStr, args, err := ins1.Build(q.Dialect())
 	require.NoError(s.T(), err)
@@ -252,9 +252,9 @@ func (s *SQLiteIntegrationTestSuite) TestDbxSQLiteSyntax() {
 
 	// Compound (UnionAll) form: WHERE true must land on the last member,
 	// not the first, or SQLite's upsert grammar rejects the statement.
-	selA := sqlb.Select(sqlb.Int(2).As("id"), sqlb.Val("y").As("name"), sqlb.Int(20).As("val"))
-	selB := sqlb.Select(sqlb.Int(3).As("id"), sqlb.Val("z").As("name"), sqlb.Int(30).As("val"))
-	ins2 := sqlb.Insert(upsertTable).Columns("id", "name", "val").
+	selA := gohan.Select(gohan.Int(2).As("id"), gohan.Val("y").As("name"), gohan.Int(20).As("val"))
+	selB := gohan.Select(gohan.Int(3).As("id"), gohan.Val("z").As("name"), gohan.Int(30).As("val"))
+	ins2 := gohan.Insert(upsertTable).Columns("id", "name", "val").
 		FromSelect(selA.UnionAll(selB)).OnConflict("id").DoUpdateExcluded("name", "val")
 	sqlStr, args, err = ins2.Build(q.Dialect())
 	require.NoError(s.T(), err)
@@ -273,8 +273,8 @@ func (s *SQLiteIntegrationTestSuite) TestDbxSQLiteSyntax() {
 }
 
 func (s *SQLiteIntegrationTestSuite) TestDbxILikeUnsupported() {
-	_, _, err := sqlb.Select("*").From("t").Where(sqlb.Col("name").ILike("%a%")).Build(sqlb.SQLite())
-	assert.ErrorIs(s.T(), err, sqlb.ErrUnsupported)
+	_, _, err := gohan.Select("*").From("t").Where(gohan.Col("name").ILike("%a%")).Build(gohan.SQLite())
+	assert.ErrorIs(s.T(), err, gohan.ErrUnsupported)
 }
 
 func (s *SQLiteIntegrationTestSuite) TestDbxChunkedInsert() {

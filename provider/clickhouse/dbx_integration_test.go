@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/oddbit-project/blueprint/dbx"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // dbxEvent is the record type used by most of this file's tests. The
@@ -77,7 +77,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxRoundTrip() {
 	require.NoError(s.T(), err)
 	require.Len(s.T(), list, 3)
 
-	got, err := r.Get(s.ctx, r.Select().Where(sqlb.Col("id").Eq(uint32(1))))
+	got, err := r.Get(s.ctx, r.Select().Where(gohan.Col("id").Eq(uint32(1))))
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "alice", got.Name)
 
@@ -89,16 +89,16 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxRoundTrip() {
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(3), cnt)
 
-	exists, err := r.Exists(s.ctx, sqlb.Col("id").Eq(uint32(1)))
+	exists, err := r.Exists(s.ctx, gohan.Col("id").Eq(uint32(1)))
 	require.NoError(s.T(), err)
 	assert.True(s.T(), exists)
 
-	notExists, err := r.Exists(s.ctx, sqlb.Col("id").Eq(uint32(999)))
+	notExists, err := r.Exists(s.ctx, gohan.Col("id").Eq(uint32(999)))
 	require.NoError(s.T(), err)
 	assert.False(s.T(), notExists)
 
 	// Querier.Exec always reports 0 rows affected on ClickHouse.
-	n, err := r.Delete(s.ctx, sqlb.Col("id").Eq(uint32(1)))
+	n, err := r.Delete(s.ctx, gohan.Col("id").Eq(uint32(1)))
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(0), n)
 
@@ -116,7 +116,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxGetNotFound() {
 	r, err := dbx.NewRepository[dbxEvent](q, table)
 	require.NoError(s.T(), err)
 
-	_, err = r.Get(s.ctx, r.Select().Where(sqlb.Col("id").Eq(uint32(999))))
+	_, err = r.Get(s.ctx, r.Select().Where(gohan.Col("id").Eq(uint32(999))))
 	require.Error(s.T(), err)
 	assert.True(s.T(), errors.Is(err, dbx.ErrNotFound), "got %v", err)
 }
@@ -167,7 +167,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxValuesRoundTrip() {
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), list, 0)
 
-	_, err = r.Delete(s.ctx, sqlb.Col("name").Eq(payload))
+	_, err = r.Delete(s.ctx, gohan.Col("name").Eq(payload))
 	require.NoError(s.T(), err)
 
 	cnt, err := r.Count(s.ctx, nil)
@@ -192,7 +192,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxBackslashIdentifier() {
 	require.NoError(s.T(), s.client.Conn.Exec(s.ctx, "INSERT INTO "+table+" VALUES (?, ?)", 1, "val1"))
 
 	q := s.client.Querier()
-	sqlStr, args, err := sqlb.Select(`c\d`).From(table).Where(sqlb.Col("id").Eq(1)).Build(q.Dialect())
+	sqlStr, args, err := gohan.Select(`c\d`).From(table).Where(gohan.Col("id").Eq(1)).Build(q.Dialect())
 	require.NoError(s.T(), err)
 
 	var out dbxBackslashCol
@@ -209,7 +209,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxBackslashIdentifier() {
 	defer s.dropTable(table2)
 	require.NoError(s.T(), s.client.Conn.Exec(s.ctx, "INSERT INTO "+table2+" VALUES (?, ?)", 1, "val2"))
 
-	sqlStr2, args2, err := sqlb.Select(`d\`).From(table2).Where(sqlb.Col("id").Eq(1)).Build(q.Dialect())
+	sqlStr2, args2, err := gohan.Select(`d\`).From(table2).Where(gohan.Col("id").Eq(1)).Build(q.Dialect())
 	require.NoError(s.T(), err)
 
 	type trailingCol struct {
@@ -221,18 +221,18 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxBackslashIdentifier() {
 }
 
 func (s *ClickhouseRepositoryTestSuite) TestDbxQuestionMarkRejected() {
-	_, _, err := sqlb.Select("q?x").From("t").Build(sqlb.ClickHouse())
-	assert.True(s.T(), errors.Is(err, sqlb.ErrInvalidIdentifier), "got %v", err)
+	_, _, err := gohan.Select("q?x").From("t").Build(gohan.ClickHouse())
+	assert.True(s.T(), errors.Is(err, gohan.ErrInvalidIdentifier), "got %v", err)
 
-	_, _, err = sqlb.Select(sqlb.Raw("'??'")).From("t").Build(sqlb.ClickHouse())
-	assert.True(s.T(), errors.Is(err, sqlb.ErrRawPlaceholder), "got %v", err)
+	_, _, err = gohan.Select(gohan.Raw("'??'")).From("t").Build(gohan.ClickHouse())
+	assert.True(s.T(), errors.Is(err, gohan.ErrRawPlaceholder), "got %v", err)
 }
 
 func (s *ClickhouseRepositoryTestSuite) TestDbxUnsafeValueRejected() {
-	_, _, err := sqlb.Select("*").From("t").
-		Where(sqlb.Col("name").Eq(map[string]int{"k": 1})).
-		Build(sqlb.ClickHouse())
-	assert.True(s.T(), errors.Is(err, sqlb.ErrUnsafeValue), "got %v", err)
+	_, _, err := gohan.Select("*").From("t").
+		Where(gohan.Col("name").Eq(map[string]int{"k": 1})).
+		Build(gohan.ClickHouse())
+	assert.True(s.T(), errors.Is(err, gohan.ErrUnsafeValue), "got %v", err)
 }
 
 // qpRow is the destination type for TestDbxQueryParamTrigger.
@@ -251,9 +251,9 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxQueryParamTrigger() {
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), r.Insert(s.ctx, &dbxEvent{ID: 1, Name: "x"}))
 
-	sel := sqlb.Select(sqlb.Col("id"), sqlb.Raw(`'{"a":1}'`).As("j")).
-		From(table).Where(sqlb.Col("id").Eq(1))
-	sqlStr, args, err := sel.Build(sqlb.ClickHouse())
+	sel := gohan.Select(gohan.Col("id"), gohan.Raw(`'{"a":1}'`).As("j")).
+		From(table).Where(gohan.Col("id").Eq(1))
+	sqlStr, args, err := sel.Build(gohan.ClickHouse())
 	require.NoError(s.T(), err)
 
 	var rows []*qpRow
@@ -282,7 +282,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxContainsLiteral() {
 	}
 
 	for _, tc := range []string{"50%", "a_b", `c\d`} {
-		list, err := r.List(s.ctx, r.Select().Where(sqlb.Col("name").Contains(tc)))
+		list, err := r.List(s.ctx, r.Select().Where(gohan.Col("name").Contains(tc)))
 		require.NoError(s.T(), err, tc)
 		require.Len(s.T(), list, 1, tc)
 		assert.Equal(s.T(), tc, list[0].Name, tc)
@@ -306,7 +306,7 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxClickHouseClauses() {
 	require.NoError(s.T(), r.Insert(s.ctx, rows...))
 	const n = int64(3)
 
-	countOf := func(sel *sqlb.SelectBuilder) int64 {
+	countOf := func(sel *gohan.SelectBuilder) int64 {
 		s.T().Helper()
 		sqlStr, args, err := sel.Build(q.Dialect())
 		require.NoError(s.T(), err)
@@ -316,49 +316,49 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxClickHouseClauses() {
 	}
 
 	// Final()
-	assert.Equal(s.T(), n, countOf(sqlb.Select(sqlb.CountAll()).From(table).Final()))
+	assert.Equal(s.T(), n, countOf(gohan.Select(gohan.CountAll()).From(table).Final()))
 
 	// Sample(1) - full ratio.
-	assert.Equal(s.T(), n, countOf(sqlb.Select(sqlb.CountAll()).From(table).Sample(1)))
+	assert.Equal(s.T(), n, countOf(gohan.Select(gohan.CountAll()).From(table).Sample(1)))
 
 	// Prewhere
-	assert.Equal(s.T(), int64(1), countOf(sqlb.Select(sqlb.CountAll()).From(table).Prewhere(sqlb.Col("id").Eq(uint32(1)))))
+	assert.Equal(s.T(), int64(1), countOf(gohan.Select(gohan.CountAll()).From(table).Prewhere(gohan.Col("id").Eq(uint32(1)))))
 
 	// ArrayJoin: 1+2+0 = 3 tag rows.
-	assert.Equal(s.T(), int64(3), countOf(sqlb.Select(sqlb.CountAll()).From(table).ArrayJoin(sqlb.Col("tags").As("tag"))))
+	assert.Equal(s.T(), int64(3), countOf(gohan.Select(gohan.CountAll()).From(table).ArrayJoin(gohan.Col("tags").As("tag"))))
 
 	// Settings
-	assert.Equal(s.T(), n, countOf(sqlb.Select(sqlb.CountAll()).From(table).Settings(map[string]any{"max_threads": 1})))
+	assert.Equal(s.T(), n, countOf(gohan.Select(gohan.CountAll()).From(table).Settings(map[string]any{"max_threads": 1})))
 
 	// Combined clause order.
-	combined := sqlb.Select(sqlb.CountAll()).From(table).
+	combined := gohan.Select(gohan.CountAll()).From(table).
 		Final().Sample(1).
-		Prewhere(sqlb.Col("id").Eq(uint32(1))).
-		Where(sqlb.Col("name").Eq("a")).
+		Prewhere(gohan.Col("id").Eq(uint32(1))).
+		Where(gohan.Col("name").Eq("a")).
 		Limit(1).
 		Settings(map[string]any{"max_threads": 1})
 	assert.Equal(s.T(), int64(1), countOf(combined))
 
 	// Union (renders UNION DISTINCT): union of the table with itself
 	// dedups back to n rows.
-	unionSel := sqlb.Select("id").From(table).Union(sqlb.Select("id").From(table))
-	assert.Equal(s.T(), n, countOf(sqlb.Select(sqlb.CountAll()).From(unionSel.As("u"))))
+	unionSel := gohan.Select("id").From(table).Union(gohan.Select("id").From(table))
+	assert.Equal(s.T(), n, countOf(gohan.Select(gohan.CountAll()).From(unionSel.As("u"))))
 
 	// With: a CTE selecting from the table.
-	withSel := sqlb.Select("n").From("w").
-		With("w", sqlb.Select(sqlb.CountAll().As("n")).From(table))
+	withSel := gohan.Select("n").From("w").
+		With("w", gohan.Select(gohan.CountAll().As("n")).From(table))
 	assert.Equal(s.T(), n, countOf(withSel))
 
 	// Join: self-join on id, one-to-one.
-	joinSel := sqlb.Select(sqlb.CountAll()).
-		From(sqlb.Table(table).As("a")).
-		Join(sqlb.Table(table).As("b"), sqlb.Table(table).As("a").Col("id").Eq(sqlb.Table(table).As("b").Col("id")))
+	joinSel := gohan.Select(gohan.CountAll()).
+		From(gohan.Table(table).As("a")).
+		Join(gohan.Table(table).As("b"), gohan.Table(table).As("a").Col("id").Eq(gohan.Table(table).As("b").Col("id")))
 	assert.Equal(s.T(), n, countOf(joinSel))
 
 	// Offset without Limit.
-	assert.Equal(s.T(), n-1, countOf(sqlb.Select(sqlb.CountAll()).From(sqlb.Select("id").From(table).Offset(1).As("o"))))
+	assert.Equal(s.T(), n-1, countOf(gohan.Select(gohan.CountAll()).From(gohan.Select("id").From(table).Offset(1).As("o"))))
 
-	// Compound-limit: sqlb must wrap the compound on ClickHouse so the
+	// Compound-limit: gohan must wrap the compound on ClickHouse so the
 	// outer LIMIT 1 applies to the whole union, not just its last member.
 	const tableB = "dbx_clauses_b"
 	s.createTable(tableB, dbxClausesDDL)
@@ -371,12 +371,12 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxClickHouseClauses() {
 		return rb.Insert(s.ctx, &dbxEvent{ID: 1, Name: "x"}, &dbxEvent{ID: 2, Name: "y"})
 	}())
 
-	compound := sqlb.Select("id").From(table).UnionAll(sqlb.Select("id").From(tableB)).OrderBy("id").Limit(1)
-	assert.Equal(s.T(), int64(1), countOf(sqlb.Select(sqlb.CountAll()).From(compound.As("c"))))
+	compound := gohan.Select("id").From(table).UnionAll(gohan.Select("id").From(tableB)).OrderBy("id").Limit(1)
+	assert.Equal(s.T(), int64(1), countOf(gohan.Select(gohan.CountAll()).From(compound.As("c"))))
 
-	// Exec(ctx, sqlb.Delete(t).All()) renders WHERE 1 and empties the
+	// Exec(ctx, gohan.Delete(t).All()) renders WHERE 1 and empties the
 	// table (lightweight DELETE).
-	delSQL, delArgs, err := sqlb.Delete(table).All().Build(q.Dialect())
+	delSQL, delArgs, err := gohan.Delete(table).All().Build(q.Dialect())
 	require.NoError(s.T(), err)
 	_, err = q.Exec(s.ctx, delSQL, delArgs...)
 	require.NoError(s.T(), err)
@@ -414,13 +414,13 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxGrid() {
 	require.True(s.T(), errors.As(err, &gerr), "got %v", err)
 	assert.Equal(s.T(), "value is not valid", gerr.Message)
 
-	// The same nested value, passed directly, must be rejected by sqlb
+	// The same nested value, passed directly, must be rejected by gohan
 	// too (defense in depth against clickhouse-go's unsafe formatting).
 	raw := jq.FilterFields["id"]
-	_, _, err = sqlb.Select(sqlb.CountAll()).From(table).
-		Where(sqlb.Col("id").In(raw)).
-		Build(sqlb.ClickHouse())
-	assert.True(s.T(), errors.Is(err, sqlb.ErrUnsafeValue), "got %v", err)
+	_, _, err = gohan.Select(gohan.CountAll()).From(table).
+		Where(gohan.Col("id").In(raw)).
+		Build(gohan.ClickHouse())
+	assert.True(s.T(), errors.Is(err, gohan.ErrUnsafeValue), "got %v", err)
 }
 
 func (s *ClickhouseRepositoryTestSuite) TestDbxUnsupported() {
@@ -432,14 +432,14 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxUnsupported() {
 	r, err := dbx.NewRepository[dbxEvent](q, table)
 	require.NoError(s.T(), err)
 
-	_, err = r.Update(s.ctx, &dbxEvent{ID: 1, Name: "x"}, sqlb.Col("id").Eq(uint32(1)))
-	assert.True(s.T(), errors.Is(err, sqlb.ErrUnsupported), "got %v", err)
+	_, err = r.Update(s.ctx, &dbxEvent{ID: 1, Name: "x"}, gohan.Col("id").Eq(uint32(1)))
+	assert.True(s.T(), errors.Is(err, gohan.ErrUnsupported), "got %v", err)
 
 	err = r.Upsert(s.ctx, &dbxEvent{ID: 1, Name: "x"}, []string{"id"})
-	assert.True(s.T(), errors.Is(err, sqlb.ErrUnsupported), "got %v", err)
+	assert.True(s.T(), errors.Is(err, gohan.ErrUnsupported), "got %v", err)
 
 	_, err = r.InsertReturning(s.ctx, &dbxEvent{ID: 1, Name: "x"})
-	assert.True(s.T(), errors.Is(err, sqlb.ErrUnsupported), "got %v", err)
+	assert.True(s.T(), errors.Is(err, gohan.ErrUnsupported), "got %v", err)
 
 	err = dbx.WithTx(s.ctx, q, nil, func(tx dbx.Querier) error { return nil })
 	assert.True(s.T(), errors.Is(err, dbx.ErrTxUnsupported), "got %v", err)

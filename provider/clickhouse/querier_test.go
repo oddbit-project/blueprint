@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/oddbit-project/blueprint/dbx"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 func TestQuerierDialect(t *testing.T) {
@@ -98,5 +98,5 @@ func TestInsertBatchInconsistentOmit(t *testing.T) {
 	// reaching this error without a panic proves the check runs first.
 	err := q.InsertBatch(nil, "t", rows)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, sqlb.ErrInconsistentOmit), "got %v", err)
+	assert.True(t, errors.Is(err, gohan.ErrInconsistentOmit), "got %v", err)
 }

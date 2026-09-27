@@ -7,7 +7,7 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 const (
@@ -99,7 +99,7 @@ func (g *GridQuery) Page(page, itemsPerPage int) {
 	g.Limit = uint(itemsPerPage)
 }
 
-// Grid[T] builds sqlb queries from a GridQuery against T's grid-flagged
+// Grid[T] builds gohan queries from a GridQuery against T's grid-flagged
 // fields (grid:"sort"/"filter"/"search"). Only such fields are addressable
 // by alias; every other field, tagged or not, answers "field is not valid".
 type Grid[T any] struct {
@@ -164,9 +164,9 @@ func validFilterScalar(v any) bool {
 // validFilterValue reports whether v is an allowed filter value: a JSON
 // scalar, or a flat (non-nested) []any of at most MaxFilterValues scalars.
 // This is the grid's defence-in-depth against clickhouse-go's unsafe map
-// formatting (sqlb's recursive isUnsafeClickHouseValue check is the
+// formatting (gohan's recursive isUnsafeClickHouseValue check is the
 // primary defence); it also rejects plain maps and nested lists outright,
-// which sqlb would otherwise accept for non-ClickHouse dialects.
+// which gohan would otherwise accept for non-ClickHouse dialects.
 func validFilterValue(v any) bool {
 	if list, ok := v.([]any); ok {
 		if len(list) > MaxFilterValues {
@@ -247,7 +247,7 @@ func (g *Grid[T]) ValidQuery(q *GridQuery) error {
 // Contains per searchable field, ORed — no searchable fields means no
 // search condition at all), sort (sorted alias order, default direction
 // desc), then paging (after WithMaxLimit's cap).
-func (g *Grid[T]) Build(base *sqlb.SelectBuilder, q *GridQuery) (*sqlb.SelectBuilder, error) {
+func (g *Grid[T]) Build(base *gohan.SelectBuilder, q *GridQuery) (*gohan.SelectBuilder, error) {
 	if q == nil {
 		return nil, GridError{Scope: "query", Message: "query is required"}
 	}
@@ -255,7 +255,7 @@ func (g *Grid[T]) Build(base *sqlb.SelectBuilder, q *GridQuery) (*sqlb.SelectBui
 		return nil, GridError{Scope: "query", Message: "base query is required"}
 	}
 	if base.IsCompound() {
-		return nil, GridError{Scope: "query", Message: "base query must not be a UNION; wrap it with sqlb.From(q.As(...))"}
+		return nil, GridError{Scope: "query", Message: "base query must not be a UNION; wrap it with gohan.From(q.As(...))"}
 	}
 	if err := g.ValidQuery(q); err != nil {
 		return nil, err
@@ -275,17 +275,17 @@ func (g *Grid[T]) Build(base *sqlb.SelectBuilder, q *GridQuery) (*sqlb.SelectBui
 				v = nv
 			}
 			if list, ok := v.([]any); ok {
-				qry = qry.Where(sqlb.Col(fname).In(list...))
+				qry = qry.Where(gohan.Col(fname).In(list...))
 			} else {
-				qry = qry.Where(sqlb.Col(fname).Eq(v))
+				qry = qry.Where(gohan.Col(fname).Eq(v))
 			}
 		}
 	}
 
 	if len(q.SearchText) > 0 && len(g.spec.searchFields) > 0 {
-		exprs := make([]sqlb.Expr, len(g.spec.searchFields))
+		exprs := make([]gohan.Expr, len(g.spec.searchFields))
 		for i, fname := range g.spec.searchFields {
-			col := sqlb.Col(fname)
+			col := gohan.Col(fname)
 			switch q.SearchType {
 			case SearchStart:
 				exprs[i] = col.HasPrefix(q.SearchText)
@@ -295,7 +295,7 @@ func (g *Grid[T]) Build(base *sqlb.SelectBuilder, q *GridQuery) (*sqlb.SelectBui
 				exprs[i] = col.Contains(q.SearchText)
 			}
 		}
-		qry = qry.Where(sqlb.Or(exprs...))
+		qry = qry.Where(gohan.Or(exprs...))
 	}
 
 	if len(q.SortFields) > 0 {
@@ -305,11 +305,11 @@ func (g *Grid[T]) Build(base *sqlb.SelectBuilder, q *GridQuery) (*sqlb.SelectBui
 			if len(dir) == 0 {
 				dir = SortDescending
 			}
-			var order sqlb.Order
+			var order gohan.Order
 			if dir == SortAscending {
-				order = sqlb.Col(fname).Asc()
+				order = gohan.Col(fname).Asc()
 			} else {
-				order = sqlb.Col(fname).Desc()
+				order = gohan.Col(fname).Desc()
 			}
 			qry = qry.OrderBy(order)
 		}

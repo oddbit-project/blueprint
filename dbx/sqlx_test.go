@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/oddbit-project/blueprint/db"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 func newMockQuerier(t *testing.T) (*SQLQuerier, sqlmock.Sqlmock) {
@@ -21,7 +21,7 @@ func newMockQuerier(t *testing.T) (*SQLQuerier, sqlmock.Sqlmock) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = mockDB.Close() })
 	conn := sqlx.NewDb(mockDB, "sqlmock")
-	return NewSQL(conn, sqlb.Postgres()), mock
+	return NewSQL(conn, gohan.Postgres()), mock
 }
 
 func TestSQLQuerierExecRowsAffected(t *testing.T) {
@@ -65,7 +65,7 @@ func TestFromClientUnknownDriver(t *testing.T) {
 	c := db.NewSqlClient("x", "nope", nil)
 	q, err := FromClient(c)
 	require.Nil(t, q)
-	require.True(t, errors.Is(err, sqlb.ErrUnknownDialect))
+	require.True(t, errors.Is(err, gohan.ErrUnknownDialect))
 	assert.False(t, c.IsConnected(), "FromClient must resolve the dialect before attempting to connect")
 }
 

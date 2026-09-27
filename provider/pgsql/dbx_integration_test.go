@@ -6,7 +6,7 @@ import (
 
 	"github.com/oddbit-project/blueprint/db"
 	"github.com/oddbit-project/blueprint/dbx"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // dbxPgUser is the record type for TestDbxFromClient.
@@ -37,7 +37,7 @@ const dbxPgRefundsDDL = `CREATE TABLE dbx_pg_refunds (id serial primary key, use
 // every case against: s.dsn (simple protocol, what the rest of this suite
 // uses) and the plain connection string (extended protocol, pgx's
 // default), where untyped bound parameters fail with "could not determine
-// data type of parameter" unless sqlb types them correctly.
+// data type of parameter" unless gohan types them correctly.
 func (s *PGIntegrationTestSuite) dbxDsns() map[string]string {
 	extDSN, err := s.pgInstance.ConnectionString(s.ctx, "sslmode=disable")
 	require.NoError(s.T(), err)
@@ -97,11 +97,11 @@ func (s *PGIntegrationTestSuite) TestDbxFromClient() {
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(1), cnt)
 
-			exists, err := r.Exists(s.ctx, sqlb.Col("id").Eq(got.ID))
+			exists, err := r.Exists(s.ctx, gohan.Col("id").Eq(got.ID))
 			require.NoError(s.T(), err)
 			assert.True(s.T(), exists)
 
-			n, err := r.Delete(s.ctx, sqlb.Col("id").Eq(got.ID))
+			n, err := r.Delete(s.ctx, gohan.Col("id").Eq(got.ID))
 			require.NoError(s.T(), err)
 			assert.Equal(s.T(), int64(1), n)
 		})
@@ -141,7 +141,7 @@ func (s *PGIntegrationTestSuite) TestDbxJoinsCtesUnion() {
 			))
 			require.NoError(s.T(), refunds.Insert(s.ctx, &dbxPgRefund{UserID: alice.ID, Amount: 5}))
 
-			countOf := func(sel *sqlb.SelectBuilder) int64 {
+			countOf := func(sel *gohan.SelectBuilder) int64 {
 				s.T().Helper()
 				sqlStr, args, err := sel.Build(q.Dialect())
 				require.NoError(s.T(), err)
@@ -153,66 +153,66 @@ func (s *PGIntegrationTestSuite) TestDbxJoinsCtesUnion() {
 			// Join (INNER): orders joined to refunds by user_id, bound
 			// against refunds.amount > 0 - only Alice's 2 order rows match
 			// (Bob has no refund).
-			joinSel := sqlb.Select(sqlb.CountAll()).
-				From(sqlb.Table("dbx_pg_orders").As("o")).
-				Join(sqlb.Table("dbx_pg_refunds").As("rf"),
-					sqlb.Table("o").Col("user_id").Eq(sqlb.Table("rf").Col("user_id"))).
-				Where(sqlb.Col("rf.amount").Gt(0))
+			joinSel := gohan.Select(gohan.CountAll()).
+				From(gohan.Table("dbx_pg_orders").As("o")).
+				Join(gohan.Table("dbx_pg_refunds").As("rf"),
+					gohan.Table("o").Col("user_id").Eq(gohan.Table("rf").Col("user_id"))).
+				Where(gohan.Col("rf.amount").Gt(0))
 			assert.Equal(s.T(), int64(2), countOf(joinSel))
 
 			// LeftJoinUsing: all 3 orders survive (LEFT JOIN), bound
 			// against orders.amount > 0.
-			leftUsingSel := sqlb.Select(sqlb.CountAll()).
+			leftUsingSel := gohan.Select(gohan.CountAll()).
 				From("dbx_pg_orders").
 				LeftJoinUsing("dbx_pg_refunds", "user_id").
-				Where(sqlb.Col("dbx_pg_orders.amount").Gt(0))
+				Where(gohan.Col("dbx_pg_orders.amount").Gt(0))
 			assert.Equal(s.T(), int64(3), countOf(leftUsingSel))
 
 			// With: a CTE of orders with amount over a bound threshold.
-			withSel := sqlb.Select("n").From("big").
-				With("big", sqlb.Select(sqlb.CountAll().As("n")).From("dbx_pg_orders").Where(sqlb.Col("amount").Gt(9)))
+			withSel := gohan.Select("n").From("big").
+				With("big", gohan.Select(gohan.CountAll().As("n")).From("dbx_pg_orders").Where(gohan.Col("amount").Gt(9)))
 			assert.Equal(s.T(), int64(2), countOf(withSel))
 
 			// WithRecursive: generate 1..3, bound against < 4.
-			recSel := sqlb.Select(sqlb.CountAll()).From(
-				sqlb.Select("k").From("r").
-					WithRecursive("r", sqlb.Select(sqlb.Int(1).As("k")).
-						UnionAll(sqlb.Select(sqlb.Raw("k + 1")).From("r").Where(sqlb.Col("k").Lt(4)))).
+			recSel := gohan.Select(gohan.CountAll()).From(
+				gohan.Select("k").From("r").
+					WithRecursive("r", gohan.Select(gohan.Int(1).As("k")).
+						UnionAll(gohan.Select(gohan.Raw("k + 1")).From("r").Where(gohan.Col("k").Lt(4)))).
 					As("gen"))
 			assert.Equal(s.T(), int64(4), countOf(recSel))
 
 			// Union: de-duplicates; two disjoint bound name filters.
-			unionSel := sqlb.Select(sqlb.CountAll()).From(
-				sqlb.Select("id").From("dbx_pg_users").Where(sqlb.Col("name").Eq("Alice")).
-					Union(sqlb.Select("id").From("dbx_pg_users").Where(sqlb.Col("name").Eq("Bob"))).
+			unionSel := gohan.Select(gohan.CountAll()).From(
+				gohan.Select("id").From("dbx_pg_users").Where(gohan.Col("name").Eq("Alice")).
+					Union(gohan.Select("id").From("dbx_pg_users").Where(gohan.Col("name").Eq("Bob"))).
 					As("u"))
 			assert.Equal(s.T(), int64(2), countOf(unionSel))
 
 			// UnionAll: same shape, no de-dup needed since disjoint.
-			unionAllSel := sqlb.Select(sqlb.CountAll()).From(
-				sqlb.Select("id").From("dbx_pg_users").Where(sqlb.Col("name").Eq("Alice")).
-					UnionAll(sqlb.Select("id").From("dbx_pg_users").Where(sqlb.Col("name").Eq("Bob"))).
+			unionAllSel := gohan.Select(gohan.CountAll()).From(
+				gohan.Select("id").From("dbx_pg_users").Where(gohan.Col("name").Eq("Alice")).
+					UnionAll(gohan.Select("id").From("dbx_pg_users").Where(gohan.Col("name").Eq("Bob"))).
 					As("u"))
 			assert.Equal(s.T(), int64(2), countOf(unionAllSel))
 
 			// Offset without Limit: 3 orders with amount > 0, skip 1.
-			offsetSel := sqlb.Select(sqlb.CountAll()).From(
-				sqlb.Select("id").From("dbx_pg_orders").Where(sqlb.Col("amount").Gt(0)).
+			offsetSel := gohan.Select(gohan.CountAll()).From(
+				gohan.Select("id").From("dbx_pg_orders").Where(gohan.Col("amount").Gt(0)).
 					OrderBy("id").Offset(1).As("o"))
 			assert.Equal(s.T(), int64(2), countOf(offsetSel))
 
 			// Exists subquery: users with at least one order over a bound
 			// amount.
-			existsSel := sqlb.Select(sqlb.CountAll()).From("dbx_pg_users").
-				Where(sqlb.Exists(sqlb.Select(sqlb.Int(1)).From("dbx_pg_orders").
-					Where(sqlb.Col("dbx_pg_orders.user_id").Eq(sqlb.Col("dbx_pg_users.id")),
-						sqlb.Col("dbx_pg_orders.amount").Gt(9))))
+			existsSel := gohan.Select(gohan.CountAll()).From("dbx_pg_users").
+				Where(gohan.Exists(gohan.Select(gohan.Int(1)).From("dbx_pg_orders").
+					Where(gohan.Col("dbx_pg_orders.user_id").Eq(gohan.Col("dbx_pg_users.id")),
+						gohan.Col("dbx_pg_orders.amount").Gt(9))))
 			assert.Equal(s.T(), int64(1), countOf(existsSel))
 
 			// In subquery: users whose id is in the set of order user_ids
 			// with amount over a bound value.
-			inSel := sqlb.Select(sqlb.CountAll()).From("dbx_pg_users").
-				Where(sqlb.Col("id").In(sqlb.Select("user_id").From("dbx_pg_orders").Where(sqlb.Col("amount").Gt(9))))
+			inSel := gohan.Select(gohan.CountAll()).From("dbx_pg_users").
+				Where(gohan.Col("id").In(gohan.Select("user_id").From("dbx_pg_orders").Where(gohan.Col("amount").Gt(9))))
 			assert.Equal(s.T(), int64(1), countOf(inSel))
 		})
 	}

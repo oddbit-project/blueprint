@@ -7,7 +7,7 @@ import (
 
 	"github.com/oddbit-project/blueprint/dbx"
 	"github.com/oddbit-project/blueprint/provider/sqlite"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 // exampleUser is the record type used by ExampleNewRepository.
@@ -60,7 +60,7 @@ func ExampleNewRepository() {
 	}
 	_ = user
 
-	users, err := repo.List(ctx, repo.Select().Where(sqlb.Col("name").HasPrefix("al")))
+	users, err := repo.List(ctx, repo.Select().Where(gohan.Col("name").HasPrefix("al")))
 	if err != nil {
 		panic(err)
 	}
@@ -68,7 +68,7 @@ func ExampleNewRepository() {
 
 	err = dbx.WithTx(ctx, q, nil, func(tx dbx.Querier) error {
 		txRepo := repo.With(tx)
-		_, err := txRepo.Delete(ctx, sqlb.Col("id").Eq(user.ID))
+		_, err := txRepo.Delete(ctx, gohan.Col("id").Eq(user.ID))
 		return err
 	})
 	if err != nil {
