@@ -35,6 +35,7 @@ type Value struct {
 	fn      func(w *writer)
 	isRaw   bool
 	trivial bool
+	never   bool
 }
 
 func (v Value) render(w *writer) {
@@ -78,6 +79,9 @@ func Col(name string) Value {
 // Val binds v as an argument. Val(nil) renders the keyword NULL.
 // Val(expr) renders expr in place.
 func Val(v any) Value {
+	if vv, ok := v.(Value); ok {
+		return vv
+	}
 	if e, ok := v.(Expr); ok {
 		return Value{fn: func(w *writer) {
 			e.render(w)
@@ -215,30 +219,42 @@ func Sub(q *SelectBuilder) Value {
 	}}
 }
 
-// Exists renders "EXISTS (<select>)".
+// Exists renders "EXISTS (<select>)". If q's combined WHERE is
+// syntactically never (an empty result set) and q has no UNION members,
+// the returned Value is flagged never for the trivially-true/false guards
+// in delete.go/update.go: this over-approximates (e.g. an aggregate
+// subquery over an empty set still returns one row), which only makes the
+// guard refuse more often, never less.
 func Exists(q *SelectBuilder) Value {
-	return Value{fn: func(w *writer) {
-		if q == nil {
-			w.fail(ErrNilExpr)
-			return
-		}
-		w.keyword("EXISTS (")
-		q.renderSelect(w)
-		w.keyword(")")
-	}}
+	return Value{
+		never: q != nil && q.whereIsNever(),
+		fn: func(w *writer) {
+			if q == nil {
+				w.fail(ErrNilExpr)
+				return
+			}
+			w.keyword("EXISTS (")
+			q.renderSelect(w)
+			w.keyword(")")
+		},
+	}
 }
 
-// NotExists renders "NOT EXISTS (<select>)".
+// NotExists renders "NOT EXISTS (<select>)". See Exists for the trivial
+// flag.
 func NotExists(q *SelectBuilder) Value {
-	return Value{fn: func(w *writer) {
-		if q == nil {
-			w.fail(ErrNilExpr)
-			return
-		}
-		w.keyword("NOT EXISTS (")
-		q.renderSelect(w)
-		w.keyword(")")
-	}}
+	return Value{
+		trivial: q != nil && q.whereIsNever(),
+		fn: func(w *writer) {
+			if q == nil {
+				w.fail(ErrNilExpr)
+				return
+			}
+			w.keyword("NOT EXISTS (")
+			q.renderSelect(w)
+			w.keyword(")")
+		},
+	}
 }
 
 // renderBoolList renders exprs joined by sep, wrapped in parentheses,
@@ -275,15 +291,19 @@ func renderBoolList(w *writer, exprs []Expr, sep, emptyLit string) {
 // one). And() renders (1=1).
 func And(exprs ...Expr) Value {
 	trivial := true
+	never := false
 	for _, e := range exprs {
 		v, ok := e.(Value)
 		if !ok || !v.trivial {
 			trivial = false
-			break
+		}
+		if ok && v.never {
+			never = true
 		}
 	}
 	return Value{
 		trivial: trivial,
+		never:   never,
 		fn: func(w *writer) {
 			renderBoolList(w, exprs, "AND", "1=1")
 		},
@@ -293,22 +313,47 @@ func And(exprs ...Expr) Value {
 // Or renders exprs joined by OR, in parentheses (unless there is exactly
 // one). Or() renders (1=0).
 func Or(exprs ...Expr) Value {
-	return Value{fn: func(w *writer) {
-		renderBoolList(w, exprs, "OR", "1=0")
-	}}
+	trivial := false
+	never := true
+	for _, e := range exprs {
+		v, ok := e.(Value)
+		if ok && v.trivial {
+			trivial = true
+		}
+		if !ok || !v.never {
+			never = false
+		}
+	}
+	return Value{
+		trivial: trivial,
+		never:   never,
+		fn: func(w *writer) {
+			renderBoolList(w, exprs, "OR", "1=0")
+		},
+	}
 }
 
-// Not renders NOT (e).
+// Not renders NOT (e). If e is a Value, Not swaps its trivial/never flags:
+// the negation of an always-true condition is always-false and vice
+// versa.
 func Not(e Expr) Value {
-	return Value{fn: func(w *writer) {
-		if e == nil {
-			w.fail(ErrNilExpr)
-			return
-		}
-		w.keyword("NOT (")
-		e.render(w)
-		w.keyword(")")
-	}}
+	var trivial, never bool
+	if v, ok := e.(Value); ok {
+		trivial, never = v.never, v.trivial
+	}
+	return Value{
+		trivial: trivial,
+		never:   never,
+		fn: func(w *writer) {
+			if e == nil {
+				w.fail(ErrNilExpr)
+				return
+			}
+			w.keyword("NOT (")
+			e.render(w)
+			w.keyword(")")
+		},
+	}
 }
 
 // Match renders an AND of equality comparisons, one per field, with keys
@@ -390,8 +435,10 @@ func expandInValues(values []any) []any {
 
 func inExpr(v Value, values []any, negate bool) Value {
 	expanded := expandInValues(values)
+	empty := len(expanded) == 0
 	return Value{
-		trivial: negate && len(expanded) == 0,
+		trivial: negate && empty,
+		never:   !negate && empty,
 		fn: func(w *writer) {
 			if len(expanded) == 0 {
 				if negate {
@@ -420,22 +467,29 @@ func inExpr(v Value, values []any, negate bool) Value {
 
 // subqueryInExpr renders "v IN (<select>)" / "v NOT IN (<select>)",
 // sharing w with the outer statement so placeholders keep counting across
-// nesting.
+// nesting. See Exists for the trivial/never propagation.
 func subqueryInExpr(v Value, sb *SelectBuilder, negate bool) Value {
-	return Value{fn: func(w *writer) {
-		if sb == nil {
-			w.fail(ErrNilExpr)
-			return
-		}
-		renderExpr(w, v)
-		if negate {
-			w.keyword(" NOT IN (")
-		} else {
-			w.keyword(" IN (")
-		}
-		sb.renderSelect(w)
-		w.keyword(")")
-	}}
+	never := sb != nil && sb.whereIsNever()
+	trivial := negate && never
+	never = !negate && never
+	return Value{
+		trivial: trivial,
+		never:   never,
+		fn: func(w *writer) {
+			if sb == nil {
+				w.fail(ErrNilExpr)
+				return
+			}
+			renderExpr(w, v)
+			if negate {
+				w.keyword(" NOT IN (")
+			} else {
+				w.keyword(" IN (")
+			}
+			sb.renderSelect(w)
+			w.keyword(")")
+		},
+	}
 }
 
 // In renders "v IN (values...)", expanding a single slice argument. With

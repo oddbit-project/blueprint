@@ -107,6 +107,17 @@ func (s *SelectBuilder) Where(conds ...Expr) *SelectBuilder {
 	return c
 }
 
+// whereIsNever reports whether s is a plain (non-UNION) select whose
+// combined WHERE clause is syntactically never (its result set is always
+// empty). Used to propagate the never flag into subquery-based guards
+// (Exists, NotExists, In/NotIn with a *SelectBuilder); see plan 009.
+func (s *SelectBuilder) whereIsNever() bool {
+	if len(s.unions) > 0 || len(s.where) == 0 {
+		return false
+	}
+	return And(s.where...).never
+}
+
 // GroupBy appends to the GROUP BY list.
 func (s *SelectBuilder) GroupBy(cols ...any) *SelectBuilder {
 	c := s.clone()

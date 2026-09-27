@@ -250,6 +250,40 @@ func TestTrivialFlag(t *testing.T) {
 	assert.False(t, And(Col("a").Eq(1)).trivial)
 	assert.False(t, Or().trivial)
 	assert.False(t, Col("a").In().trivial)
+
+	// Not swaps trivial/never.
+	assert.True(t, Not(Col("a").In()).trivial)
+	assert.False(t, Not(Col("a").NotIn()).trivial)
+	assert.True(t, Not(Col("a").NotIn()).never)
+
+	// Or is trivial if any child is trivial.
+	assert.True(t, Or(Col("a").Eq(1), Col("b").NotIn()).trivial)
+
+	// Or() is never.
+	assert.True(t, Or().never)
+
+	// Val copies both flags.
+	assert.True(t, Val(And()).trivial)
+
+	// Not(Raw(...)) is neither (Raw carries no flags).
+	assert.False(t, Not(Raw("x")).trivial)
+	assert.False(t, Not(Raw("x")).never)
+
+	// And is never if any child is never.
+	assert.True(t, Not(And(Col("a").Eq(1), Col("b").In())).trivial)
+
+	// Or is never only if all children are never.
+	assert.True(t, Not(Or(Col("a").In(), Col("b").In())).trivial)
+
+	// Subquery propagation: never WHERE inside NotIn/NotExists -> trivial.
+	assert.True(t, Col("id").NotIn(Select("id").From("x").Where(Col("g").In())).trivial)
+	assert.True(t, NotExists(Select(Int(1)).From("x").Where(Col("k").In())).trivial)
+}
+
+func TestValPreservesRawParens(t *testing.T) {
+	sql, _, err := render(Postgres(), Val(Raw("a OR b")).Eq(1))
+	require.NoError(t, err)
+	assert.Equal(t, `(a OR b) = $1`, sql)
 }
 
 func TestAliasSinglePart(t *testing.T) {

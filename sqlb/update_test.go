@@ -80,6 +80,8 @@ func TestUpdateRequiresWhere(t *testing.T) {
 		Update("t").Set("a", 1).Where(),
 		Update("t").Set("a", 1).Where(And()),
 		Update("t").Set("a", 1).Where(Col("id").NotIn()),
+		Update("t").Set("a", 1).Where(Not(Col("id").In())),
+		Update("t").Set("a", 1).Where(Or(Col("a").Eq(1), Col("id").NotIn())),
 	}
 	for i, b := range trivialCases {
 		_, _, err := b.Build(Postgres())
@@ -89,6 +91,11 @@ func TestUpdateRequiresWhere(t *testing.T) {
 	sql, args, err := Update("t").Set("a", 1).Where(And()).Where(Col("id").Eq(1)).Build(Postgres())
 	require.NoError(t, err)
 	assert.Equal(t, `UPDATE "t" SET "a" = $1 WHERE ((1=1) AND "id" = $2)`, sql)
+	assert.Equal(t, []any{1, 1}, args)
+
+	sql, args, err = Update("t").Set("a", 1).Where(Not(Col("id").In(1))).Build(Postgres())
+	require.NoError(t, err)
+	assert.Equal(t, `UPDATE "t" SET "a" = $1 WHERE NOT ("id" IN ($2))`, sql)
 	assert.Equal(t, []any{1, 1}, args)
 }
 

@@ -62,6 +62,8 @@ func TestDeleteTrivialWhere(t *testing.T) {
 		Delete("t").Where(And(And())),
 		Delete("t").Where(Col("id").NotIn()),
 		Delete("t").Where(And()).Where(Col("id").NotIn()),
+		Delete("t").Where(Not(Col("id").In())),
+		Delete("t").Where(Or(Col("a").Eq(1), Col("id").NotIn())),
 	}
 	for i, b := range trivialCases {
 		_, _, err := b.Build(Postgres())
@@ -72,6 +74,12 @@ func TestDeleteTrivialWhere(t *testing.T) {
 	sql, args, err := Delete("t").Where(And()).Where(Col("a").Eq(1)).Build(Postgres())
 	require.NoError(t, err)
 	assert.Equal(t, `DELETE FROM "t" WHERE ((1=1) AND "a" = $1)`, sql)
+	assert.Equal(t, []any{1}, args)
+
+	// Not(In(1)) is a real condition, not trivial.
+	sql, args, err = Delete("t").Where(Not(Col("id").In(1))).Build(Postgres())
+	require.NoError(t, err)
+	assert.Equal(t, `DELETE FROM "t" WHERE NOT ("id" IN ($1))`, sql)
 	assert.Equal(t, []any{1}, args)
 
 	// Raw is explicit and trusted: it is never treated as trivial.
