@@ -32,7 +32,7 @@ func ColumnExists(ctx context.Context, client *db.SqlClient, tableName string, c
 	if err != nil {
 		return false, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
