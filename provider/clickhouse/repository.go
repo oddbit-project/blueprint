@@ -304,7 +304,7 @@ func (r *repository) Insert(rows any) error {
 
 	appendRow := func(row any) error {
 		if err := batch.AppendStruct(row); err != nil {
-			batch.Abort()
+			_ = batch.Abort()
 			return err
 		}
 		return nil
@@ -339,7 +339,7 @@ func (r *repository) InsertAsync(record any) error {
 		return err
 	}
 	placeholders := make([]string, len(cols))
-	for i, _ := range cols {
+	for i := range cols {
 		placeholders[i] = r.sqlDialect.Placeholder(-1)
 	}
 
@@ -347,7 +347,7 @@ func (r *repository) InsertAsync(record any) error {
 	var qry strings.Builder
 	qry.WriteString("INSERT INTO ")
 	qry.WriteString(tableName)
-	qry.WriteString(fmt.Sprintf("(%s)", strings.Join(cols, ",")))
+	_, _ = fmt.Fprintf(&qry, "(%s)", strings.Join(cols, ","))
 	qry.WriteString(" VALUES(")
 	qry.WriteString(strings.Join(placeholders, ","))
 	qry.WriteString(")")

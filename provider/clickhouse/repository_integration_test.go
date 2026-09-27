@@ -57,7 +57,7 @@ func (s *ClickhouseRepositoryTestSuite) SetupSuite() {
 					return status == http.StatusOK
 				},
 			),
-		).WithStartupTimeout(60 * time.Second),
+		).WithDeadline(60 * time.Second),
 	}
 
 	// Start container
@@ -107,7 +107,7 @@ func (s *ClickhouseRepositoryTestSuite) TearDownSuite() {
 			s.T().Logf("Failed to drop complex test table: %v", err)
 		}
 		// Close the client
-		s.client.Close()
+		_ = s.client.Close()
 	}
 
 	// Stop and remove container

@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -28,13 +29,13 @@ func TestQuerierNotTransactional(t *testing.T) {
 func TestQuerierSelectRejectsNonSlice(t *testing.T) {
 	q := NewQuerier(nil)
 	var dest int
-	err := q.Select(nil, &dest, "SELECT 1")
+	err := q.Select(context.TODO(), &dest, "SELECT 1")
 	assert.Error(t, err)
 }
 
 func TestInsertBatchEmpty(t *testing.T) {
 	q := NewQuerier(nil)
-	err := q.InsertBatch(nil, "t", nil)
+	err := q.InsertBatch(context.TODO(), "t", nil)
 	assert.NoError(t, err)
 }
 
@@ -65,13 +66,13 @@ func rejectColumnNameCases(q *Querier) map[string]func() error {
 		A int `ch:"a\fb"`
 	}
 	return map[string]func() error{
-		"space":       func() error { return q.InsertBatch(nil, "t", []any{&recSpace{A: 1}}) },
-		"quote":       func() error { return q.InsertBatch(nil, "t", []any{&recQuote{A: 1}}) },
-		"backslash":   func() error { return q.InsertBatch(nil, "t", []any{&recBackslash{A: 1}}) },
-		"open paren":  func() error { return q.InsertBatch(nil, "t", []any{&recOpenParen{A: 1}}) },
-		"close paren": func() error { return q.InsertBatch(nil, "t", []any{&recCloseParen{A: 1}}) },
-		"tab":         func() error { return q.InsertBatch(nil, "t", []any{&recTab{A: 1}}) },
-		"form feed":   func() error { return q.InsertBatch(nil, "t", []any{&recFormFeed{A: 1}}) },
+		"space":       func() error { return q.InsertBatch(context.TODO(), "t", []any{&recSpace{A: 1}}) },
+		"quote":       func() error { return q.InsertBatch(context.TODO(), "t", []any{&recQuote{A: 1}}) },
+		"backslash":   func() error { return q.InsertBatch(context.TODO(), "t", []any{&recBackslash{A: 1}}) },
+		"open paren":  func() error { return q.InsertBatch(context.TODO(), "t", []any{&recOpenParen{A: 1}}) },
+		"close paren": func() error { return q.InsertBatch(context.TODO(), "t", []any{&recCloseParen{A: 1}}) },
+		"tab":         func() error { return q.InsertBatch(context.TODO(), "t", []any{&recTab{A: 1}}) },
+		"form feed":   func() error { return q.InsertBatch(context.TODO(), "t", []any{&recFormFeed{A: 1}}) },
 	}
 }
 
@@ -96,7 +97,7 @@ func TestInsertBatchInconsistentOmit(t *testing.T) {
 	}
 	// A nil conn would panic if InsertBatch reached PrepareBatch/AppendStruct;
 	// reaching this error without a panic proves the check runs first.
-	err := q.InsertBatch(nil, "t", rows)
+	err := q.InsertBatch(context.TODO(), "t", rows)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, gohan.ErrInconsistentOmit), "got %v", err)
 }
