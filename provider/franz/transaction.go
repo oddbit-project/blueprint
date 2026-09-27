@@ -112,7 +112,9 @@ func (tx *Transaction) Commit() error {
 			if res.Err != nil {
 				// If any record fails, abort the transaction
 				tx.aborted = true
-				tx.client.AbortBufferedRecords(tx.ctx)
+				if err := tx.client.AbortBufferedRecords(tx.ctx); err != nil {
+					tx.producer.Logger.Error(err, "Failed to abort buffered records after produce error")
+				}
 				if err := tx.client.EndTransaction(tx.ctx, kgo.TryAbort); err != nil {
 					tx.producer.Logger.Error(err, "Failed to abort transaction after produce error")
 				}
@@ -148,7 +150,9 @@ func (tx *Transaction) Abort() error {
 	tx.finished = true
 
 	// Abort any buffered records
-	tx.client.AbortBufferedRecords(tx.ctx)
+	if err := tx.client.AbortBufferedRecords(tx.ctx); err != nil {
+		tx.producer.Logger.Error(err, "Failed to abort buffered records")
+	}
 
 	// End the transaction with abort
 	if err := tx.client.EndTransaction(tx.ctx, kgo.TryAbort); err != nil {
@@ -185,7 +189,9 @@ func (p *Producer) Transact(ctx context.Context, fn TransactionFunc) error {
 	// Handle panics by aborting the transaction
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Abort()
+			if abortErr := tx.Abort(); abortErr != nil {
+				p.Logger.Error(abortErr, "Failed to abort transaction after panic")
+			}
 			panic(r) // Re-panic after cleanup
 		}
 	}()

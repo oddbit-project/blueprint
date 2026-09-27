@@ -65,7 +65,7 @@ func NewJSProducer(cfg *JSProducerConfig, logger *log.Logger) (*JSProducer, erro
 		return nil, err
 	}
 
-	conn, err := cfg.JSConnectionConfig.dial("natsJSProducer")
+	conn, err := cfg.dial("natsJSProducer")
 	if err != nil {
 		return nil, err
 	}

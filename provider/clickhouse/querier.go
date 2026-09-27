@@ -96,7 +96,7 @@ func (q *Querier) Select(ctx context.Context, dest any, query string, args ...an
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		p := reflect.New(elemType.Elem())
@@ -187,7 +187,7 @@ func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) err
 	}
 	for _, row := range rows {
 		if err := batch.AppendStruct(row); err != nil {
-			batch.Abort()
+			_ = batch.Abort()
 			return err
 		}
 	}

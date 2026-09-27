@@ -44,7 +44,7 @@ func (s *ClickhouseMigrationTestSuite) SetupSuite() {
 					return status == http.StatusOK
 				},
 			),
-		).WithStartupTimeout(60 * time.Second),
+		).WithDeadline(60 * time.Second),
 	}
 
 	// Start container
@@ -91,7 +91,7 @@ func (s *ClickhouseMigrationTestSuite) TearDownSuite() {
 			s.T().Logf("Failed to drop test table: %v", err)
 		}
 		// Close the client
-		s.client.Close()
+		_ = s.client.Close()
 	}
 
 	// Stop and remove container
@@ -135,7 +135,7 @@ func (s *ClickhouseMigrationTestSuite) TestUpdateMigrations() {
 	_ = s.client.Conn.Exec(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 
 	// create old version table
-	qry := `CREATE TABLE IF NOT EXISTS  %s %s(created DateTime, name String, sha2 String, contents String) ENGINE = TinyLog`
+	qry := `CREATE TABLE IF NOT EXISTS  %s(created DateTime, name String, sha2 String, contents String) ENGINE = TinyLog`
 	qry = fmt.Sprintf(qry, MigrationTable)
 	_ = s.client.Conn.Exec(s.ctx, qry)
 
@@ -244,6 +244,7 @@ func (s *ClickhouseMigrationTestSuite) TestSameNameMigrations() {
 	// list, should still have 1
 	sysList, err = sysMgr.List(context.Background())
 	assert.Equal(s.T(), 1, len(sysList))
+	assert.Nil(s.T(), err)
 
 	// migration manager - module
 	moduleMgr, err := NewMigrationManager(context.Background(), s.client, WithModule("sample-module"))

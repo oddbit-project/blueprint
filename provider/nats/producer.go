@@ -92,9 +92,9 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		Username:     cfg.Username,
 		Cred:         cfg.DefaultCredentialConfig,
 		TLS:          cfg.ClientConfig,
-		PingInterval: cfg.ProducerOptions.PingInterval,
-		MaxPingsOut:  cfg.ProducerOptions.MaxPingsOut,
-		Timeout:      cfg.ProducerOptions.Timeout,
+		PingInterval: cfg.PingInterval,
+		MaxPingsOut:  cfg.MaxPingsOut,
+		Timeout:      cfg.Timeout,
 	})
 	if err != nil {
 		logger.Error(err, "Failed to connect to NATS", log.KV{

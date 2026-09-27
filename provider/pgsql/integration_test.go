@@ -59,24 +59,6 @@ func (s *PGIntegrationTestSuite) getTestClient() *db.SqlClient {
 	return client
 }
 
-// Legacy function for compatibility with existing standalone tests
-func resolveDSN() string {
-	// Disable prepared statement cache to avoid "cached plan must not change result type" errors
-	// Use default_query_exec_mode=simple_protocol for pgx driver
-	return "postgres://blueprint:password@postgres:5432/blueprint?default_query_exec_mode=simple_protocol"
-}
-
-// Legacy function for compatibility with existing standalone tests
-func dbClient(t *testing.T) *db.SqlClient {
-	cfg := NewClientConfig()
-	cfg.DSN = resolveDSN()
-	client, err := NewClient(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return client
-}
-
 // SetupSuite prepares the test environment with testcontainers
 func (s *PGIntegrationTestSuite) SetupSuite() {
 	s.ctx = context.Background()
@@ -255,7 +237,7 @@ func (s *PGIntegrationTestSuite) TestLockConcurrent() {
 	wg.Add(1)
 	require.NoError(s.T(), lock1.Lock(s.ctx))
 	time.AfterFunc(time.Second*1, func() {
-		lock1.Unlock(s.ctx)
+		assert.NoError(s.T(), lock1.Unlock(s.ctx))
 		wg.Done()
 	})
 
