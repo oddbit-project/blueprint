@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+> **Potentially breaking release**: see "Breaking changes" below and in the root
+> [CHANGELOG](../../CHANGELOG.md).
+
+### Breaking changes
+
+- **Backslashes in values are escaped.** ClickHouse treats `\` as an escape character in string
+  literals. The goqu dialect now sends it literally, so a value such as `a\nb` is stored as those
+  four characters instead of `a`, a newline, and `b`. Rows written by earlier versions keep what
+  ClickHouse stored at the time.
+- **Column names are validated**: `FetchRecord`, `FetchByKey`, `FetchWhere`, `Exists`,
+  `CountWhere`, `DeleteWhere` and `DeleteByKey` return `db.ErrInvalidIdentifier` for column names
+  containing `"`, `\` or NUL.
+- **`DeleteWhere` refuses an empty map** with `ErrInvalidParameters`.
+- `Exists` returns `ErrInvalidParameters` (instead of panicking) when the skip column is not a
+  string.
+
+### Fixed
+
+- **`Count`, `CountWhere` and `Exists` failed on every call**: they scanned ClickHouse's `UInt64`
+  `COUNT(*)` into a signed integer, which clickhouse-go rejects. They now scan into `uint64`.
+
 ### Added
 
 - **`Client.Querier()` / `NewQuerier(conn)`** — returns a `*clickhouse.Querier` implementing

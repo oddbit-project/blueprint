@@ -300,7 +300,9 @@ if gridErr, ok := err.(db.GridError); ok {
 
 - **Field Spec Caching**: Struct metadata is cached automatically
 - **Connection Pooling**: Managed by underlying provider packages
-- **Prepared Statements**: Used automatically where beneficial
+- **Bound Parameters**: Values in goqu datasets are sent as bound arguments, never inlined. Build
+  datasets from a registered dialect (`repo.SqlSelect()`, `goqu.Dialect("pgx")`); see
+  [Database Functions](functions.md#bound-values-and-dialects)
 - **Batch Operations**: Available for bulk inserts and updates
 - **Lazy Loading**: Grid field specs are built on-demand
 

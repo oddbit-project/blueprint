@@ -17,6 +17,43 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+> **Potentially breaking release.** No exported API was removed, but the SQL-injection fix in the
+> legacy `db` package changes how queries are rendered, and some existing code will fail at run
+> time after upgrading. Read "Breaking changes" below before upgrading.
+
+### Breaking changes
+
+- **`db`: values in goqu queries are now bound, not inlined.** `db.Exec`, `Fetch`, `FetchOne`,
+  `FetchRecord`, `FetchByKey`, `FetchWhere`, `Exists`, `Count`, `Delete`, `DeleteWhere` and
+  `DeleteByKey`, and the `db.Repository` methods built on them, now render goqu datasets with
+  `Prepared(true)`. The placeholder style comes from the dataset's goqu dialect, so on
+  PostgreSQL the dataset **must use a registered dialect**:
+  - Queries from `repo.SqlSelect()`/`repo.SqlDelete()` are unaffected: they use the client's
+    dialect (`pgx`, registered by `provider/pgsql`).
+  - Datasets built with `goqu.From(...)`, `goqu.Select(...)`, or
+    `goqu.Dialect("postgres")` without importing `github.com/doug-martin/goqu/v9/dialect/postgres`,
+    fall back to goqu's default dialect and render `?` placeholders, which PostgreSQL rejects.
+    Build them from `repo.SqlSelect()`/`repo.SqlDelete()` or `goqu.Dialect("pgx")` instead.
+    `db.Update` and `db.Do` already bound values, so they already had this requirement.
+  - Values PostgreSQL cannot type from context now fail. For example, a bound integer in a select
+    list or inside `SUM(CASE WHEN … THEN 1 …)` is sent as text (`function sum(text) does not
+    exist`). Use `goqu.L("1")` for such constants.
+  - A single statement is limited to 65535 bound values, which affects very large `IN` lists.
+- **`db.DeleteWhere` and `provider/clickhouse`'s `DeleteWhere` refuse an empty map** with
+  `ErrInvalidParameters`. Previously, in the legacy `db` package, a non-nil empty map deleted
+  every row.
+- **Column names are validated.** Column names passed to the `db` helpers and the
+  `Fetch*`/`Exists`/`CountWhere`/`Delete*` repository methods (legacy `db` and
+  `provider/clickhouse`) are rejected with `db.ErrInvalidIdentifier` if they contain `"`, `\` or
+  NUL.
+- **`provider/clickhouse`: backslashes in values are escaped.** ClickHouse treats `\` as an escape
+  character in string literals. Blueprint now sends it literally, so a value such as `a\nb` is
+  stored as those four characters instead of `a`, a newline, and `b`. Rows written by earlier
+  versions keep what ClickHouse stored at the time. If you rely on the old behaviour, compare
+  those rows explicitly.
+- **Dependency:** the core module now requires `github.com/oddbit-project/gohan` (v0.1.0). The Go
+  version stays 1.26.5.
+
 ### Added
 
 - **`SECURITY.md`**: vulnerabilities are reported through GitHub private vulnerability
