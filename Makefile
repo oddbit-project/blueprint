@@ -1,4 +1,5 @@
 SBOM_FILE=sbom.json
+CYCLONEDX_GOMOD_VERSION ?= v1.12.0
 
 # Provider modules list
 PROVIDERS := franz kafka nats mqtt redis s3 etcd pgsql sqlite clickhouse httpserver metrics smtp htpasswd hmacprovider
@@ -141,7 +142,7 @@ benchmark-s3:
 	@./scripts/run_s3_benchmark.sh
 
 install-sbom-tool:
-	go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+	go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CYCLONEDX_GOMOD_VERSION)
 
 sbom: install-sbom-tool
 	@echo "Generating SBOM for core module..."

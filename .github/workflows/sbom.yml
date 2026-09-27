@@ -8,6 +8,10 @@ on:
       - 'provider/*/v*'
   workflow_dispatch:
 
+env:
+  CYCLONEDX_GOMOD_VERSION: 'v1.12.0'
+  TRIVY_VERSION: 'v0.74.0'
+
 permissions:
   contents: write
   actions: read
@@ -29,7 +33,7 @@ jobs:
 
       - name: Install cyclonedx-gomod
         run: |
-          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+          go install "github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CYCLONEDX_GOMOD_VERSION}"
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
       - name: Generate SBOM for Core Module (CycloneDX JSON)
@@ -69,8 +73,9 @@ jobs:
           path: sbom-providers/
 
       - name: Install Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+        uses: aquasecurity/setup-trivy@v0.3.1
+        with:
+          version: ${{ env.TRIVY_VERSION }}
 
       - name: Scan SBOM for Vulnerabilities
         run: trivy sbom sbom.json --format table --severity CRITICAL,HIGH
