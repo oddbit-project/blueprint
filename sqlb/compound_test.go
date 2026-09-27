@@ -99,3 +99,9 @@ func TestCompoundNames(t *testing.T) {
 	_, _, err := From("s").With("a.b", Select("x").From("y")).Build(Postgres())
 	assert.True(t, errors.Is(err, ErrInvalidIdentifier), "got %v", err)
 }
+
+func TestIsCompound(t *testing.T) {
+	assert.False(t, Select("a").From("t").IsCompound())
+	assert.True(t, Select("a").From("t").Union(Select("a").From("u")).IsCompound())
+	assert.True(t, Select("a").From("t").UnionAll(Select("a").From("u")).IsCompound())
+}

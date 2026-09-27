@@ -254,6 +254,9 @@ func (g *Grid[T]) Build(base *sqlb.SelectBuilder, q *GridQuery) (*sqlb.SelectBui
 	if base == nil {
 		return nil, GridError{Scope: "query", Message: "base query is required"}
 	}
+	if base.IsCompound() {
+		return nil, GridError{Scope: "query", Message: "base query must not be a UNION; wrap it with sqlb.From(q.As(...))"}
+	}
 	if err := g.ValidQuery(q); err != nil {
 		return nil, err
 	}

@@ -69,6 +69,15 @@ func (s *SelectBuilder) UnionAll(q *SelectBuilder) *SelectBuilder {
 	return s.addUnion(unionAll, q)
 }
 
+// IsCompound reports whether s has any UNION members. Where/Having/
+// Prewhere called on a compound builder apply to the first member's core
+// only, while ORDER BY/LIMIT/OFFSET apply to the whole compound; callers
+// that need filters applied to the whole result set (e.g. dbx.Grid)
+// should reject a compound base query.
+func (s *SelectBuilder) IsCompound() bool {
+	return len(s.unions) > 0
+}
+
 // checkCompoundMember reports ErrCompoundPart if q cannot be used as a
 // UNION member, or ErrNilExpr if q is nil.
 func checkCompoundMember(q *SelectBuilder) error {

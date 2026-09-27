@@ -286,6 +286,33 @@ func TestGridBuildGolden(t *testing.T) {
 	}
 }
 
+func TestGridRejectsCompoundBase(t *testing.T) {
+	g, err := NewGrid[row]()
+	require.NoError(t, err)
+	compound := rowBase().Union(sqlb.Select("id", "name", "email", "tag").From("more_rows"))
+	_, err = g.Build(compound, &GridQuery{})
+	require.Error(t, err)
+	var gerr GridError
+	require.True(t, errors.As(err, &gerr))
+	assert.Equal(t, GridError{Scope: "query", Message: "base query must not be a UNION; wrap it with sqlb.From(q.As(...))"}, gerr)
+}
+
+func TestGridCompoundBaseWorkaround(t *testing.T) {
+	g, err := NewGrid[row]()
+	require.NoError(t, err)
+	compound := sqlb.Select("id", "name", "email", "tag").From("rows").
+		Union(sqlb.Select("id", "name", "email", "tag").From("more_rows"))
+	base := sqlb.From(compound.As("u"))
+	sb, err := g.Build(base, &GridQuery{FilterFields: map[string]any{"tag": "a"}})
+	require.NoError(t, err)
+	gotSQL, gotArgs, err := sb.Build(sqlb.Postgres())
+	require.NoError(t, err)
+	assert.Equal(t,
+		`SELECT * FROM (SELECT "id", "name", "email", "tag" FROM "rows" UNION SELECT "id", "name", "email", "tag" FROM "more_rows") AS "u" WHERE "tag" = $1`,
+		gotSQL)
+	assert.Equal(t, []any{"a"}, gotArgs)
+}
+
 // TestGridBuildGoldenSQLite proves the SQLite-specific "LIMIT -1 OFFSET n"
 // rendering for an offset-only query, exercised through sqlb rather than
 // re-implemented in Build.
