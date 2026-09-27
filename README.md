@@ -409,6 +409,11 @@ Blueprint also includes the following modular providers:
 
 Each provider is independently versioned and can be imported separately. See the [documentation](https://oddbit-project.github.io/blueprint/) for detailed usage examples.
 
+## Security
+
+Please report vulnerabilities privately — see [SECURITY.md](SECURITY.md). Do not open public issues
+for security problems.
+
 ## License information
 
 All the custom code is licensed under Apache2 license. Some code pieces were copied or imported from different sources,

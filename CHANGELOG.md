@@ -19,6 +19,8 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Added
 
+- **`SECURITY.md`**: vulnerabilities are reported through GitHub private vulnerability
+  reporting (now enabled on the repository).
 - **`sqlb`**: a new SQL query builder where values are always bound and identifiers are always
   quoted and escaped by construction, so the normal API cannot reintroduce SQL injection the way
   goqu's inlined rendering did (fixed in `654df80`). It supports `SELECT`/`INSERT`/`UPDATE`/
