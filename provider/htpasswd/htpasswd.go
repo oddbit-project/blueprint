@@ -34,7 +34,7 @@ func NewFromFile(path string) (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return NewFromReader(f)
 }
 
@@ -93,13 +93,16 @@ func (c *Container) Write(dest io.Writer) error {
 	defer c.mutex.RUnlock()
 
 	writer := bufio.NewWriter(dest)
-	defer writer.Flush()
 
 	for _, entry := range c.entries {
 		line := fmt.Sprintf("%s:%s\n", entry.Username, entry.Hash)
 		if _, err := writer.WriteString(line); err != nil {
 			return fmt.Errorf("failed to write entry: %w", err)
 		}
+	}
+
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush entries: %w", err)
 	}
 
 	return nil
