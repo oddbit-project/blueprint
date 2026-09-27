@@ -4,6 +4,13 @@ All notable changes to the Blueprint Kafka provider will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- `Disconnect` on the admin client, consumer and producer logs `Close` errors instead of
+  discarding them.
+
 ## [v0.8.4] - 2026-09-20
 
 ### Security

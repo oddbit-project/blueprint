@@ -4,6 +4,12 @@ All notable changes to the Blueprint SMTP provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- An invalid `To` address now fails with `ErrInvalidTo` instead of being silently ignored.
+
 ## [v0.9.1] - 2026-09-20
 
 ### Security

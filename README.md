@@ -3,6 +3,7 @@
 ![go-version](https://img.shields.io/github/go-mod/go-version/oddbit-project/blueprint)
 [![Release](https://img.shields.io/github/v/release/oddbit-project/blueprint)](https://github.com/oddbit-project/blueprint/releases)
 [![Build Status](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml)
+[![lint](https://github.com/oddbit-project/blueprint/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/oddbit-project/blueprint/actions/workflows/lint.yml)
 
 ---
 

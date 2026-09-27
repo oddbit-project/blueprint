@@ -4,6 +4,14 @@ All notable changes to the Blueprint JWT provider will be documented in this fil
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- `requireECDSA`/`requireEdDSA` no longer discard the error from creating the derived public-key
+  credential; configuration now fails instead of leaving the provider without a public key
+  ([#88](https://github.com/oddbit-project/blueprint/issues/88)).
+
 ## [v0.8.3] - 2026-09-20
 
 ### Security

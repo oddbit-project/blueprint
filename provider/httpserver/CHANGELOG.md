@@ -4,6 +4,15 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Session store**: `Store.Get` returns the decryption error (e.g. `secure.ErrAuthenticationFailed`
+  for a tampered or wrong-key session) instead of a misleading unmarshal error
+  ([#87](https://github.com/oddbit-project/blueprint/issues/87)).
+- `Regenerate` logs a failure to store the regenerated session instead of ignoring it.
+
 ## [v0.9.4] - 2026-09-20
 
 ### Security

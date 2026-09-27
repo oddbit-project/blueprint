@@ -4,6 +4,13 @@ All notable changes to the franz Kafka provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Transactions log errors from aborting buffered records and from the abort in the
+  panic-recovery path instead of discarding them.
+
 ## [v0.8.5] - 2026-09-20
 
 ### Security

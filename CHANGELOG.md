@@ -87,7 +87,26 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   with `gohan.ErrInconsistentOmit`, instead of silently building the wrong batch, when rows
   disagree on which columns they omit.
 
+### Fixed
+
+Found while enabling golangci-lint; see each provider's CHANGELOG for details.
+
+- `provider/httpserver` session store returns decryption errors
+  ([#87](https://github.com/oddbit-project/blueprint/issues/87)); `provider/jwtprovider` no longer
+  discards derived public-key errors ([#88](https://github.com/oddbit-project/blueprint/issues/88));
+  `provider/htpasswd` `Write` reports flush errors; `provider/smtp` rejects an invalid `To` address.
+- Samples: `pgsql_migrations` and `ch-migrations` check errors they ignored; the `nextjs-api-demo`
+  delete handler returns 404 when the user does not exist instead of always reporting success.
+
 ### Changed
+
+- **`log.LogContextKey`** is now a value of an unexported type instead of the string `"logger"`,
+  so it cannot collide with other packages' context keys. Code that uses `log.LogContextKey`
+  keeps working; code that stored or read the logger with the literal string `"logger"` must use
+  `log.LogContextKey`, `log.FromContext` or `(*log.Logger).WithContext` instead.
+- **golangci-lint in CI**: a `lint` workflow runs golangci-lint v2.14.0 (standard linters, config
+  in `.golangci.yml`) on the core module and every provider module; all existing findings were
+  fixed.
 
 - **`make test`/`make test-all` now run `provider/sqlite`'s tests** as part of the provider test
   loop.

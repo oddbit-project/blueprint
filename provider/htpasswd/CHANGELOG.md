@@ -4,6 +4,13 @@ All notable changes to the Blueprint HTPasswd provider will be documented in thi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- `Write` returns the error from the final buffer flush (e.g. disk full) instead of reporting
+  success after losing data.
+
 ## [v0.8.3] - 2026-09-20
 
 ### Security
