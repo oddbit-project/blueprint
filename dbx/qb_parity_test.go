@@ -1,11 +1,11 @@
-package sqlb_test
+package dbx_test
 
-// This file requires exact string/args equality between sqlb and the
+// This file requires exact string/args equality between gohan and the
 // frozen db/qb over every record shape and update-option combination qb
-// handles correctly. It deliberately excludes: the shapes sqlb rejects
+// handles correctly. It deliberately excludes: the shapes gohan rejects
 // (duplicate promoted names, embedded pointers, unexported/tagged embedded
-// structs — see sqlb/record_test.go's TestRecordShapes) and unknown
-// include/exclude names (qb ignores them; sqlb returns ErrUnknownField),
+// structs — see gohan's own record_test.go TestRecordShapes) and unknown
+// include/exclude names (qb ignores them; gohan returns ErrUnknownField),
 // both tested directly instead of here.
 
 import (
@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/oddbit-project/blueprint/db/qb"
-	"github.com/oddbit-project/blueprint/sqlb"
+	"github.com/oddbit-project/gohan"
 )
 
 func intPtr(n int) *int       { return &n }
@@ -83,7 +83,7 @@ type ParityNamedStruct struct {
 
 func assertInsertParity(t *testing.T, rec any) {
 	t.Helper()
-	sqlA, argsA, errA := sqlb.Insert("t").Rows(rec).Build(sqlb.Postgres())
+	sqlA, argsA, errA := gohan.Insert("t").Rows(rec).Build(gohan.Postgres())
 	require.NoError(t, errA)
 
 	b := qb.NewSqlBuilder(qb.PostgreSQLDialect())
@@ -126,7 +126,7 @@ func TestBatchInsertParityWithQB(t *testing.T) {
 	r3 := ParityRecord{Name: "c", Age: intPtr(3), Tags: []string{"z"}, Count: 3, Created: fixedTime}
 	recs := []any{r1, r2, r3}
 
-	sqlA, argsA, errA := sqlb.Insert("t").Rows(recs...).Build(sqlb.Postgres())
+	sqlA, argsA, errA := gohan.Insert("t").Rows(recs...).Build(gohan.Postgres())
 	require.NoError(t, errA)
 
 	b := qb.NewSqlBuilder(qb.PostgreSQLDialect())
@@ -139,7 +139,7 @@ func TestBatchInsertParityWithQB(t *testing.T) {
 	// First record includes Age/Tags/Count; second omits them all -> both
 	// engines must error.
 	omitting := []any{r1, ParityRecord{Name: "b", Created: fixedTime}}
-	_, _, errA2 := sqlb.Insert("t").Rows(omitting...).Build(sqlb.Postgres())
+	_, _, errA2 := gohan.Insert("t").Rows(omitting...).Build(gohan.Postgres())
 	_, _, errB2 := b.BuildSQLBatchInsert("t", omitting)
 	assert.Error(t, errA2)
 	assert.Error(t, errB2)
@@ -147,7 +147,7 @@ func TestBatchInsertParityWithQB(t *testing.T) {
 	// Reverse: first record omits, second includes -> both engines must
 	// error.
 	including := []any{ParityRecord{Name: "a", Created: fixedTime}, r2}
-	_, _, errA3 := sqlb.Insert("t").Rows(including...).Build(sqlb.Postgres())
+	_, _, errA3 := gohan.Insert("t").Rows(including...).Build(gohan.Postgres())
 	_, _, errB3 := b.BuildSQLBatchInsert("t", including)
 	assert.Error(t, errA3)
 	assert.Error(t, errB3)
@@ -155,9 +155,9 @@ func TestBatchInsertParityWithQB(t *testing.T) {
 
 // --- update option combinations ---
 
-func assertUpdateParity(t *testing.T, rec any, sqlbOpts []sqlb.RecordOption, qbOpts *qb.UpdateOptions) {
+func assertUpdateParity(t *testing.T, rec any, gohanOpts []gohan.RecordOption, qbOpts *qb.UpdateOptions) {
 	t.Helper()
-	sqlA, argsA, errA := sqlb.Update("t").SetRecord(rec, sqlbOpts...).Where(sqlb.Col("id").Eq(1)).Build(sqlb.Postgres())
+	sqlA, argsA, errA := gohan.Update("t").SetRecord(rec, gohanOpts...).Where(gohan.Col("id").Eq(1)).Build(gohan.Postgres())
 	require.NoError(t, errA)
 
 	b := qb.NewSqlBuilder(qb.PostgreSQLDialect())
@@ -179,22 +179,22 @@ func TestUpdateParityWithQB(t *testing.T) {
 	})
 	t.Run("SkipZeroValues", func(t *testing.T) {
 		assertUpdateParity(t, rec,
-			[]sqlb.RecordOption{sqlb.SkipZeroValues()},
+			[]gohan.RecordOption{gohan.SkipZeroValues()},
 			&qb.UpdateOptions{IncludeZeroValues: false})
 	})
 	t.Run("IncludeFields", func(t *testing.T) {
 		assertUpdateParity(t, rec,
-			[]sqlb.RecordOption{sqlb.IncludeFields("name")},
+			[]gohan.RecordOption{gohan.IncludeFields("name")},
 			&qb.UpdateOptions{IncludeZeroValues: true, IncludeFields: []string{"name"}})
 	})
 	t.Run("ExcludeFields", func(t *testing.T) {
 		assertUpdateParity(t, rec,
-			[]sqlb.RecordOption{sqlb.ExcludeFields("age")},
+			[]gohan.RecordOption{gohan.ExcludeFields("age")},
 			&qb.UpdateOptions{IncludeZeroValues: true, ExcludeFields: []string{"age"}})
 	})
 	t.Run("WithAutoFields", func(t *testing.T) {
 		assertUpdateParity(t, rec,
-			[]sqlb.RecordOption{sqlb.WithAutoFields()},
+			[]gohan.RecordOption{gohan.WithAutoFields()},
 			&qb.UpdateOptions{IncludeZeroValues: true, UpdateAutoFields: true})
 	})
 }
