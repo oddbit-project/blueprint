@@ -229,7 +229,7 @@ func DefaultProducerConfig() *ProducerConfig {
 
 // buildOpts builds kgo options from producer config
 func (c *ProducerConfig) buildOpts() ([]kgo.Opt, error) {
-	opts, err := c.BaseConfig.buildBaseOpts()
+	opts, err := c.buildBaseOpts()
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func DefaultConsumerConfig() *ConsumerConfig {
 
 // buildOpts builds kgo options from consumer config
 func (c *ConsumerConfig) buildOpts() ([]kgo.Opt, error) {
-	opts, err := c.BaseConfig.buildBaseOpts()
+	opts, err := c.buildBaseOpts()
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +444,7 @@ func DefaultAdminConfig() *AdminConfig {
 
 // buildOpts builds kgo options from admin config
 func (c *AdminConfig) buildOpts() ([]kgo.Opt, error) {
-	return c.BaseConfig.buildBaseOpts()
+	return c.buildBaseOpts()
 }
 
 // setupCredentials creates and retrieves password from credential configuration

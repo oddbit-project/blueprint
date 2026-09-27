@@ -69,7 +69,7 @@ func TestProducerOperations(t *testing.T) {
 		}
 		defer producer.Close()
 
-		results, err := producer.Produce(nil, NewRecord([]byte("test")))
+		results, err := producer.Produce(nil, NewRecord([]byte("test"))) //nolint:staticcheck // intentionally testing nil-context handling
 		assert.Error(t, err)
 		assert.Equal(t, ErrNilContext, err)
 		assert.Nil(t, results)
@@ -89,7 +89,7 @@ func TestProducerOperations(t *testing.T) {
 		}
 		defer producer.Close()
 
-		err = producer.ProduceAsync(nil, NewRecord([]byte("test")), nil)
+		err = producer.ProduceAsync(nil, NewRecord([]byte("test")), nil) //nolint:staticcheck // intentionally testing nil-context handling
 		assert.Error(t, err)
 		assert.Equal(t, ErrNilContext, err)
 	})
