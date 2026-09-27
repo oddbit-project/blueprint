@@ -76,7 +76,7 @@ nav:
     - Database Functions: db/functions.md
     - Migration System: db/migrations.md
     - SQL Update API: db/sql-update-api.md
-    - sqlb Query Builder: db/sqlb.md
+    - gohan Query Builder: db/gohan.md
     - dbx Repositories: db/dbx.md
     - Migrating to dbx: db/migrating-to-dbx.md
 

@@ -9,12 +9,12 @@ and database migrations.
 
 > Not all funcionality is available for ClickHouse databases 
 
-## New: sqlb and dbx
+## New: gohan and dbx
 
-New code should use [`sqlb`](sqlb.md) (a SQL query builder that always binds values and quotes
-identifiers) and [`dbx`](dbx.md) (typed generic repositories built on `sqlb`) instead of this
+New code should use [`gohan`](gohan.md) (a SQL query builder that always binds values and quotes
+identifiers) and [`dbx`](dbx.md) (typed generic repositories built on `gohan`) instead of this
 package's goqu-based query building. See [Migrating to dbx](migrating-to-dbx.md) for a full
-`db`/goqu → `dbx`/`sqlb` mapping and the behaviour that changed on purpose.
+`db`/goqu → `dbx`/`gohan` mapping and the behaviour that changed on purpose.
 
 ## Overview
 

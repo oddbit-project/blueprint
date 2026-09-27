@@ -21,21 +21,22 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 - **`SECURITY.md`**: vulnerabilities are reported through GitHub private vulnerability
   reporting (now enabled on the repository).
-- **`sqlb`**: a new SQL query builder where values are always bound and identifiers are always
-  quoted and escaped by construction, so the normal API cannot reintroduce SQL injection the way
-  goqu's inlined rendering did (fixed in `654df80`). It supports `SELECT`/`INSERT`/`UPDATE`/
-  `DELETE`, joins, CTEs, `UNION`/`UNION ALL`, and ClickHouse-specific clauses (`FINAL`, `SAMPLE`,
-  `ARRAY JOIN`, `PREWHERE`, `SETTINGS`) across the PostgreSQL, SQLite and ClickHouse dialects.
-  `SelectBuilder.IsCompound()` reports whether a builder has UNION members, for callers (like
-  `dbx.Grid`) that need to reject or wrap a compound base query. ClickHouse's value check
-  recurses into pointers/interfaces and accepts `fmt.Stringer` values, and rejects a
-  `database/sql/driver.Valuer` nested inside a slice/pointer/interface argument
+- **`dbx` is built on the new standalone module `github.com/oddbit-project/gohan` (v0.1.0)**: a
+  SQL query builder where values are always bound and identifiers are always quoted and escaped
+  by construction, so the normal API cannot reintroduce SQL injection the way goqu's inlined
+  rendering did (fixed in the first release after Blueprint v0.10.3). It supports
+  `SELECT`/`INSERT`/`UPDATE`/`DELETE`, joins, CTEs, `UNION`/`UNION ALL`, and ClickHouse-specific
+  clauses (`FINAL`, `SAMPLE`, `ARRAY JOIN`, `PREWHERE`, `SETTINGS`) across the PostgreSQL, SQLite
+  and ClickHouse dialects. `SelectBuilder.IsCompound()` reports whether a builder has UNION
+  members, for callers (like `dbx.Grid`) that need to reject or wrap a compound base query.
+  ClickHouse's value check recurses into pointers/interfaces and accepts `fmt.Stringer` values,
+  and rejects a `database/sql/driver.Valuer` nested inside a slice/pointer/interface argument
   (`ErrUnsafeValue`) unless it is also a `Stringer`, matching what `clickhouse-go` actually calls
   `Value()` on; a top-level nil pointer `Valuer` is bound as `NULL` instead of reaching the
   driver, where it previously panicked. `Not`/`Or` of a trivially true/false condition (e.g.
   `Not(Or())`) is now recognized by the `DELETE`/`UPDATE` no-WHERE guard, not just a bare
-  `And()`/empty `NotIn`. See [docs/db/sqlb.md](docs/db/sqlb.md).
-- **`dbx`**: typed generic repositories (`dbx.Repository[T]`) built entirely on `sqlb`, with a
+  `And()`/empty `NotIn`. See [docs/db/gohan.md](docs/db/gohan.md).
+- **`dbx`**: typed generic repositories (`dbx.Repository[T]`) built entirely on `gohan`, with a
   `database/sql` adapter (`dbx.FromClient`), a transaction helper (`dbx.WithTx`), and a
   data-grid system (`dbx.Grid[T]`) restricted to fields a struct explicitly flags with
   `grid:"sort"`/`"filter"`/`"search"`. Every call takes a `context.Context`; `dbx.ErrNotFound` is
@@ -46,7 +47,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **`provider/clickhouse`: `Client.Querier()`** — returns a `dbx.Querier`/`dbx.BatchInserter`
   bound to the client's native ClickHouse connection, so `dbx.Repository[T]` can run against
   ClickHouse without `database/sql` (which ClickHouse's driver doesn't use). `InsertBatch` fails
-  with `sqlb.ErrInconsistentOmit`, instead of silently building the wrong batch, when rows
+  with `gohan.ErrInconsistentOmit`, instead of silently building the wrong batch, when rows
   disagree on which columns they omit.
 
 ### Changed
@@ -56,17 +57,18 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Release order
 
-`provider/clickhouse` (non-test) now imports `dbx`/`sqlb`, so releasing it requires a core
+`provider/clickhouse` (non-test) now imports `dbx`/`gohan`, so releasing it requires a core
 version that contains them — `make tag-version VERSION=…` alone is not enough, since it tags
 core and every provider at the same commit while each provider's `go.mod` still requires the
 prior core version via a `replace`-shadowed `require` (ignored by consumers, not by the tag). The
-release order for this change is: **1.** tag core (`git tag vX.Y.Z`); **2.** bump the core
-`require` in `provider/clickhouse`, `provider/pgsql` and `provider/sqlite`'s `go.mod` to that
-version (`go get github.com/oddbit-project/blueprint@vX.Y.Z` in each, or `make update-deps
-VERSION=vX.Y.Z`); **3.** tag the providers. `sqlite` is now included in the Makefile's
+release order for this change is: **1.** tag `gohan` first, in its own repository, if this
+release depends on a new `gohan` version; **2.** tag core (`git tag vX.Y.Z`); **3.** bump the
+core `require` in `provider/clickhouse`, `provider/pgsql` and `provider/sqlite`'s `go.mod` to
+that version (`go get github.com/oddbit-project/blueprint@vX.Y.Z` in each, or `make update-deps
+VERSION=vX.Y.Z`); **4.** tag the providers. `sqlite` is now included in the Makefile's
 `PROVIDERS` list, so `tag-version`, `sbom`, `update-deps`, `build-providers` and
 `tidy-providers` already cover it. See
-[docs/release-process.md](docs/release-process.md#sqlbdbx-release-order).
+[docs/release-process.md](docs/release-process.md#gohandbx-release-order).
 
 ## [v0.10.3] - 2026-09-21
 

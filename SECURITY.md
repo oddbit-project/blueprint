@@ -35,8 +35,8 @@ to be.
 
 - Credentials that appear in test files and testcontainer setups are throwaway test values for
   local containers, not secrets.
-- The SQL query builder used by `dbx` is being moved to its own module,
+- The SQL query builder used by `dbx` is the standalone module
   [`github.com/oddbit-project/gohan`](https://github.com/oddbit-project/gohan); report builder
-  issues there once it is released.
+  issues in that repository.
 - Issues in third-party dependencies should be reported upstream; a heads-up here is welcome if
   Blueprint needs to react (pin, patch or work around).
