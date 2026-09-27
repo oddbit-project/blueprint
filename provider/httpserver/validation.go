@@ -98,7 +98,7 @@ func validateNested(obj interface{}, path string) error {
 	val := reflect.ValueOf(obj)
 
 	// Skip nil pointers entirely
-	if val.Kind() == reflect.Ptr && val.IsNil() {
+	if val.Kind() == reflect.Pointer && val.IsNil() {
 		return nil
 	}
 
@@ -120,12 +120,12 @@ func validateNestedFields(obj interface{}, path string) error {
 	val := reflect.ValueOf(obj)
 
 	// Skip nil pointers entirely
-	if val.Kind() == reflect.Ptr && val.IsNil() {
+	if val.Kind() == reflect.Pointer && val.IsNil() {
 		return nil
 	}
 
 	// Dereference pointer for struct field iteration
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 

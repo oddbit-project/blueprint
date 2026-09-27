@@ -309,7 +309,7 @@ func ValidateFingerprint(fp *DeviceFingerprint) error {
 	}
 
 	for _, char := range fp.Fingerprint {
-		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
 			return fmt.Errorf("fingerprint hash must be valid hexadecimal")
 		}
 	}

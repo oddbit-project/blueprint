@@ -222,7 +222,7 @@ func (c *JWTConfig) requireECDSA() error {
 			return err
 		}
 		c.publicKey, err = secure.NewCredential(data, secure.RandomKey32(), false)
-		return nil
+		return err
 	}
 
 	// if CfgPublicKey is set, override publicKey
@@ -284,7 +284,7 @@ func (c *JWTConfig) requireEdDSA() error {
 			return err
 		}
 		c.publicKey, err = secure.NewCredential(key[32:], secure.RandomKey32(), false)
-		return nil
+		return err
 	}
 
 	// if CfgPublicKey is set, override publicKey

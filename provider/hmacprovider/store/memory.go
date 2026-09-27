@@ -45,7 +45,6 @@ func WithEvictPolicy(evictPolicy MemEvictPolicyFn) MemStoreOption {
 
 func EvictNone() MemEvictPolicyFn {
 	return func(store *memStore) {
-		return
 	}
 }
 

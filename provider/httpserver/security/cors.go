@@ -53,7 +53,7 @@ func (c *CorsConfig) Validate() error {
 	// validate origins
 	for _, origin := range c.AllowOrigins {
 		if !request.ValidOrigin(origin, []string{"http", "https"}) {
-			return errors.New(fmt.Sprintf("invalid allowOrigin value %s", origin))
+			return fmt.Errorf("invalid allowOrigin value %s", origin)
 		}
 	}
 
