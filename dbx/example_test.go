@@ -25,7 +25,7 @@ type exampleUser struct {
 func ExampleNewRepository() {
 	dbPath := filepath.Join(os.TempDir(), "blueprint-dbx-example.db")
 	_ = os.Remove(dbPath)
-	defer os.Remove(dbPath)
+	defer func() { _ = os.Remove(dbPath) }()
 
 	cfg := sqlite.NewClientConfig()
 	cfg.DSN = dbPath

@@ -39,7 +39,7 @@ func validateSliceNotEmpty(value interface{}, name string) error {
 }
 
 func validateStructType(t reflect.Type, name string) error {
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 

@@ -167,8 +167,8 @@ func TestCredentialFromEnv(t *testing.T) {
 
 	// Test with existing environment variable
 	testValue := "test-env-value"
-	os.Setenv("TEST_CREDENTIAL_ENV_VAR", testValue)
-	defer os.Unsetenv("TEST_CREDENTIAL_ENV_VAR")
+	_ = os.Setenv("TEST_CREDENTIAL_ENV_VAR", testValue)
+	defer func() { _ = os.Unsetenv("TEST_CREDENTIAL_ENV_VAR") }()
 
 	credential, err := CredentialFromEnv("TEST_CREDENTIAL_ENV_VAR", key, false)
 	if err != nil {
@@ -184,8 +184,8 @@ func TestCredentialFromEnv(t *testing.T) {
 	}
 
 	// Test with empty environment variable and allowEmpty=true
-	os.Setenv("TEST_CREDENTIAL_EMPTY_ENV_VAR", "")
-	defer os.Unsetenv("TEST_CREDENTIAL_EMPTY_ENV_VAR")
+	_ = os.Setenv("TEST_CREDENTIAL_EMPTY_ENV_VAR", "")
+	defer func() { _ = os.Unsetenv("TEST_CREDENTIAL_EMPTY_ENV_VAR") }()
 
 	_, err = CredentialFromEnv("TEST_CREDENTIAL_EMPTY_ENV_VAR", key, false)
 	if err != ErrEmptyCredential {
@@ -207,7 +207,7 @@ func TestCredentialFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Test with non-existent file
 	nonExistentFile := filepath.Join(tempDir, "nonexistent.txt")
@@ -310,8 +310,8 @@ func TestCredentialFromConfig(t *testing.T) {
 
 	// Test with env var
 	envVarName := "TEST_CREDENTIAL_ENV_VAR_CONFIG"
-	os.Setenv(envVarName, "env-var-password")
-	defer os.Unsetenv(envVarName)
+	_ = os.Setenv(envVarName, "env-var-password")
+	defer func() { _ = os.Unsetenv(envVarName) }()
 
 	config = DefaultCredentialConfig{
 		Password:       "",
@@ -338,7 +338,7 @@ func TestCredentialFromConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	secretFile := filepath.Join(tempDir, "secret.txt")
 	err = os.WriteFile(secretFile, []byte("file-password"), 0600)

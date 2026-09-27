@@ -50,7 +50,7 @@ func CreateMockRepository(t *testing.T, tableName string) *MockRepositoryHelper 
 
 	// Return cleanup function
 	cleanup := func() {
-		db.Close()
+		_ = db.Close()
 		// Verify all expectations were met
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("Unmet mock expectations: %v", err)

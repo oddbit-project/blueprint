@@ -27,7 +27,7 @@ var valuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
 
 // getGridSpec returns the cached gridSpec for t, building it on first use.
 func getGridSpec(t reflect.Type) (*gridSpec, error) {
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	if cached, ok := gridSpecCache.Load(t); ok {
@@ -45,7 +45,7 @@ func getGridSpec(t reflect.Type) (*gridSpec, error) {
 // string-kind or implements driver.Valuer (either as t or *t). LIKE against
 // anything else fails on PostgreSQL and ClickHouse.
 func isSearchableType(t reflect.Type) bool {
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	if t.Kind() == reflect.String {

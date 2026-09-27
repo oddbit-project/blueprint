@@ -132,9 +132,11 @@ func (f *HtpasswdFile) Save() error {
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", f.filename, err)
 	}
-	defer file.Close()
-
-	return f.c.Write(file)
+	if err := f.c.Write(file); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 func (f *HtpasswdFile) DeleteUser(username string) error {

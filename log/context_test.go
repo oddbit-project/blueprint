@@ -35,7 +35,7 @@ func TestNewRequestContext(t *testing.T) {
 }
 
 func TestExtractLoggerFromContext_NilContext(t *testing.T) {
-	logger := ExtractLoggerFromContext(nil)
+	logger := ExtractLoggerFromContext(nil) //nolint:staticcheck // intentionally testing nil-context handling
 	assert.NotNil(t, logger)
 	assert.Equal(t, "default", logger.moduleInfo)
 }

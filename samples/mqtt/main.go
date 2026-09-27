@@ -39,7 +39,7 @@ func main() {
 		logger.Fatal(err, "cannot connect to mqtt")
 		os.Exit(1)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	topicName := "blueprint/test"
 	message := []byte("the quick brown fox jumps over the lazy dog")

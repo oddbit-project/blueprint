@@ -187,19 +187,19 @@ func main() {
 
 	// Set secret key using environment variable or flag
 	if envSecret := os.Getenv("S3_SECRET_KEY"); envSecret != "" {
-		config.DefaultCredentialConfig.PasswordEnvVar = "S3_SECRET_KEY"
+		config.PasswordEnvVar = "S3_SECRET_KEY"
 	} else {
 		// For demo purposes, we'll use the flag value directly
 		// In production, always use environment variables or secure credential files
-		os.Setenv("S3_SECRET_KEY_DEMO", *secretKey)
-		config.DefaultCredentialConfig.PasswordEnvVar = "S3_SECRET_KEY_DEMO"
+		_ = os.Setenv("S3_SECRET_KEY_DEMO", *secretKey)
+		config.PasswordEnvVar = "S3_SECRET_KEY_DEMO"
 	}
 
 	if *verbose {
 		logger.Info("Credential configuration", map[string]interface{}{
 			"access_key": *accessKey,
-			"env_var":    config.DefaultCredentialConfig.PasswordEnvVar,
-			"has_secret": os.Getenv(config.DefaultCredentialConfig.PasswordEnvVar) != "",
+			"env_var":    config.PasswordEnvVar,
+			"has_secret": os.Getenv(config.PasswordEnvVar) != "",
 		})
 	}
 
@@ -218,7 +218,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error connecting to S3: %v\n", err)
 		os.Exit(1)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	if *verbose {
 		logger.Info("Successfully connected to S3")
@@ -351,7 +351,7 @@ func (cli *CLI) uploadFile(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open local file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Get file info
 	info, err := file.Stat()
@@ -422,14 +422,14 @@ func (cli *CLI) downloadFile(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get object: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Create local file
 	file, err := os.Create(localFile)
 	if err != nil {
 		return fmt.Errorf("failed to create local file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Copy data
 	written, err := io.Copy(file, reader)

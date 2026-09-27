@@ -13,7 +13,7 @@ func Filter(s string, set []rune, replacement ...rune) string {
 	}
 	hasRep := len(replacement) > 0
 	result := strings.Builder{}
-	for _, v := range []rune(s) {
+	for _, v := range s {
 		if slices.Contains(set, v) {
 			result.WriteRune(v)
 		} else {

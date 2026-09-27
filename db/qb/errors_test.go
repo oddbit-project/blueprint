@@ -32,7 +32,7 @@ func TestSqlError_Unwrap(t *testing.T) {
 
 func TestSqlError_WithContext(t *testing.T) {
 	err := NewError("test error", nil)
-	err.WithContext("table", "users").WithContext("operation", "insert")
+	_ = err.WithContext("table", "users").WithContext("operation", "insert")
 
 	assert.Equal(t, "users", err.Context["table"])
 	assert.Equal(t, "insert", err.Context["operation"])
@@ -186,9 +186,9 @@ func TestErrorChaining(t *testing.T) {
 
 func TestErrorContext(t *testing.T) {
 	err := NewError("test error", nil)
-	err.WithContext("table", "users")
-	err.WithContext("operation", "insert")
-	err.WithContext("field", "name")
+	_ = err.WithContext("table", "users")
+	_ = err.WithContext("operation", "insert")
+	_ = err.WithContext("field", "name")
 
 	assert.Equal(t, 3, len(err.Context))
 	assert.Equal(t, "users", err.Context["table"])

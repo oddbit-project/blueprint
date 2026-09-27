@@ -45,22 +45,22 @@ EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
 	caFile = filepath.Join(tempDir, "ca.pem")
 
 	if err := os.WriteFile(certFile, []byte(certPEM), 0600); err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		t.Fatalf("Failed to write cert file: %v", err)
 	}
 
 	if err := os.WriteFile(keyFile, []byte(keyPEM), 0600); err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		t.Fatalf("Failed to write key file: %v", err)
 	}
 
 	if err := os.WriteFile(caFile, []byte(caPEM), 0600); err != nil {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		t.Fatalf("Failed to write CA file: %v", err)
 	}
 
 	cleanup = func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	}
 
 	return certFile, keyFile, caFile, cleanup
@@ -244,7 +244,7 @@ func TestClientConfig_TLSConfig_WithPassword(t *testing.T) {
 	}
 
 	// Just verify that the fields are set correctly
-	key, err := config.TlsKeyCredential.Fetch()
+	key, err := config.Fetch()
 	if err != nil {
 		t.Fatalf("Unexpected error when fetching key: %v", err)
 	}

@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// Configure logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("csrf-demo-server")
 
 	// Create server configuration

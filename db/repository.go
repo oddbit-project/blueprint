@@ -396,7 +396,7 @@ func (r *repository) Do(qry any, target ...any) error {
 // concatenated using AND
 func (r *repository) UpdateRecord(record any, whereFieldsValues map[string]any) error {
 	builder := r.sqlBuilder.Update(r.tableName, record).WithOptions(qb.DefaultUpdateOptions())
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -417,7 +417,7 @@ func (r *repository) UpdateFields(record any, fieldsValues map[string]any, where
 	builder := r.sqlBuilder.Update(r.tableName, record).
 		WithOptions(qb.DefaultUpdateOptions()).
 		FieldsValues(fieldsValues)
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -456,7 +456,7 @@ func (r *repository) UpdateReturning(record any, whereFieldsValues map[string]an
 	opts.ReturningFields = returnFields
 
 	builder := r.sqlBuilder.Update(r.tableName, record).WithOptions(opts)
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -488,7 +488,7 @@ func (r *repository) UpdateFieldsReturning(record any, fieldsValues map[string]a
 		WithOptions(opts).
 		FieldsValues(fieldsValues)
 
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -698,7 +698,7 @@ func (t *tx) Do(qry any, target ...any) error {
 // concatenated using AND
 func (t *tx) UpdateRecord(record any, whereFieldsValues map[string]any) error {
 	builder := t.sqlBuilder.Update(t.tableName, record).WithOptions(qb.DefaultUpdateOptions())
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -719,7 +719,7 @@ func (t *tx) UpdateFields(record any, fieldsValues map[string]any, whereFieldsVa
 	builder := t.sqlBuilder.Update(t.tableName, record).
 		WithOptions(qb.DefaultUpdateOptions()).
 		FieldsValues(fieldsValues)
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -758,7 +758,7 @@ func (t *tx) UpdateReturning(record any, whereFieldsValues map[string]any, retur
 	opts.ReturningFields = returnFields
 
 	builder := t.sqlBuilder.Update(t.tableName, record).WithOptions(opts)
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))
@@ -799,7 +799,7 @@ func (t *tx) UpdateFieldsReturning(record any, fieldsValues map[string]any, wher
 		WithOptions(opts).
 		FieldsValues(fieldsValues)
 
-	if whereFieldsValues != nil && len(whereFieldsValues) > 0 {
+	if len(whereFieldsValues) > 0 {
 		clauses := make([]qb.WhereClause, 0, len(whereFieldsValues))
 		for key, value := range whereFieldsValues {
 			clauses = append(clauses, qb.Eq(key, value))

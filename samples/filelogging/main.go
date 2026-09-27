@@ -79,7 +79,7 @@ func main() {
 	})
 
 	// Clean up log resources
-	log.CloseLogFiles()
+	_ = log.CloseLogFiles()
 
 	// Print where to find the logs
 	fmt.Printf("Log file created at: %s\n", logFilePath)

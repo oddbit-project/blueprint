@@ -14,7 +14,7 @@ import (
 
 func main() {
 	// Configure logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("session-sample")
 
 	// Create server config
@@ -132,5 +132,7 @@ func main() {
 
 	// Start HTTP server
 	logger.Info(fmt.Sprintf("Running session demo at http://%s:%d", srvConfig.Host, srvConfig.Port))
-	server.Start()
+	if err := server.Start(); err != nil {
+		logger.Fatal(err, "could not start http server")
+	}
 }

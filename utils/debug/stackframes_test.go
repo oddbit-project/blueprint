@@ -15,8 +15,7 @@ func TestGet(t *testing.T) {
 	assert.Greater(t, len(stack), 0)
 
 	// Define a function that we can identify in the stack
-	var identifiableFunction func() []string
-	identifiableFunction = func() []string {
+	identifiableFunction := func() []string {
 		return GetStackTrace(0)
 	}
 

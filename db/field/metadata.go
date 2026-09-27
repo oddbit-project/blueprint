@@ -83,7 +83,7 @@ func scanStruct(arg any) ([]Metadata, error) {
 	v := reflect.ValueOf(arg)
 
 	// if ptr, unwrap
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil, ErrNilPointer
 		}

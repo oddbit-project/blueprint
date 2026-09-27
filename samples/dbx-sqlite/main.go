@@ -25,7 +25,7 @@ type User struct {
 func main() {
 	dbPath := filepath.Join(os.TempDir(), "blueprint-dbx-sample.db")
 	_ = os.Remove(dbPath)
-	defer os.Remove(dbPath)
+	defer func() { _ = os.Remove(dbPath) }()
 
 	cfg := sqlite.NewClientConfig()
 	cfg.DSN = dbPath
