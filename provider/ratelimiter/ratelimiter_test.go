@@ -307,8 +307,13 @@ func TestRateLimiter_ShutdownWithContext(t *testing.T) {
 
 		time.Sleep(10 * time.Millisecond) // Ensure context times out
 
+		// Shutdown is always initiated; the cleanup goroutine may finish before the select
+		// sees the expired context, so either outcome is valid
 		err = rl2.ShutdownWithContext(ctx)
-		assert.Equal(t, context.DeadlineExceeded, err)
+		if err != nil {
+			assert.Equal(t, context.DeadlineExceeded, err)
+		}
+		assertStopped(t, rl2)
 
 		// Clean shutdown for cleanup
 		rl2.Shutdown()
@@ -324,11 +329,24 @@ func TestRateLimiter_ShutdownWithContext(t *testing.T) {
 		cancel() // Cancel immediately
 
 		err = rl3.ShutdownWithContext(ctx)
-		assert.Equal(t, context.Canceled, err)
+		if err != nil {
+			assert.Equal(t, context.Canceled, err)
+		}
+		assertStopped(t, rl3)
 
 		// Clean shutdown for cleanup
 		rl3.Shutdown()
 	})
+}
+
+// assertStopped fails unless the cleanup goroutine has exited
+func assertStopped(t *testing.T, rl *RateLimiter) {
+	t.Helper()
+	select {
+	case <-rl.done:
+	case <-time.After(time.Second):
+		t.Fatal("cleanup goroutine did not stop")
+	}
 }
 
 func TestRateLimiter_ConcurrentAccess(t *testing.T) {
