@@ -110,7 +110,7 @@ func (grid *Grid) AddFilterFunc(dbField string, f GridFilterFunc) *Grid {
 func (grid *Grid) ValidQuery(query *GridQuery) error {
 	// match filterable fields
 	if query.FilterFields != nil {
-		for f, _ := range query.FilterFields {
+		for f := range query.FilterFields {
 			fname, ok := grid.spec.aliasField[f]
 			if !ok {
 				return GridError{
@@ -293,15 +293,11 @@ func (grid *Grid) Build(qry *goqu.SelectDataset, args *GridQuery) (*goqu.SelectD
 	}
 
 	//offset & limit
-	if args.Offset >= 0 {
-		if args.Limit > 0 {
-			// offset 0 only makes sense if limit is set
-			qry = qry.Offset(args.Offset).Limit(args.Limit)
-		} else {
-			if args.Offset > 0 {
-				qry = qry.Offset(args.Offset)
-			}
-		}
+	if args.Limit > 0 {
+		// offset 0 only makes sense if limit is set
+		qry = qry.Offset(args.Offset).Limit(args.Limit)
+	} else if args.Offset > 0 {
+		qry = qry.Offset(args.Offset)
 	}
 
 	return qry, nil

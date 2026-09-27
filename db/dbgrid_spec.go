@@ -21,7 +21,7 @@ func getFieldSpec(from any) (*fieldSpec, error) {
 	if t == nil {
 		return nil, field.ErrInvalidStruct
 	}
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 

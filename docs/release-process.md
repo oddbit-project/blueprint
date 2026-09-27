@@ -136,6 +136,36 @@ git push origin --tags
 git tag --sort=-version:refname
 ```
 
+## gohan/dbx release order
+
+`dbx` and `provider/clickhouse`'s non-test code depend on the standalone module
+`github.com/oddbit-project/gohan` (`dbx` directly; `provider/clickhouse` via `Client.Querier()`).
+`gohan` is released and tagged independently of Blueprint, in its own repository. `make
+tag-version VERSION=…` tags core and every provider module **at the same commit**, but each
+provider's `go.mod` still `require`s an older core version (shadowed in this workspace by a local
+`replace`, which a real consumer does not get) until that `require` is bumped. Run as a single
+step, `tag-version` therefore publishes `provider/clickhouse` at a version whose declared core
+dependency does not contain the current `dbx`/`gohan` code — a broken release for any consumer
+who resolves the provider's `go.mod` normally (i.e. without the workspace's `replace`).
+
+For a release that bumps `gohan`, adds to or changes `dbx`, or anything a provider's non-test
+code imports from core, tag in this order instead of a single `tag-version` call:
+
+1. **Tag `gohan` first**, in its own repository, if this release depends on a new `gohan`
+   version.
+2. **Tag core only**: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. **Bump the core requirement** in the affected providers' `go.mod` — currently
+   `provider/clickhouse`, `provider/pgsql` and `provider/sqlite` — to `vX.Y.Z`:
+   `make update-deps VERSION=vX.Y.Z`, or `cd provider/<name> && go get
+   github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy` per module. Commit the `go.mod`/
+   `go.sum` changes.
+4. **Tag the providers** (`make tag-version VERSION=vX.Y.Z` is safe now that step 3 has landed,
+   or tag them individually).
+
+`sqlite` is included in the Makefile's `PROVIDERS` list, so `tag-version`, `sbom`,
+`update-deps`, `build-providers` and `tidy-providers` already act on it along with the other
+provider modules — no separate step is needed for `sqlite` itself.
+
 ## Version Strategy
 
 ### Semantic Versioning

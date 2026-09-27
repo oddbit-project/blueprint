@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// config logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("http-server")
 
 	srvConfig := httpserver.NewServerConfig()
@@ -32,7 +32,9 @@ func main() {
 	})
 
 	// start http server
-	server.Start()
+	if err := server.Start(); err != nil {
+		logger.Fatal(err, "could not start http server")
+	}
 
 	fmt.Println("Done!")
 }

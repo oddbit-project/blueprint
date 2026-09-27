@@ -111,7 +111,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate credentials if provided
-	if c.AccessKeyID != "" && c.DefaultCredentialConfig.IsEmpty() {
+	if c.AccessKeyID != "" && c.IsEmpty() {
 		return errors.New("missing secret access key")
 	}
 

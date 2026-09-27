@@ -24,7 +24,7 @@ func (t *testJob) Run(ctx context.Context) {
 
 func runPool(t *testing.T, jobCount int, pool *ThreadPool) {
 	require.NoError(t, pool.Start(context.Background()))
-	defer pool.Stop()
+	defer func() { require.NoError(t, pool.Stop()) }()
 
 	counter := 0
 	var lock sync.Mutex

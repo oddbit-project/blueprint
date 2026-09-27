@@ -70,7 +70,7 @@ func NewClient(cfg *Config) (*Client, error) {
 		hashedKey := hasher.Sum(nil)
 		crypto, err := secure.NewAES256GCM(hashedKey)
 		if err != nil {
-			client.Close()
+			_ = client.Close()
 			return nil, fmt.Errorf("failed to setup encryption: %w", err)
 		}
 		c.crypto = crypto

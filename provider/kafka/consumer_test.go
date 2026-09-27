@@ -576,9 +576,10 @@ func (s *ConsumerUnitTestSuite) TestIsolationLevelConfiguration() {
 				s.NotNil(readerCfg)
 
 				// Check that the isolation level was set (if specified)
-				if tt.isolationLevel == "committed" {
+				switch tt.isolationLevel {
+				case "committed":
 					s.Equal(int(1), int(readerCfg.IsolationLevel), "IsolationLevel should be ReadCommitted (1)")
-				} else if tt.isolationLevel == "uncommitted" {
+				case "uncommitted":
 					s.Equal(int(0), int(readerCfg.IsolationLevel), "IsolationLevel should be ReadUncommitted (0)")
 				}
 			}

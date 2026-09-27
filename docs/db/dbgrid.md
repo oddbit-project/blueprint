@@ -452,8 +452,9 @@ query.FilterFields = map[string]any{
     "active": true,
 }
 
-// Create a custom select
-customSelect := goqu.Select(goqu.COUNT("*")).From("users")
+// Create a custom select from the repository (a db.Repository for "users"), so it uses the
+// client's registered dialect; goqu.Select(...).From(...) would render ? placeholders on PostgreSQL
+customSelect := repo.SqlSelect().Select(goqu.COUNT("*"))
 
 // Build with the custom select
 statement, _ := grid.Build(customSelect, query)

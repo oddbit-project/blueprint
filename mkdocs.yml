@@ -76,7 +76,10 @@ nav:
     - Database Functions: db/functions.md
     - Migration System: db/migrations.md
     - SQL Update API: db/sql-update-api.md
-  
+    - gohan Query Builder: db/gohan.md
+    - dbx Repositories: db/dbx.md
+    - Migrating to dbx: db/migrating-to-dbx.md
+
   - Security:
     - Secure Credentials: crypt/secure-credentials.md
     - Password Hashing: crypt/password-hashing.md

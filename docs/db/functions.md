@@ -14,6 +14,23 @@ The functions module includes:
 
 These functions are used internally by the Repository but are also available for direct use when you need more control over SQL operations.
 
+### Bound values and dialects
+
+The goqu-based functions (`Exec`, `Fetch*`, `Exists`, `Count`, `Delete*`, `Update`, `Do`) render
+the dataset with `Prepared(true)`: values are sent as bound arguments, never inlined into the SQL.
+The placeholder style (`$1` or `?`) comes from the dataset's goqu dialect, so build datasets from a
+**registered** dialect:
+
+- `repo.SqlSelect()`, `repo.SqlDelete()` and `repo.SqlUpdate()` use the client's dialect.
+- `goqu.Dialect("pgx")` is registered by `provider/pgsql`, and `goqu.Dialect("clickhouse")` by
+  `provider/clickhouse`. `provider/sqlite` registers its driver name.
+- `goqu.From(...)`, `goqu.Select(...)` and an unregistered name such as `goqu.Dialect("postgres")`
+  fall back to goqu's default dialect, which renders `?`. PostgreSQL rejects `?`.
+
+Column names passed as strings (`fieldValues` keys, `keyField`, `fieldName`, the `Exists` skip
+column) are rejected with `db.ErrInvalidIdentifier` if they contain `"`, `\` or NUL. `DeleteWhere`
+returns `db.ErrInvalidParameters` for an empty map instead of deleting every row.
+
 ## Raw Execution Functions
 
 ### RawExec
@@ -122,7 +139,7 @@ type User struct {
 }
 
 func getUserByID(ctx context.Context, client db.Client, userID int) (*User, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users").Where(goqu.C("id").Eq(userID))
     
     user := &User{}
@@ -146,7 +163,7 @@ Fetches multiple records using a goqu SelectDataset. The target must be a slice 
 **Example:**
 ```go
 func getActiveUsers(ctx context.Context, client db.Client) ([]*User, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users").Where(goqu.C("active").IsTrue())
     
     var users []*User
@@ -170,7 +187,7 @@ Fetches a single record with WHERE clauses built from a field values map.
 **Example:**
 ```go
 func getUserByEmail(ctx context.Context, client db.Client, email string) (*User, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users")
     
     fieldValues := map[string]any{
@@ -199,7 +216,7 @@ Fetches a single record by a specific key field.
 **Example:**
 ```go
 func getUserByID(ctx context.Context, client db.Client, id int) (*User, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users")
     
     user := &User{}
@@ -223,7 +240,7 @@ Fetches multiple records with WHERE clauses from field values map.
 **Example:**
 ```go
 func getUsersByStatus(ctx context.Context, client db.Client, active bool, role string) ([]*User, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users")
     
     fieldValues := map[string]any{
@@ -254,7 +271,7 @@ Checks if records exist matching the given criteria. The optional skip parameter
 **Example:**
 ```go
 func emailExists(ctx context.Context, client db.Client, email string, excludeID ...int) (bool, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users")
     
     var skip []any
@@ -295,7 +312,7 @@ Executes a COUNT query and returns the result.
 **Example:**
 ```go
 func countActiveUsers(ctx context.Context, client db.Client) (int64, error) {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.From("users").
         Select(goqu.L("COUNT(*)")).
         Where(goqu.C("active").IsTrue())
@@ -317,7 +334,7 @@ Executes a DELETE query using a goqu DeleteDataset.
 **Example:**
 ```go
 func deleteInactiveUsers(ctx context.Context, client db.Client, daysInactive int) error {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     cutoff := time.Now().AddDate(0, 0, -daysInactive)
     
     query := dialect.Delete("users").
@@ -339,7 +356,7 @@ Deletes records matching field values.
 **Example:**
 ```go
 func deleteUsersByRole(ctx context.Context, client db.Client, role string) error {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.Delete("users")
     
     fieldValues := map[string]any{
@@ -362,7 +379,7 @@ Deletes a record by key field.
 **Example:**
 ```go
 func deleteUserByID(ctx context.Context, client db.Client, userID int) error {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.Delete("users")
     
     return db.DeleteByKey(ctx, client.GetClient(), query, "id", userID)
@@ -444,7 +461,7 @@ Executes an UPDATE query using goqu UpdateDataset.
 **Example:**
 ```go
 func updateUserEmail(ctx context.Context, client db.Client, userID int, newEmail string) error {
-    dialect := goqu.Dialect("postgres")
+    dialect := goqu.Dialect("pgx")
     query := dialect.Update("users").
         Set(goqu.Record{"email": newEmail, "updated_at": time.Now()}).
         Where(goqu.C("id").Eq(userID))

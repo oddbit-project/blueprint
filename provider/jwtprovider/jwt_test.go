@@ -43,10 +43,6 @@ func generateRSAKeyPair(t *testing.T) (privateKeyPEM, publicKeyPEM []byte) {
 	return privateKeyPEM, publicKeyPEM
 }
 
-func generateECDSAKeyPair(t *testing.T) (privateKeyPEM, publicKeyPEM []byte) {
-	return generateECDSAKeyPairForCurve(t, elliptic.P256())
-}
-
 func generateECDSAKeyPairForCurve(t *testing.T, curve elliptic.Curve) (privateKeyPEM, publicKeyPEM []byte) {
 	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	require.NoError(t, err)
@@ -366,9 +362,9 @@ func TestGenerateAndParseToken_AllAlgorithms(t *testing.T) {
 			assert.Equal(t, testData["email"], claims.Data["email"])
 
 			// Verify timing claims
-			assert.True(t, claims.IssuedAt.Time.Before(time.Now().Add(time.Second)))
-			assert.True(t, claims.NotBefore.Time.Before(time.Now().Add(time.Second)))
-			assert.True(t, claims.ExpiresAt.Time.After(time.Now()))
+			assert.True(t, claims.IssuedAt.Before(time.Now().Add(time.Second)))
+			assert.True(t, claims.NotBefore.Before(time.Now().Add(time.Second)))
+			assert.True(t, claims.ExpiresAt.After(time.Now()))
 		})
 	}
 }
@@ -1011,37 +1007,4 @@ func TestEdgeCases(t *testing.T) {
 		err = provider.RevokeToken(tokenString)
 		assert.NoError(t, err)
 	})
-}
-
-// Mock JWT provider for testing edge cases
-type mockJWTProvider struct {
-	claims *Claims
-	err    error
-}
-
-func (m *mockJWTProvider) ParseToken(tokenString string) (*Claims, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.claims, nil
-}
-
-func (m *mockJWTProvider) GenerateToken(subject string, data map[string]any) (string, error) {
-	return "", nil
-}
-
-func (m *mockJWTProvider) RevokeToken(tokenString string) error {
-	return nil
-}
-
-func (m *mockJWTProvider) RevokeTokenByID(tokenID string, expiresAt time.Time) error {
-	return nil
-}
-
-func (m *mockJWTProvider) IsTokenRevoked(tokenID string) bool {
-	return false
-}
-
-func (m *mockJWTProvider) GetRevocationManager() *RevocationManager {
-	return nil
 }

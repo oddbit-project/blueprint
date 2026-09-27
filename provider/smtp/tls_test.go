@@ -108,7 +108,7 @@ func startSMTPServer(t *testing.T, opts serverOpts) (int, *smtpStats) {
 		ln, err = net.Listen("tcp", "127.0.0.1:0")
 	}
 	require.NoError(t, err)
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { _ = ln.Close() })
 
 	stats := &smtpStats{}
 	go func() {
@@ -140,7 +140,7 @@ func serverTLSConfig(opts serverOpts) *tls.Config {
 }
 
 func serveSMTP(conn net.Conn, opts serverOpts, stats *smtpStats) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	r := bufio.NewReader(conn)
 	write := func(s string) bool {
@@ -352,7 +352,7 @@ func TestTimeoutConfigured(t *testing.T) {
 func TestTimeoutAbortsSend(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { _ = ln.Close() })
 
 	done := make(chan struct{})
 	t.Cleanup(func() { close(done) })
@@ -361,7 +361,7 @@ func TestTimeoutAbortsSend(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		<-done // stall without ever answering
 	}()
 

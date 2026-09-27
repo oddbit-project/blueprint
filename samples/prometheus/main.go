@@ -75,7 +75,7 @@ func (m *AppMetrics) SetActiveUsers(count float64) {
 }
 
 func main() {
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("prometheus-sample")
 
 	// create custom metrics collector
@@ -155,5 +155,7 @@ func main() {
 	logger.Info("Server running on http://localhost:8089")
 	logger.Info("Try: curl http://localhost:8089/hello")
 	logger.Info("Try: curl http://localhost:8089/metrics")
-	server.Start()
+	if err := server.Start(); err != nil {
+		logger.Fatal(err, "could not start http server")
+	}
 }

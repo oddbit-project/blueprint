@@ -309,7 +309,7 @@ func BenchmarkMap_Get(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		m.Get(i % 1000)
+		_, _ = m.Get(i % 1000)
 	}
 }
 
@@ -338,7 +338,7 @@ func BenchmarkMap_ConcurrentReadWrite(b *testing.B) {
 			if i%2 == 0 {
 				m.Add(i%100, fmt.Sprintf("value-%d", i))
 			} else {
-				m.Get(i % 100)
+				_, _ = m.Get(i % 100)
 			}
 			i++
 		}

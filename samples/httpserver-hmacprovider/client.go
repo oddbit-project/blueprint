@@ -139,7 +139,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 2: Test protected endpoint (authentication required)
@@ -150,7 +150,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 3: Test POST with data
@@ -165,7 +165,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 4: Test PUT request
@@ -185,7 +185,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 5: Test DELETE request
@@ -196,7 +196,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 6: Test admin endpoint
@@ -207,7 +207,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 7: Test sign endpoint (public)
@@ -222,7 +222,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 8: Demonstrate authentication failure with wrong secret
@@ -238,7 +238,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d (Expected 401)\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// Example 9: Demonstrate request without authentication headers
@@ -250,7 +250,7 @@ func runClientExamples() {
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Status: %d (Expected 401)\nResponse: %s\n", resp.StatusCode, string(body))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	fmt.Println("\n=== Client Examples Complete ===")
@@ -267,7 +267,9 @@ func runPerformanceTest() {
 	}
 
 	// Warm up
-	client.Get("/api/protected/profile")
+	if resp, err := client.Get("/api/protected/profile"); err == nil {
+		_ = resp.Body.Close()
+	}
 
 	// Performance test
 	numRequests := 100
@@ -279,7 +281,7 @@ func runPerformanceTest() {
 			fmt.Printf("Request %d failed: %v\n", i, err)
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	duration := time.Since(start)
@@ -351,7 +353,7 @@ func runSingleRequest(method, path string, bodyArgs []string) {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	responseBody, _ := io.ReadAll(resp.Body)
 	fmt.Printf("Status: %d\n", resp.StatusCode)

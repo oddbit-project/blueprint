@@ -140,10 +140,8 @@ func (j *jwtProvider) GenerateToken(subject string, data map[string]any) (string
 	}
 
 	// copy optional data
-	if data != nil {
-		for k, v := range data {
-			claims.Data[k] = v
-		}
+	for k, v := range data {
+		claims.Data[k] = v
 	}
 
 	// Create token with key ID header for JWKS support

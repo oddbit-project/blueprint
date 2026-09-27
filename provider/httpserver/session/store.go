@@ -94,6 +94,9 @@ func (s *Store) Get(id string) (*SessionData, error) {
 	// Decrypt the data, if necessary
 	if s.crypt != nil {
 		data, err = s.crypt.Decrypt(data)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Deserialize the session
@@ -105,13 +108,13 @@ func (s *Store) Get(id string) (*SessionData, error) {
 	// Check if the session has expired
 	now := time.Now()
 	if now.Sub(session.Created) > time.Duration(s.config.ExpirationSeconds)*time.Second {
-		s.backend.Delete(id)
+		_ = s.backend.Delete(id)
 		return nil, ErrSessionExpired
 	}
 
 	// Check idle timeout
 	if now.Sub(session.LastAccessed) > time.Duration(s.config.IdleTimeoutSeconds)*time.Second {
-		s.backend.Delete(id)
+		_ = s.backend.Delete(id)
 		return nil, ErrSessionExpired
 	}
 

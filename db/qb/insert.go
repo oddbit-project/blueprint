@@ -28,7 +28,7 @@ func (s *SqlBuilder) BuildSQLInsert(tableName string, data any) (string, []any, 
 	}
 
 	v := reflect.ValueOf(data)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return "", nil, InvalidInputError("data pointer cannot be nil", nil)
 		}
@@ -70,7 +70,7 @@ func (s *SqlBuilder) BuildSQLInsert(tableName string, data any) (string, []any, 
 		}
 
 		// Handle omitnil - skip if field is nil pointer
-		if meta.OmitNil && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+		if meta.OmitNil && fieldValue.Kind() == reflect.Pointer && fieldValue.IsNil() {
 			continue
 		}
 
@@ -86,7 +86,7 @@ func (s *SqlBuilder) BuildSQLInsert(tableName string, data any) (string, []any, 
 
 		// Extract the actual value
 		var actualValue any
-		if fieldValue.Kind() == reflect.Ptr {
+		if fieldValue.Kind() == reflect.Pointer {
 			if fieldValue.IsNil() {
 				actualValue = nil
 			} else {
@@ -158,7 +158,7 @@ func (s *SqlBuilder) BuildSQLBatchInsert(tableName string, data []any) (string, 
 	}
 
 	firstRecord := reflect.ValueOf(data[0])
-	if firstRecord.Kind() == reflect.Ptr {
+	if firstRecord.Kind() == reflect.Pointer {
 		if firstRecord.IsNil() {
 			return "", nil, BatchProcessingError(0, fmt.Errorf("first record cannot be nil"))
 		}
@@ -211,7 +211,7 @@ func (s *SqlBuilder) BuildSQLBatchInsert(tableName string, data []any) (string, 
 
 		// Check if this field should be included based on omitnil/omitempty
 		shouldInclude := true
-		if meta.OmitNil && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+		if meta.OmitNil && fieldValue.Kind() == reflect.Pointer && fieldValue.IsNil() {
 			shouldInclude = false
 		} else if meta.OmitEmpty && fieldValue.IsZero() {
 			shouldInclude = false
@@ -246,7 +246,7 @@ func (s *SqlBuilder) BuildSQLBatchInsert(tableName string, data []any) (string, 
 		}
 
 		v := reflect.ValueOf(record)
-		if v.Kind() == reflect.Ptr {
+		if v.Kind() == reflect.Pointer {
 			if v.IsNil() {
 				return "", nil, BatchProcessingError(i, fmt.Errorf("record cannot be nil"))
 			}
@@ -272,7 +272,7 @@ func (s *SqlBuilder) BuildSQLBatchInsert(tableName string, data []any) (string, 
 
 			// Check if this field would be omitted based on omitnil/omitempty
 			wouldOmit := false
-			if col.meta.OmitNil && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			if col.meta.OmitNil && fieldValue.Kind() == reflect.Pointer && fieldValue.IsNil() {
 				wouldOmit = true
 			} else if col.meta.OmitEmpty && fieldValue.IsZero() {
 				wouldOmit = true
@@ -286,7 +286,7 @@ func (s *SqlBuilder) BuildSQLBatchInsert(tableName string, data []any) (string, 
 
 			// Extract the actual value
 			var actualValue any
-			if fieldValue.Kind() == reflect.Ptr {
+			if fieldValue.Kind() == reflect.Pointer {
 				if fieldValue.IsNil() {
 					actualValue = nil
 				} else {
@@ -310,7 +310,7 @@ func (s *SqlBuilder) BuildSQLBatchInsert(tableName string, data []any) (string, 
 
 			// Check if it would also be omitted in this record
 			wouldOmit := false
-			if meta.OmitNil && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			if meta.OmitNil && fieldValue.Kind() == reflect.Pointer && fieldValue.IsNil() {
 				wouldOmit = true
 			} else if meta.OmitEmpty && fieldValue.IsZero() {
 				wouldOmit = true

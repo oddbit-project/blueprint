@@ -10,7 +10,7 @@ import (
 )
 
 func (s *PGIntegrationTestSuite) TestMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	src := migrations.NewMemorySource()
 
 	src.Add("sample1.sql", "drop table if exists sample;")
@@ -37,7 +37,7 @@ func (s *PGIntegrationTestSuite) TestMigrations() {
 }
 
 func (s *PGIntegrationTestSuite) TestUpdateMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 
 	// create old version table
 	qry := fmt.Sprintf(`CREATE TABLE  %s (
@@ -46,7 +46,7 @@ func (s *PGIntegrationTestSuite) TestUpdateMigrations() {
 			sha2 TEXT,
 			contents TEXT)`,
 		EngineMigrationTable)
-	_, err = s.client.Db().ExecContext(s.ctx, qry)
+	_, _ = s.client.Db().ExecContext(s.ctx, qry)
 
 	src := migrations.NewMemorySource()
 	src.Add("sample1.sql", "drop table if exists sample;")
@@ -71,7 +71,7 @@ func (s *PGIntegrationTestSuite) TestUpdateMigrations() {
 }
 
 func (s *PGIntegrationTestSuite) TestModuleMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	systemSrc := migrations.NewMemorySource()
 	systemSrc.Add("sample1.sql", "drop table if exists sample;")
 	systemSrc.Add("sample2.sql", "create table sample(id int);")
@@ -126,7 +126,7 @@ func (s *PGIntegrationTestSuite) TestModuleMigrations() {
 }
 
 func (s *PGIntegrationTestSuite) TestSameNameMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	systemSrc := migrations.NewMemorySource()
 	systemSrc.Add("sample1.sql", "select 1;")
 
@@ -153,6 +153,7 @@ func (s *PGIntegrationTestSuite) TestSameNameMigrations() {
 	// list, should still have 1
 	sysList, err = sysMgr.List(context.Background())
 	assert.Equal(s.T(), 1, len(sysList))
+	assert.Nil(s.T(), err)
 
 	// migration manager - module
 	moduleMgr, err := NewMigrationManager(context.Background(), s.client, WithModule("sample-module"))

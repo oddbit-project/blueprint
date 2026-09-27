@@ -596,7 +596,9 @@ err := repo.Delete(
 func (r *repository) DeleteWhere(fieldNameValue map[string]any) error
 ```
 
-Deletes records matching field values. All conditions are combined with AND.
+Deletes records matching field values. All conditions are combined with AND. An empty map
+returns `ErrInvalidParameters` instead of deleting every row, and a column name containing `"`,
+`\` or NUL returns `db.ErrInvalidIdentifier`.
 
 **Example:**
 ```go

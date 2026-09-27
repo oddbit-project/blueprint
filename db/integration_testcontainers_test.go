@@ -115,8 +115,12 @@ func (s *DBIntegrationTestSuite) SetupSuite() {
 	err = s.client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to PostgreSQL")
 
-	// Register dialect
+	// Register dialect; the goqu dialect mirrors provider/pgsql, which this module cannot import
 	RegisterDialect("pgx", PostgreSQLDialect())
+	goquOpts := goqu.DefaultDialectOptions()
+	goquOpts.PlaceHolderFragment = []byte("$")
+	goquOpts.IncludePlaceholderNum = true
+	goqu.RegisterDialect("pgx", goquOpts)
 }
 
 // TearDownSuite cleans up after all tests
@@ -754,7 +758,8 @@ func (s *DBIntegrationTestSuite) TestComplexQueries() {
 			goqu.AVG("score").As("avg_score"),
 			goqu.MAX("score").As("max_score"),
 			goqu.MIN("score").As("min_score"),
-			goqu.SUM(goqu.Case().When(goqu.C("is_active").IsTrue(), 1).Else(0)).As("active_count"),
+			// bound CASE values are untyped parameters and PostgreSQL resolves them as text; use literals
+			goqu.SUM(goqu.Case().When(goqu.C("is_active").IsTrue(), goqu.L("1")).Else(goqu.L("0"))).As("active_count"),
 		)
 
 		var result AggResult

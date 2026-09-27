@@ -9,7 +9,7 @@ import (
 )
 
 func (s *SQLiteIntegrationTestSuite) TestMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	src := migrations.NewMemorySource()
 
 	src.Add("sample1.sql", "drop table if exists sample;")
@@ -36,7 +36,7 @@ func (s *SQLiteIntegrationTestSuite) TestMigrations() {
 }
 
 func (s *SQLiteIntegrationTestSuite) TestUpdateMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 
 	// create old version table (no module column)
 	qry := fmt.Sprintf(`CREATE TABLE %s (
@@ -45,7 +45,7 @@ func (s *SQLiteIntegrationTestSuite) TestUpdateMigrations() {
 			sha2 TEXT,
 			contents TEXT)`,
 		MigrationTable)
-	_, err = s.client.Db().ExecContext(s.ctx, qry)
+	_, _ = s.client.Db().ExecContext(s.ctx, qry)
 
 	src := migrations.NewMemorySource()
 	src.Add("sample1.sql", "drop table if exists sample;")
@@ -68,7 +68,7 @@ func (s *SQLiteIntegrationTestSuite) TestUpdateMigrations() {
 }
 
 func (s *SQLiteIntegrationTestSuite) TestModuleMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	systemSrc := migrations.NewMemorySource()
 	systemSrc.Add("sample1.sql", "drop table if exists sample;")
 	systemSrc.Add("sample2.sql", "create table sample(id int);")
@@ -121,7 +121,7 @@ func (s *SQLiteIntegrationTestSuite) TestModuleMigrations() {
 }
 
 func (s *SQLiteIntegrationTestSuite) TestSameNameMigrations() {
-	_, err := s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
+	_, _ = s.client.Conn.ExecContext(s.ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", MigrationTable))
 	systemSrc := migrations.NewMemorySource()
 	systemSrc.Add("sample1.sql", "select 1;")
 
@@ -143,6 +143,7 @@ func (s *SQLiteIntegrationTestSuite) TestSameNameMigrations() {
 
 	sysList, err = sysMgr.List(context.Background())
 	assert.Equal(s.T(), 1, len(sysList))
+	assert.Nil(s.T(), err)
 
 	moduleMgr, err := NewMigrationManager(context.Background(), s.client, WithModule("sample-module"))
 	assert.Nil(s.T(), err)

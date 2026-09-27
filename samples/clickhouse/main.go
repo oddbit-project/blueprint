@@ -21,7 +21,7 @@ type SampleRecord struct {
 
 func main() {
 	// Configure logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("clickhouse-sample")
 
 	// Create a configuration
@@ -36,7 +36,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(err, "Failed to create client")
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Test connection with a ping
 	ctx := context.Background()

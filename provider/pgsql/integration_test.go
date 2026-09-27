@@ -59,24 +59,6 @@ func (s *PGIntegrationTestSuite) getTestClient() *db.SqlClient {
 	return client
 }
 
-// Legacy function for compatibility with existing standalone tests
-func resolveDSN() string {
-	// Disable prepared statement cache to avoid "cached plan must not change result type" errors
-	// Use default_query_exec_mode=simple_protocol for pgx driver
-	return "postgres://blueprint:password@postgres:5432/blueprint?default_query_exec_mode=simple_protocol"
-}
-
-// Legacy function for compatibility with existing standalone tests
-func dbClient(t *testing.T) *db.SqlClient {
-	cfg := NewClientConfig()
-	cfg.DSN = resolveDSN()
-	client, err := NewClient(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return client
-}
-
 // SetupSuite prepares the test environment with testcontainers
 func (s *PGIntegrationTestSuite) SetupSuite() {
 	s.ctx = context.Background()
@@ -255,7 +237,7 @@ func (s *PGIntegrationTestSuite) TestLockConcurrent() {
 	wg.Add(1)
 	require.NoError(s.T(), lock1.Lock(s.ctx))
 	time.AfterFunc(time.Second*1, func() {
-		lock1.Unlock(s.ctx)
+		assert.NoError(s.T(), lock1.Unlock(s.ctx))
 		wg.Done()
 	})
 
@@ -466,6 +448,83 @@ func (s *PGIntegrationTestSuite) testFunctions(repo testRepository) {
 	count, err = repo.CountWhere(map[string]any{"label": "bar"})
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), int64(1), count)
+}
+
+// TestStringEscaping checks that values containing backslashes and quotes are matched literally,
+// including when the server has standard_conforming_strings=off
+func (s *PGIntegrationTestSuite) TestStringEscaping() {
+	baseDSN, err := s.pgInstance.ConnectionString(s.ctx, "sslmode=disable")
+	require.NoError(s.T(), err)
+
+	tests := []struct {
+		name string
+		dsn  string
+		scs  string
+	}{
+		{"simple protocol", s.dsn, "on"},
+		{"extended protocol", baseDSN, "on"},
+		{"extended protocol, standard_conforming_strings off", baseDSN + "&standard_conforming_strings=off", "off"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			cfg := NewClientConfig()
+			cfg.DSN = tt.dsn
+			client, err := NewClient(cfg)
+			require.NoError(s.T(), err)
+			require.NoError(s.T(), client.Connect())
+			defer client.Disconnect()
+
+			var scs string
+			require.NoError(s.T(), client.Db().QueryRow("SHOW standard_conforming_strings").Scan(&scs))
+			require.Equal(s.T(), tt.scs, scs)
+
+			s.dbCleanup(client)
+			s.testStringEscaping(db.NewRepository(s.ctx, client, sampleTable))
+		})
+	}
+}
+
+func (s *PGIntegrationTestSuite) testStringEscaping(repo testRepository) {
+	const payload = `x\' OR 1=1 --`
+	labels := []string{`a\'b`, `a\nb`, `a\\b`, "plain"}
+	records := make([]*sampleRecord, 0, len(labels))
+	for _, label := range labels {
+		records = append(records, &sampleRecord{CreatedAt: time.Now(), Label: label})
+	}
+	require.NoError(s.T(), repo.Insert(records))
+
+	for _, label := range labels {
+		rows := make([]*sampleRecord, 0)
+		require.NoError(s.T(), repo.FetchWhere(map[string]any{"label": label}, &rows), label)
+		require.Len(s.T(), rows, 1, label)
+		assert.Equal(s.T(), label, rows[0].Label)
+
+		count, err := repo.CountWhere(map[string]any{"label": label})
+		require.NoError(s.T(), err, label)
+		assert.Equal(s.T(), int64(1), count, label)
+	}
+
+	rows := make([]*sampleRecord, 0)
+	require.NoError(s.T(), repo.FetchWhere(map[string]any{"label": payload}, &rows))
+	assert.Empty(s.T(), rows)
+	require.NoError(s.T(), repo.Fetch(repo.SqlSelect().Where(goqu.C("label").Eq(payload)), &rows))
+	assert.Empty(s.T(), rows)
+	count, err := repo.CountWhere(map[string]any{"label": payload})
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(0), count)
+	exists, err := repo.Exists("label", payload)
+	require.NoError(s.T(), err)
+	assert.False(s.T(), exists)
+
+	require.NoError(s.T(), repo.DeleteWhere(map[string]any{"label": payload}))
+	count, err = repo.Count()
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(len(labels)), count)
+
+	require.NoError(s.T(), repo.DeleteWhere(map[string]any{"label": `a\'b`}))
+	count, err = repo.Count()
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(len(labels)-1), count)
 }
 
 // Run the test suite

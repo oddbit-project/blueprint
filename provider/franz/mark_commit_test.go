@@ -59,7 +59,7 @@ func TestMarkCommitOffsets_Integration(t *testing.T) {
 	if err != nil {
 		t.Skipf("no kafka broker at %s: %v", broker, err)
 	}
-	conn.Close()
+	_ = conn.Close()
 
 	topic := fmt.Sprintf("marks-it-%d", time.Now().UnixNano())
 	group := fmt.Sprintf("marks-it-group-%d", time.Now().UnixNano())

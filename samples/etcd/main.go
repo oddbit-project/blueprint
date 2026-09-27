@@ -57,7 +57,7 @@ func runSamples(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create etcd client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Printf("Connected to etcd at %v\n", config.Endpoints)
 
@@ -274,7 +274,7 @@ func distributedLockDemo(ctx context.Context, client *etcd.Client) error {
 	if err != nil {
 		return fmt.Errorf("create lock failed: %w", err)
 	}
-	defer lock1.Close()
+	defer func() { _ = lock1.Close() }()
 
 	fmt.Printf("Created lock: %s\n", lockName)
 
@@ -336,7 +336,7 @@ func distributedLockDemo(ctx context.Context, client *etcd.Client) error {
 	if err != nil {
 		return fmt.Errorf("create second lock failed: %w", err)
 	}
-	defer lock2.Close()
+	defer func() { _ = lock2.Close() }()
 
 	// First, acquire lock1 to demonstrate blocking
 	fmt.Println("Acquiring lock1 for 3 seconds...")
@@ -450,7 +450,7 @@ func encryptionDemo(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encrypted client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	fmt.Printf("Created encrypted client (encryption: %t)\n", client.IsEncrypted())
 
@@ -472,7 +472,7 @@ func encryptionDemo(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create regular client: %w", err)
 	}
-	defer regularClient.Close()
+	defer func() { _ = regularClient.Close() }()
 
 	rawEncrypted, err := regularClient.Get(ctx, key)
 	if err != nil {

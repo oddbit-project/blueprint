@@ -47,7 +47,7 @@ func TestHMACProviderWithMemoryStore(t *testing.T) {
 	assert.True(t, valid)
 	assert.Equal(t, "", string(userId))
 	// Test replay protection
-	userId, valid, err = provider.Verify256(strings.NewReader(testData), hash, timestamp, nonce)
+	_, valid, err = provider.Verify256(strings.NewReader(testData), hash, timestamp, nonce)
 	assert.Error(t, err)
 	assert.False(t, valid)
 }
@@ -90,7 +90,7 @@ func TestHMACProviderWithKVStore(t *testing.T) {
 	assert.Equal(t, []byte("1"), value)
 
 	// Test replay protection
-	userId, valid, err = provider.Verify256(strings.NewReader(testData), hash, timestamp, nonce)
+	_, valid, err = provider.Verify256(strings.NewReader(testData), hash, timestamp, nonce)
 	assert.Error(t, err)
 	assert.False(t, valid)
 }
@@ -205,7 +205,7 @@ func TestHMACProviderTimeWindow(t *testing.T) {
 		time.Sleep(shortInterval + 100*time.Millisecond)
 
 		// Should fail due to expired timestamp
-		userId, valid, err = provider.Verify256(strings.NewReader(testData), hash2, timestamp2, nonce2)
+		_, valid, err = provider.Verify256(strings.NewReader(testData), hash2, timestamp2, nonce2)
 		assert.Error(t, err)
 		assert.False(t, valid)
 	}

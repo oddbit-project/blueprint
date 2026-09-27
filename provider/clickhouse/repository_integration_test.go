@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doug-martin/goqu/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -56,7 +57,7 @@ func (s *ClickhouseRepositoryTestSuite) SetupSuite() {
 					return status == http.StatusOK
 				},
 			),
-		).WithStartupTimeout(60 * time.Second),
+		).WithDeadline(60 * time.Second),
 	}
 
 	// Start container
@@ -106,7 +107,7 @@ func (s *ClickhouseRepositoryTestSuite) TearDownSuite() {
 			s.T().Logf("Failed to drop complex test table: %v", err)
 		}
 		// Close the client
-		s.client.Close()
+		_ = s.client.Close()
 	}
 
 	// Stop and remove container
@@ -227,17 +228,21 @@ func (s *ClickhouseRepositoryTestSuite) TestCounters() {
 	err := s.repo.Insert(records)
 	assert.NoError(s.T(), err, "Insert should succeed")
 
-	// Direct count with SQL (workaround for type issue)
-	var totalCount uint64
-	err = s.client.Conn.QueryRow(s.ctx, "SELECT COUNT(*) FROM complex_test").Scan(&totalCount)
-	assert.NoError(s.T(), err, "Count query should succeed")
-	assert.Equal(s.T(), uint64(3), totalCount, "Should have 3 total records")
+	totalCount, err := s.repo.Count()
+	assert.NoError(s.T(), err, "Count should succeed")
+	assert.Equal(s.T(), int64(3), totalCount, "Should have 3 total records")
 
 	// Count with condition
-	var validCount uint64
-	err = s.client.Conn.QueryRow(s.ctx, "SELECT COUNT(*) FROM complex_test WHERE is_valid = 1").Scan(&validCount)
-	assert.NoError(s.T(), err, "Conditional count query should succeed")
-	assert.Equal(s.T(), uint64(2), validCount, "Should have 2 valid records")
+	validCount, err := s.repo.CountWhere(map[string]any{"is_valid": 1})
+	assert.NoError(s.T(), err, "CountWhere should succeed")
+	assert.Equal(s.T(), int64(2), validCount, "Should have 2 valid records")
+
+	exists, err := s.repo.Exists("name", "Record 3")
+	assert.NoError(s.T(), err, "Exists should succeed")
+	assert.True(s.T(), exists)
+	exists, err = s.repo.Exists("name", "Record 3", "id", int32(3))
+	assert.NoError(s.T(), err, "Exists with skip should succeed")
+	assert.False(s.T(), exists)
 }
 
 // Test raw SQL execution
@@ -257,6 +262,53 @@ func (s *ClickhouseRepositoryTestSuite) TestRawExecution() {
 	assert.NoError(s.T(), err, "FetchByKey should find raw SQL inserted record")
 	assert.Equal(s.T(), "Raw SQL Record", record.Name)
 	assert.Equal(s.T(), uint64(500), record.Count)
+}
+
+// TestStringEscaping checks that values containing backslashes and quotes are matched literally,
+// and cannot end the string literal in the generated SQL
+func (s *ClickhouseRepositoryTestSuite) TestStringEscaping() {
+	s.setupComplexTable()
+	const payload = `x\' OR 1=1 --`
+	now := time.Now().Round(time.Second)
+	names := []string{`a\'b`, `a\nb`, `a\\b`, "plain"}
+	records := make([]any, 0, len(names))
+	for i, name := range names {
+		records = append(records, &ComplexTestRecord{ID: int32(i + 1), Name: name, Created: now, Updated: now})
+	}
+	s.Require().NoError(s.repo.Insert(records))
+
+	for _, name := range names {
+		var rows []ComplexTestRecord
+		s.Require().NoError(s.repo.FetchWhere(map[string]any{"name": name}, &rows), name)
+		s.Require().Len(rows, 1, name)
+		s.Equal(name, rows[0].Name)
+
+		count, err := s.repo.CountWhere(map[string]any{"name": name})
+		s.Require().NoError(err, name)
+		s.Equal(int64(1), count, name)
+	}
+
+	var rows []ComplexTestRecord
+	s.Require().NoError(s.repo.FetchWhere(map[string]any{"name": payload}, &rows))
+	s.Empty(rows)
+	s.Require().NoError(s.repo.Fetch(s.repo.SqlSelect().Where(goqu.C("name").Eq(payload)), &rows))
+	s.Empty(rows)
+	count, err := s.repo.CountWhere(map[string]any{"name": payload})
+	s.Require().NoError(err)
+	s.Equal(int64(0), count)
+	exists, err := s.repo.Exists("name", payload)
+	s.Require().NoError(err)
+	s.False(exists)
+
+	s.Require().NoError(s.repo.DeleteWhere(map[string]any{"name": payload}))
+	count, err = s.repo.Count()
+	s.Require().NoError(err)
+	s.Equal(int64(len(names)), count)
+
+	s.Require().NoError(s.repo.DeleteWhere(map[string]any{"name": `a\'b`}))
+	count, err = s.repo.Count()
+	s.Require().NoError(err)
+	s.Equal(int64(len(names)-1), count)
 }
 
 // Run the test suite

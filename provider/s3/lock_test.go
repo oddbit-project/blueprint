@@ -61,7 +61,7 @@ func TestIntegrationObjectLock(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)
@@ -179,7 +179,7 @@ func TestIntegrationObjectLockConfigDisabledBucket(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucket, err := client.Bucket(generateTestBucketName())
 	require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestIntegrationDeleteLockedVersion(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)

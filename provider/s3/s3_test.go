@@ -71,11 +71,13 @@ func TestOperationsWithoutConnection(t *testing.T) {
 
 	t.Run("Bucket operations fail when not connected", func(t *testing.T) {
 		bucket, err := client.Bucket("test-bucket")
+		assert.NoError(t, err)
 		err = bucket.Create(ctx)
 		assert.Error(t, err)
 		assert.Equal(t, ErrClientNotConnected, err)
 
 		bucket, err = client.Bucket("test-bucket")
+		assert.NoError(t, err)
 		err = bucket.Delete(ctx)
 		assert.Error(t, err)
 		assert.Equal(t, ErrClientNotConnected, err)
@@ -85,6 +87,7 @@ func TestOperationsWithoutConnection(t *testing.T) {
 		assert.Equal(t, ErrClientNotConnected, err)
 
 		bucket, err = client.Bucket("test-bucket")
+		assert.NoError(t, err)
 		_, err = bucket.Exists(ctx)
 		assert.Error(t, err)
 		assert.Equal(t, ErrClientNotConnected, err)

@@ -99,7 +99,7 @@ func NewClientConfig() *ClientConfig {
 }
 
 func (c ClientConfig) Validate() error {
-	if c.Hosts == nil || len(c.Hosts) == 0 {
+	if len(c.Hosts) == 0 {
 		return ErrEmptyHosts
 	}
 
@@ -190,7 +190,7 @@ func NewClient(config *ClientConfig) (*Client, error) {
 		opts.BlockBufferSize = config.BlockBufferSize
 	}
 
-	if config.Settings != nil && len(config.Settings) > 0 {
+	if len(config.Settings) > 0 {
 		opts.Settings = config.Settings
 	}
 
@@ -231,6 +231,8 @@ func DialectOptions() *goqu.SQLDialectOptions {
 	do := goqu.DefaultDialectOptions()
 	do.PlaceHolderFragment = []byte("?")
 	do.IncludePlaceholderNum = false
+	// ClickHouse treats backslash as an escape character in string literals
+	do.EscapedRunes['\\'] = []byte(`\\`)
 	return do
 }
 

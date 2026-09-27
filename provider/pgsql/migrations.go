@@ -169,7 +169,7 @@ func (b *pgMigrationManager) RunMigration(ctx context.Context, m *migrations.Mig
 	}
 	// the wait is cancellable, the release is not: unlocking with a cancelled
 	// context would leave the lock held for as long as the session survives
-	defer lock.Unlock(context.WithoutCancel(ctx))
+	defer func() { _ = lock.Unlock(context.WithoutCancel(ctx)) }()
 
 	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
@@ -195,7 +195,7 @@ func (b *pgMigrationManager) RegisterMigration(ctx context.Context, m *migration
 	}
 	// the wait is cancellable, the release is not: unlocking with a cancelled
 	// context would leave the lock held for as long as the session survives
-	defer lock.Unlock(context.WithoutCancel(ctx))
+	defer func() { _ = lock.Unlock(context.WithoutCancel(ctx)) }()
 
 	exists, err := b.MigrationExists(ctx, m.Name, m.SHA2)
 	if err != nil {
@@ -230,7 +230,7 @@ func (b *pgMigrationManager) Run(ctx context.Context, src migrations.Source, con
 	}
 	// the wait is cancellable, the release is not: unlocking with a cancelled
 	// context would leave the lock held for as long as the session survives
-	defer lock.Unlock(context.WithoutCancel(ctx))
+	defer func() { _ = lock.Unlock(context.WithoutCancel(ctx)) }()
 
 	files, err := src.List()
 	if err != nil {

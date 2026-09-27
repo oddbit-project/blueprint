@@ -439,6 +439,15 @@ type User struct {
 - `decimal.Decimal` (if using shopspring/decimal)
 - Database-specific types (e.g., PostgreSQL arrays, JSON types)
 
+**Two separate registries.** `field.AddReservedType(name)` (this package, `db/field`) registers
+a type with the legacy `db` package's own registry — it affects `db.Repository` and nothing
+else. `dbx` reads struct metadata through the standalone `field` subpackage of
+[`gohan`](gohan.md) instead (`github.com/oddbit-project/gohan/field`), which keeps its own,
+separate reserved-type registry: `gohan/field.AddReservedType(name)` is what affects `dbx`.
+Registering a type with one package's registry does not register it with the other's, and
+`errors.Is` against `db/field.ErrInvalidStruct` does not match the equivalent error `dbx`/`gohan`
+returns.
+
 ## Testing Struct Definitions
 
 ### Validation Example

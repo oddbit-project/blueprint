@@ -103,7 +103,9 @@ func TestStart_Success(t *testing.T) {
 	// Cleanup
 	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	runner.Stop(stopCtx)
+	if err := runner.Stop(stopCtx); err != nil {
+		t.Errorf("Stop failed: %v", err)
+	}
 }
 
 func TestStart_AlreadyRunning(t *testing.T) {
@@ -129,7 +131,9 @@ func TestStart_AlreadyRunning(t *testing.T) {
 	// Cleanup
 	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	runner.Stop(stopCtx)
+	if err := runner.Stop(stopCtx); err != nil {
+		t.Errorf("Stop failed: %v", err)
+	}
 }
 
 func TestStop_Success(t *testing.T) {

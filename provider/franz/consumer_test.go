@@ -84,7 +84,7 @@ func TestConsumerOperations(t *testing.T) {
 		}
 		defer consumer.Close()
 
-		result, err := consumer.Poll(nil)
+		result, err := consumer.Poll(nil) //nolint:staticcheck // intentionally testing nil-context handling
 		assert.Error(t, err)
 		assert.Equal(t, ErrNilContext, err)
 		assert.Nil(t, result)
@@ -106,7 +106,7 @@ func TestConsumerOperations(t *testing.T) {
 		}
 		defer consumer.Close()
 
-		err = consumer.Consume(nil, func(ctx context.Context, record ConsumedRecord) error {
+		err = consumer.Consume(nil, func(ctx context.Context, record ConsumedRecord) error { //nolint:staticcheck // intentionally testing nil-context handling
 			return nil
 		})
 		assert.Error(t, err)
@@ -256,7 +256,7 @@ func TestConsumeChannel(t *testing.T) {
 		defer consumer.Close()
 
 		ch := make(chan ConsumedRecord)
-		err = consumer.ConsumeChannel(nil, ch)
+		err = consumer.ConsumeChannel(nil, ch) //nolint:staticcheck // intentionally testing nil-context handling
 		assert.Error(t, err)
 		assert.Equal(t, ErrNilContext, err)
 	})

@@ -188,7 +188,7 @@ func (b *UpdateBuilder) buildUpdateSQL() (string, []any, error) {
 		}
 
 		// Handle omitnil - skip if field is nil pointer
-		if meta.OmitNil && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+		if meta.OmitNil && fieldValue.Kind() == reflect.Pointer && fieldValue.IsNil() {
 			continue
 		}
 
@@ -208,7 +208,7 @@ func (b *UpdateBuilder) buildUpdateSQL() (string, []any, error) {
 
 		// Extract the actual value
 		var actualValue any
-		if fieldValue.Kind() == reflect.Ptr {
+		if fieldValue.Kind() == reflect.Pointer {
 			if fieldValue.IsNil() {
 				actualValue = nil
 			} else {
@@ -261,7 +261,7 @@ func (b *UpdateBuilder) validateBuildArgs() (reflect.Value, error) {
 		return v, err
 	}
 
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return v, InvalidInputError("record pointer cannot be nil", nil)
 		}

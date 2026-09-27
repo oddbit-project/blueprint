@@ -101,7 +101,7 @@ func setEnvVars(t *testing.T, vars map[string]string) {
 
 func resetEnvVars(vars map[string]string) {
 	for k := range vars {
-		os.Unsetenv(k)
+		_ = os.Unsetenv(k)
 	}
 }
 

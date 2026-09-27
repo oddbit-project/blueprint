@@ -32,7 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	src := migrations.NewMemorySource()
 	src.Add("sample1.sql", "create table if not exists sample(id Int32) engine=TinyLog;")
@@ -51,6 +51,8 @@ func main() {
 		fmt.Println("Error: ", err)
 		os.Exit(1)
 	}
+	fmt.Println("Existing migrations:", len(list))
+
 	err = mgr.Run(context.Background(), src, migrations.DefaultProgressFn)
 	if err != nil {
 		fmt.Println("Error: ", err)
@@ -58,6 +60,10 @@ func main() {
 	}
 
 	list, err = mgr.List(context.Background())
+	if err != nil {
+		fmt.Println("Error: ", err)
+		os.Exit(1)
+	}
 	for _, m := range list {
 		fmt.Println(m.Created, m.Name, m.SHA2)
 	}

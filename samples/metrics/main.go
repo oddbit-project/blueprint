@@ -15,7 +15,9 @@ func main() {
 
 	// Start prometheus http server on http://localhost:2201/metrics
 	fmt.Println("exposing metrics on http://localhost:2201/metrics...")
-	server.Start()
+	if err := server.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 	fmt.Println("Done!")
 }

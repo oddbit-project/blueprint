@@ -36,7 +36,7 @@ func TestFileLogging(t *testing.T) {
 	// Create a temporary directory for log files
 	tempDir, err := os.MkdirTemp("", "filelogger_test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { require.NoError(t, os.RemoveAll(tempDir)) }()
 
 	// Setup a log file path
 	logFile := filepath.Join(tempDir, "test.log")
@@ -60,7 +60,7 @@ func TestFileLogging(t *testing.T) {
 		logger.Error(nil, "Test error message")
 
 		// Close log files
-		CloseLogFiles()
+		require.NoError(t, CloseLogFiles())
 
 		// Read log file contents
 		content, err := os.ReadFile(logFile)
@@ -94,7 +94,7 @@ func TestFileLogging(t *testing.T) {
 		logger.Info("Test console file message")
 
 		// Close log files
-		CloseLogFiles()
+		require.NoError(t, CloseLogFiles())
 
 		// Read log file contents
 		content, err := os.ReadFile(logFile)
@@ -127,7 +127,7 @@ func TestFileLogging(t *testing.T) {
 		logger.Info("Appended log message")
 
 		// Close log files
-		CloseLogFiles()
+		require.NoError(t, CloseLogFiles())
 
 		// Read log file contents
 		content, err := os.ReadFile(logFile)

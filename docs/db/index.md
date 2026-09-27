@@ -9,6 +9,13 @@ and database migrations.
 
 > Not all funcionality is available for ClickHouse databases 
 
+## New: gohan and dbx
+
+New code should use [`gohan`](gohan.md) (a SQL query builder that always binds values and quotes
+identifiers) and [`dbx`](dbx.md) (typed generic repositories built on `gohan`) instead of this
+package's goqu-based query building. See [Migrating to dbx](migrating-to-dbx.md) for a full
+`db`/goqu → `dbx`/`gohan` mapping and the behaviour that changed on purpose.
+
 ## Overview
 
 The db package is designed around the principle of interface-based composition, offering different levels of abstraction to suit various use cases:
@@ -293,7 +300,9 @@ if gridErr, ok := err.(db.GridError); ok {
 
 - **Field Spec Caching**: Struct metadata is cached automatically
 - **Connection Pooling**: Managed by underlying provider packages
-- **Prepared Statements**: Used automatically where beneficial
+- **Bound Parameters**: Values in goqu datasets are sent as bound arguments, never inlined. Build
+  datasets from a registered dialect (`repo.SqlSelect()`, `goqu.Dialect("pgx")`); see
+  [Database Functions](functions.md#bound-values-and-dialects)
 - **Batch Operations**: Available for bulk inserts and updates
 - **Lazy Loading**: Grid field specs are built on-demand
 

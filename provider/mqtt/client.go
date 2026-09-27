@@ -191,7 +191,7 @@ func clientOptions(cfg *Config) (*paho.ClientOptions, error) {
 	}
 
 	if cfg.TLSEnable {
-		tlsCfg, err := cfg.ClientConfig.TLSConfig()
+		tlsCfg, err := cfg.TLSConfig()
 		if err != nil {
 			return nil, err
 		}
@@ -218,20 +218,20 @@ func clientOptions(cfg *Config) (*paho.ClientOptions, error) {
 	}
 
 	// custom handlers
-	if cfg.MqttHandlers.DefaultPublishHandler != nil {
-		opts.DefaultPublishHandler = cfg.MqttHandlers.DefaultPublishHandler
+	if cfg.DefaultPublishHandler != nil {
+		opts.DefaultPublishHandler = cfg.DefaultPublishHandler
 	}
-	if cfg.MqttHandlers.OnConnect != nil {
-		opts.OnConnect = cfg.MqttHandlers.OnConnect
+	if cfg.OnConnect != nil {
+		opts.OnConnect = cfg.OnConnect
 	}
-	if cfg.MqttHandlers.OnConnectionLost != nil {
-		opts.OnConnectionLost = cfg.MqttHandlers.OnConnectionLost
+	if cfg.OnConnectionLost != nil {
+		opts.OnConnectionLost = cfg.OnConnectionLost
 	}
-	if cfg.MqttHandlers.OnReconnecting != nil {
-		opts.OnReconnecting = cfg.MqttHandlers.OnReconnecting
+	if cfg.OnReconnecting != nil {
+		opts.OnReconnecting = cfg.OnReconnecting
 	}
-	if cfg.MqttHandlers.OnConnectAttempt != nil {
-		opts.OnConnectAttempt = cfg.MqttHandlers.OnConnectAttempt
+	if cfg.OnConnectAttempt != nil {
+		opts.OnConnectAttempt = cfg.OnConnectAttempt
 	}
 
 	return opts, nil

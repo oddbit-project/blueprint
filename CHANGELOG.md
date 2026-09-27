@@ -17,6 +17,138 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.11.0] - 2026-09-27
+
+> **Breaking release.** No exported API was removed, but the SQL-injection fix in the
+> legacy `db` package changes how queries are rendered, and some existing code will fail at run
+> time after upgrading. Read "Breaking changes" below before upgrading.
+
+### Module versions
+
+Released together with core v0.11.0 (each requires core v0.11.0):
+
+- `provider/clickhouse` v0.9.0
+- `provider/etcd` v0.10.0
+- `provider/franz` v0.9.0
+- `provider/hmacprovider` v0.9.0
+- `provider/htpasswd` v0.9.0
+- `provider/httpserver` v0.10.0
+- `provider/jwtprovider` v0.9.0
+- `provider/kafka` v0.9.0
+- `provider/mqtt` v0.9.0
+- `provider/nats` v0.9.0
+- `provider/pgsql` v0.9.0
+- `provider/s3` v0.9.0
+- `provider/smtp` v0.10.0
+- `provider/sqlite` v0.9.0
+
+`provider/metrics`, `provider/prometheus` and `provider/redis` are unchanged.
+
+### Breaking changes
+
+- **`db`: values in goqu queries are now bound, not inlined.** `db.Exec`, `Fetch`, `FetchOne`,
+  `FetchRecord`, `FetchByKey`, `FetchWhere`, `Exists`, `Count`, `Delete`, `DeleteWhere` and
+  `DeleteByKey`, and the `db.Repository` methods built on them, now render goqu datasets with
+  `Prepared(true)`. The placeholder style comes from the dataset's goqu dialect, so on
+  PostgreSQL the dataset **must use a registered dialect**:
+  - Queries from `repo.SqlSelect()`/`repo.SqlDelete()` are unaffected: they use the client's
+    dialect (`pgx`, registered by `provider/pgsql`).
+  - Datasets built with `goqu.From(...)`, `goqu.Select(...)`, or
+    `goqu.Dialect("postgres")` without importing `github.com/doug-martin/goqu/v9/dialect/postgres`,
+    fall back to goqu's default dialect and render `?` placeholders, which PostgreSQL rejects.
+    Build them from `repo.SqlSelect()`/`repo.SqlDelete()` or `goqu.Dialect("pgx")` instead.
+    `db.Update` and `db.Do` already bound values, so they already had this requirement.
+  - Values PostgreSQL cannot type from context now fail. For example, a bound integer in a select
+    list or inside `SUM(CASE WHEN … THEN 1 …)` is sent as text (`function sum(text) does not
+    exist`). Use `goqu.L("1")` for such constants.
+  - A single statement is limited to 65535 bound values, which affects very large `IN` lists.
+- **`db.DeleteWhere` and `provider/clickhouse`'s `DeleteWhere` refuse an empty map** with
+  `ErrInvalidParameters`. Previously, in the legacy `db` package, a non-nil empty map deleted
+  every row.
+- **Column names are validated.** Column names passed to the `db` helpers and the
+  `Fetch*`/`Exists`/`CountWhere`/`Delete*` repository methods (legacy `db` and
+  `provider/clickhouse`) are rejected with `db.ErrInvalidIdentifier` if they contain `"`, `\` or
+  NUL.
+- **`provider/clickhouse`: backslashes in values are escaped.** ClickHouse treats `\` as an escape
+  character in string literals. Blueprint now sends it literally, so a value such as `a\nb` is
+  stored as those four characters instead of `a`, a newline, and `b`. Rows written by earlier
+  versions keep what ClickHouse stored at the time. If you rely on the old behaviour, compare
+  those rows explicitly.
+- **Dependency:** the core module now requires `github.com/oddbit-project/gohan` (v0.1.0). The Go
+  version stays 1.26.5.
+
+### Added
+
+- **`SECURITY.md`**: vulnerabilities are reported through GitHub private vulnerability
+  reporting (now enabled on the repository).
+- **`dbx` is built on the new standalone module `github.com/oddbit-project/gohan` (v0.1.0)**: a
+  SQL query builder where values are always bound and identifiers are always quoted and escaped
+  by construction, so the normal API cannot reintroduce SQL injection the way goqu's inlined
+  rendering did (fixed in v0.11.0). It supports
+  `SELECT`/`INSERT`/`UPDATE`/`DELETE`, joins, CTEs, `UNION`/`UNION ALL`, and ClickHouse-specific
+  clauses (`FINAL`, `SAMPLE`, `ARRAY JOIN`, `PREWHERE`, `SETTINGS`) across the PostgreSQL, SQLite
+  and ClickHouse dialects. `SelectBuilder.IsCompound()` reports whether a builder has UNION
+  members, for callers (like `dbx.Grid`) that need to reject or wrap a compound base query.
+  ClickHouse's value check recurses into pointers/interfaces and accepts `fmt.Stringer` values,
+  and rejects a `database/sql/driver.Valuer` nested inside a slice/pointer/interface argument
+  (`ErrUnsafeValue`) unless it is also a `Stringer`, matching what `clickhouse-go` actually calls
+  `Value()` on; a top-level nil pointer `Valuer` is bound as `NULL` instead of reaching the
+  driver, where it previously panicked. `Not`/`Or` of a trivially true/false condition (e.g.
+  `Not(Or())`) is now recognized by the `DELETE`/`UPDATE` no-WHERE guard, not just a bare
+  `And()`/empty `NotIn`. See [docs/db/gohan.md](docs/db/gohan.md).
+- **`dbx`**: typed generic repositories (`dbx.Repository[T]`) built entirely on `gohan`, with a
+  `database/sql` adapter (`dbx.FromClient`), a transaction helper (`dbx.WithTx`), and a
+  data-grid system (`dbx.Grid[T]`) restricted to fields a struct explicitly flags with
+  `grid:"sort"`/`"filter"`/`"search"`. Every call takes a `context.Context`; `dbx.ErrNotFound` is
+  an alias for `sql.ErrNoRows`. `Grid.Build` rejects a `UNION`/`UNION ALL` base query outright
+  (`SelectBuilder.IsCompound()`) instead of silently filtering only its first member. See
+  [docs/db/dbx.md](docs/db/dbx.md) and [docs/db/migrating-to-dbx.md](docs/db/migrating-to-dbx.md)
+  for a full `db`/goqu migration mapping.
+- **`provider/clickhouse`: `Client.Querier()`** — returns a `dbx.Querier`/`dbx.BatchInserter`
+  bound to the client's native ClickHouse connection, so `dbx.Repository[T]` can run against
+  ClickHouse without `database/sql` (which ClickHouse's driver doesn't use). `InsertBatch` fails
+  with `gohan.ErrInconsistentOmit`, instead of silently building the wrong batch, when rows
+  disagree on which columns they omit.
+
+### Fixed
+
+Found while enabling golangci-lint; see each provider's CHANGELOG for details.
+
+- `provider/httpserver` session store returns decryption errors
+  ([#87](https://github.com/oddbit-project/blueprint/issues/87)); `provider/jwtprovider` no longer
+  discards derived public-key errors ([#88](https://github.com/oddbit-project/blueprint/issues/88));
+  `provider/htpasswd` `Write` reports flush errors; `provider/smtp` rejects an invalid `To` address.
+- Samples: `pgsql_migrations` and `ch-migrations` check errors they ignored; the `nextjs-api-demo`
+  delete handler returns 404 when the user does not exist instead of always reporting success.
+
+### Changed
+
+- **`log.LogContextKey`** is now a value of an unexported type instead of the string `"logger"`,
+  so it cannot collide with other packages' context keys. Code that uses `log.LogContextKey`
+  keeps working; code that stored or read the logger with the literal string `"logger"` must use
+  `log.LogContextKey`, `log.FromContext` or `(*log.Logger).WithContext` instead.
+- **golangci-lint in CI**: a `lint` workflow runs golangci-lint v2.14.0 (standard linters, config
+  in `.golangci.yml`) on the core module and every provider module; all existing findings were
+  fixed.
+
+- **`make test`/`make test-all` now run `provider/sqlite`'s tests** as part of the provider test
+  loop.
+
+### Release order
+
+`provider/clickhouse` (non-test) now imports `dbx`/`gohan`, so releasing it requires a core
+version that contains them — `make tag-version VERSION=…` alone is not enough, since it tags
+core and every provider at the same commit while each provider's `go.mod` still requires the
+prior core version via a `replace`-shadowed `require` (ignored by consumers, not by the tag). The
+release order for this change is: **1.** tag `gohan` first, in its own repository, if this
+release depends on a new `gohan` version; **2.** tag core (`git tag vX.Y.Z`); **3.** bump the
+core `require` in `provider/clickhouse`, `provider/pgsql` and `provider/sqlite`'s `go.mod` to
+that version (`go get github.com/oddbit-project/blueprint@vX.Y.Z` in each, or `make update-deps
+VERSION=vX.Y.Z`); **4.** tag the providers. `sqlite` is now included in the Makefile's
+`PROVIDERS` list, so `tag-version`, `sbom`, `update-deps`, `build-providers` and
+`tidy-providers` already cover it. See
+[docs/release-process.md](docs/release-process.md#gohandbx-release-order).
+
 ## [v0.10.3] - 2026-09-21
 
 ### Fixed

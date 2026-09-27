@@ -4,6 +4,15 @@ All notable changes to the franz Kafka provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.9.0] - 2026-09-27
+
+Requires Blueprint core v0.11.0.
+
+### Changed
+
+- Transactions log errors from aborting buffered records and from the abort in the
+  panic-recovery path instead of discarding them.
+
 ## [v0.8.5] - 2026-09-20
 
 ### Security

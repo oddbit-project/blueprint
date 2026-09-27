@@ -175,7 +175,7 @@ func (c *MTLSClient) GetJSON(path string, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
@@ -191,7 +191,7 @@ func (c *MTLSClient) PostJSON(path string, requestBody interface{}, result inter
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
@@ -351,7 +351,9 @@ func runPerformanceTest(client *MTLSClient, logger *log.Logger) {
 	fmt.Println("==================")
 
 	// Warm up
-	client.Get("/health")
+	if resp, err := client.Get("/health"); err == nil {
+		_ = resp.Body.Close()
+	}
 
 	numRequests := 50
 	start := time.Now()
@@ -363,7 +365,7 @@ func runPerformanceTest(client *MTLSClient, logger *log.Logger) {
 			logger.Error(err, "Performance test request failed", log.KV{"request": i})
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode == 200 {
 			successCount++
 		}
@@ -398,7 +400,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(err, "Failed to create mTLS client")
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Check command line arguments
 	if len(os.Args) > 1 {
@@ -451,7 +453,7 @@ func runSingleRequest(client *MTLSClient, method, path string, bodyArgs []string
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	responseBody, _ := io.ReadAll(resp.Body)
 	fmt.Printf("Status: %d\n", resp.StatusCode)
