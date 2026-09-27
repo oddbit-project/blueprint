@@ -4,6 +4,17 @@ All notable changes to the Blueprint ClickHouse provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- **`Client.Querier()` / `NewQuerier(conn)`** — returns a `*clickhouse.Querier` implementing
+  `dbx.Querier` and `dbx.BatchInserter` directly over the client's native ClickHouse connection,
+  so `dbx.Repository[T]` can run against ClickHouse without `database/sql` (which ClickHouse's
+  driver doesn't use). **Requires the core Blueprint release that contains `sqlb`/`dbx`** — do
+  not tag this provider release before core is tagged and this module's `go.mod` is bumped to
+  that core version; see [docs/release-process.md](../../docs/release-process.md#sqlbdbx-release-order).
+
 ## [v0.8.4] - 2026-09-20
 
 ### Security

@@ -15,8 +15,9 @@ type kv struct {
 
 var settingsKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// Final adds FINAL to the FROM clause. ErrUnsupported unless the dialect
-// has FeatureClickHouse, or the FROM source is a Subquery.
+// Final adds FINAL to the FROM clause. Fails with ErrUnsupported at Build
+// on a dialect without FeatureClickHouse, and also when the FROM source is
+// a Subquery (ClickHouse or not).
 func (s *SelectBuilder) Final() *SelectBuilder {
 	c := s.clone()
 	c.final = true
@@ -24,8 +25,9 @@ func (s *SelectBuilder) Final() *SelectBuilder {
 }
 
 // Sample adds SAMPLE ratio to the FROM clause. ratio must be in (0, 1] and
-// finite, else ErrInvalidSample at Build. ErrUnsupported unless the
-// dialect has FeatureClickHouse, or the FROM source is a Subquery.
+// finite, else ErrInvalidSample at Build. Fails with ErrUnsupported at
+// Build on a dialect without FeatureClickHouse, and also when the FROM
+// source is a Subquery (ClickHouse or not).
 func (s *SelectBuilder) Sample(ratio float64) *SelectBuilder {
 	c := s.clone()
 	c.hasSample = true
@@ -35,8 +37,9 @@ func (s *SelectBuilder) Sample(ratio float64) *SelectBuilder {
 }
 
 // SampleRows adds SAMPLE n (an absolute row count) to the FROM clause. n
-// must be >= 1, else ErrInvalidSample at Build. ErrUnsupported unless the
-// dialect has FeatureClickHouse, or the FROM source is a Subquery.
+// must be >= 1, else ErrInvalidSample at Build. Fails with ErrUnsupported
+// at Build on a dialect without FeatureClickHouse, and also when the FROM
+// source is a Subquery (ClickHouse or not).
 func (s *SelectBuilder) SampleRows(n uint64) *SelectBuilder {
 	c := s.clone()
 	c.hasSample = true

@@ -92,7 +92,7 @@ var (
 )
 
 // isUnsafeClickHouse reports whether v is a value clickhouse-go's formatter
-// would render unsafely (see plan 001's and plan 009's facts tables). top
+// would render unsafely. top
 // is true only for the argument as originally passed to arg: clickhouse-go
 // calls Value() on a driver.Valuer only when it is the top-level bound
 // argument (bind.go bindPositional), so a Valuer nested inside a slice,

@@ -180,9 +180,9 @@ func (r *Repository[T]) Count(ctx context.Context, where sqlb.Expr) (int64, erro
 // Exists reports whether any row matches where (nil matches every row). It
 // is built as
 // "SELECT COUNT(*) FROM (SELECT 1 FROM <table>[ WHERE ...] LIMIT 1) AS "e""
-// so QueryInt64 always reads a COUNT column: ClickHouse (plan 007) returns
-// COUNT() as UInt64 but a bare SELECT 1 as UInt8, and QueryInt64's scan
-// target only accepts the former.
+// so QueryInt64 always reads a COUNT column: on ClickHouse, COUNT(*) returns
+// UInt64 but a bare SELECT 1 returns UInt8, and QueryInt64's scan target
+// only accepts the former.
 func (r *Repository[T]) Exists(ctx context.Context, where sqlb.Expr) (bool, error) {
 	inner := sqlb.Select(sqlb.Int(1)).From(r.table)
 	if where != nil {

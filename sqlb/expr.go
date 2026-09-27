@@ -205,8 +205,8 @@ func (star) render(w *writer) { w.keyword("*") }
 // Star renders the unquoted `*`.
 func Star() Expr { return star{} }
 
-// Sub renders a scalar subquery: "(<select>)". It shares w with the outer
-// statement so placeholders keep counting across nesting.
+// Sub renders a scalar subquery: "(<select>)". It shares the outer
+// statement's writer so placeholders keep counting across nesting.
 func Sub(q *SelectBuilder) Value {
 	return Value{fn: func(w *writer) {
 		if q == nil {

@@ -57,6 +57,12 @@ func (q *Querier) Exec(ctx context.Context, query string, args ...any) (int64, e
 
 // Get scans the first row of query into dest (a *T). sql.ErrNoRows passes
 // through unwrapped when the query matches no row (== dbx.ErrNotFound).
+//
+// Scanning goes through clickhouse-go's ScanStruct, which maps result
+// columns to dest's fields by the `ch` struct tag (falling back to the Go
+// field name), not the `db` tag sqlb/dbx build column lists from. A record
+// type used with this Querier needs `ch` tags equal to its `db` tags (or
+// only `ch` tags), or the mapping silently diverges.
 func (q *Querier) Get(ctx context.Context, dest any, query string, args ...any) error {
 	row := q.conn.QueryRow(ctx, query, args...)
 	return row.ScanStruct(dest)
@@ -64,6 +70,8 @@ func (q *Querier) Get(ctx context.Context, dest any, query string, args ...any) 
 
 // Select scans every row of query into dest, a *[]T or *[]*T. dest is
 // validated before any query is sent, and is reset to length 0 first.
+// See Get's doc comment for the `ch`/`db` tag requirement ScanStruct
+// imposes.
 func (q *Querier) Select(ctx context.Context, dest any, query string, args ...any) error {
 	dv := reflect.ValueOf(dest)
 	if dv.Kind() != reflect.Pointer || dv.IsNil() {
@@ -134,6 +142,12 @@ func (q *Querier) QueryInt64(ctx context.Context, query string, args ...any) (in
 // columns before preparing the batch. A comma cannot actually reach this
 // check: struct tags are split on commas (runtime/tags.go), so a `ch:"a,b"`
 // tag yields the column name "a", never "a,b".
+//
+// The column list itself comes from each row's `db`/field tags via
+// sqlb.InsertColumns, but AppendStruct (clickhouse-go) writes each column
+// by matching the row's `ch` tag (falling back to the Go field name). A
+// record type used here needs `ch` tags equal to its `db` tags (or only
+// `ch` tags), or a column in the list has no matching struct field to read.
 func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) error {
 	if len(rows) == 0 {
 		return nil

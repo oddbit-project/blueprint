@@ -70,8 +70,10 @@ if _, err := repo.Delete(ctx, sqlb.Col("id").Eq(staleID)); err != nil {
 These are intentional differences, not bugs — code relying on the old behaviour needs to change,
 not just its call syntax:
 
-- **Unfiltered DELETE/UPDATE refused.** `db.DeleteWhere(db.FV{})` with an empty map (or a
-  goqu dataset with no WHERE) would delete every row. `dbx.Repository.Delete`/`Update`/
+- **Unfiltered DELETE/UPDATE refused.** Up to v0.10.3, `db.DeleteWhere(db.FV{})` with an empty,
+  non-nil map (or a goqu dataset with no WHERE) would delete every row — the check was
+  `fieldNameValue == nil`, which an empty non-nil map passes; commit `654df80` tightened it to
+  `len(fieldNameValue) == 0`. `dbx.Repository.Delete`/`Update`/
   `UpdateFields` require a non-nil `where` and fail with `sqlb.ErrNoWhere` instead — before
   touching the database. A trivially-true `where` (`sqlb.And()`, an empty `NotIn`) is rejected
   the same way. A caller who means "every row" now says so explicitly:
@@ -104,7 +106,11 @@ not just its call syntax:
   rows a ClickHouse-backed repository affected always sees `n == 0` — ClickHouse does not report
   it. Rewrite `if n == 0 { ... }` logic that assumed a real count.
 - **`dbx` selects an explicit column list, never `SELECT *`.** A record type must map every
-  column it selects; the old `SELECT *` tolerated a table column the struct didn't map.
+  column it selects, or the query fails with "missing destination name" — the same failure the
+  old `SELECT *` had (`db.Fetch` calls sqlx's `SelectContext` without `Unsafe()`, so it already
+  failed on an unmapped column, not tolerated it). What changed is the other direction: `dbx`'s
+  explicit column list tolerates a table column the struct doesn't map (it's just never
+  selected), where the old `SELECT *` would have included, and then failed to scan, it too.
 - **Record shapes that used to bind silently wrong data are now rejected outright.** An embedded
   pointer struct, an unexported or `db`/`ch`-tagged embedded struct, an ambiguous promoted field
   name, or the same column set more than once all fail at `NewRepository`/`Build` time

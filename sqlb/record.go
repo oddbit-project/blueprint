@@ -190,7 +190,7 @@ func extractValue(fv reflect.Value) any {
 }
 
 // recordValues resolves rec's insertable (forInsert) or updatable columns
-// and values, per the rules in plans/003: Auto fields are skipped (insert
+// and values: Auto fields are skipped (insert
 // always; update unless WithAutoFields); update additionally applies
 // include/exclude (checked after Auto, before OmitNil/OmitEmpty) and
 // SkipZeroValues. Insert returns ErrNoColumns when nothing is left to

@@ -136,6 +136,32 @@ git push origin --tags
 git tag --sort=-version:refname
 ```
 
+## sqlb/dbx release order
+
+`provider/clickhouse`'s non-test code imports `dbx`/`sqlb` (via `Client.Querier()`). `make
+tag-version VERSION=…` tags core and every provider module **at the same commit**, but each
+provider's `go.mod` still `require`s an older core version (shadowed in this workspace by a local
+`replace`, which a real consumer does not get) until that `require` is bumped. Run as a single
+step, `tag-version` therefore publishes `provider/clickhouse` at a version whose declared core
+dependency does not contain `sqlb`/`dbx` — a broken release for any consumer who resolves the
+provider's `go.mod` normally (i.e. without the workspace's `replace`).
+
+For a release that adds to or changes `sqlb`/`dbx`, or anything a provider's non-test code
+imports from core, tag in this order instead of a single `tag-version` call:
+
+1. **Tag core only**: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+2. **Bump the core requirement** in the affected providers' `go.mod` — currently
+   `provider/clickhouse`, `provider/pgsql` and `provider/sqlite` — to `vX.Y.Z`:
+   `make update-deps VERSION=vX.Y.Z`, or `cd provider/<name> && go get
+   github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy` per module. Commit the `go.mod`/
+   `go.sum` changes.
+3. **Tag the providers** (`make tag-version VERSION=vX.Y.Z` is safe now that step 2 has landed,
+   or tag them individually).
+
+`sqlite` is included in the Makefile's `PROVIDERS` list, so `tag-version`, `sbom`,
+`update-deps`, `build-providers` and `tidy-providers` already act on it along with the other
+provider modules — no separate step is needed for `sqlite` itself.
+
 ## Version Strategy
 
 ### Semantic Versioning

@@ -39,7 +39,7 @@ type TxBeginner interface {
 }
 
 // BatchInserter is implemented by adapters with a bulk-insert fast path
-// (e.g. the ClickHouse adapter in plan 007). Repository.Insert prefers it
+// (e.g. provider/clickhouse's Querier). Repository.Insert prefers it
 // over chunked INSERT statements when the bound Querier implements it.
 type BatchInserter interface {
 	// InsertBatch inserts rows (each a *T) into table in one operation.

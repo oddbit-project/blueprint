@@ -5,7 +5,7 @@ and escaped by construction, so a caller cannot reintroduce SQL injection throug
 It replaces the pattern of building SQL with goqu and inlined values (the class of bug fixed in
 commit `654df80`) — see [Migrating to dbx](migrating-to-dbx.md) for a full mapping.
 
-> Two escape hatches exist for trusted input only, and must never be built from request data:
+> Three escape hatches exist for trusted input only, and must never be built from request data:
 > `Raw`'s SQL text, `Fn`'s function name, and `Cast`'s type string.
 
 ## Overview
@@ -91,6 +91,16 @@ sql, args, err := sqlb.Delete("users").Build(sqlb.Postgres())
 condition renders `... WHERE 1` (ClickHouse's lightweight-delete syntax requires a `WHERE`
 clause even to select every row); on PostgreSQL/SQLite the `WHERE` clause is omitted entirely.
 
+The trivially-true/false check sees through `Not`/`Or` and `Val`/subqueries, not just a bare
+`And()`/`NotIn()`: `Not(sqlb.Or())` (the negation of an always-false `OR`) is recognized as
+always-true and refused the same way. This check is per-condition, not per-statement: a `WHERE`
+that combines a real, non-trivial condition with a trivially-true one — e.g.
+`Where(sqlb.Col("tenant").Eq(id), sqlb.Col("status").NotIn())` ("tenant, and status not in
+nothing") — is **not** refused, because the overall `AND` is not trivially true; it deletes/updates
+every row of that tenant. `NotIn()` with no arguments is only ever a bug in the caller's own
+condition-building code, not a caller expressing "no rows" — write the condition you mean instead
+of relying on the guard to catch this shape.
+
 ## Raw: the escape hatch
 
 `Raw(sql, args...)` renders `sql` text verbatim, substituting each `?` marker with the
@@ -108,10 +118,13 @@ sql, args, err := sqlb.Select().
 // SELECT * FROM "docs" WHERE (data ? $1) [owner]
 ```
 
-(`ExampleRaw`.) Note the parentheses: a `Raw` expression is always parenthesized when it is
-rendered (`WHERE (data ? $1)` above; the same applies when a `Raw` is used as a select column,
-e.g. `SELECT (k + 1) ...`), so it composes safely next to other expressions. `??` is rejected
-outright on ClickHouse (`ErrRawPlaceholder`) — there is no literal `?` in ClickHouse `Raw` text.
+(`ExampleRaw`.) Note the parentheses: a `Raw` expression is parenthesized when it is rendered as
+an operand of `And`/`Or`/`Not`/a comparison (`WHERE (data ? $1)` above) or as a select-list
+column (`SELECT (k + 1) ...`), so it composes safely next to other expressions there. It renders
+bare — no parentheses — as an `UPDATE`/`DO UPDATE` SET value (`SET "x" = y + 1`, not
+`SET "x" = (y + 1)`), including through `Val(Raw(...))`, which unwraps to the same `Raw` value.
+`??` is rejected outright on ClickHouse (`ErrRawPlaceholder`) — there is no literal `?` in
+ClickHouse `Raw` text.
 A `$` followed by a digit is also rejected everywhere (it would collide with PostgreSQL's own
 `$n` placeholder syntax).
 
@@ -153,6 +166,12 @@ ClickHouse, a UNION with an outer `ORDER BY`/`LIMIT`/`OFFSET` is wrapped as
 `SELECT * FROM (<union>) ORDER BY ... LIMIT ...` — ClickHouse's own UNION grammar does not
 accept a trailing `ORDER BY`/`LIMIT` the way PostgreSQL/SQLite do.
 
+`SelectBuilder.IsCompound()` reports whether a builder has any UNION members. `Where`/`Having`/
+`Prewhere` called on a compound builder apply to the first member's core only — not the whole
+result set — while `OrderBy`/`Limit`/`Offset` apply to the compound as a whole; a caller that
+needs a filter applied across the whole result set (e.g. `dbx.Grid`, which rejects a compound
+base query outright) must wrap the compound in a subquery first: `sqlb.From(q.As("u"))`.
+
 ## ClickHouse-specific clauses
 
 `FeatureClickHouse` gates `Final()`, `Sample(ratio)`/`SampleRows(n)`, `ArrayJoin`/
@@ -162,7 +181,14 @@ and `$` followed by a digit (`ErrInvalidIdentifier`) — these would collide wit
 parameterized-query and settings placeholder syntax. Values are checked recursively: a map,
 struct, or a statement builder passed where a value is expected fails with `ErrUnsafeValue` /
 `ErrInvalidColumn` rather than being sent to the driver, since `clickhouse-go` does not bind
-these safely (verified against `clickhouse-go` v2.40.3). ClickHouse's `LEFT JOIN` fills
+these safely (verified against `clickhouse-go` v2.40.3). This recursion also rejects a
+`database/sql/driver.Valuer` nested inside a slice, pointer or interface argument (`ErrUnsafeValue`)
+unless it implements `fmt.Stringer` — `clickhouse-go` only calls `Value()` on a `Valuer` that is
+itself the top-level bound argument, so a nested one would otherwise reach the driver unconverted;
+pass it unwrapped as its own top-level value, or via `In(...)`, which binds each element at top
+level. A top-level `nil` pointer whose type implements `driver.Valuer` is bound as `NULL` instead
+of being passed to the driver, which would otherwise panic calling a value-receiver `Value()`
+method on a nil pointer. ClickHouse's `LEFT JOIN` fills
 non-matching columns with each column's type default (`0`, `''`, etc.), not `NULL`, unless the
 `join_use_nulls = 1` setting is used — a `sqlb`-built `LEFT JOIN` sends valid SQL either way, but
 code that checks a joined column for `NULL` needs that setting set (via `.Settings(...)`) to see

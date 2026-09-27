@@ -28,8 +28,12 @@ repo, err := dbx.NewRepository[User](q, "users")
 record-shape checks as `sqlb` (see [sqlb: Record shapes](sqlb.md#record-shapes)): a shape it
 cannot map safely fails here, at setup, rather than on the first query. Because `dbx` selects an
 explicit column list (`repo.Select()` renders `SELECT <T's columns> FROM <table>`, never
-`SELECT *`), every field `T` maps must exist as a column — the old `db` package's `SELECT *`
-tolerated extra table columns a struct didn't map; `dbx` does not.
+`SELECT *`), every field `T` maps must exist as a column, or the query fails ("missing
+destination name") — the same failure the old `db` package's `SELECT *` had (`db.Fetch` calls
+sqlx's `SelectContext` without `Unsafe()`, which fails the same way on an unmapped column).
+What's different is the other direction: `dbx`'s explicit column list *tolerates* extra table
+columns the struct doesn't map (they're simply never selected), where the old `SELECT *` would
+have included — and then failed to scan — them too.
 
 (`dbx/example_test.go`'s `ExampleNewRepository` is a full, compiling setup — client, table
 creation, insert, get, list, transaction.)
@@ -78,13 +82,27 @@ against the repository's known columns before running any query — an unknown k
 ```go
 if err := repo.Insert(ctx, &User{Name: "alice", Email: "alice@example.com"}); err != nil { ... }
 
-n, err := repo.Update(ctx, &User{Name: "alice2"}, sqlb.Col("id").Eq(1))
+// Update sets every non-auto field of the record, so a partial struct
+// literal overwrites the fields it leaves zero (Email would be written as
+// "" here without IncludeFields):
+n, err := repo.Update(ctx, &User{Name: "alice2"}, sqlb.Col("id").Eq(1),
+    sqlb.IncludeFields("name"))
+// or pass a full record to write every field:
+n, err = repo.Update(ctx, &User{Name: "alice2", Email: "alice@example.com"}, sqlb.Col("id").Eq(1))
+
 n, err = repo.UpdateFields(ctx, map[string]any{"name": "alice2"}, sqlb.Col("id").Eq(1))
 n, err = repo.Delete(ctx, sqlb.Col("id").Eq(1))
 
 err = repo.Upsert(ctx, &User{Email: "alice@example.com", Name: "alice"},
     []string{"email"}) // conflict columns; updates every other written column
 ```
+
+`Update(ctx, rec, where, opts...)` sets every non-auto field of `rec` per `opts`
+(`sqlb.RecordOption`s: `sqlb.IncludeFields`, `sqlb.ExcludeFields`, `sqlb.SkipZeroValues`,
+`sqlb.WithAutoFields`) — the same options as `sqlb.UpdateBuilder.SetRecord`. A partial struct
+literal without `IncludeFields`/`SkipZeroValues` writes its zero-valued fields too, overwriting
+whatever they held. `UpdateFields` sets exactly the map's keys and is the more common choice for
+a partial update.
 
 `Insert` writes multiple records in one call: `repo.Insert(ctx, rec1, rec2, rec3)`. If the bound
 `Querier` implements `dbx.BatchInserter` (the ClickHouse adapter), `InsertBatch` is used instead
@@ -121,29 +139,43 @@ connection, which `WithTx` is already holding.
 
 ```go
 type User struct {
-    ID    int64  `db:"id,auto" grid:"sort,filter"`
-    Name  string `db:"name" grid:"sort,search"`
-    Email string `db:"email" grid:"search"`
+    ID    int64  `db:"id,auto" json:"id" grid:"sort,filter"`
+    Name  string `db:"name" json:"name" grid:"sort,search"`
+    Email string `db:"email" json:"email" grid:"search"`
 }
 
 grid, err := dbx.NewGrid[User]()
-grid = grid.WithMaxLimit(100)
+grid = grid.WithMaxLimit(100) // configure before concurrent use — WithMaxLimit/AddFilterFunc mutate the grid
 
 q, err := dbx.NewGridQuery(dbx.SearchAny, 10, 0)
 q.SearchText = "ali"
-q.FilterFields = map[string]any{"id": 1}
+q.FilterFields = map[string]any{"id": float64(1)} // GridQuery is JSON-shaped: numbers are float64
 q.SortFields = map[string]string{"name": dbx.SortAscending}
 
 users, err := repo.QueryGrid(ctx, grid, q)
 ```
 
-Only grid-flagged fields are addressable by alias (the struct's `db` name unless overridden);
+Only grid-flagged fields are addressable by alias — the struct's **Go field name** by default
+(`"ID"`, `"Name"`, `"Email"` above), or an `alias`/`json`/`xml` tag when one is set (the `json`
+tags above make the aliases `"id"`/`"name"`/`"email"`, matching what a JSON client would send);
 every other field, tagged or not, answers "field is not valid". `NewGrid` fails outright — not
 silently — on a duplicate, empty or `"-"` alias among grid-flagged fields, or a searchable field
 that is neither string-kind nor a `database/sql/driver.Valuer`.
 
-Filter values are checked against an allowlist (JSON scalars and flat lists, capped at
-`dbx.MaxFilterValues` elements); `SearchText` is capped at `dbx.MaxSearchText` bytes;
+`AddFilterFunc` and `WithMaxLimit` mutate the `Grid` in place — unlike `sqlb`'s builders and
+`Repository.With`, which are immutable/return a new value. Call them once at setup, before the
+grid is used concurrently.
+
+`dbx.Grid.Build` rejects a compound (`UNION`/`UNION ALL`) base query outright (`base.IsCompound()`
+— see [sqlb: UNION](sqlb.md#union)): `Where`/`Having`/`Prewhere` on a compound builder would only
+filter its first member, not the whole result set the grid is supposed to page over. Wrap a
+compound base in a subquery instead: `sqlb.From(q.As("u"))`.
+
+Filter values are checked against an allowlist matching what `encoding/json` produces — `nil`,
+`bool`, `float64`, `string`, `json.Number`, or a flat `[]any` of those, capped at
+`dbx.MaxFilterValues` elements — so a Go `int` (as opposed to `float64`) is rejected; build
+`GridQuery` from `json.Unmarshal`ed request data (the common case) to get this for free, or use
+`float64` explicitly in a literal Go map, as above. `SearchText` is capped at `dbx.MaxSearchText` bytes;
 `GridQuery.SearchType` is range-checked by `ValidQuery`/`NewGridQuery`. `WithMaxLimit(n)` caps
 `Limit`: `n == 0` (the default) applies no cap, so `Limit == 0` returns every row; with a cap set,
 `Limit == 0` or `Limit > n` is treated as `Limit == n`. `GridQuery` fields decode from JSON as
@@ -166,15 +198,36 @@ connection — ClickHouse doesn't use `database/sql`, binds placeholders client-
 fill a slice of pointers through its own `Select`, so `dbx.FromClient` (the `database/sql`
 adapter) explicitly rejects the ClickHouse driver with `dbx.ErrDialectDriver`.
 
+### Record types need matching `ch` tags
+
+`sqlb`/`dbx` build column lists (`SELECT`, `InsertBatch`'s column list) from a record's `db` tag
+(or the Go field name). But `clickhouse.Querier` scans and appends rows through clickhouse-go's
+own `ScanStruct`/`AppendStruct`, which map columns to fields by the **`ch`** struct tag (also
+falling back to the Go field name) — a different tag, read by different code. A record type used
+against `clickhouse.Querier` needs `ch` tags equal to its `db` tags (or the field names to already
+agree, or only `ch` tags set), or the column list `sqlb`/`dbx` builds and the fields clickhouse-go
+actually scans into silently diverge:
+
+```go
+type Event struct {
+    ID   uint32   `ch:"id" db:"id,auto"`
+    Name string   `ch:"name" db:"name"`
+    Tags []string `ch:"tags" db:"tags"`
+}
+```
+
 - `Exec` always returns `0` rows affected — ClickHouse does not report the number of rows a
   statement affected.
 - `InsertBatch` derives its column list from the first row's `sqlb.InsertColumns`, not an
   unqualified `INSERT INTO t` (which would require every non-`MATERIALIZED`/`ALIAS` column of
   `t`); a column name containing `"`, `\`, `,` or a space cannot be used, since the driver's batch
-  column-list parser strips quotes with a regex without un-escaping.
-- `Count`/`Exists` read `COUNT()` — `Exists`'s wrapping subquery is specifically shaped so
+  column-list parser strips quotes with a regex without un-escaping. Every row must agree on
+  which columns are omitted (`OmitNil`/`OmitEmpty`, e.g. a nil pointer with an `omitnil` tag) — a
+  row whose omitted-column set differs from row 0's fails the whole batch with
+  `sqlb.ErrInconsistentOmit`, since the batch's column list is fixed once, by row 0.
+- `Count`/`Exists` read `COUNT(*)` — `Exists`'s wrapping subquery is specifically shaped so
   `QueryInt64` reads a `COUNT` column even though a bare `SELECT 1` on ClickHouse is `UInt8`, not
-  the `UInt64` `COUNT()` returns.
+  the `UInt64` `COUNT(*)` returns.
 - A bound `time.Time` is sent at second precision — a `clickhouse-go` v2.40.3 limitation, not a
   `dbx`/`sqlb` choice.
 - `Querier` is not transactional (no `TxBeginner`/`TxQuerier`): `dbx.WithTx` fails with
@@ -202,3 +255,11 @@ adapter) explicitly rejects the ClickHouse driver with `dbx.ErrDialectDriver`.
   ClickHouse section above and [sqlb's dialect support table](sqlb.md#dialect-support).
 - `WithTx`'s `fn` must run every statement through `repo.With(tx)`, not the outer repository —
   nothing in the type system enforces this (see the Transactions section above).
+- `dbx` and `sqlb` each define a similarly-named error for a different failure, and both can
+  surface from the same call — check the specific sentinel, not just the name: `dbx.ErrNoColumns`
+  is returned by `NewRepository` when the record type maps zero columns, while
+  `sqlb.ErrNoColumns` means a statement (`Insert`/`Update`) ended up with nothing to write;
+  `dbx.ErrUnknownColumn` is returned when a caller-supplied map key (`GetBy`/`ListBy`/
+  `UpdateFields`) isn't one of the repository's known columns, while `sqlb.ErrUnknownField` is
+  `IncludeFields`/`ExcludeFields`/`DoUpdateExcluded` naming a field or column `sqlb` doesn't
+  recognize on the record/statement in question.

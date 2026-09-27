@@ -13,8 +13,8 @@ import (
 	"github.com/oddbit-project/blueprint/sqlb"
 )
 
-// row is the golden record type from plan 006: normative aliases and grid
-// flags for TestGridBuildGolden and friends.
+// row is the golden record type used across this file: normative aliases
+// and grid flags for TestGridBuildGolden and friends.
 type row struct {
 	ID    int    `db:"id" json:"id" grid:"sort,filter"`
 	Name  string `db:"name" json:"name" grid:"search,sort"`
