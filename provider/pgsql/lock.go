@@ -33,7 +33,6 @@ type LockConn interface {
 }
 
 type AdvisoryLock struct {
-	db   *sqlx.DB
 	conn *sql.Conn
 	id   int
 }
@@ -51,7 +50,7 @@ func NewAdvisoryLock(ctx context.Context, db *sqlx.DB, id int) (*AdvisoryLock, e
 
 func (l *AdvisoryLock) Close() {
 	if l.conn != nil {
-		l.conn.Close()
+		_ = l.conn.Close()
 		l.conn = nil
 	}
 }
