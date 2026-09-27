@@ -83,11 +83,14 @@ func setupTLSMinIOContainer(ctx context.Context, t *testing.T) (*MinIOContainer,
 			"MINIO_KMS_SECRET_KEY": kmsKey,
 		},
 		Files: []testcontainers.ContainerFile{
-			{Reader: bytes.NewReader(certPEM), ContainerFilePath: "/root/.minio/certs/public.crt", FileMode: 0o644},
-			{Reader: bytes.NewReader(keyPEM), ContainerFilePath: "/root/.minio/certs/private.key", FileMode: 0o600},
+			// the image runs as a non-root user, so the certs live outside /root and the
+			// throwaway test key must be readable by it
+			{Reader: bytes.NewReader(certPEM), ContainerFilePath: "/certs/public.crt", FileMode: 0o644},
+			{Reader: bytes.NewReader(keyPEM), ContainerFilePath: "/certs/private.key", FileMode: 0o644},
 		},
 		Cmd: []string{
 			"server", "/data",
+			"--certs-dir", "/certs",
 			"--console-address", ":9001",
 			"--address", ":9000",
 		},

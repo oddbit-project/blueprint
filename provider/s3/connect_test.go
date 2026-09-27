@@ -36,7 +36,7 @@ func TestSimpleIntegration(t *testing.T) {
 		"-p", "9021:9001",
 		"-e", "MINIO_ROOT_USER=minioadmin",
 		"-e", "MINIO_ROOT_PASSWORD=minioadmin",
-		"quay.io/minio/minio", "server", "/data", "--console-address", ":9001")
+		testMinIOImage, "server", "/data", "--console-address", ":9001")
 
 	err := cmd.Run()
 	require.NoError(t, err, "Failed to start MinIO container")

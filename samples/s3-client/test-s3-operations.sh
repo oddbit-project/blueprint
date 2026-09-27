@@ -88,7 +88,7 @@ run_tests() {
     # Check if MinIO is running
     if ! curl -s http://localhost:9010/minio/health/live >/dev/null 2>&1; then
         log_warning "MinIO server may not be running at localhost:9010"
-        log_info "Start MinIO with: docker-compose up -d (or docker run -p 9010:9000 -p 9011:9001 --name minio quay.io/minio/minio server /data --console-address :9001)"
+        log_info "Start MinIO with: docker-compose up -d (or docker run -p 9010:9000 -p 9011:9001 --name minio ghcr.io/blackshieldpt/minio:0.20260717.120751 server /data --console-address :9001)"
         echo ""
     fi
     

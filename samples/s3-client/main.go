@@ -139,7 +139,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  %s create-bucket my-bucket\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s upload my-bucket ./file.txt\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s download my-bucket file.txt ./downloaded-file.txt\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "\nFor MinIO server, run: docker run -p 9000:9000 -p 9001:9001 --name minio quay.io/minio/minio server /data --console-address :9001\n")
+		fmt.Fprintf(os.Stderr, "\nFor MinIO server, run: docker run -p 9000:9000 -p 9001:9001 --name minio ghcr.io/blackshieldpt/minio:0.20260717.120751 server /data --console-address :9001\n")
 	}
 
 	flag.Parse()

@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   minio:
-    image: quay.io/minio/minio:latest
+    # hardened MinIO (github.com/blackshieldpt/hardened-images); distroless, so no curl healthcheck
+    image: ghcr.io/blackshieldpt/minio:0.20260717.120751
     container_name: minio-s3-demo
     ports:
       - "9010:9000"   # S3 API
@@ -13,16 +14,12 @@ services:
     command: server /data --console-address :9001
     volumes:
       - minio-data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
     restart: unless-stopped
 
   # Optional: MC (MinIO Client) for administrative tasks
   mc:
-    image: quay.io/minio/mc:latest
+    # the -dev variant adds a shell; mc is included in the hardened MinIO image
+    image: ghcr.io/blackshieldpt/minio:0.20260717.120751-dev
     container_name: minio-mc
     depends_on:
       - minio

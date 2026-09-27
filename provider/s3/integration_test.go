@@ -20,7 +20,8 @@ import (
 // Test configuration for testcontainers
 const (
 	// MinIO test configuration
-	testMinIOImage     = "quay.io/minio/minio:latest"
+	// hardened MinIO from github.com/blackshieldpt/hardened-images (runs as UID 65532)
+	testMinIOImage     = "ghcr.io/blackshieldpt/minio:0.20260717.120751"
 	testMinIOAccessKey = "minioadmin"
 	testMinIOSecretKey = "minioadmin"
 	testMinIORegion    = "us-east-1"

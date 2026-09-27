@@ -5,7 +5,7 @@
 // Run against a local MinIO (Object Lock requires an object-lock-enabled bucket):
 //
 //	docker run -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-//	    quay.io/minio/minio:latest server /data
+//	    ghcr.io/blackshieldpt/minio:0.20260717.120751 server /data
 //	go run ./samples/s3-objectlock
 package main
 
