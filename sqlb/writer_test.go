@@ -55,7 +55,7 @@ func TestIdentRejects(t *testing.T) {
 		}
 	}
 
-	for _, in := range []string{"a?b", "a@b", "a$1"} {
+	for _, in := range []string{"a?b", "a@b", "a$1", "a{b", "a}b", "{a:b}"} {
 		t.Run("clickhouse/"+in, func(t *testing.T) {
 			_, _, err := render(ClickHouse(), Col(in))
 			assert.True(t, errors.Is(err, ErrInvalidIdentifier), "got %v", err)

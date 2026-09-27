@@ -110,6 +110,10 @@ func TestUpdateReturning(t *testing.T) {
 
 	_, _, err = Update("t").Set("a", 1).All().Build(ClickHouse())
 	assert.True(t, errors.Is(err, ErrUnsupported))
+
+	// Generic() has FeatureUpdate but not FeatureReturning.
+	_, _, err = Update("t").Set("a", 1).All().Returning("id").Build(Generic())
+	assert.True(t, errors.Is(err, ErrUnsupported))
 }
 
 func TestUpdateDuplicateAcrossSetters(t *testing.T) {

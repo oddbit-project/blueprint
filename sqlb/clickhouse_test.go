@@ -88,6 +88,22 @@ func TestClickHouseOnlyClauses(t *testing.T) {
 			})
 		}
 	}
+
+	// On ClickHouse itself, FeatureClickHouse passes but a subquery FROM is
+	// still rejected: the dialect check must not be the only guard.
+	chSubqueryCases := []struct {
+		name  string
+		build *SelectBuilder
+	}{
+		{"final on subquery from", From(Select("a").From("t").As("s")).Final()},
+		{"sample on subquery from", From(Select("a").From("t").As("s")).Sample(0.5)},
+	}
+	for _, tt := range chSubqueryCases {
+		t.Run("clickhouse/"+tt.name, func(t *testing.T) {
+			_, _, err := tt.build.Build(ClickHouse())
+			assert.True(t, errors.Is(err, ErrUnsupported), "got %v", err)
+		})
+	}
 }
 
 func TestSampleValidation(t *testing.T) {

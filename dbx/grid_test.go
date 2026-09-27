@@ -70,7 +70,7 @@ func TestGridSpecCacheByType(t *testing.T) {
 		ID int `db:"id" grid:"sort"`
 	}{}))
 	require.NoError(t, err)
-	_ = specA2
+	assert.Same(t, specA, specA2)
 
 	_ = typA{}
 	_ = typB{}
@@ -250,6 +250,11 @@ func TestGridBuildGolden(t *testing.T) {
 		{
 			name:    "nested list rejected",
 			q:       &GridQuery{FilterFields: map[string]any{"tag": []any{[]any{map[string]any{"k') OR 1=1 --": 1}}}}},
+			wantErr: &GridError{Scope: "filter", Field: "tag", Message: "value is not valid"},
+		},
+		{
+			name:    "nested list of scalars rejected",
+			q:       &GridQuery{FilterFields: map[string]any{"tag": []any{[]any{float64(1), float64(2)}}}},
 			wantErr: &GridError{Scope: "filter", Field: "tag", Message: "value is not valid"},
 		},
 		{

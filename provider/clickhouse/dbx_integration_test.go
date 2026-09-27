@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -258,7 +259,8 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxQueryParamTrigger() {
 	var rows []*qpRow
 	err = q.Select(s.ctx, &rows, sqlStr, args...)
 	if err != nil {
-		s.T().Logf("TestDbxQueryParamTrigger: driver rejected the query as documented: %v", err)
+		require.ErrorIs(s.T(), err, clickhouse.ErrUnsupportedQueryParameter,
+			"driver rejected the query, but not with the documented error: %v", err)
 		return
 	}
 	require.Len(s.T(), rows, 1, "must be exactly the id=1 row, not more/fewer")
