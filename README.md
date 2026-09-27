@@ -3,7 +3,7 @@
 ![go-version](https://img.shields.io/github/go-mod/go-version/oddbit-project/blueprint)
 [![Release](https://img.shields.io/github/v/release/oddbit-project/blueprint)](https://github.com/oddbit-project/blueprint/releases)
 [![Build Status](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml/badge.svg?branch=main)](https://github.com/oddbit-project/blueprint/actions/workflows/run-tests.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/oddbit-project/blueprint)](https://goreportcard.com/report/github.com/oddbit-project/blueprint)
+[![golangci-lint](https://img.shields.io/badge/linted%20by-golangci--lint-brightgreen)](https://golangci-lint.run/)
 
 ---
 
@@ -67,7 +67,8 @@ Blueprint provides:
   - JWT authentication with symmetric/asymmetric key support
   - Token revocation system
   - HTPasswd file-based authentication
-- Database connectivity (PostgreSQL, ClickHouse)
+- Database connectivity (PostgreSQL, SQLite, ClickHouse)
+- Typed generic repositories (`dbx`) on the injection-safe [gohan](https://github.com/oddbit-project/gohan) query builder
 - Message queue integration (Kafka, MQTT)
 - Metrics endpoint for Prometheus monitoring
 - Middleware system with request helpers and utilities
@@ -332,6 +333,8 @@ Blueprint's base library provides the following components for application devel
 - **[Query Builder](docs/db/query-builder.md)** - SQL query building with type safety
 - **[Data Grid](docs/db/dbgrid.md)** - Advanced filtering, sorting, and pagination
 - **[Migrations](docs/db/migrations.md)** - Database schema versioning
+- **[dbx Repositories](docs/db/dbx.md)** - Typed generic repositories built on [gohan](docs/db/gohan.md)
+- **[Migrating to dbx](docs/db/migrating-to-dbx.md)** - Moving from `db`/goqu to `dbx`/gohan
 
 ### **Security & Cryptography**
 - **[Password Hashing](docs/crypt/password-hashing.md)** - Argon2id password hashing with timing attack protection
