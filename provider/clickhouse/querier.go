@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"unicode"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/oddbit-project/blueprint/dbx"
@@ -121,14 +122,18 @@ func (q *Querier) QueryInt64(ctx context.Context, query string, args ...any) (in
 // column list from rows[0]'s InsertColumns rather than an unqualified
 // INSERT: an unqualified "INSERT INTO t" batch expects every
 // non-MATERIALIZED/ALIAS column of t, so a DEFAULT column absent from T
-// would fail with "missing destination name". Using the first row's
-// columns also means rows whose SkipZeroValues-omitted fields differ from
-// the first row still send those columns, with their zero value.
+// would fail with "missing destination name". Every row's InsertColumns
+// must match row 0's exactly (same columns, same order); a row whose
+// omitnil/omitempty-tagged fields are omitted or present differently from
+// row 0 fails with sqlb.ErrInconsistentOmit, since the batch's column list
+// is fixed by row 0 and cannot vary per row.
 //
 // The driver's batch column-list parser strips quotes with a regex
-// without un-escaping, so a column name containing `"`, `\`, `,` or a
-// space cannot be used here; InsertBatch rejects such columns before
-// preparing the batch.
+// without un-escaping, so a column name containing `"`, `\`, `(`, `)`, a
+// comma or whitespace cannot be used here; InsertBatch rejects such
+// columns before preparing the batch. A comma cannot actually reach this
+// check: struct tags are split on commas (runtime/tags.go), so a `ch:"a,b"`
+// tag yields the column name "a", never "a,b".
 func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) error {
 	if len(rows) == 0 {
 		return nil
@@ -141,9 +146,18 @@ func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) err
 	if err != nil {
 		return err
 	}
+	for i := 1; i < len(rows); i++ {
+		rowCols, err := sqlb.InsertColumns(rows[i])
+		if err != nil {
+			return err
+		}
+		if !equalColumns(cols, rowCols) {
+			return fmt.Errorf("%w: row %d", sqlb.ErrInconsistentOmit, i)
+		}
+	}
 	quoted := make([]string, len(cols))
 	for i, col := range cols {
-		if strings.ContainsAny(col, "\"\\, ") {
+		if strings.ContainsAny(col, "\"\\(),") || strings.ContainsFunc(col, unicode.IsSpace) {
 			return fmt.Errorf("clickhouse: column %q cannot be used in a batch column list", col)
 		}
 		qc, err := sqlb.ClickHouse().QuoteIdent(col)
@@ -164,4 +178,18 @@ func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) err
 		}
 	}
 	return batch.Send()
+}
+
+// equalColumns reports whether a and b have the same column names in the
+// same order.
+func equalColumns(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
