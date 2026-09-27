@@ -396,7 +396,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("RevokeToken", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		tokenID := "test-token"
 		expiresAt := time.Now().Add(time.Hour)
@@ -417,7 +417,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("IsTokenRevoked with expired token", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		tokenID := "expired-token"
 		// Revoke with past expiration
@@ -441,7 +441,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("RevokeAllUserTokens", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		userID := "user-123"
 		
@@ -452,7 +452,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		backend.TrackUserToken(userID, "token3", expiresAt)
 		
 		// Revoke some tokens individually first
-		backend.RevokeToken("token1", time.Now().Add(time.Hour))
+		_ = backend.RevokeToken("token1", time.Now().Add(time.Hour))
 		
 		// Revoke all user tokens
 		issuedBefore := time.Now()
@@ -467,7 +467,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("RevokeAllUserTokens with no tokens", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		// Should not error for non-existent user
 		err := backend.RevokeAllUserTokens("unknown-user", time.Now())
@@ -476,7 +476,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("GetRevokedTokens", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		// Add some tokens
 		now := time.Now()
@@ -509,7 +509,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("CleanupExpired", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		now := time.Now()
 		
@@ -551,7 +551,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("TrackUserToken", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		// Track tokens
 		expiresAt := time.Now().Add(time.Hour)
@@ -582,7 +582,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 		
 		// Add some data
 		expiresAt := time.Now().Add(time.Hour)
-		backend.RevokeToken("token1", expiresAt)
+		_ = backend.RevokeToken("token1", expiresAt)
 		backend.TrackUserToken("user1", "token1", expiresAt)
 		
 		err := backend.Close()
@@ -598,7 +598,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 	
 	t.Run("Concurrent operations", func(t *testing.T) {
 		backend := NewMemoryRevocationBackend()
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		
 		// Run concurrent operations
 		done := make(chan bool)
@@ -608,7 +608,7 @@ func TestMemoryRevocationBackend(t *testing.T) {
 			go func(id int) {
 				for j := 0; j < 100; j++ {
 					tokenID := fmt.Sprintf("token-%d-%d", id, j)
-					backend.RevokeToken(tokenID, time.Now().Add(time.Hour))
+					_ = backend.RevokeToken(tokenID, time.Now().Add(time.Hour))
 				}
 				done <- true
 			}(i)

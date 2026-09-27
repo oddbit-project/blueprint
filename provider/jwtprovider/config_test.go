@@ -76,8 +76,8 @@ func TestValidate_HMAC(t *testing.T) {
 			
 			// Valid configuration with env var
 			envVar := "TEST_JWT_SECRET_" + alg // Make unique for each algorithm
-			os.Setenv(envVar, "env-secret-key")
-			defer os.Unsetenv(envVar)
+			require.NoError(t, os.Setenv(envVar, "env-secret-key"))
+			defer func() { _ = os.Unsetenv(envVar) }()
 			
 			cfg2 := NewJWTConfig()
 			cfg2.SigningAlgorithm = alg
@@ -490,15 +490,15 @@ func TestKeyConfiguration_Files(t *testing.T) {
 // Test key configuration with environment variables
 func TestKeyConfiguration_EnvVars(t *testing.T) {
 	// Set up environment variables
-	os.Setenv("TEST_SIGNING_KEY", "env-signing-key")
-	defer os.Unsetenv("TEST_SIGNING_KEY")
+	require.NoError(t, os.Setenv("TEST_SIGNING_KEY", "env-signing-key"))
+	defer func() { _ = os.Unsetenv("TEST_SIGNING_KEY") }()
 	
 	privateKeyPEM, publicKeyPEM := generateRSAKeyPair(t)
-	os.Setenv("TEST_PRIVATE_KEY", string(privateKeyPEM))
-	defer os.Unsetenv("TEST_PRIVATE_KEY")
+	require.NoError(t, os.Setenv("TEST_PRIVATE_KEY", string(privateKeyPEM)))
+	defer func() { _ = os.Unsetenv("TEST_PRIVATE_KEY") }()
 	
-	os.Setenv("TEST_PUBLIC_KEY", string(publicKeyPEM))
-	defer os.Unsetenv("TEST_PUBLIC_KEY")
+	require.NoError(t, os.Setenv("TEST_PUBLIC_KEY", string(publicKeyPEM)))
+	defer func() { _ = os.Unsetenv("TEST_PUBLIC_KEY") }()
 	
 	t.Run("HMAC with env var", func(t *testing.T) {
 		cfg := NewJWTConfig()
