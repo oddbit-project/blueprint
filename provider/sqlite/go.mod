@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/oddbit-project/blueprint v0.10.2
+	github.com/oddbit-project/blueprint v0.11.0
 	github.com/stretchr/testify v1.11.1
 	modernc.org/sqlite v1.53.0
 )
