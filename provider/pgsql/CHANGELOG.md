@@ -4,6 +4,15 @@ All notable changes to the Blueprint PostgreSQL provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.0] - 2026-09-27
+
+Requires Blueprint core v0.11.0.
+
+### Changed
+
+- Code-quality fixes from enabling golangci-lint (unchecked errors made explicit, staticcheck
+  simplifications, dead unexported code removed); no API changes.
+
 ## [v0.8.3] - 2026-09-20
 
 ### Security

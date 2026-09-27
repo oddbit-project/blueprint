@@ -4,7 +4,9 @@ All notable changes to the Blueprint HTTP Server provider will be documented in 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.10.0] - 2026-09-27
+
+Requires Blueprint core v0.11.0. Requires `provider/jwtprovider` v0.9.0, `provider/hmacprovider` v0.9.0 and `provider/htpasswd` v0.9.0.
 
 ### Fixed
 

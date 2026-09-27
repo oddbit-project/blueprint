@@ -4,9 +4,11 @@ All notable changes to the Blueprint ClickHouse provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.9.0] - 2026-09-27
 
-> **Potentially breaking release**: see "Breaking changes" below and in the root
+Requires Blueprint core v0.11.0.
+
+> **Breaking release**: see "Breaking changes" below and in the root
 > [CHANGELOG](../../CHANGELOG.md).
 
 ### Breaking changes
@@ -32,10 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`Client.Querier()` / `NewQuerier(conn)`** — returns a `*clickhouse.Querier` implementing
   `dbx.Querier` and `dbx.BatchInserter` directly over the client's native ClickHouse connection,
   so `dbx.Repository[T]` can run against ClickHouse without `database/sql` (which ClickHouse's
-  driver doesn't use). **Requires the core Blueprint release that contains `dbx`/`gohan`** — do
-  not tag this provider release before `gohan` is tagged, core is tagged, and this module's
-  `go.mod` is bumped to that core version; see
-  [docs/release-process.md](../../docs/release-process.md#gohandbx-release-order).
+  driver doesn't use). Requires Blueprint core v0.11.0, which contains `dbx` and depends on `gohan` v0.1.0.
 
 ## [v0.8.4] - 2026-09-20
 

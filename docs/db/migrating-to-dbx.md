@@ -72,8 +72,8 @@ not just its call syntax:
 
 - **Unfiltered DELETE/UPDATE refused.** Up to v0.10.3, `db.DeleteWhere(db.FV{})` with an empty,
   non-nil map (or a goqu dataset with no WHERE) would delete every row — the check was
-  `fieldNameValue == nil`, which an empty non-nil map passes; the first release after Blueprint
-  v0.10.3 tightened it to `len(fieldNameValue) == 0`. `dbx.Repository.Delete`/`Update`/
+  `fieldNameValue == nil`, which an empty non-nil map passes; Blueprint v0.11.0
+  tightened it to `len(fieldNameValue) == 0`. `dbx.Repository.Delete`/`Update`/
   `UpdateFields` require a non-nil `where` and fail with `gohan.ErrNoWhere` instead — before
   touching the database. A trivially-true `where` (`gohan.And()`, an empty `NotIn`) is rejected
   the same way. A caller who means "every row" now says so explicitly:

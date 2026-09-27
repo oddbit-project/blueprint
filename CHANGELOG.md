@@ -17,9 +17,32 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
-> **Potentially breaking release.** No exported API was removed, but the SQL-injection fix in the
+## [v0.11.0] - 2026-09-27
+
+> **Breaking release.** No exported API was removed, but the SQL-injection fix in the
 > legacy `db` package changes how queries are rendered, and some existing code will fail at run
 > time after upgrading. Read "Breaking changes" below before upgrading.
+
+### Module versions
+
+Released together with core v0.11.0 (each requires core v0.11.0):
+
+- `provider/clickhouse` v0.9.0
+- `provider/etcd` v0.10.0
+- `provider/franz` v0.9.0
+- `provider/hmacprovider` v0.9.0
+- `provider/htpasswd` v0.9.0
+- `provider/httpserver` v0.10.0
+- `provider/jwtprovider` v0.9.0
+- `provider/kafka` v0.9.0
+- `provider/mqtt` v0.9.0
+- `provider/nats` v0.9.0
+- `provider/pgsql` v0.9.0
+- `provider/s3` v0.9.0
+- `provider/smtp` v0.10.0
+- `provider/sqlite` v0.9.0
+
+`provider/metrics`, `provider/prometheus` and `provider/redis` are unchanged.
 
 ### Breaking changes
 
@@ -61,7 +84,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **`dbx` is built on the new standalone module `github.com/oddbit-project/gohan` (v0.1.0)**: a
   SQL query builder where values are always bound and identifiers are always quoted and escaped
   by construction, so the normal API cannot reintroduce SQL injection the way goqu's inlined
-  rendering did (fixed in the first release after Blueprint v0.10.3). It supports
+  rendering did (fixed in v0.11.0). It supports
   `SELECT`/`INSERT`/`UPDATE`/`DELETE`, joins, CTEs, `UNION`/`UNION ALL`, and ClickHouse-specific
   clauses (`FINAL`, `SAMPLE`, `ARRAY JOIN`, `PREWHERE`, `SETTINGS`) across the PostgreSQL, SQLite
   and ClickHouse dialects. `SelectBuilder.IsCompound()` reports whether a builder has UNION

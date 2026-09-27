@@ -4,7 +4,7 @@ The SQL query builder Blueprint's `dbx` is built on is the standalone module
 [`github.com/oddbit-project/gohan`](https://github.com/oddbit-project/gohan) — values are always
 bound and identifiers are always quoted and escaped by construction, so a caller cannot
 reintroduce SQL injection through the normal API. It replaces the pattern of building SQL with
-goqu and inlined values (the class of bug fixed in the first release after Blueprint `v0.10.3`) —
+goqu and inlined values (the class of bug fixed in Blueprint `v0.11.0`) —
 see [Migrating to dbx](migrating-to-dbx.md) for a full mapping.
 
 > Three escape hatches exist for trusted input only, and must never be built from request data:
