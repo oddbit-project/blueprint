@@ -776,6 +776,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#gohandbx-release-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gohan/dbx release order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#version-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1379,6 +1390,90 @@
     
   
     SQL Update API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db/gohan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gohan Query Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db/dbx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    dbx Repositories
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../db/migrating-to-dbx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating to dbx
   
 
     
@@ -2912,6 +3007,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#gohandbx-release-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gohan/dbx release order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#version-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3224,6 +3330,33 @@ independent provider versioning.</p>
 </span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># List existing tags</span>
 </span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>git<span class="w"> </span>tag<span class="w"> </span>--sort<span class="o">=</span>-version:refname
 </span></code></pre></div>
+<h2 id="gohandbx-release-order">gohan/dbx release order<a class="headerlink" href="#gohandbx-release-order" title="Permanent link">&para;</a></h2>
+<p><code>dbx</code> and <code>provider/clickhouse</code>'s non-test code depend on the standalone module
+<code>github.com/oddbit-project/gohan</code> (<code>dbx</code> directly; <code>provider/clickhouse</code> via <code>Client.Querier()</code>).
+<code>gohan</code> is released and tagged independently of Blueprint, in its own repository. <code>make
+tag-version VERSION=…</code> tags core and every provider module <strong>at the same commit</strong>, but each
+provider's <code>go.mod</code> still <code>require</code>s an older core version (shadowed in this workspace by a local
+<code>replace</code>, which a real consumer does not get) until that <code>require</code> is bumped. Run as a single
+step, <code>tag-version</code> therefore publishes <code>provider/clickhouse</code> at a version whose declared core
+dependency does not contain the current <code>dbx</code>/<code>gohan</code> code — a broken release for any consumer
+who resolves the provider's <code>go.mod</code> normally (i.e. without the workspace's <code>replace</code>).</p>
+<p>For a release that bumps <code>gohan</code>, adds to or changes <code>dbx</code>, or anything a provider's non-test
+code imports from core, tag in this order instead of a single <code>tag-version</code> call:</p>
+<ol>
+<li><strong>Tag <code>gohan</code> first</strong>, in its own repository, if this release depends on a new <code>gohan</code>
+   version.</li>
+<li><strong>Tag core only</strong>: <code>git tag vX.Y.Z &amp;&amp; git push origin vX.Y.Z</code>.</li>
+<li><strong>Bump the core requirement</strong> in the affected providers' <code>go.mod</code> — currently
+   <code>provider/clickhouse</code>, <code>provider/pgsql</code> and <code>provider/sqlite</code> — to <code>vX.Y.Z</code>:
+   <code>make update-deps VERSION=vX.Y.Z</code>, or <code>cd provider/&lt;name&gt; &amp;&amp; go get
+   github.com/oddbit-project/blueprint@vX.Y.Z &amp;&amp; go mod tidy</code> per module. Commit the <code>go.mod</code>/
+   <code>go.sum</code> changes.</li>
+<li><strong>Tag the providers</strong> (<code>make tag-version VERSION=vX.Y.Z</code> is safe now that step 3 has landed,
+   or tag them individually).</li>
+</ol>
+<p><code>sqlite</code> is included in the Makefile's <code>PROVIDERS</code> list, so <code>tag-version</code>, <code>sbom</code>,
+<code>update-deps</code>, <code>build-providers</code> and <code>tidy-providers</code> already act on it along with the other
+provider modules — no separate step is needed for <code>sqlite</code> itself.</p>
 <h2 id="version-strategy">Version Strategy<a class="headerlink" href="#version-strategy" title="Permanent link">&para;</a></h2>
 <h3 id="semantic-versioning">Semantic Versioning<a class="headerlink" href="#semantic-versioning" title="Permanent link">&para;</a></h3>
 <p>All modules follow <a href="https://semver.org/">Semantic Versioning</a>:</p>
@@ -3434,7 +3567,7 @@ independent provider versioning.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="September 12, 2025 03:41:35 UTC">September 12, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="September 27, 2026 20:13:24 UTC">September 27, 2026</span>
   </span>
 
     
