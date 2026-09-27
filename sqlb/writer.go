@@ -85,26 +85,53 @@ func (w *writer) quotePart(p string) string {
 	}
 }
 
-var clickHouseNamedValueTypes = map[string]bool{
-	"NamedValue":     true,
-	"NamedDateValue": true,
-}
+var (
+	stringerType  = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
+	errorType     = reflect.TypeOf((*error)(nil)).Elem()
+	formatterType = reflect.TypeOf((*fmt.Formatter)(nil)).Elem()
+)
 
-// isUnsafeClickHouseValue reports whether v is a value clickhouse-go's
-// formatter would render unsafely (see plan 001's facts table). It
+// isUnsafeClickHouse reports whether v is a value clickhouse-go's formatter
+// would render unsafely (see plan 001's and plan 009's facts tables). top
+// is true only for the argument as originally passed to arg: clickhouse-go
+// calls Value() on a driver.Valuer only when it is the top-level bound
+// argument (bind.go bindPositional), so a Valuer nested inside a slice,
+// pointer or interface must still be checked by the rules below. It
 // recurses into slices and arrays other than []byte.
-func isUnsafeClickHouseValue(v any) bool {
+func isUnsafeClickHouse(v any, top bool) bool {
 	if v == nil {
 		return false
 	}
-	rv := reflect.ValueOf(v)
-	for rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
+	if top {
+		if _, ok := v.(driver.Valuer); ok {
 			return false
 		}
-		rv = rv.Elem()
+	}
+	rv := reflect.ValueOf(v)
+	for {
+		switch rv.Kind() {
+		case reflect.Ptr:
+			if rv.IsNil() {
+				return false
+			}
+			if rv.Type().Implements(stringerType) {
+				return false
+			}
+			rv = rv.Elem()
+			continue
+		case reflect.Interface:
+			if rv.IsNil() {
+				return false
+			}
+			rv = rv.Elem()
+			continue
+		}
+		break
 	}
 	if !rv.IsValid() {
+		return false
+	}
+	if rv.Type().Implements(stringerType) {
 		return false
 	}
 
@@ -114,7 +141,7 @@ func isUnsafeClickHouseValue(v any) bool {
 			return false
 		}
 		for i := 0; i < rv.Len(); i++ {
-			if isUnsafeClickHouseValue(rv.Index(i).Interface()) {
+			if isUnsafeClickHouse(rv.Index(i).Interface(), false) {
 				return true
 			}
 		}
@@ -122,23 +149,35 @@ func isUnsafeClickHouseValue(v any) bool {
 	case reflect.Map:
 		return true
 	case reflect.Struct:
-		if _, ok := rv.Interface().(driver.Valuer); ok {
-			return false
-		}
 		t := rv.Type()
 		if t.PkgPath() == "time" && t.Name() == "Time" {
 			return false
 		}
-		if t.Name() == "NamedArg" && strings.Contains(t.PkgPath(), "database/sql") {
-			return true
-		}
-		if strings.Contains(t.PkgPath(), "clickhouse-go") && clickHouseNamedValueTypes[t.Name()] {
-			return true
-		}
 		return true
 	default:
+		if rv.Type().Implements(errorType) || rv.Type().Implements(formatterType) {
+			return true
+		}
 		return false
 	}
+}
+
+// clickHouseNilValuer returns untyped nil in place of v when v is a
+// top-level nil pointer whose type implements driver.Valuer: clickhouse-go
+// would call Value() on it (bindPositional, bind.go:138), which panics for
+// a value-receiver Value method promoted onto a nil pointer.
+func clickHouseNilValuer(v any) any {
+	if v == nil {
+		return v
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+		return v
+	}
+	if _, ok := v.(driver.Valuer); ok {
+		return nil
+	}
+	return v
 }
 
 // arg binds v as a placeholder, or renders it inline if it implements
@@ -156,9 +195,12 @@ func (w *writer) arg(v any) {
 		e.render(w)
 		return
 	}
-	if w.d.quote == quoteClickHouse && isUnsafeClickHouseValue(v) {
-		w.fail(fmt.Errorf("%w: %T", ErrUnsafeValue, v))
-		return
+	if w.d.quote == quoteClickHouse {
+		if isUnsafeClickHouse(v, true) {
+			w.fail(fmt.Errorf("%w: %T", ErrUnsafeValue, v))
+			return
+		}
+		v = clickHouseNilValuer(v)
 	}
 	w.args = append(w.args, v)
 	if w.d.name == "postgres" {

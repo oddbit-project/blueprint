@@ -136,6 +136,116 @@ func TestUnsafeValuesClickHouse(t *testing.T) {
 	})
 }
 
+type stringerErr string
+
+func (s stringerErr) String() string { return string(s) }
+
+type ptrStringer struct{ v string }
+
+func (p *ptrStringer) String() string { return p.v }
+
+type badErr int
+
+func (b badErr) Error() string { return "bad" }
+
+func TestNestedValuersClickHouse(t *testing.T) {
+	t.Run("nested NullString in slice is unsafe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		w.arg([]sql.NullString{{String: "x') OR 1=1 --", Valid: true}})
+		_, _, err := w.finish()
+		assert.True(t, errors.Is(err, ErrUnsafeValue))
+	})
+
+	t.Run("In expands the slice so each element is top-level", func(t *testing.T) {
+		_, _, err := render(ClickHouse(), Col("x").In([]sql.NullInt64{{Int64: 1, Valid: true}}))
+		assert.NoError(t, err)
+	})
+
+	t.Run("top-level NullString is safe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		w.arg(sql.NullString{String: "x", Valid: true})
+		_, _, err := w.finish()
+		assert.NoError(t, err)
+	})
+
+	t.Run("top-level double pointer is unsafe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		ns := sql.NullString{String: "x", Valid: true}
+		p := &ns
+		w.arg(&p)
+		_, _, err := w.finish()
+		assert.True(t, errors.Is(err, ErrUnsafeValue))
+	})
+
+	t.Run("nested struct implementing Stringer is safe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		w.arg([]stringerErr{"a"})
+		_, _, err := w.finish()
+		assert.NoError(t, err)
+	})
+
+	t.Run("slice of pointer-receiver Stringer is safe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		w.arg([]*ptrStringer{{v: "a"}})
+		_, _, err := w.finish()
+		assert.NoError(t, err)
+	})
+
+	t.Run("nested time.Time slice is safe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		w.arg([]time.Time{time.Now()})
+		_, _, err := w.finish()
+		assert.NoError(t, err)
+	})
+
+	t.Run("nested NullString slice on postgres is safe", func(t *testing.T) {
+		w := &writer{d: Postgres()}
+		w.arg([]sql.NullString{{String: "x", Valid: true}})
+		_, _, err := w.finish()
+		assert.NoError(t, err)
+	})
+
+	t.Run("interface pointer to map is unsafe", func(t *testing.T) {
+		x := any(map[string]any{"k') OR 1=1 --": 1})
+		w := &writer{d: ClickHouse()}
+		w.arg(&x)
+		_, _, err := w.finish()
+		assert.True(t, errors.Is(err, ErrUnsafeValue))
+	})
+
+	t.Run("interface pointer to NullString is unsafe", func(t *testing.T) {
+		y := any(sql.NullString{String: "z", Valid: true})
+		w := &writer{d: ClickHouse()}
+		w.arg(&y)
+		_, _, err := w.finish()
+		assert.True(t, errors.Is(err, ErrUnsafeValue))
+	})
+
+	t.Run("slice of interface pointers to map is unsafe", func(t *testing.T) {
+		m := any(map[string]any{"k": 1})
+		w := &writer{d: ClickHouse()}
+		w.arg([]*any{&m})
+		_, _, err := w.finish()
+		assert.True(t, errors.Is(err, ErrUnsafeValue))
+	})
+
+	t.Run("error without Stringer nested in slice is unsafe", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		w.arg([]badErr{badErr(1)})
+		_, _, err := w.finish()
+		assert.True(t, errors.Is(err, ErrUnsafeValue))
+	})
+
+	t.Run("top-level nil pointer to Valuer is safe and bound as nil", func(t *testing.T) {
+		w := &writer{d: ClickHouse()}
+		var p *sql.NullString
+		w.arg(p)
+		_, args, err := w.finish()
+		assert.NoError(t, err)
+		assert.Equal(t, []any{nil}, args)
+	})
+}
+
 func TestNestedSliceViaIn(t *testing.T) {
 	// Col("a").In([]any{[]any{map[string]any{"k": 1}}}) on ClickHouse -> ErrUnsafeValue.
 	// In() is defined in expr.go (step 3); here we exercise the writer's
