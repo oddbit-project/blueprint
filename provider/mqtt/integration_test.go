@@ -53,7 +53,7 @@ func (s *MQTTIntegrationTestSuite) SetupSuite() {
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("1883/tcp"),
 			wait.ForLog("Opening ipv4 listen socket on port 1883").WithStartupTimeout(30*time.Second),
-		).WithStartupTimeout(60 * time.Second),
+		).WithDeadline(60 * time.Second),
 	}
 
 	var err error
@@ -106,22 +106,12 @@ func (s *MQTTIntegrationTestSuite) getTestConfig() *Config {
 	return cfg
 }
 
-// getTestConfigWithAuth creates a test configuration with auth (if supported)
-func (s *MQTTIntegrationTestSuite) getTestConfigWithAuth() *Config {
-	cfg := s.getTestConfig()
-	// Note: Basic Mosquitto container doesn't have auth by default
-	// This is for demonstration of the API
-	cfg.Username = "testuser"
-	cfg.Password = "testpassword"
-	return cfg
-}
-
 // TestConnection tests basic connectivity
 func (s *MQTTIntegrationTestSuite) TestConnection() {
 	cfg := s.getTestConfig()
 	client, err := NewClient(cfg)
 	require.NoError(s.T(), err, "Failed to create MQTT client")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	connected, err := client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to MQTT broker")
@@ -134,7 +124,7 @@ func (s *MQTTIntegrationTestSuite) TestPublishSubscribe() {
 	cfg := s.getTestConfig()
 	client, err := NewClient(cfg)
 	require.NoError(s.T(), err, "Failed to create MQTT client")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to MQTT broker")
@@ -179,7 +169,7 @@ func (s *MQTTIntegrationTestSuite) TestJSONMessages() {
 	cfg := s.getTestConfig()
 	client, err := NewClient(cfg)
 	require.NoError(s.T(), err, "Failed to create MQTT client")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to MQTT broker")
@@ -240,7 +230,7 @@ func (s *MQTTIntegrationTestSuite) TestMultipleSubscriptions() {
 	cfg := s.getTestConfig()
 	client, err := NewClient(cfg)
 	require.NoError(s.T(), err, "Failed to create MQTT client")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to MQTT broker")
@@ -315,7 +305,7 @@ func (s *MQTTIntegrationTestSuite) TestQoSLevels() {
 			cfg.QoS = qos
 			client, err := NewClient(cfg)
 			require.NoError(t, err, "Failed to create MQTT client")
-			defer client.Close()
+			defer func() { _ = client.Close() }()
 
 			_, err = client.Connect()
 			require.NoError(t, err, "Failed to connect to MQTT broker")
@@ -363,7 +353,7 @@ func (s *MQTTIntegrationTestSuite) TestRetainedMessages() {
 	cfg.Retain = true // Enable retain for this test
 	client, err := NewClient(cfg)
 	require.NoError(s.T(), err, "Failed to create MQTT client")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to MQTT broker")
@@ -382,7 +372,7 @@ func (s *MQTTIntegrationTestSuite) TestRetainedMessages() {
 	cfg2 := s.getTestConfig()
 	client2, err := NewClient(cfg2)
 	require.NoError(s.T(), err, "Failed to create second MQTT client")
-	defer client2.Close()
+	defer func() { _ = client2.Close() }()
 
 	_, err = client2.Connect()
 	require.NoError(s.T(), err, "Failed to connect second client to MQTT broker")
@@ -418,7 +408,7 @@ func (s *MQTTIntegrationTestSuite) TestChannelSubscribe() {
 	cfg := s.getTestConfig()
 	client, err := NewClient(cfg)
 	require.NoError(s.T(), err, "Failed to create MQTT client")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	_, err = client.Connect()
 	require.NoError(s.T(), err, "Failed to connect to MQTT broker")
@@ -523,7 +513,7 @@ func (s *MQTTIntegrationTestSuite) TestConfigValidation() {
 				client, err := NewClient(cfg)
 				assert.NoError(t, err, "Should be able to create client with valid config")
 				if client != nil {
-					client.Close()
+					_ = client.Close()
 				}
 			}
 		})
