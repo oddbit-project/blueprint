@@ -139,7 +139,7 @@ func (c *Config) Validate() error {
 	}
 	// the certificate settings are only read when TLS is enabled; setting them without
 	// TLSEnable is a misconfiguration, as they would be silently ignored
-	keyCredential := c.ClientConfig.TlsKeyCredential
+	keyCredential := c.TlsKeyCredential
 	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||
 		keyCredential.Password != "" || keyCredential.PasswordEnvVar != "" || keyCredential.PasswordFile != "") {
 		return ErrTLSNotEnabled
@@ -162,7 +162,8 @@ func (c *Config) Validate() error {
 
 func WithFrom(from string) MessageOpts {
 	return func(msg *gomail.Msg) {
-		msg.From(from)
+		// MessageOpts has no error return; an invalid from is silently ignored, as before
+		_ = msg.From(from)
 	}
 }
 
@@ -252,7 +253,7 @@ func NewMailer(cfg *Config, customAuth ...gomail.Option) (*Mailer, error) {
 	clientOpts = append(clientOpts, gomail.WithTLSPolicy(policy))
 
 	// TLSConfig() returns nil when TLSEnable is false; fall back to go-mail's defaults
-	tlsConfig, err := cfg.ClientConfig.TLSConfig()
+	tlsConfig, err := cfg.TLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidTLSConfig, err)
 	}
@@ -311,7 +312,7 @@ func dialContext(useSSL bool, tlsConfig *tls.Config, timeout time.Duration) goma
 		}
 
 		if err = conn.SetDeadline(time.Now().Add(timeout)); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil, err
 		}
 		return conn, nil
@@ -331,7 +332,9 @@ func (m *Mailer) NewMessage(to []string, subject string, opts ...MessageOpts) (*
 		}
 		validTo = append(validTo, addr)
 	}
-	msg.To(validTo...)
+	if err := msg.To(validTo...); err != nil {
+		return nil, ErrInvalidTo
+	}
 	msg.Subject(subject)
 
 	// configured sender, overridable with WithFrom
