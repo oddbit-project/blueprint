@@ -34,7 +34,7 @@ func TestComprehensiveIntegration(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), comprehensiveTestTimeout)
 	defer cancel()
@@ -123,7 +123,7 @@ func testBucketManagement(t *testing.T, ctx context.Context, client *Client) {
 
 		// Test bucket creation with options
 		bucketNameWithOptions := generateTestBucketName()
-		defer client.DeleteBucket(ctx, bucketNameWithOptions) // Cleanup
+		defer func() { _ = client.DeleteBucket(ctx, bucketNameWithOptions) }() // Cleanup
 		err = client.CreateBucket(ctx, bucketNameWithOptions, BucketOptions{
 			Region: testMinIORegion,
 			ACL:    "private",
@@ -189,7 +189,7 @@ func testBucketManagement(t *testing.T, ctx context.Context, client *Client) {
 
 	// Keep the main test bucket for other tests
 	t.Cleanup(func() {
-		client.DeleteBucket(ctx, bucketName)
+		_ = client.DeleteBucket(ctx, bucketName)
 	})
 }
 
@@ -198,7 +198,7 @@ func testObjectCRUD(t *testing.T, ctx context.Context, client *Client) {
 	bucketName := generateTestBucketName()
 	err := client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err, "Should create test bucket")
-	defer client.DeleteBucket(ctx, bucketName)
+	defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 	bucket, err := client.Bucket(bucketName)
 	require.NoError(t, err, "Should get bucket object")
@@ -231,7 +231,7 @@ func testObjectCRUD(t *testing.T, ctx context.Context, client *Client) {
 			StorageClass: "STANDARD",
 		})
 		assert.NoError(t, err, "Should put object with options successfully")
-		defer bucket.DeleteObject(ctx, optionsObjectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, optionsObjectKey) }()
 	})
 
 	t.Run("ObjectExists", func(t *testing.T) {
@@ -259,7 +259,7 @@ func testObjectCRUD(t *testing.T, ctx context.Context, client *Client) {
 		reader, err := bucket.GetObject(ctx, objectKey)
 		assert.NoError(t, err, "Should get object successfully")
 		require.NotNil(t, reader, "Reader should not be nil")
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		data, err := io.ReadAll(reader)
 		assert.NoError(t, err, "Should read object data successfully")
@@ -277,7 +277,7 @@ func testObjectCRUD(t *testing.T, ctx context.Context, client *Client) {
 			reader := bytes.NewReader(testData)
 			err := bucket.PutObject(ctx, key, reader, int64(len(testData)))
 			require.NoError(t, err, "Should put additional object")
-			defer bucket.DeleteObject(ctx, key)
+			defer func() { _ = bucket.DeleteObject(ctx, key) }()
 		}
 
 		// Test basic listing
@@ -324,7 +324,7 @@ func testUploadOperations(t *testing.T, ctx context.Context, client *Client) {
 	bucketName := generateTestBucketName()
 	err := client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err, "Should create test bucket")
-	defer client.DeleteBucket(ctx, bucketName)
+	defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 	bucket, err := client.Bucket(bucketName)
 	require.NoError(t, err, "Should get bucket object")
@@ -336,12 +336,12 @@ func testUploadOperations(t *testing.T, ctx context.Context, client *Client) {
 
 		err := bucket.PutObjectStream(ctx, objectKey, reader)
 		assert.NoError(t, err, "Should put object stream successfully")
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		// Verify uploaded data
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		require.NoError(t, err, "Should get streamed object")
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		data, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read streamed object data")
@@ -357,7 +357,7 @@ func testUploadOperations(t *testing.T, ctx context.Context, client *Client) {
 			},
 		})
 		assert.NoError(t, err, "Should put object stream with options successfully")
-		defer bucket.DeleteObject(ctx, objectKeyWithOptions)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKeyWithOptions) }()
 	})
 
 	t.Run("PutObjectMultipart", func(t *testing.T) {
@@ -367,12 +367,12 @@ func testUploadOperations(t *testing.T, ctx context.Context, client *Client) {
 
 		err := bucket.PutObjectMultipart(ctx, objectKey, reader, int64(len(testData)))
 		assert.NoError(t, err, "Should put object multipart successfully")
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		// Verify uploaded data
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		require.NoError(t, err, "Should get multipart object")
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		data, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read multipart object data")
@@ -390,7 +390,7 @@ func testUploadOperations(t *testing.T, ctx context.Context, client *Client) {
 			},
 		})
 		assert.NoError(t, err, "Should put multipart object with options successfully")
-		defer bucket.DeleteObject(ctx, objectKeyWithOptions)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKeyWithOptions) }()
 	})
 
 	t.Run("PutObjectAdvanced", func(t *testing.T) {
@@ -417,12 +417,12 @@ func testUploadOperations(t *testing.T, ctx context.Context, client *Client) {
 
 		err := bucket.PutObjectAdvanced(ctx, objectKey, reader, int64(len(testData)), uploadOpts)
 		assert.NoError(t, err, "Should put object advanced successfully")
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		// Verify uploaded data
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		require.NoError(t, err, "Should get advanced upload object")
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		data, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read advanced upload object data")
@@ -440,7 +440,7 @@ func testDownloadOperations(t *testing.T, ctx context.Context, client *Client) {
 	bucketName := generateTestBucketName()
 	err := client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err, "Should create test bucket")
-	defer client.DeleteBucket(ctx, bucketName)
+	defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 	bucket, err := client.Bucket(bucketName)
 	require.NoError(t, err, "Should get bucket object")
@@ -451,7 +451,7 @@ func testDownloadOperations(t *testing.T, ctx context.Context, client *Client) {
 	reader := bytes.NewReader(testData)
 	err = bucket.PutObject(ctx, objectKey, reader, int64(len(testData)))
 	require.NoError(t, err, "Should create test object for download tests")
-	defer bucket.DeleteObject(ctx, objectKey)
+	defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 	t.Run("GetObjectStream", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -467,7 +467,7 @@ func testDownloadOperations(t *testing.T, ctx context.Context, client *Client) {
 		rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 10, 19)
 		assert.NoError(t, err, "Should get object range successfully")
 		require.NotNil(t, rangeReader, "Range reader should not be nil")
-		defer rangeReader.Close()
+		defer func() { _ = rangeReader.Close() }()
 
 		data, err := io.ReadAll(rangeReader)
 		assert.NoError(t, err, "Should read range data successfully")
@@ -478,7 +478,7 @@ func testDownloadOperations(t *testing.T, ctx context.Context, client *Client) {
 		rangeReader, err = bucket.GetObjectRange(ctx, objectKey, 100, -1)
 		assert.NoError(t, err, "Should get range to EOF successfully")
 		require.NotNil(t, rangeReader, "Range reader should not be nil")
-		defer rangeReader.Close()
+		defer func() { _ = rangeReader.Close() }()
 
 		data, err = io.ReadAll(rangeReader)
 		assert.NoError(t, err, "Should read range to EOF successfully")
@@ -489,7 +489,7 @@ func testDownloadOperations(t *testing.T, ctx context.Context, client *Client) {
 		rangeReader, err = bucket.GetObjectRange(ctx, objectKey, 50, 50)
 		assert.NoError(t, err, "Should get single byte range successfully")
 		require.NotNil(t, rangeReader, "Single byte range reader should not be nil")
-		defer rangeReader.Close()
+		defer func() { _ = rangeReader.Close() }()
 
 		data, err = io.ReadAll(rangeReader)
 		assert.NoError(t, err, "Should read single byte successfully")
@@ -544,7 +544,7 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 	bucketName := generateTestBucketName()
 	err := client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err, "Should create test bucket")
-	defer client.DeleteBucket(ctx, bucketName)
+	defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 	bucket, err := client.Bucket(bucketName)
 	require.NoError(t, err, "Should get bucket object")
@@ -555,7 +555,7 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 	reader := bytes.NewReader(testData)
 	err = bucket.PutObject(ctx, objectKey, reader, int64(len(testData)))
 	require.NoError(t, err, "Should create test object for presigned tests")
-	defer bucket.DeleteObject(ctx, objectKey)
+	defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 	t.Run("PresignGetObject", func(t *testing.T) {
 		expiry := 5 * time.Minute
@@ -573,7 +573,7 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 		// Test the presigned URL by making HTTP request
 		resp, err := http.Get(presignedURL)
 		assert.NoError(t, err, "Should access presigned GET URL successfully")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "Presigned GET should return 200")
 
@@ -589,7 +589,7 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 		presignedURL, err := bucket.PresignPutObject(ctx, putObjectKey, expiry)
 		assert.NoError(t, err, "Should generate presigned PUT URL successfully")
 		assert.NotEmpty(t, presignedURL, "Presigned PUT URL should not be empty")
-		defer bucket.DeleteObject(ctx, putObjectKey) // Cleanup
+		defer func() { _ = bucket.DeleteObject(ctx, putObjectKey) }() // Cleanup
 
 		// Validate URL format
 		parsedURL, err := url.Parse(presignedURL)
@@ -605,7 +605,7 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 		client := &http.Client{Timeout: 30 * time.Second}
 		resp, err := client.Do(req)
 		assert.NoError(t, err, "Should execute presigned PUT successfully")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.True(t, resp.StatusCode >= 200 && resp.StatusCode < 300, "Presigned PUT should return success status")
 
@@ -620,7 +620,8 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 			ContentType: "text/plain",
 		})
 		assert.NoError(t, err, "Should generate presigned PUT URL with options successfully")
-		defer bucket.DeleteObject(ctx, putObjectKeyWithOptions)
+		assert.NotEmpty(t, presignedURL, "Presigned PUT URL with options should not be empty")
+		defer func() { _ = bucket.DeleteObject(ctx, putObjectKeyWithOptions) }()
 	})
 
 	t.Run("PresignHeadObject", func(t *testing.T) {
@@ -636,7 +637,7 @@ func testPresignedURLs(t *testing.T, ctx context.Context, client *Client) {
 		client := &http.Client{Timeout: 30 * time.Second}
 		resp, err := client.Do(req)
 		assert.NoError(t, err, "Should execute presigned HEAD successfully")
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "Presigned HEAD should return 200")
 		assert.NotEmpty(t, resp.Header.Get("ETag"), "HEAD response should include ETag")
@@ -662,11 +663,11 @@ func testCopyOperations(t *testing.T, ctx context.Context, client *Client) {
 	// Create source and destination buckets
 	err := client.CreateBucket(ctx, sourceBucketName)
 	require.NoError(t, err, "Should create source bucket")
-	defer client.DeleteBucket(ctx, sourceBucketName)
+	defer func() { _ = client.DeleteBucket(ctx, sourceBucketName) }()
 
 	err = client.CreateBucket(ctx, destBucketName)
 	require.NoError(t, err, "Should create destination bucket")
-	defer client.DeleteBucket(ctx, destBucketName)
+	defer func() { _ = client.DeleteBucket(ctx, destBucketName) }()
 
 	sourceBucket, err := client.Bucket(sourceBucketName)
 	require.NoError(t, err, "Should get source bucket object")
@@ -683,13 +684,13 @@ func testCopyOperations(t *testing.T, ctx context.Context, client *Client) {
 		},
 	})
 	require.NoError(t, err, "Should create source object")
-	defer sourceBucket.DeleteObject(ctx, sourceObjectKey)
+	defer func() { _ = sourceBucket.DeleteObject(ctx, sourceObjectKey) }()
 
 	t.Run("CopyObjectSameBucket", func(t *testing.T) {
 		destObjectKey := generateTestObjectKey()
 		err := sourceBucket.CopyObject(ctx, sourceObjectKey, sourceBucketName, destObjectKey)
 		assert.NoError(t, err, "Should copy object within same bucket successfully")
-		defer sourceBucket.DeleteObject(ctx, destObjectKey)
+		defer func() { _ = sourceBucket.DeleteObject(ctx, destObjectKey) }()
 
 		// Verify copied object exists
 		exists, err := sourceBucket.ObjectExists(ctx, destObjectKey)
@@ -699,7 +700,7 @@ func testCopyOperations(t *testing.T, ctx context.Context, client *Client) {
 		// Verify copied object data
 		reader, err := sourceBucket.GetObject(ctx, destObjectKey)
 		assert.NoError(t, err, "Should get copied object")
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		data, err := io.ReadAll(reader)
 		assert.NoError(t, err, "Should read copied object data")
@@ -714,7 +715,7 @@ func testCopyOperations(t *testing.T, ctx context.Context, client *Client) {
 		// Verify copied object exists in destination bucket
 		destBucket, err := client.Bucket(destBucketName)
 		require.NoError(t, err, "Should get destination bucket")
-		defer destBucket.DeleteObject(ctx, destObjectKey)
+		defer func() { _ = destBucket.DeleteObject(ctx, destObjectKey) }()
 
 		exists, err := destBucket.ObjectExists(ctx, destObjectKey)
 		assert.NoError(t, err, "Should check copied object existence in dest bucket")
@@ -723,7 +724,7 @@ func testCopyOperations(t *testing.T, ctx context.Context, client *Client) {
 		// Verify copied object data
 		reader, err := destBucket.GetObject(ctx, destObjectKey)
 		assert.NoError(t, err, "Should get copied object from dest bucket")
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		data, err := io.ReadAll(reader)
 		assert.NoError(t, err, "Should read copied object data from dest bucket")
@@ -746,7 +747,7 @@ func testCopyOperations(t *testing.T, ctx context.Context, client *Client) {
 
 		err := sourceBucket.CopyObject(ctx, sourceObjectKey, sourceBucketName, destObjectKey, copyOptions)
 		assert.NoError(t, err, "Should copy object with options successfully")
-		defer sourceBucket.DeleteObject(ctx, destObjectKey)
+		defer func() { _ = sourceBucket.DeleteObject(ctx, destObjectKey) }()
 
 		// Verify copied object metadata
 		info, err := sourceBucket.HeadObject(ctx, destObjectKey)
@@ -781,7 +782,7 @@ func testErrorScenarios(t *testing.T, ctx context.Context, client *Client) {
 		bucketName := generateTestBucketName()
 		err := client.CreateBucket(ctx, bucketName)
 		require.NoError(t, err, "Should create test bucket")
-		defer client.DeleteBucket(ctx, bucketName)
+		defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 		bucket, err := client.Bucket(bucketName)
 		require.NoError(t, err, "Should get bucket object")
@@ -827,8 +828,8 @@ func testErrorScenarios(t *testing.T, ctx context.Context, client *Client) {
 
 		// Set secret key using test-specific env var
 		envVarName := fmt.Sprintf("MINIO_DISCONNECTED_TEST_SECRET_%s", strings.ReplaceAll(t.Name(), "/", "_"))
-		os.Setenv(envVarName, testMinIOSecretKey)
-		config.DefaultCredentialConfig.PasswordEnvVar = envVarName
+		require.NoError(t, os.Setenv(envVarName, testMinIOSecretKey))
+		config.PasswordEnvVar = envVarName
 
 		disconnectedClient, err := NewClient(config, nil)
 		require.NoError(t, err, "Should create disconnected client")
@@ -853,19 +854,19 @@ func testErrorScenarios(t *testing.T, ctx context.Context, client *Client) {
 
 		// Set secret key using test-specific env var
 		envVarName := fmt.Sprintf("MINIO_TIMEOUT_TEST_SECRET_%s", strings.ReplaceAll(t.Name(), "/", "_"))
-		os.Setenv(envVarName, testMinIOSecretKey)
-		config.DefaultCredentialConfig.PasswordEnvVar = envVarName
+		require.NoError(t, os.Setenv(envVarName, testMinIOSecretKey))
+		config.PasswordEnvVar = envVarName
 
 		timeoutClient, err := NewClient(config, nil)
 		require.NoError(t, err, "Should create timeout client")
 		err = timeoutClient.Connect(ctx)
 		require.NoError(t, err, "Should connect timeout client")
-		defer timeoutClient.Close()
+		defer func() { _ = timeoutClient.Close() }()
 
 		bucketName := generateTestBucketName()
 		err = timeoutClient.CreateBucket(ctx, bucketName)
 		require.NoError(t, err, "Should create bucket with timeout client")
-		defer timeoutClient.DeleteBucket(ctx, bucketName)
+		defer func() { _ = timeoutClient.DeleteBucket(ctx, bucketName) }()
 
 		bucket, err := timeoutClient.Bucket(bucketName)
 		require.NoError(t, err, "Should get bucket")
@@ -878,7 +879,7 @@ func testErrorScenarios(t *testing.T, ctx context.Context, client *Client) {
 		err = bucket.PutObject(ctx, objectKey, reader, int64(len(largeData)))
 		// This might timeout or succeed depending on system performance
 		if err == nil {
-			bucket.DeleteObject(ctx, objectKey)
+			_ = bucket.DeleteObject(ctx, objectKey)
 		}
 		// We don't assert error here as it's system-dependent
 	})
@@ -889,7 +890,7 @@ func testConcurrency(t *testing.T, ctx context.Context, client *Client) {
 	bucketName := generateTestBucketName()
 	err := client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err, "Should create test bucket")
-	defer client.DeleteBucket(ctx, bucketName)
+	defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 	bucket, err := client.Bucket(bucketName)
 	require.NoError(t, err, "Should get bucket object")
@@ -927,7 +928,7 @@ func testConcurrency(t *testing.T, ctx context.Context, client *Client) {
 			exists, err := bucket.ObjectExists(ctx, key)
 			assert.NoError(t, err, "Should check object existence")
 			assert.True(t, exists, "Concurrent uploaded object should exist: %s", key)
-			bucket.DeleteObject(ctx, key) // Cleanup
+			_ = bucket.DeleteObject(ctx, key) // Cleanup
 		}
 	})
 
@@ -938,7 +939,7 @@ func testConcurrency(t *testing.T, ctx context.Context, client *Client) {
 		reader := bytes.NewReader(testData)
 		err := bucket.PutObject(ctx, objectKey, reader, int64(len(testData)))
 		require.NoError(t, err, "Should create object for concurrent download test")
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		const numConcurrentDownloads = 10
 		results := make(chan error, numConcurrentDownloads)
@@ -951,7 +952,7 @@ func testConcurrency(t *testing.T, ctx context.Context, client *Client) {
 					results <- err
 					return
 				}
-				defer reader.Close()
+				defer func() { _ = reader.Close() }()
 
 				data, err := io.ReadAll(reader)
 				if err != nil {
@@ -1033,7 +1034,7 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 	bucketName := generateTestBucketName()
 	err := client.CreateBucket(ctx, bucketName)
 	require.NoError(t, err, "Should create test bucket")
-	defer client.DeleteBucket(ctx, bucketName)
+	defer func() { _ = client.DeleteBucket(ctx, bucketName) }()
 
 	bucket, err := client.Bucket(bucketName)
 	require.NoError(t, err, "Should get bucket object")
@@ -1046,12 +1047,12 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 		reader := bytes.NewReader(emptyData)
 		err := bucket.PutObject(ctx, objectKey, reader, 0)
 		assert.NoError(t, err, "Should upload empty object successfully")
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		// Download empty object
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		assert.NoError(t, err, "Should download empty object successfully")
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		data, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read empty object data")
@@ -1071,7 +1072,7 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 		reader := bytes.NewReader(testData)
 		err := bucket.PutObject(ctx, longKey, reader, int64(len(testData)))
 		assert.NoError(t, err, "Should upload object with long key successfully")
-		defer bucket.DeleteObject(ctx, longKey)
+		defer func() { _ = bucket.DeleteObject(ctx, longKey) }()
 
 		// Verify the object exists
 		exists, err := bucket.ObjectExists(ctx, longKey)
@@ -1081,7 +1082,7 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 		// Download and verify
 		downloadReader, err := bucket.GetObject(ctx, longKey)
 		assert.NoError(t, err, "Should download long key object")
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		data, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read long key object data")
@@ -1116,13 +1117,13 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 
 				// Some special characters might be invalid, so we check if upload succeeds
 				if err == nil {
-					defer bucket.DeleteObject(ctx, key)
+					defer func() { _ = bucket.DeleteObject(ctx, key) }()
 
 					// If upload succeeded, verify download works
 					downloadReader, err := bucket.GetObject(ctx, key)
 					assert.NoError(t, err, "Should download special key object: %s", key)
 					if downloadReader != nil {
-						defer downloadReader.Close()
+						defer func() { _ = downloadReader.Close() }()
 						data, err := io.ReadAll(downloadReader)
 						assert.NoError(t, err, "Should read special key object data: %s", key)
 						assert.Equal(t, testData, data, "Special key object data should match: %s", key)
@@ -1146,7 +1147,7 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 		reader := bytes.NewReader(largeData)
 		err := bucket.PutObject(ctx, objectKey, reader, int64(len(largeData)))
 		assert.NoError(t, err, "Should upload large object successfully")
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		// Verify object metadata
 		info, err := bucket.HeadObject(ctx, objectKey)
@@ -1156,7 +1157,7 @@ func testEdgeCases(t *testing.T, ctx context.Context, client *Client) {
 		// Download and verify large object
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		assert.NoError(t, err, "Should download large object")
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		data, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read large object data")

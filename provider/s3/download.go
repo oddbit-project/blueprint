@@ -23,7 +23,7 @@ func (b *Bucket) GetObjectStream(ctx context.Context, objectName string, writer 
 	if err != nil {
 		return err
 	}
-	defer obj.Close()
+	defer func() { _ = obj.Close() }()
 
 	// Copy object data to writer
 	_, err = io.Copy(writer, obj)
@@ -80,7 +80,7 @@ func (b *Bucket) GetObjectStreamRange(ctx context.Context, objectName string, wr
 	if err != nil {
 		return err
 	}
-	defer body.Close()
+	defer func() { _ = body.Close() }()
 
 	_, err = io.Copy(writer, body)
 	return err

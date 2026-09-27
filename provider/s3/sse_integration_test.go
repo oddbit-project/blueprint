@@ -134,9 +134,9 @@ func createTLSTestClient(t *testing.T, container *MinIOContainer, caPath string)
 	config.TLSInsecureSkipVerify = true
 
 	envVar := fmt.Sprintf("MINIO_TLS_SECRET_%s", strings.ReplaceAll(t.Name(), "/", "_"))
-	os.Setenv(envVar, testMinIOSecretKey)
-	config.DefaultCredentialConfig.PasswordEnvVar = envVar
-	config.DefaultCredentialConfig.Password = testMinIOSecretKey
+	require.NoError(t, os.Setenv(envVar, testMinIOSecretKey))
+	config.PasswordEnvVar = envVar
+	config.Password = testMinIOSecretKey
 
 	client, err := NewClient(config, nil)
 	require.NoError(t, err)
@@ -160,7 +160,7 @@ func TestIntegrationSSE(t *testing.T) {
 	defer cleanup()
 
 	client := createTLSTestClient(t, container, caPath)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)
@@ -226,7 +226,7 @@ func mustGet(t *testing.T, ctx context.Context, bucket *Bucket, key string) []by
 	t.Helper()
 	rc, err := bucket.GetObject(ctx, key)
 	require.NoError(t, err)
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	data, err := io.ReadAll(rc)
 	require.NoError(t, err)
 	return data

@@ -51,9 +51,9 @@ func setupMinIOContainer(ctx context.Context, t *testing.T) (*MinIOContainer, fu
 		Image:        testMinIOImage,
 		ExposedPorts: []string{"9000/tcp", "9001/tcp"},
 		Env: map[string]string{
-			"MINIO_ROOT_USER":              testMinIOAccessKey,
-			"MINIO_ROOT_PASSWORD":          testMinIOSecretKey,
-			"MINIO_PROMETHEUS_AUTH_TYPE":   "public",
+			"MINIO_ROOT_USER":            testMinIOAccessKey,
+			"MINIO_ROOT_PASSWORD":        testMinIOSecretKey,
+			"MINIO_PROMETHEUS_AUTH_TYPE": "public",
 		},
 		Cmd: []string{
 			"server", "/data",
@@ -112,7 +112,7 @@ func testMinIOConnectivity(t *testing.T, endpoint string) bool {
 	config.Endpoint = endpoint
 	config.Region = testMinIORegion
 	config.AccessKeyID = testMinIOAccessKey
-	config.DefaultCredentialConfig.Password = testMinIOSecretKey
+	config.Password = testMinIOSecretKey
 	config.UseSSL = false
 	config.ForcePathStyle = true
 
@@ -128,7 +128,7 @@ func testMinIOConnectivity(t *testing.T, endpoint string) bool {
 	if err != nil {
 		return false
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Test basic operation
 	_, err = client.ListBuckets(ctx)
@@ -146,11 +146,11 @@ func createTestClientWithContainer(t *testing.T, container *MinIOContainer) *Cli
 
 	// Set secret key using test-specific env var
 	envVarName := fmt.Sprintf("MINIO_TEST_SECRET_%s", strings.ReplaceAll(t.Name(), "/", "_"))
-	os.Setenv(envVarName, testMinIOSecretKey)
-	config.DefaultCredentialConfig.PasswordEnvVar = envVarName
-	
+	require.NoError(t, os.Setenv(envVarName, testMinIOSecretKey))
+	config.PasswordEnvVar = envVarName
+
 	// Also set the password directly as a fallback
-	config.DefaultCredentialConfig.Password = testMinIOSecretKey
+	config.Password = testMinIOSecretKey
 
 	client, err := NewClient(config, nil)
 	require.NoError(t, err)
@@ -190,7 +190,7 @@ func TestIntegrationBucketOperations(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)
@@ -241,10 +241,10 @@ func TestIntegrationBucketOperations(t *testing.T) {
 		// List and delete all objects first
 		objects, _ := bucket.ListObjects(ctx)
 		for _, obj := range objects {
-			bucket.DeleteObject(ctx, obj.Key)
+			_ = bucket.DeleteObject(ctx, obj.Key)
 		}
 		// Then delete the bucket
-		bucket.Delete(ctx)
+		_ = bucket.Delete(ctx)
 	})
 }
 
@@ -259,7 +259,7 @@ func TestIntegrationObjectOperations(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	objectKey := generateTestObjectKey()
@@ -271,8 +271,8 @@ func TestIntegrationObjectOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		bucket.DeleteObject(ctx, objectKey)
-		bucket.Delete(ctx)
+		_ = bucket.DeleteObject(ctx, objectKey)
+		_ = bucket.Delete(ctx)
 	}()
 
 	testData := []byte("Hello, MinIO testcontainers integration test!")
@@ -307,7 +307,7 @@ func TestIntegrationObjectOperations(t *testing.T) {
 	t.Run("GetObject", func(t *testing.T) {
 		reader, err := bucket.GetObject(ctx, objectKey)
 		assert.NoError(t, err, "Should download object successfully")
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		data, err := io.ReadAll(reader)
 		assert.NoError(t, err, "Should read object data successfully")
@@ -354,7 +354,7 @@ func TestIntegrationMultipartUpload(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)
@@ -364,7 +364,7 @@ func TestIntegrationMultipartUpload(t *testing.T) {
 	err = bucket.Create(ctx)
 	require.NoError(t, err)
 
-	defer bucket.Delete(ctx)
+	defer func() { _ = bucket.Delete(ctx) }()
 
 	t.Run("MultipartUploadSmallFile", func(t *testing.T) {
 		objectKey := generateTestObjectKey()
@@ -375,12 +375,12 @@ func TestIntegrationMultipartUpload(t *testing.T) {
 		err := bucket.PutObjectMultipart(ctx, objectKey, reader, int64(len(testData)))
 		assert.NoError(t, err, "Should upload large object via multipart successfully")
 
-		defer bucket.DeleteObject(ctx, objectKey)
+		defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 		// Verify uploaded data
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		require.NoError(t, err)
-		defer downloadReader.Close()
+		defer func() { _ = downloadReader.Close() }()
 
 		downloadedData, err := io.ReadAll(downloadReader)
 		assert.NoError(t, err, "Should read multipart uploaded object successfully")
@@ -399,7 +399,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)
@@ -408,7 +408,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 	// Setup bucket
 	err = bucket.Create(ctx)
 	require.NoError(t, err)
-	defer bucket.Delete(ctx)
+	defer func() { _ = bucket.Delete(ctx) }()
 
 	// Create test data with known content for range testing
 	testData := []byte("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+-=[]{}|;:,.<>?")
@@ -418,7 +418,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 	reader := bytes.NewReader(testData)
 	err = bucket.PutObject(ctx, objectKey, reader, int64(len(testData)))
 	require.NoError(t, err)
-	defer bucket.DeleteObject(ctx, objectKey)
+	defer func() { _ = bucket.DeleteObject(ctx, objectKey) }()
 
 	t.Run("GetObjectRange", func(t *testing.T) {
 		t.Run("RangeFirstBytes", func(t *testing.T) {
@@ -426,7 +426,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 0, 4)
 			assert.NoError(t, err, "Should get first bytes successfully")
 			require.NotNil(t, rangeReader)
-			defer rangeReader.Close()
+			defer func() { _ = rangeReader.Close() }()
 
 			data, err := io.ReadAll(rangeReader)
 			assert.NoError(t, err, "Should read range data successfully")
@@ -441,7 +441,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, int64(dataLen-5), int64(dataLen-1))
 			assert.NoError(t, err, "Should get last bytes successfully")
 			require.NotNil(t, rangeReader)
-			defer rangeReader.Close()
+			defer func() { _ = rangeReader.Close() }()
 
 			data, err := io.ReadAll(rangeReader)
 			assert.NoError(t, err, "Should read range data successfully")
@@ -454,7 +454,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 10, 19)
 			assert.NoError(t, err, "Should get object range successfully")
 			require.NotNil(t, rangeReader)
-			defer rangeReader.Close()
+			defer func() { _ = rangeReader.Close() }()
 
 			data, err := io.ReadAll(rangeReader)
 			assert.NoError(t, err, "Should read range data successfully")
@@ -468,7 +468,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 10, -1)
 			assert.NoError(t, err)
 			require.NotNil(t, rangeReader)
-			defer rangeReader.Close()
+			defer func() { _ = rangeReader.Close() }()
 
 			data, err := io.ReadAll(rangeReader)
 			assert.NoError(t, err)
@@ -480,7 +480,7 @@ func TestIntegrationRangeDownloads(t *testing.T) {
 			rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 0, -1)
 			assert.NoError(t, err)
 			require.NotNil(t, rangeReader)
-			defer rangeReader.Close()
+			defer func() { _ = rangeReader.Close() }()
 
 			data, err := io.ReadAll(rangeReader)
 			assert.NoError(t, err)
@@ -517,7 +517,7 @@ func TestIntegrationComprehensiveWorkflow(t *testing.T) {
 	defer cleanup()
 
 	client := createTestClientWithContainer(t, container)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	bucketName := generateTestBucketName()
 	bucket, err := client.Bucket(bucketName)
@@ -526,7 +526,7 @@ func TestIntegrationComprehensiveWorkflow(t *testing.T) {
 	// Setup bucket
 	err = bucket.Create(ctx)
 	require.NoError(t, err)
-	defer bucket.Delete(ctx)
+	defer func() { _ = bucket.Delete(ctx) }()
 
 	t.Run("ComprehensiveWorkflow", func(t *testing.T) {
 		// Test a complete workflow: upload, copy, download, range download, delete
@@ -552,7 +552,7 @@ func TestIntegrationComprehensiveWorkflow(t *testing.T) {
 		downloadReader, err := bucket.GetObject(ctx, objectKey)
 		assert.NoError(t, err, "Should download original object successfully")
 		originalData, err := io.ReadAll(downloadReader)
-		downloadReader.Close()
+		_ = downloadReader.Close()
 		assert.NoError(t, err)
 		assert.Equal(t, testData, originalData, "Original downloaded data should match")
 
@@ -560,7 +560,7 @@ func TestIntegrationComprehensiveWorkflow(t *testing.T) {
 		copyReader, err := bucket.GetObject(ctx, copyKey)
 		assert.NoError(t, err, "Should download copied object successfully")
 		copyData, err := io.ReadAll(copyReader)
-		copyReader.Close()
+		_ = copyReader.Close()
 		assert.NoError(t, err)
 		assert.Equal(t, testData, copyData, "Copied data should match original")
 
@@ -568,7 +568,7 @@ func TestIntegrationComprehensiveWorkflow(t *testing.T) {
 		rangeReader, err := bucket.GetObjectRange(ctx, objectKey, 0, 4)
 		assert.NoError(t, err, "Should get range successfully")
 		rangeData, err := io.ReadAll(rangeReader)
-		rangeReader.Close()
+		_ = rangeReader.Close()
 		assert.NoError(t, err)
 		assert.Equal(t, testData[0:5], rangeData, "Range data should match")
 

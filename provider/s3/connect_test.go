@@ -26,8 +26,8 @@ func TestSimpleIntegration(t *testing.T) {
 	t.Log("Starting MinIO container...")
 
 	// Stop and remove any existing container
-	exec.Command("docker", "stop", "simple-minio-test").Run()
-	exec.Command("docker", "rm", "simple-minio-test").Run()
+	_ = exec.Command("docker", "stop", "simple-minio-test").Run()
+	_ = exec.Command("docker", "rm", "simple-minio-test").Run()
 
 	// Start fresh container
 	cmd := exec.Command("docker", "run", "-d",
@@ -44,8 +44,8 @@ func TestSimpleIntegration(t *testing.T) {
 	// Cleanup function
 	defer func() {
 		t.Log("Cleaning up MinIO container...")
-		exec.Command("docker", "stop", "simple-minio-test").Run()
-		exec.Command("docker", "rm", "simple-minio-test").Run()
+		_ = exec.Command("docker", "stop", "simple-minio-test").Run()
+		_ = exec.Command("docker", "rm", "simple-minio-test").Run()
 	}()
 
 	// Wait for MinIO to be ready
@@ -76,12 +76,12 @@ func TestSimpleIntegration(t *testing.T) {
 	config.ForcePathStyle = true
 
 	// Set secret key via environment
-	os.Setenv("SIMPLE_TEST_SECRET", "minioadmin")
-	config.DefaultCredentialConfig.PasswordEnvVar = "SIMPLE_TEST_SECRET"
+	require.NoError(t, os.Setenv("SIMPLE_TEST_SECRET", "minioadmin"))
+	config.PasswordEnvVar = "SIMPLE_TEST_SECRET"
 
 	client, err := NewClient(config, nil)
 	require.NoError(t, err, "Should create client successfully")
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -122,7 +122,7 @@ func TestSimpleIntegration(t *testing.T) {
 		assert.True(t, found, "Should find created bucket in list")
 
 		// Clean up
-		bucket.Delete(ctx)
+		_ = bucket.Delete(ctx)
 	})
 }
 

@@ -78,12 +78,12 @@ func (c *Client) Connect(ctx context.Context) error {
 	var secretKey string
 	if c.config.AccessKeyID != "" {
 		var err error
-		secretKey, err = c.config.DefaultCredentialConfig.Fetch()
+		secretKey, err = c.config.Fetch()
 		if err != nil {
 			// Log the credential fetch error for debugging
 			if c.logger != nil {
 				c.logger.Error(err, "Failed to fetch secret key from Blueprint credential system", log.KV{
-					"env_var": c.config.DefaultCredentialConfig.PasswordEnvVar,
+					"env_var": c.config.PasswordEnvVar,
 				})
 			}
 			connectionError = err
