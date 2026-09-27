@@ -171,6 +171,71 @@ func (s *SQLiteIntegrationTestSuite) TestTransaction() {
 	require.NoError(s.T(), tx.Commit())
 }
 
+// TestStringEscaping checks that values and column names cannot break out of the query
+func (s *SQLiteIntegrationTestSuite) TestStringEscaping() {
+	client := s.getTestClient()
+	require.NoError(s.T(), client.Connect())
+	defer client.Disconnect()
+
+	s.dbCleanup(client)
+	repo := db.NewRepository(s.ctx, client, sampleTable)
+
+	payloads := []string{`x' OR '1'='1`, `x' OR 1=1 --`, `x\' OR 1=1 --`}
+	labels := []string{`a'b`, `a\'b`, `a\nb`, `a"b`, "plain"}
+	records := make([]*sampleRecord, 0, len(labels))
+	for _, label := range labels {
+		records = append(records, &sampleRecord{CreatedAt: time.Now(), Label: label})
+	}
+	require.NoError(s.T(), repo.Insert(records))
+
+	for _, label := range labels {
+		rows := make([]*sampleRecord, 0)
+		require.NoError(s.T(), repo.FetchWhere(map[string]any{"label": label}, &rows), label)
+		require.Len(s.T(), rows, 1, label)
+		assert.Equal(s.T(), label, rows[0].Label)
+
+		count, err := repo.CountWhere(map[string]any{"label": label})
+		require.NoError(s.T(), err, label)
+		assert.Equal(s.T(), int64(1), count, label)
+	}
+
+	for _, payload := range payloads {
+		rows := make([]*sampleRecord, 0)
+		require.NoError(s.T(), repo.FetchWhere(map[string]any{"label": payload}, &rows), payload)
+		assert.Empty(s.T(), rows, payload)
+		require.NoError(s.T(), repo.Fetch(repo.SqlSelect().Where(goqu.C("label").Eq(payload)), &rows), payload)
+		assert.Empty(s.T(), rows, payload)
+		count, err := repo.CountWhere(map[string]any{"label": payload})
+		require.NoError(s.T(), err, payload)
+		assert.Equal(s.T(), int64(0), count, payload)
+		exists, err := repo.Exists("label", payload)
+		require.NoError(s.T(), err, payload)
+		assert.False(s.T(), exists, payload)
+
+		require.NoError(s.T(), repo.DeleteWhere(map[string]any{"label": payload}), payload)
+		count, err = repo.Count()
+		require.NoError(s.T(), err)
+		assert.Equal(s.T(), int64(len(labels)), count, payload)
+	}
+
+	badColumn := `label" = "label" OR 1=1 --`
+	rows := make([]*sampleRecord, 0)
+	assert.ErrorIs(s.T(), repo.FetchWhere(map[string]any{badColumn: "x"}, &rows), db.ErrInvalidIdentifier)
+	assert.ErrorIs(s.T(), repo.DeleteWhere(map[string]any{badColumn: "x"}), db.ErrInvalidIdentifier)
+	_, err := repo.Exists(badColumn, "x")
+	assert.ErrorIs(s.T(), err, db.ErrInvalidIdentifier)
+	assert.ErrorIs(s.T(), repo.DeleteWhere(map[string]any{}), db.ErrInvalidParameters)
+
+	count, err := repo.Count()
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(len(labels)), count)
+
+	require.NoError(s.T(), repo.DeleteWhere(map[string]any{"label": `a'b`}))
+	count, err = repo.Count()
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(len(labels)-1), count)
+}
+
 // dbCleanup helper method for cleaning up test database
 func (s *SQLiteIntegrationTestSuite) dbCleanup(client *db.SqlClient) {
 	_, err := client.Db().Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", sampleTable))
