@@ -946,7 +946,7 @@ func TestEmptyStruct(t *testing.T) {
 func TestUnexportedFields(t *testing.T) {
 	type WithUnexported struct {
 		Public  string `json:"public" binding:"required"`
-		private string
+		private string //nolint:unused // field exists to verify unexported fields are ignored by JSON binding
 	}
 
 	tests := []struct {

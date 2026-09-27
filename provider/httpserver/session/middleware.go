@@ -167,7 +167,9 @@ func (m *Manager) Regenerate(c *gin.Context) {
 	newSession.Values = oldSession.Values
 
 	// Save the new session
-	m.store.Set(newSessionID, newSession)
+	if err := m.store.Set(newSessionID, newSession); err != nil {
+		m.logger.Error(err, "Failed to save regenerated session")
+	}
 
 	// Set the new session and ID in context
 	c.Set(ContextSessionKey, newSession)
@@ -179,7 +181,7 @@ func (m *Manager) Regenerate(c *gin.Context) {
 	// Delete the old session
 	oldCookie, err := c.Cookie(m.config.CookieName)
 	if err == nil && oldCookie != "" {
-		m.store.Delete(oldCookie)
+		_ = m.store.Delete(oldCookie)
 	}
 }
 
@@ -188,7 +190,7 @@ func (m *Manager) Clear(c *gin.Context) {
 	// Delete the session from the store
 	cookie, err := c.Cookie(m.config.CookieName)
 	if err == nil && cookie != "" {
-		m.store.Delete(cookie)
+		_ = m.store.Delete(cookie)
 	}
 
 	// Clear the cookie

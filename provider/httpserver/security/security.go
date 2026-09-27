@@ -100,7 +100,7 @@ func SecurityMiddleware(config *SecurityConfig) gin.HandlerFunc {
 		if config.UseCSPNonce && config.CSP != "" {
 			nonce := generateCSPNonce()
 			c.Set(ContextCSPNonce, nonce)
-			csp := strings.Replace(config.CSP, "{nonce}", nonce, -1)
+			csp := strings.ReplaceAll(config.CSP, "{nonce}", nonce)
 			c.Header("Content-Security-Policy", csp)
 		} else if config.CSP != "" {
 			c.Header("Content-Security-Policy", config.CSP)

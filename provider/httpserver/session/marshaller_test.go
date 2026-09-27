@@ -211,7 +211,7 @@ func BenchmarkMarshallers(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			data, _ := marshaller.MarshalSession(session)
-			marshaller.UnmarshalSession(data)
+			_, _ = marshaller.UnmarshalSession(data)
 		}
 	})
 
@@ -221,7 +221,7 @@ func BenchmarkMarshallers(b *testing.B) {
 
 		for i := 0; i < b.N; i++ {
 			data, _ := marshaller.MarshalSession(session)
-			marshaller.UnmarshalSession(data)
+			_, _ = marshaller.UnmarshalSession(data)
 		}
 	})
 }
