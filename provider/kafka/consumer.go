@@ -109,7 +109,7 @@ func (c ConsumerConfig) ApplyOptions(r *kafka.ReaderConfig) {
 		r.Partition = int(c.Partition)
 	}
 
-	if c.GroupTopics != nil && len(c.GroupTopics) > 0 {
+	if len(c.GroupTopics) > 0 {
 		r.GroupTopics = c.GroupTopics
 	}
 
@@ -299,7 +299,9 @@ func (c *Consumer) Disconnect() {
 
 	if reader != nil {
 		c.Logger.Info("Closing Kafka reader")
-		reader.Close()
+		if err := reader.Close(); err != nil {
+			c.Logger.Error(err, "failed to close kafka reader")
+		}
 
 		c.Logger.Info("Waiting for active subscriptions to complete")
 		c.activeReaders.Wait()

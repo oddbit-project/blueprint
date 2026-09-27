@@ -161,7 +161,9 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 func (p *Producer) Disconnect() {
 	if p.Writer != nil {
 		p.Logger.Info("Closing producer")
-		p.Writer.Close()
+		if err := p.Writer.Close(); err != nil {
+			p.Logger.Error(err, "failed to close kafka writer")
+		}
 		p.Writer = nil
 	}
 }

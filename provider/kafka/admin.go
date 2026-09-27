@@ -98,7 +98,9 @@ func (c *Admin) Connect(ctx context.Context) error {
 func (c *Admin) Disconnect() {
 	if c.Conn != nil {
 		c.Logger.Info("disconnecting from kafka...")
-		c.Conn.Close()
+		if err := c.Conn.Close(); err != nil {
+			c.Logger.Error(err, "failed to close kafka connection")
+		}
 		c.Conn = nil
 	}
 }
