@@ -26,24 +26,24 @@ func NewJsonProvider(src interface{}) (config.ConfigProvider, error) {
 	provider := &JsonProvider{
 		configData: make(map[string]json.RawMessage),
 	}
-	switch src.(type) {
+	switch src := src.(type) {
 	case json.RawMessage:
-		if err := json.Unmarshal(src.(json.RawMessage), &provider.configData); err != nil {
+		if err := json.Unmarshal(src, &provider.configData); err != nil {
 			return nil, err
 		}
 
 	case io.Reader:
-		if err := provider.fromReader(src.(io.Reader)); err != nil {
+		if err := provider.fromReader(src); err != nil {
 			return nil, err
 		}
 
 	case string:
-		if err := provider.fromFile(src.(string)); err != nil {
+		if err := provider.fromFile(src); err != nil {
 			return nil, err
 		}
 
 	case []byte:
-		if err := json.Unmarshal(src.([]byte), &provider.configData); err != nil {
+		if err := json.Unmarshal(src, &provider.configData); err != nil {
 			return nil, err
 		}
 
@@ -69,7 +69,7 @@ func (j *JsonProvider) fromFile(fname string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return j.fromReader(f)
 }
 
@@ -102,7 +102,7 @@ func setDefaultFieldValue(fieldValue reflect.Value, defaultVal string) error {
 // applyDefaults applies default values to struct fields that have zero values
 func applyDefaults(dest interface{}) error {
 	v := reflect.ValueOf(dest)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
@@ -127,7 +127,7 @@ func applyDefaults(dest interface{}) error {
 					return err
 				}
 			}
-		} else if fieldValue.Kind() == reflect.Ptr && fieldValue.Type().Elem().Kind() == reflect.Struct {
+		} else if fieldValue.Kind() == reflect.Pointer && fieldValue.Type().Elem().Kind() == reflect.Struct {
 			if fieldValue.IsNil() {
 				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
 			}

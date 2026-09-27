@@ -14,10 +14,15 @@ import (
 	"time"
 )
 
+// logContextKeyType is a private type for the logger context key, to avoid
+// collisions with context keys defined in other packages.
+type logContextKeyType struct{}
+
+// LogContextKey is used to store/retrieve logger from context
+var LogContextKey = logContextKeyType{}
+
 // Configuration constants
 const (
-	// LogContextKey is used to store/retrieve logger from context
-	LogContextKey      = "logger"
 	LogTraceIDKey      = "trace_id"
 	LogModuleKey       = "module"
 	LogComponentKey    = "component"
@@ -116,7 +121,6 @@ func buildLogWriter(cfg *Config) (io.Writer, error) {
 	var consoleWriter io.Writer
 
 	// Set up console writer
-	consoleWriter = os.Stdout
 	if cfg.Format == "pretty" {
 		consoleWriter = zerolog.ConsoleWriter{
 			Out:        os.Stdout,

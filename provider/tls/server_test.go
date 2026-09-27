@@ -241,7 +241,7 @@ func TestServerConfig_TLSConfig_WithPassword(t *testing.T) {
 	}
 
 	// Just verify fields are set correctly
-	key, err := config.TlsKeyCredential.Fetch()
+	key, err := config.Fetch()
 	if err != nil {
 		t.Fatalf("Unexpected error with password config: %v", err)
 	}

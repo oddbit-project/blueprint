@@ -91,9 +91,7 @@ func (s *UserStore) GetUsers() ([]userRecord, error) {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
 	result := make([]userRecord, 0)
-	for _, record := range s.data {
-		result = append(result, record)
-	}
+	result = append(result, s.data...)
 	return result, nil
 }
 
@@ -111,7 +109,7 @@ func (s *UserStore) GetUser(id int) *userRecord {
 var userStore = newUserStore()
 
 func main() {
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("nextjs-api")
 
 	srvConfig := httpserver.NewServerConfig()
@@ -200,7 +198,9 @@ func main() {
 	logger.Info("CSRF protection enabled for POST/PUT/DELETE requests")
 	logger.Info("CORS configured for Next.js development (localhost:3000)")
 
-	server.Start()
+	if err := server.Start(); err != nil {
+		logger.Fatal(err, "could not start http server")
+	}
 }
 
 // User management handlers
@@ -314,7 +314,13 @@ func deleteUser(c *gin.Context) {
 		return
 	}
 
-	userStore.DeleteUser(userId)
+	if err := userStore.DeleteUser(userId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":         true,
@@ -359,7 +365,6 @@ func getUser(c *gin.Context) {
 		"success": true,
 		"user":    user,
 	})
-	return
 }
 
 // Generic data handlers
@@ -470,7 +475,7 @@ func handleFileUpload(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// In a real application, you would save the file
 	// For this demo, we just return file info

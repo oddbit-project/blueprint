@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Configure logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("jwt-user-tracking")
 
 	// Create JWT provider with user tracking enabled
@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(err, "Failed to create provider")
 	}
-	defer revocationMgr.Close()
+	defer func() { _ = revocationMgr.Close() }()
 
 	// Demonstrate user token tracking
 	userID := "user123"

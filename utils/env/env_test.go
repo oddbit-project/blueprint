@@ -14,7 +14,7 @@ func TestGetEnvVar(t *testing.T) {
 
 	err := os.Setenv(testEnvName, testEnvValue)
 	assert.NoError(t, err)
-	defer os.Unsetenv(testEnvName)
+	defer func() { assert.NoError(t, os.Unsetenv(testEnvName)) }()
 
 	// First call should get from environment
 	result := GetEnvVar(testEnvName)
@@ -32,7 +32,7 @@ func TestGetEnvVar(t *testing.T) {
 
 	// Test case: environment variable doesn't exist
 	nonExistentVar := "NON_EXISTENT_TEST_VAR"
-	os.Unsetenv(nonExistentVar) // Make sure it doesn't exist
+	assert.NoError(t, os.Unsetenv(nonExistentVar)) // Make sure it doesn't exist
 
 	emptyResult := GetEnvVar(nonExistentVar)
 	assert.Equal(t, "", emptyResult)
@@ -44,8 +44,8 @@ func TestSetEnvVar(t *testing.T) {
 	testEnvValue := "test-value-789"
 
 	// Clean up before and after test
-	os.Unsetenv(testEnvName)
-	defer os.Unsetenv(testEnvName)
+	assert.NoError(t, os.Unsetenv(testEnvName))
+	defer func() { assert.NoError(t, os.Unsetenv(testEnvName)) }()
 
 	// Set environment variable
 	err := SetEnvVar(testEnvName, testEnvValue)

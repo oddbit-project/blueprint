@@ -89,7 +89,7 @@ func TestThreadPool_TryDispatch(t *testing.T) {
 	pool, err := NewThreadPool(1, 1)
 	require.NoError(t, err)
 	require.NoError(t, pool.Start(context.Background()))
-	defer pool.Stop()
+	defer func() { require.NoError(t, pool.Stop()) }()
 
 	// First job - blocks until we signal
 	require.True(t, pool.TryDispatch(newTestJob(func() {
@@ -125,7 +125,7 @@ func TestThreadPool_DispatchWithContext(t *testing.T) {
 	pool, err := NewThreadPool(1, 1)
 	require.NoError(t, err)
 	require.NoError(t, pool.Start(context.Background()))
-	defer pool.Stop()
+	defer func() { require.NoError(t, pool.Stop()) }()
 
 	// First job - blocks until we signal
 	require.True(t, pool.TryDispatch(newTestJob(func() {
@@ -164,7 +164,7 @@ func TestThreadPool_PanicRecovery(t *testing.T) {
 	pool, err := NewThreadPool(1, 2)
 	require.NoError(t, err)
 	require.NoError(t, pool.Start(context.Background()))
-	defer pool.Stop()
+	defer func() { require.NoError(t, pool.Stop()) }()
 
 	// Job that panics
 	pool.Dispatch(newTestJob(func() {

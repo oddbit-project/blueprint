@@ -15,7 +15,7 @@ var cliArgs = &CliArgs{
 
 func main() {
 	// Configure logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("sample-api")
 
 	// parse cli args

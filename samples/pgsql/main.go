@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// Configure logger
-	log.Configure(log.NewDefaultConfig())
+	_ = log.Configure(log.NewDefaultConfig())
 	logger := log.New("pgsql-sample")
 
 	pgConfig := pgsql.NewClientConfig()

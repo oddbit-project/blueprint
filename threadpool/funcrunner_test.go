@@ -33,10 +33,11 @@ func TestFuncRunner_Basic(t *testing.T) {
 			receivedCtx = ctx
 		})
 
-		ctx := context.WithValue(context.Background(), "test", "value")
+		type testCtxKey struct{}
+		ctx := context.WithValue(context.Background(), testCtxKey{}, "value")
 		job.Run(ctx)
 
-		require.Equal(t, "value", receivedCtx.Value("test"))
+		require.Equal(t, "value", receivedCtx.Value(testCtxKey{}))
 	})
 
 	t.Run("NilFunction", func(t *testing.T) {
@@ -56,7 +57,7 @@ func TestFuncRunner_WithThreadPool(t *testing.T) {
 		pool, err := NewThreadPool(2, 5)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		executed := false
 		var mu sync.Mutex
@@ -81,7 +82,7 @@ func TestFuncRunner_WithThreadPool(t *testing.T) {
 		pool, err := NewThreadPool(3, 10)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		const jobCount = 100
 		var counter int64
@@ -108,7 +109,7 @@ func TestFuncRunner_WithThreadPool(t *testing.T) {
 		pool, err := NewThreadPool(5, 20)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		var counter int64
 		var wg sync.WaitGroup
@@ -137,7 +138,7 @@ func TestFuncRunner_ContextCancellation(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		require.NoError(t, pool.Start(ctx))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		jobStarted := make(chan struct{})
 		jobCancelled := make(chan struct{})
@@ -173,7 +174,7 @@ func TestFuncRunner_ContextCancellation(t *testing.T) {
 		pool, err := NewThreadPool(1, 5)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		var completed bool
 		var cancelled bool
@@ -228,7 +229,7 @@ func TestFuncRunner_ErrorHandling(t *testing.T) {
 		pool, err := NewThreadPool(1, 5)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		panicJob := FuncRunner(func(ctx context.Context) {
 			panic("test panic in FuncRunner")
@@ -264,7 +265,7 @@ func TestFuncRunner_ErrorHandling(t *testing.T) {
 		pool, err := NewThreadPool(1, 5)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		recovered := false
 		var mu sync.Mutex
@@ -294,7 +295,7 @@ func TestFuncRunner_PerformanceAndLoad(t *testing.T) {
 		pool, err := NewThreadPool(10, 1000)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		const jobCount = 10000
 		var counter int64
@@ -330,7 +331,7 @@ func TestFuncRunner_PerformanceAndLoad(t *testing.T) {
 		pool, err := NewThreadPool(5, 100)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		const iterations = 1000
 		for i := 0; i < iterations; i++ {
@@ -363,7 +364,7 @@ func TestFuncRunner_Integration(t *testing.T) {
 		pool, err := NewThreadPool(3, 10)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		var funcRunnerCount, testJobCount int64
 		var wg sync.WaitGroup
@@ -397,7 +398,7 @@ func TestFuncRunner_Integration(t *testing.T) {
 		pool, err := NewThreadPool(2, 20)
 		require.NoError(t, err)
 		require.NoError(t, pool.Start(context.Background()))
-		defer pool.Stop()
+		defer func() { require.NoError(t, pool.Stop()) }()
 
 		var finalCount int64
 		var wg sync.WaitGroup
@@ -456,7 +457,7 @@ func BenchmarkFuncRunner_WithThreadPool(b *testing.B) {
 	pool, err := NewThreadPool(4, 1000)
 	require.NoError(b, err)
 	require.NoError(b, pool.Start(context.Background()))
-	defer pool.Stop()
+	defer func() { require.NoError(b, pool.Stop()) }()
 
 	var wg sync.WaitGroup
 

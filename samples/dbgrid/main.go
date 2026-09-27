@@ -24,10 +24,7 @@ type User struct {
 
 func main() {
 	// Check if this is a demo mode or should try to connect to a real DB
-	realDB := false
-	if len(os.Args) > 1 && os.Args[1] == "--connect" {
-		realDB = true
-	}
+	realDB := len(os.Args) > 1 && os.Args[1] == "--connect"
 
 	fmt.Println("DB Grid Sample")
 	fmt.Println("==============")
@@ -260,7 +257,7 @@ func main() {
 		if err != nil {
 			log.Fatal("Error executing query: ", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		// Display results
 		fmt.Println("\nQuery Results:")

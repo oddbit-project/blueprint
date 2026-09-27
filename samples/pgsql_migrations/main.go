@@ -23,6 +23,9 @@ func main() {
 	defer client.Disconnect()
 
 	source, err := migrations.NewEmbedSource(migFs, "migrations")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	manager, err := pgsql.NewMigrationManager(context.Background(), client)
 	if err != nil {

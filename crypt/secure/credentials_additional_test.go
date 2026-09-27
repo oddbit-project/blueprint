@@ -302,8 +302,8 @@ func TestKeyConfig_Fetch(t *testing.T) {
 
 	// Test with environment variable
 	envVarName := "TEST_KEY_CONFIG_ENV_VAR"
-	os.Setenv(envVarName, "env-var-key")
-	defer os.Unsetenv(envVarName)
+	_ = os.Setenv(envVarName, "env-var-key")
+	defer func() { _ = os.Unsetenv(envVarName) }()
 
 	config = KeyConfig{
 		Key:       "",
@@ -329,7 +329,7 @@ func TestKeyConfig_Fetch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	keyFile := filepath.Join(tempDir, "key.txt")
 	err = os.WriteFile(keyFile, []byte("file-key"), 0600)
@@ -394,8 +394,8 @@ func TestKeyConfig_Fetch(t *testing.T) {
 	}
 
 	// Test priority: Key over EnvVar over File
-	os.Setenv("TEST_KEY_PRIORITY", "env-key")
-	defer os.Unsetenv("TEST_KEY_PRIORITY")
+	_ = os.Setenv("TEST_KEY_PRIORITY", "env-key")
+	defer func() { _ = os.Unsetenv("TEST_KEY_PRIORITY") }()
 
 	config = KeyConfig{
 		Key:       "direct-key",

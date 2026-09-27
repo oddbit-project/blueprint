@@ -315,22 +315,22 @@ func findFieldByDbName(meta []Metadata, dbName string) *Metadata {
 
 func BenchmarkGetStructMeta_Simple(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GetStructMeta(reflect.TypeOf(SimpleStruct{}))
+		_, _ = GetStructMeta(reflect.TypeOf(SimpleStruct{}))
 	}
 }
 
 func BenchmarkGetStructMeta_Complex(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GetStructMeta(reflect.TypeOf(StructWithTags{}))
+		_, _ = GetStructMeta(reflect.TypeOf(StructWithTags{}))
 	}
 }
 
 func BenchmarkGetStructMeta_Cached(b *testing.B) {
 	// Ensure it's cached first
-	GetStructMeta(reflect.TypeOf(StructWithTags{}))
+	_, _ = GetStructMeta(reflect.TypeOf(StructWithTags{}))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		GetStructMeta(reflect.TypeOf(StructWithTags{}))
+		_, _ = GetStructMeta(reflect.TypeOf(StructWithTags{}))
 	}
 }

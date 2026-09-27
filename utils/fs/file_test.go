@@ -12,13 +12,13 @@ func TestFileExists(t *testing.T) {
 	// Create a temporary file
 	tempFile, err := os.CreateTemp("", "file_test_*")
 	require.NoError(t, err)
-	defer os.Remove(tempFile.Name())
-	tempFile.Close()
+	defer func() { _ = os.Remove(tempFile.Name()) }()
+	require.NoError(t, tempFile.Close())
 
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "file_test_dir_*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { require.NoError(t, os.RemoveAll(tempDir)) }()
 
 	// Test existing file
 	assert.True(t, FileExists(tempFile.Name()))
@@ -34,13 +34,13 @@ func TestDirExists(t *testing.T) {
 	// Create a temporary file
 	tempFile, err := os.CreateTemp("", "dir_test_*")
 	require.NoError(t, err)
-	defer os.Remove(tempFile.Name())
-	tempFile.Close()
+	defer func() { _ = os.Remove(tempFile.Name()) }()
+	require.NoError(t, tempFile.Close())
 
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "dir_test_dir_*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { require.NoError(t, os.RemoveAll(tempDir)) }()
 
 	// Test existing directory
 	assert.True(t, DirExists(tempDir))
@@ -59,11 +59,11 @@ func TestReadString(t *testing.T) {
 
 	tempFile, err := os.CreateTemp("", "read_test_*")
 	require.NoError(t, err)
-	defer os.Remove(tempFile.Name())
+	defer func() { _ = os.Remove(tempFile.Name()) }()
 
 	_, err = tempFile.WriteString(content)
 	require.NoError(t, err)
-	tempFile.Close()
+	require.NoError(t, tempFile.Close())
 
 	// Test reading existing file
 	readContent, err := ReadString(tempFile.Name())
@@ -77,7 +77,7 @@ func TestReadString(t *testing.T) {
 	// Test reading directory
 	tempDir, err := os.MkdirTemp("", "read_test_dir_*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { require.NoError(t, os.RemoveAll(tempDir)) }()
 
 	_, err = ReadString(tempDir)
 	assert.Error(t, err)

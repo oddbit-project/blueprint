@@ -1,9 +1,6 @@
 package generator
 
-import (
-	"math/rand"
-	"time"
-)
+import "math/rand"
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -13,8 +10,4 @@ func RandomString(n int) string {
 		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
 	}
 	return string(b)
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }

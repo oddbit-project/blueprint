@@ -348,7 +348,7 @@ func TestRepositoryInsertSingle(t *testing.T) {
 func TestRepositoryInsertChunked(t *testing.T) {
 	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
-	defer mockDB.Close()
+	defer func() { _ = mockDB.Close() }()
 	conn := sqlx.NewDb(mockDB, "sqlmock")
 	q := NewSQL(conn, gohan.Generic())
 	r, err := NewRepository[user](q, "users")
@@ -402,7 +402,7 @@ func TestRepositoryInsertBatchInserter(t *testing.T) {
 	assert.Equal(t, 1, bi.batchCalls)
 	assert.Equal(t, "users", bi.gotTable)
 	assert.Len(t, bi.gotRows, 2)
-	assert.Equal(t, 0, bi.countingQuerier.calls)
+	assert.Equal(t, 0, bi.calls)
 }
 
 func TestRepositoryInsertEmpty(t *testing.T) {

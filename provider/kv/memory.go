@@ -63,7 +63,7 @@ func (mkv *memkv) Get(k string) ([]byte, error) {
 		return nil, nil // not found
 	}
 	if v.ttl >= 0 {
-		if v.ttl < time.Now().Sub(v.created) {
+		if v.ttl < time.Since(v.created) {
 			delete(mkv.data, k)
 			return nil, nil // not found
 		}

@@ -143,7 +143,7 @@ func (e *EnvProvider) convertKey(key string) string {
 func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error {
 	v := reflect.ValueOf(dest)
 	// unwrap pointer
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
@@ -192,7 +192,7 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 						return err
 					}
 				}
-			} else if fieldValue.Kind() == reflect.Ptr && fieldValue.Type().Elem().Kind() == reflect.Struct {
+			} else if fieldValue.Kind() == reflect.Pointer && fieldValue.Type().Elem().Kind() == reflect.Struct {
 				if fieldValue.IsNil() {
 					fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
 				}
@@ -275,7 +275,7 @@ func (e *EnvProvider) GetKey(key string, dest interface{}) error {
 	}
 
 	destType := reflect.TypeOf(dest)
-	if destType.Kind() == reflect.Ptr {
+	if destType.Kind() == reflect.Pointer {
 		v := destType.Elem()
 		if v.Kind() == reflect.Struct {
 			// For structs, pass the key as prefix
