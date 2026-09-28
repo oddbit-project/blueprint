@@ -31,3 +31,22 @@ const (
 	// (currently ClickHouse; use provider/clickhouse's Querier instead).
 	ErrDialectDriver = utils.Error("dbx: driver/dialect not supported by the database/sql adapter")
 )
+
+const (
+	// ErrInvalidCursor is returned when a pagination cursor cannot be used:
+	// it is malformed, was tampered with, or was minted for another table,
+	// key list or key type. It is a client error.
+	ErrInvalidCursor = utils.Error("dbx: invalid pagination cursor")
+	// ErrCursorTooLarge is returned when the cursor for the next page would
+	// exceed MaxCursorBytes (the key values are too long). It is a server
+	// error: the client did nothing wrong.
+	ErrCursorTooLarge = utils.Error("dbx: pagination cursor exceeds the size limit")
+	// ErrInvalidKeysetKey is returned when a keyset key list is empty, too
+	// long, repeats a column, or names a column whose Go type cannot be a
+	// keyset key.
+	ErrInvalidKeysetKey = utils.Error("dbx: invalid keyset key")
+	// ErrKeysetNotUnique is returned when two fetched rows have the same key
+	// values: the keys must identify rows uniquely for keyset pagination not
+	// to skip or repeat rows.
+	ErrKeysetNotUnique = utils.Error("dbx: keyset keys do not identify rows uniquely")
+)

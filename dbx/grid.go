@@ -70,9 +70,11 @@ type SortField struct {
 	Order string `json:"order,omitempty"`
 }
 
-// GridError is returned by ValidQuery/Build/NewGridQuery for an invalid
-// request. Scope is "query", "filter", "sort" or "search"; Field is the
-// offending alias, or empty when the error is not about one field.
+// GridError is returned by ValidQuery/Build/NewGridQuery (and
+// Repository.QueryGridKeyset) for an invalid request. Scope is "query",
+// "filter", "sort", "search" or "cursor" (an invalid pagination cursor, for
+// which errors.Is(err, ErrInvalidCursor) holds); Field is the offending
+// alias, or empty when the error is not about one field.
 type GridError struct {
 	Scope   string `json:"scope"`
 	Field   string `json:"field"`
@@ -85,6 +87,11 @@ func (err GridError) Error() string {
 		return fmt.Sprintf("error on %s with field %s: %s", err.Scope, err.Field, err.Message)
 	}
 	return fmt.Sprintf("error on %s: %s", err.Scope, err.Message)
+}
+
+// Is reports whether a "cursor" scope GridError matches ErrInvalidCursor.
+func (err GridError) Is(target error) bool {
+	return err.Scope == "cursor" && target == ErrInvalidCursor
 }
 
 // NewGridQuery builds a GridQuery, rejecting an out-of-range searchType.
@@ -128,6 +135,7 @@ type Grid[T any] struct {
 	filterFunc map[string]GridFilterFunc
 	maxLimit   uint
 	tiebreaker []string
+	foldSearch bool
 
 	maxLimitErr   error
 	tiebreakerErr error
@@ -164,6 +172,15 @@ func (g *Grid[T]) WithMaxLimit(n uint) *Grid[T] {
 		g.maxLimitErr = fmt.Errorf("dbx: max limit %d is above math.MaxInt64", n)
 	}
 	g.maxLimit = n
+	return g
+}
+
+// WithCaseInsensitiveSearch makes search match regardless of case: ILIKE on
+// PostgreSQL and ClickHouse, LIKE on SQLite (which folds ASCII letters only).
+// The default is case-sensitive LIKE (except on SQLite, whose LIKE ignores
+// ASCII case either way).
+func (g *Grid[T]) WithCaseInsensitiveSearch() *Grid[T] {
+	g.foldSearch = true
 	return g
 }
 
@@ -430,53 +447,20 @@ func (g *Grid[T]) Build(base *gohan.SelectBuilder, q *GridQuery) (*gohan.SelectB
 		return nil, err
 	}
 
+	conds, err := g.conds(q)
+	if err != nil {
+		return nil, err
+	}
 	qry := base
-
-	if len(q.FilterFields) > 0 {
-		for _, alias := range sortedStringKeys(q.FilterFields) {
-			fname := g.spec.aliasField[alias]
-			v, err := g.filterValue(alias, fname, q.FilterFields[alias])
-			if err != nil {
-				return nil, err
-			}
-			if list, ok := v.([]any); ok {
-				qry = qry.Where(gohan.Col(fname).In(list...))
-			} else {
-				qry = qry.Where(gohan.Col(fname).Eq(v))
-			}
-		}
+	if len(conds) > 0 {
+		qry = qry.Where(conds...)
 	}
 
-	if len(q.SearchText) > 0 && len(g.spec.searchFields) > 0 {
-		exprs := make([]gohan.Expr, len(g.spec.searchFields))
-		for i, fname := range g.spec.searchFields {
-			col := gohan.Col(fname)
-			switch q.SearchType {
-			case SearchStart:
-				exprs[i] = col.HasPrefix(q.SearchText)
-			case SearchEnd:
-				exprs[i] = col.HasSuffix(q.SearchText)
-			default: // SearchAny (ValidQuery already rejected anything else with search text set)
-				exprs[i] = col.Contains(q.SearchText)
-			}
-		}
-		qry = qry.Where(gohan.Or(exprs...))
-	}
-
-	sorted := make(map[string]bool)
-	for _, sf := range sortOrder(q) {
-		fname := g.spec.aliasField[sf.Field]
-		sorted[fname] = true
-		if sf.Order == SortAscending {
-			qry = qry.OrderBy(gohan.Col(fname).Asc())
+	for _, k := range g.orderKeys(q) {
+		if k.Desc {
+			qry = qry.OrderBy(gohan.Col(k.Column).Desc())
 		} else {
-			qry = qry.OrderBy(gohan.Col(fname).Desc())
-		}
-	}
-	for _, col := range g.tiebreaker {
-		if !sorted[col] {
-			sorted[col] = true
-			qry = qry.OrderBy(gohan.Col(col).Asc())
+			qry = qry.OrderBy(gohan.Col(k.Column).Asc())
 		}
 	}
 
@@ -491,4 +475,86 @@ func (g *Grid[T]) Build(base *gohan.SelectBuilder, q *GridQuery) (*gohan.SelectB
 	}
 
 	return qry, nil
+}
+
+// gridKey is one ORDER BY key of a grid query: alias is the client's sort
+// field, or "" for a WithTiebreaker column.
+type gridKey struct {
+	alias string
+	KeysetKey
+}
+
+// orderKeys returns the ORDER BY keys of an already validated q: its sort
+// fields in the order they apply (default direction desc), then the
+// WithTiebreaker columns (ascending) it does not already sort by.
+func (g *Grid[T]) orderKeys(q *GridQuery) []gridKey {
+	var keys []gridKey
+	sorted := make(map[string]bool)
+	for _, sf := range sortOrder(q) {
+		fname := g.spec.aliasField[sf.Field]
+		sorted[fname] = true
+		keys = append(keys, gridKey{alias: sf.Field, KeysetKey: KeysetKey{Column: fname, Desc: sf.Order != SortAscending}})
+	}
+	for _, col := range g.tiebreaker {
+		if !sorted[col] {
+			sorted[col] = true
+			keys = append(keys, gridKey{KeysetKey: KeyAsc(col)})
+		}
+	}
+	return keys
+}
+
+// Conds validates q (as ValidQuery does) and returns the WHERE conditions
+// Build would add for it: one per filter (sorted alias order), then the ORed
+// search expression, if any. Sort and paging are not included, so the
+// result can feed a COUNT of the rows the query pages over. An empty result
+// means q filters nothing.
+func (g *Grid[T]) Conds(q *GridQuery) ([]gohan.Expr, error) {
+	if err := g.ValidQuery(q); err != nil {
+		return nil, err
+	}
+	return g.conds(q)
+}
+
+// conds builds Conds' conditions for an already validated q.
+func (g *Grid[T]) conds(q *GridQuery) ([]gohan.Expr, error) {
+	var conds []gohan.Expr
+	if len(q.FilterFields) > 0 {
+		for _, alias := range sortedStringKeys(q.FilterFields) {
+			fname := g.spec.aliasField[alias]
+			v, err := g.filterValue(alias, fname, q.FilterFields[alias])
+			if err != nil {
+				return nil, err
+			}
+			if list, ok := v.([]any); ok {
+				conds = append(conds, gohan.Col(fname).In(list...))
+			} else {
+				conds = append(conds, gohan.Col(fname).Eq(v))
+			}
+		}
+	}
+
+	if len(q.SearchText) > 0 && len(g.spec.searchFields) > 0 {
+		exprs := make([]gohan.Expr, len(g.spec.searchFields))
+		for i, fname := range g.spec.searchFields {
+			col := gohan.Col(fname)
+			switch {
+			case q.SearchType == SearchStart && g.foldSearch:
+				exprs[i] = col.HasPrefixFold(q.SearchText)
+			case q.SearchType == SearchStart:
+				exprs[i] = col.HasPrefix(q.SearchText)
+			case q.SearchType == SearchEnd && g.foldSearch:
+				exprs[i] = col.HasSuffixFold(q.SearchText)
+			case q.SearchType == SearchEnd:
+				exprs[i] = col.HasSuffix(q.SearchText)
+			case g.foldSearch: // SearchAny (ValidQuery already rejected anything else with search text set)
+				exprs[i] = col.ContainsFold(q.SearchText)
+			default:
+				exprs[i] = col.Contains(q.SearchText)
+			}
+		}
+		conds = append(conds, gohan.Or(exprs...))
+	}
+
+	return conds, nil
 }

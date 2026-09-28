@@ -2,7 +2,9 @@ package dbx
 
 import (
 	"context"
+	"errors"
 	"reflect"
+	"strings"
 
 	"github.com/oddbit-project/gohan"
 )
@@ -17,6 +19,9 @@ type Repository[T any] struct {
 	cols   []string
 	colSet map[string]bool
 	sel    *gohan.SelectBuilder
+
+	// grouped enables grouped inserts (see WithGroupedInserts).
+	grouped bool
 }
 
 // NewRepository builds a Repository[T] bound to q, for table. T must be a
@@ -26,7 +31,8 @@ type Repository[T any] struct {
 // gohan.ErrDuplicateColumn). A record type with zero mapped columns fails
 // with ErrNoColumns. The base "SELECT <columns> FROM <table>" statement is
 // built once against q.Dialect(), so an invalid table name or unknown
-// dialect surfaces here, not at the first query.
+// dialect surfaces here, not at the first query. When q implements
+// RecordChecker, its CheckRecord error for T is returned unchanged.
 func NewRepository[T any](q Querier, table string) (*Repository[T], error) {
 	t := reflect.TypeFor[T]()
 	if t.Kind() != reflect.Struct {
@@ -38,6 +44,11 @@ func NewRepository[T any](q Querier, table string) (*Repository[T], error) {
 	}
 	if len(cols) == 0 {
 		return nil, ErrNoColumns
+	}
+	if rc, ok := q.(RecordChecker); ok {
+		if err := rc.CheckRecord(t); err != nil {
+			return nil, err
+		}
 	}
 
 	colSet := make(map[string]bool, len(cols))
@@ -73,6 +84,27 @@ func (r *Repository[T]) Querier() Querier { return r.q }
 func (r *Repository[T]) With(q Querier) *Repository[T] {
 	nr := *r
 	nr.q = q
+	return &nr
+}
+
+// WithGroupedInserts returns a copy of the repository whose Insert accepts
+// records that omit different columns (omitnil/omitempty fields): records
+// are grouped by the set of columns their INSERT writes, and each group is
+// chunked and inserted as Insert would; a record that writes no column at
+// all is inserted on its own as "INSERT INTO <table> DEFAULT VALUES". When
+// this takes more than one statement, they all run atomically through
+// WithTx (ErrTxUnsupported if the Querier cannot begin a transaction).
+// Groups are inserted in order of their first record, so rows are not
+// written in argument order across groups (auto-generated ids follow the
+// groups, not the arguments). Without it, Insert fails such a call with
+// gohan.ErrInconsistentOmit (or gohan.ErrNoColumns for a record that writes
+// no column). The option does not apply to a BatchInserter Querier (the
+// ClickHouse adapter), whose InsertBatch still rejects mixed records:
+// several ClickHouse batches cannot be made atomic. The receiver is not
+// modified; With keeps the option.
+func (r *Repository[T]) WithGroupedInserts() *Repository[T] {
+	nr := *r
+	nr.grouped = true
 	return &nr
 }
 
@@ -142,6 +174,38 @@ func (r *Repository[T]) QueryGrid(ctx context.Context, g *Grid[T], q *GridQuery)
 		return nil, err
 	}
 	return r.List(ctx, sel)
+}
+
+// QueryGridWithCount returns QueryGrid's rows and the total number of rows
+// q's filters and search match, ignoring its sort and paging: the total is
+// counted with Count over g.Conds(q), so the COUNT carries no ORDER BY,
+// LIMIT or OFFSET. q is validated before any query runs. Rows and total are
+// read by two separate statements, not in one transaction or snapshot, so
+// the total can disagree with the rows under concurrent writes. If that
+// matters, run it through a repository bound (With) to a transaction whose
+// statements share one snapshot: on PostgreSQL that needs REPEATABLE READ
+// or SERIALIZABLE isolation (WithTx(ctx, q, &sql.TxOptions{Isolation:
+// sql.LevelRepeatableRead}, fn)), since READ COMMITTED takes a snapshot per
+// statement; on SQLite any transaction will do. ClickHouse has no
+// transactions, so there the total is always a separate read.
+func (r *Repository[T]) QueryGridWithCount(ctx context.Context, g *Grid[T], q *GridQuery) ([]*T, int64, error) {
+	conds, err := g.Conds(q)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := r.QueryGrid(ctx, g, q)
+	if err != nil {
+		return nil, 0, err
+	}
+	var where gohan.Expr
+	if len(conds) > 0 {
+		where = gohan.And(conds...)
+	}
+	total, err := r.Count(ctx, where)
+	if err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
 }
 
 // GetBy is Get filtered by an equality match on fields, whose keys must all
@@ -231,14 +295,15 @@ func (r *Repository[T]) execInsertChunk(ctx context.Context, q Querier, chunk []
 
 // Insert writes records. Zero records is a no-op. If the bound Querier
 // implements BatchInserter, InsertBatch is used instead of building INSERT
-// statements. Otherwise records are chunked at
+// statements (also with WithGroupedInserts). Otherwise records are chunked at
 // perChunk = Dialect().MaxArgs() / <T's full column count, auto columns
 // included> (all records in one statement when MaxArgs() == 0); more than
 // one chunk runs atomically through WithTx, which joins an existing
 // transaction, begins a new one, or fails with ErrTxUnsupported — Insert
 // never issues a silent non-atomic multi-statement write. Each chunk's
 // column set is decided independently by its first record (gohan's
-// ErrInconsistentOmit still applies within a chunk).
+// ErrInconsistentOmit still applies within a chunk, unless the repository
+// was built with WithGroupedInserts).
 func (r *Repository[T]) Insert(ctx context.Context, records ...*T) error {
 	if len(records) == 0 {
 		return nil
@@ -252,16 +317,11 @@ func (r *Repository[T]) Insert(ctx context.Context, records ...*T) error {
 		return bi.InsertBatch(ctx, r.table, rows)
 	}
 
-	maxArgs := r.q.Dialect().MaxArgs()
-	perChunk := len(rows)
-	if maxArgs > 0 {
-		perChunk = maxArgs / len(r.cols)
-		if perChunk < 1 {
-			perChunk = 1
-		}
+	if r.grouped {
+		return r.insertGrouped(ctx, rows)
 	}
 
-	chunks := chunkRecords(rows, perChunk)
+	chunks := chunkRecords(rows, r.perChunk(len(rows)))
 	if len(chunks) == 1 {
 		return r.execInsertChunk(ctx, r.q, chunks[0])
 	}
@@ -275,15 +335,88 @@ func (r *Repository[T]) Insert(ctx context.Context, records ...*T) error {
 	})
 }
 
+// perChunk returns how many of n records one INSERT statement may carry:
+// Dialect().MaxArgs() / <T's full column count>, at least 1, or n when the
+// dialect has no argument limit.
+func (r *Repository[T]) perChunk(n int) int {
+	maxArgs := r.q.Dialect().MaxArgs()
+	if maxArgs == 0 {
+		return n
+	}
+	return max(maxArgs/len(r.cols), 1)
+}
+
+// insertGrouped is Insert under WithGroupedInserts: rows are grouped by
+// their INSERT column set, in order of each group's first row; each group
+// is chunked, except rows that write no column, which get one DEFAULT
+// VALUES statement each. Every statement is built before any runs, and
+// more than one runs inside WithTx.
+func (r *Repository[T]) insertGrouped(ctx context.Context, rows []any) error {
+	// noColumns keys the rows that write no column; a real key is never
+	// empty.
+	const noColumns = ""
+	var order []string
+	groups := make(map[string][]any)
+	for _, row := range rows {
+		key := noColumns
+		cols, err := gohan.InsertColumns(row)
+		if err == nil {
+			key = strings.Join(cols, "\x00")
+		} else if !errors.Is(err, gohan.ErrNoColumns) {
+			return err
+		}
+		if _, ok := groups[key]; !ok {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], row)
+	}
+
+	var stmts []*gohan.InsertBuilder
+	for _, key := range order {
+		group := groups[key]
+		if key == noColumns {
+			for range group {
+				stmts = append(stmts, gohan.Insert(r.table).DefaultValues())
+			}
+			continue
+		}
+		for _, chunk := range chunkRecords(group, r.perChunk(len(group))) {
+			stmts = append(stmts, gohan.Insert(r.table).Rows(chunk...))
+		}
+	}
+
+	type built struct {
+		sql  string
+		args []any
+	}
+	queries := make([]built, len(stmts))
+	for i, st := range stmts {
+		sqlStr, args, err := st.Build(r.q.Dialect())
+		if err != nil {
+			return err
+		}
+		queries[i] = built{sqlStr, args}
+	}
+
+	run := func(q Querier) error {
+		for _, b := range queries {
+			if _, err := q.Exec(ctx, b.sql, b.args...); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if len(queries) == 1 {
+		return run(r.q)
+	}
+	return WithTx(ctx, r.q, nil, run)
+}
+
 // InsertReturning inserts rec and scans every repository column back from
 // RETURNING into a new T. Dialects without gohan's FeatureReturning fail
 // with gohan.ErrUnsupported.
 func (r *Repository[T]) InsertReturning(ctx context.Context, rec *T) (*T, error) {
-	returning := make([]any, len(r.cols))
-	for i, c := range r.cols {
-		returning[i] = c
-	}
-	st := gohan.Insert(r.table).Rows(rec).Returning(returning...)
+	st := gohan.Insert(r.table).Rows(rec).Returning(r.returningCols()...)
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return nil, err
@@ -293,6 +426,15 @@ func (r *Repository[T]) InsertReturning(ctx context.Context, rec *T) (*T, error)
 		return nil, err
 	}
 	return &out, nil
+}
+
+// returningCols returns every repository column, for a RETURNING list.
+func (r *Repository[T]) returningCols() []any {
+	cols := make([]any, len(r.cols))
+	for i, c := range r.cols {
+		cols[i] = c
+	}
+	return cols
 }
 
 // subtractStrings returns the elements of a not present in b, preserving
@@ -319,36 +461,88 @@ func subtractStrings(a, b []string) []string {
 // "DO NOTHING". conflict and update names must all be repository columns
 // (else ErrUnknownColumn, checked before any query).
 func (r *Repository[T]) Upsert(ctx context.Context, rec *T, conflict []string, update ...string) error {
-	if err := r.checkColumns(conflict); err != nil {
+	st, err := r.upsertStmt(rec, conflict, update)
+	if err != nil {
 		return err
 	}
-	if err := r.checkColumns(update); err != nil {
-		return err
-	}
-
-	updateCols := update
-	if len(updateCols) == 0 {
-		insCols, err := gohan.InsertColumns(rec)
-		if err != nil {
-			return err
-		}
-		updateCols = subtractStrings(insCols, conflict)
-	}
-
-	cb := gohan.Insert(r.table).Rows(rec).OnConflict(conflict...)
-	var st *gohan.InsertBuilder
-	if len(updateCols) == 0 {
-		st = cb.DoNothing()
-	} else {
-		st = cb.DoUpdateExcluded(updateCols...)
-	}
-
 	sqlStr, args, err := st.Build(r.q.Dialect())
 	if err != nil {
 		return err
 	}
 	_, err = r.q.Exec(ctx, sqlStr, args...)
 	return err
+}
+
+// upsertStmt builds Upsert's statement (see Upsert for the rules).
+func (r *Repository[T]) upsertStmt(rec *T, conflict, update []string) (*gohan.InsertBuilder, error) {
+	if err := r.checkColumns(conflict); err != nil {
+		return nil, err
+	}
+	if err := r.checkColumns(update); err != nil {
+		return nil, err
+	}
+
+	updateCols := update
+	if len(updateCols) == 0 {
+		insCols, err := gohan.InsertColumns(rec)
+		if err != nil {
+			return nil, err
+		}
+		updateCols = subtractStrings(insCols, conflict)
+	}
+
+	cb := gohan.Insert(r.table).Rows(rec).OnConflict(conflict...)
+	if len(updateCols) == 0 {
+		return cb.DoNothing(), nil
+	}
+	return cb.DoUpdateExcluded(updateCols...), nil
+}
+
+// UpsertReturning is Upsert with "RETURNING <T's columns>", scanned into a
+// new T: the row as inserted or as updated, including values the database
+// filled in (defaults, triggers, ...). rec itself is never written to, so a
+// failed scan cannot leave it half-updated. When the statement resolves to
+// "DO NOTHING" (every written column is a conflict column) and the row
+// already exists, the database returns no row and UpsertReturning fails
+// with ErrNotFound. Dialects without gohan's FeatureUpsert and
+// FeatureReturning (ClickHouse) fail with gohan.ErrUnsupported.
+func (r *Repository[T]) UpsertReturning(ctx context.Context, rec *T, conflict []string, update ...string) (*T, error) {
+	st, err := r.upsertStmt(rec, conflict, update)
+	if err != nil {
+		return nil, err
+	}
+	sqlStr, args, err := st.Returning(r.returningCols()...).Build(r.q.Dialect())
+	if err != nil {
+		return nil, err
+	}
+	var out T
+	if err := r.q.Get(ctx, &out, sqlStr, args...); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// InsertIgnore inserts rec with "ON CONFLICT [(conflict...)] DO NOTHING" and
+// reports whether a row was inserted (rows affected > 0), so a conflicting
+// row is skipped rather than failing. With no conflict columns the clause is
+// untargeted and any unique or exclusion constraint violation is ignored.
+// conflict names must all be repository columns (else ErrUnknownColumn,
+// checked before any query). Dialects without gohan's FeatureUpsert
+// (ClickHouse) fail with gohan.ErrUnsupported.
+func (r *Repository[T]) InsertIgnore(ctx context.Context, rec *T, conflict ...string) (bool, error) {
+	if err := r.checkColumns(conflict); err != nil {
+		return false, err
+	}
+	st := gohan.Insert(r.table).Rows(rec).OnConflict(conflict...).DoNothing()
+	sqlStr, args, err := st.Build(r.q.Dialect())
+	if err != nil {
+		return false, err
+	}
+	n, err := r.q.Exec(ctx, sqlStr, args...)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // Update sets every non-auto field of rec (per opts) and requires a
@@ -381,6 +575,32 @@ func (r *Repository[T]) UpdateFields(ctx context.Context, fields map[string]any,
 		return 0, err
 	}
 	return r.q.Exec(ctx, sqlStr, args...)
+}
+
+// UpdateReturning is UpdateFields with "RETURNING <T's columns>": it
+// returns every updated row as a new T, as the database left it (including
+// values set by triggers), and an empty, non-nil slice when nothing
+// matched. The same guards as UpdateFields apply before any query
+// (ErrUnknownColumn, gohan.ErrNoWhere). Dialects without gohan's
+// FeatureUpdate and FeatureReturning (ClickHouse) fail with
+// gohan.ErrUnsupported.
+func (r *Repository[T]) UpdateReturning(ctx context.Context, fields map[string]any, where gohan.Expr) ([]*T, error) {
+	if where == nil {
+		return nil, gohan.ErrNoWhere
+	}
+	if err := r.checkColumns(mapKeys(fields)); err != nil {
+		return nil, err
+	}
+	st := gohan.Update(r.table).SetMap(fields).Where(where).Returning(r.returningCols()...)
+	sqlStr, args, err := st.Build(r.q.Dialect())
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*T, 0)
+	if err := r.q.Select(ctx, &out, sqlStr, args...); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Delete requires a non-nil where (else gohan.ErrNoWhere, without touching

@@ -10,26 +10,28 @@
 //
 // ErrNotFound is an alias for sql.ErrNoRows, so errors.Is(err,
 // sql.ErrNoRows) keeps working against code written against database/sql or
-// db.Repository. Get returns (nil, ErrNotFound) when no row matches;
-// QueryInt64 (used by Count/Exists internally) also returns ErrNotFound on
-// no row, though Count/Exists themselves never surface it (a COUNT(*) query
-// always returns exactly one row).
+// db.Repository. Get, GetBy and QueryOne return (nil, ErrNotFound) when no
+// row matches, and UpsertReturning when its DO NOTHING skipped an existing
+// row; List, ListBy, Query and UpdateReturning return an empty, non-nil
+// slice instead. QueryInt64 (used by Count/Exists internally) also returns
+// ErrNotFound on no row, though Count/Exists themselves never surface it (a
+// COUNT(*) query always returns exactly one row).
 //
 // # No unfiltered DELETE/UPDATE
 //
-// Delete, Update and UpdateFields require a non-nil where expression and
-// return gohan.ErrNoWhere without touching the database when where is nil.
-// There is deliberately no "delete all" or "update all" method: a caller who
-// means it uses Exec with an explicit gohan.Delete(table).All() (or
-// gohan.Update(table).All()) statement.
+// Delete, Update, UpdateFields and UpdateReturning require a non-nil where
+// expression and return gohan.ErrNoWhere without touching the database when
+// where is nil. There is deliberately no "delete all" or "update all"
+// method: a caller who means it uses Exec with an explicit
+// gohan.Delete(table).All() (or gohan.Update(table).All()) statement.
 //
 // # Caller obligations (nothing here can enforce these)
 //
-//   - Inside WithTx, use repo.With(tx) to run through the transaction —
-//     using the outer repository (bound to the non-transactional Querier)
-//     runs the statement outside the transaction, and on SQLite with
-//     MaxOpenConns == 1 this deadlocks waiting for the only connection,
-//     which WithTx is already holding.
+//   - Inside WithTx or WithTxRetry, use repo.With(tx) to run through the
+//     transaction — using the outer repository (bound to the
+//     non-transactional Querier) runs the statement outside the transaction,
+//     and on SQLite with MaxOpenConns == 1 this deadlocks waiting for the
+//     only connection, which WithTx is already holding.
 //   - Custom queries passed to Get/List should start from r.Select(),
 //     not a bare gohan.From(table): gohan.From renders "SELECT *", which sqlx
 //     rejects when the table has columns T does not map.

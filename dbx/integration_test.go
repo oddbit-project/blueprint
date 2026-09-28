@@ -2,12 +2,14 @@ package dbx
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -417,6 +419,426 @@ func (s *DbxIntegrationSuite) TestGridIntegration() {
 			require.Len(s.T(), list, 2)
 			assert.Equal(s.T(), "50%", list[0].Name)
 			assert.Equal(s.T(), "50x", list[1].Name)
+		})
+	}
+}
+
+// TestQueryGridWithCount checks that the total counts every row the grid
+// query's filters and search match, ignoring its sort and paging (an
+// OFFSET past the first row must not zero the count).
+func (s *DbxIntegrationSuite) TestQueryGridWithCount() {
+	_, err := s.adminClient.Conn.ExecContext(s.ctx, gridRowsDDL)
+	require.NoError(s.T(), err, "failed to create grid_rows table")
+	defer func() {
+		_, err := s.adminClient.Conn.ExecContext(s.ctx, "DROP TABLE grid_rows")
+		require.NoError(s.T(), err, "failed to drop grid_rows table")
+	}()
+
+	for _, v := range s.clientVariants() {
+		s.Run(v.name, func() {
+			_, err := s.adminClient.Conn.ExecContext(s.ctx, "TRUNCATE grid_rows RESTART IDENTITY")
+			require.NoError(s.T(), err)
+
+			q := s.newQuerier(v.dsn)
+			r, err := NewRepository[gridRow](q, "grid_rows")
+			require.NoError(s.T(), err)
+			g, err := NewGrid[gridRow]()
+			require.NoError(s.T(), err)
+
+			for i, n := range []string{"ann", "anna", "bob", "annie", "carl"} {
+				tag := "a"
+				if i == 1 {
+					tag = "b"
+				}
+				require.NoError(s.T(), r.Insert(s.ctx, &gridRow{Name: n, Email: fmt.Sprintf("u%d@x.com", i), Tag: tag}))
+			}
+
+			// tag "a" and name/email containing "ann": ann (1) and annie
+			// (4); anna has tag "b". Offset 1 leaves one row.
+			rows, total, err := r.QueryGridWithCount(s.ctx, g, &GridQuery{
+				FilterFields: map[string]any{"tag": "a"},
+				SearchType:   SearchAny,
+				SearchText:   "ann",
+				Sort:         []SortField{{Field: "id", Order: SortAscending}},
+				Limit:        1,
+				Offset:       1,
+			})
+			require.NoError(s.T(), err)
+			require.Len(s.T(), rows, 1)
+			assert.Equal(s.T(), "annie", rows[0].Name)
+			assert.Equal(s.T(), int64(2), total)
+
+			rows, total, err = r.QueryGridWithCount(s.ctx, g, &GridQuery{Limit: 2, Offset: 10})
+			require.NoError(s.T(), err)
+			assert.Empty(s.T(), rows)
+			assert.Equal(s.T(), int64(5), total)
+		})
+	}
+}
+
+func (s *DbxIntegrationSuite) TestInsertIgnore() {
+	for _, v := range s.clientVariants() {
+		s.Run(v.name, func() {
+			s.resetTable()
+			q := s.newQuerier(v.dsn)
+			r, err := NewRepository[dbxUser](q, "users")
+			require.NoError(s.T(), err)
+
+			ok, err := r.InsertIgnore(s.ctx, &dbxUser{Name: "Alice", Email: "alice@x.com"}, "email")
+			require.NoError(s.T(), err)
+			assert.True(s.T(), ok)
+
+			ok, err = r.InsertIgnore(s.ctx, &dbxUser{Name: "Other", Email: "alice@x.com"}, "email")
+			require.NoError(s.T(), err)
+			assert.False(s.T(), ok)
+
+			ok, err = r.InsertIgnore(s.ctx, &dbxUser{Name: "Other", Email: "alice@x.com"})
+			require.NoError(s.T(), err)
+			assert.False(s.T(), ok, "untargeted DO NOTHING ignores the conflict too")
+
+			got, err := r.GetBy(s.ctx, map[string]any{"email": "alice@x.com"})
+			require.NoError(s.T(), err)
+			assert.Equal(s.T(), "Alice", got.Name)
+			n, err := r.Count(s.ctx, nil)
+			require.NoError(s.T(), err)
+			assert.Equal(s.T(), int64(1), n)
+		})
+	}
+}
+
+// retRow is the record type for TestReturning: version is filled by the
+// database (a default on insert, a trigger on update).
+type retRow struct {
+	ID      int64  `db:"id,auto"`
+	Email   string `db:"email"`
+	Name    string `db:"name"`
+	Version int64  `db:"version,auto"`
+}
+
+const retRowsDDL = `
+create table ret_rows(id serial primary key, email text unique not null, name text not null, version int not null default 1, unique (email, name));
+create function ret_rows_bump() returns trigger language plpgsql as $$
+begin
+	new.version := old.version + 1;
+	return new;
+end $$;
+create trigger ret_rows_bump before update on ret_rows for each row execute function ret_rows_bump();`
+
+// TestReturning checks that UpsertReturning/UpdateReturning read back what
+// the database stored, not what was sent.
+func (s *DbxIntegrationSuite) TestReturning() {
+	_, err := s.adminClient.Conn.ExecContext(s.ctx, retRowsDDL)
+	require.NoError(s.T(), err, "failed to create ret_rows")
+	defer func() {
+		_, err := s.adminClient.Conn.ExecContext(s.ctx, "DROP TABLE ret_rows; DROP FUNCTION ret_rows_bump()")
+		require.NoError(s.T(), err, "failed to drop ret_rows")
+	}()
+
+	for _, v := range s.clientVariants() {
+		s.Run(v.name, func() {
+			_, err := s.adminClient.Conn.ExecContext(s.ctx, "TRUNCATE ret_rows RESTART IDENTITY")
+			require.NoError(s.T(), err)
+			q := s.newQuerier(v.dsn)
+			r, err := NewRepository[retRow](q, "ret_rows")
+			require.NoError(s.T(), err)
+
+			rec := &retRow{Email: "a@x.com", Name: "A"}
+			ins, err := r.UpsertReturning(s.ctx, rec, []string{"email"})
+			require.NoError(s.T(), err)
+			assert.NotZero(s.T(), ins.ID)
+			assert.Equal(s.T(), int64(1), ins.Version, "column default")
+			assert.Zero(s.T(), rec.ID, "caller's record is not written")
+
+			upd, err := r.UpsertReturning(s.ctx, &retRow{Email: "a@x.com", Name: "A2"}, []string{"email"})
+			require.NoError(s.T(), err)
+			assert.Equal(s.T(), ins.ID, upd.ID)
+			assert.Equal(s.T(), "A2", upd.Name)
+			assert.Equal(s.T(), int64(2), upd.Version, "update trigger")
+
+			_, err = r.UpsertReturning(s.ctx, &retRow{Email: "a@x.com", Name: "A2"}, []string{"email", "name"})
+			assert.True(s.T(), errors.Is(err, ErrNotFound), "DO NOTHING on an existing row: got %v", err)
+
+			list, err := r.UpdateReturning(s.ctx, map[string]any{"name": "A3"}, gohan.Col("email").Eq("a@x.com"))
+			require.NoError(s.T(), err)
+			require.Len(s.T(), list, 1)
+			assert.Equal(s.T(), retRow{ID: ins.ID, Email: "a@x.com", Name: "A3", Version: 3}, *list[0])
+
+			list, err = r.UpdateReturning(s.ctx, map[string]any{"name": "A4"}, gohan.Col("email").Eq("missing@x.com"))
+			require.NoError(s.T(), err)
+			assert.Empty(s.T(), list)
+		})
+	}
+}
+
+// grpRow is the record type for TestGroupedInsert: every column is
+// omittable, so a record can write any subset, including none.
+type grpRow struct {
+	ID   int64   `db:"id,auto"`
+	Name *string `db:"name" goqu:"omitnil"`
+	Bio  *string `db:"bio" goqu:"omitnil"`
+}
+
+const grpRowsDDL = `create table grp_rows(id serial primary key, name text unique, bio text not null default 'none')`
+
+func (s *DbxIntegrationSuite) TestGroupedInsert() {
+	_, err := s.adminClient.Conn.ExecContext(s.ctx, grpRowsDDL)
+	require.NoError(s.T(), err, "failed to create grp_rows")
+	defer func() {
+		_, err := s.adminClient.Conn.ExecContext(s.ctx, "DROP TABLE grp_rows")
+		require.NoError(s.T(), err, "failed to drop grp_rows")
+	}()
+
+	str := func(v string) *string { return &v }
+	q := s.newQuerier(s.dsn)
+	r, err := NewRepository[grpRow](q, "grp_rows")
+	require.NoError(s.T(), err)
+
+	records := []*grpRow{{Name: str("a")}, {Name: str("b"), Bio: str("bb")}, {}, {Name: str("c")}, {Bio: str("x")}}
+	err = r.Insert(s.ctx, records...)
+	assert.True(s.T(), errors.Is(err, gohan.ErrInconsistentOmit), "default Insert: got %v", err)
+
+	require.NoError(s.T(), r.WithGroupedInserts().Insert(s.ctx, records...))
+
+	got, err := r.List(s.ctx, r.Select().OrderBy(gohan.Col("id").Asc()))
+	require.NoError(s.T(), err)
+	require.Len(s.T(), got, 5)
+	type nb struct{ name, bio string }
+	flat := make([]nb, len(got))
+	for i, g := range got {
+		if g.Name != nil {
+			flat[i].name = *g.Name
+		}
+		flat[i].bio = *g.Bio
+	}
+	// groups in order of their first record: {name}, {name,bio}, {}, {bio}
+	assert.Equal(s.T(), []nb{{"a", "none"}, {"c", "none"}, {"b", "bb"}, {"", "none"}, {"", "x"}}, flat)
+
+	// a failing group rolls back the groups already written
+	err = r.WithGroupedInserts().Insert(s.ctx, &grpRow{Name: str("d")}, &grpRow{Name: str("a"), Bio: str("dup")})
+	require.Error(s.T(), err)
+	n, err := r.Count(s.ctx, nil)
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(5), n)
+}
+
+// --- keyset pagination ---
+
+// ksPgRow is the record type for the keyset pagination tests.
+type ksPgRow struct {
+	ID           int64     `db:"id,auto" json:"id" grid:"sort,filter"`
+	Score        int32     `db:"score" json:"score" grid:"sort,filter"`
+	Name         string    `db:"name" json:"name" grid:"sort,search"`
+	Created      time.Time `db:"created" json:"created" grid:"sort"`
+	CreatedNaive time.Time `db:"created_naive" json:"createdNaive" grid:"sort"`
+	UID          uuid.UUID `db:"uid" json:"uid" grid:"sort"`
+}
+
+const ksPgRowsDDL = `create table keyset_rows(id bigserial primary key, score int not null, name text not null,
+	created timestamptz not null, created_naive timestamp not null, uid uuid not null)`
+
+// ksNames has multi-byte and case-variant names, repeated across rows.
+var ksNames = []string{"alice", "Alice", "ALICE", "Ålund", "ábaco", "zebra", "Zoë", "日本", "b", "émile", "Émile"}
+
+// ksPgSeed inserts n rows: scores repeat every 13 rows, created takes 20
+// distinct microsecond values, created_naive 7 distinct values.
+func ksPgSeed(n int) []*ksPgRow {
+	base := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)
+	rows := make([]*ksPgRow, n)
+	for i := range rows {
+		rows[i] = &ksPgRow{
+			Score:        int32(i % 13),
+			Name:         ksNames[i%len(ksNames)],
+			Created:      base.Add(time.Duration(i%20) * 1234567 * time.Microsecond),
+			CreatedNaive: base.Add(time.Duration(i%7) * 1500 * time.Microsecond),
+			UID:          uuid.New(),
+		}
+	}
+	return rows
+}
+
+// ksWalk fetches pages until HasMore is false, checking the page shape:
+// every page but the last is full, HasMore is set exactly when NextCursor
+// is, and the last page has no cursor.
+func ksWalk[T any](t *testing.T, pageSize int, fetch func(cursor string) (*KeysetPage[T], error)) []*T {
+	t.Helper()
+	var all []*T
+	cursor := ""
+	for i := 0; ; i++ {
+		require.Less(t, i, 10000, "walk does not end")
+		page, err := fetch(cursor)
+		require.NoError(t, err)
+		require.NotNil(t, page.Items)
+		assert.Equal(t, page.HasMore, page.NextCursor != "")
+		all = append(all, page.Items...)
+		if !page.HasMore {
+			assert.LessOrEqual(t, len(page.Items), pageSize)
+			return all
+		}
+		require.Len(t, page.Items, pageSize)
+		cursor = page.NextCursor
+	}
+}
+
+// ksOrdered lists every row of r ordered by keys.
+func ksOrdered[T any](t *testing.T, ctx context.Context, r *Repository[T], keys []KeysetKey) []*T {
+	t.Helper()
+	sel := r.Select()
+	for _, k := range keys {
+		if k.Desc {
+			sel = sel.OrderBy(gohan.Col(k.Column).Desc())
+		} else {
+			sel = sel.OrderBy(gohan.Col(k.Column).Asc())
+		}
+	}
+	rows, err := r.List(ctx, sel)
+	require.NoError(t, err)
+	return rows
+}
+
+func ksPgIDs(rows []*ksPgRow) []int64 {
+	ids := make([]int64, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+// ksForge returns cursor with its key values replaced by keys (fingerprint
+// kept), as a client could.
+func ksForge(t *testing.T, cursor string, keys ...string) string {
+	t.Helper()
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	require.NoError(t, err)
+	var pl cursorPayload
+	require.NoError(t, json.Unmarshal(raw, &pl))
+	pl.K = keys
+	b, err := marshalPayload(pl)
+	require.NoError(t, err)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func (s *DbxIntegrationSuite) TestKeysetPagination() {
+	_, err := s.adminClient.Conn.ExecContext(s.ctx, ksPgRowsDDL)
+	require.NoError(s.T(), err, "failed to create keyset_rows")
+	defer func() {
+		_, err := s.adminClient.Conn.ExecContext(s.ctx, "DROP TABLE keyset_rows")
+		require.NoError(s.T(), err, "failed to drop keyset_rows")
+	}()
+
+	const total = 257
+	keySets := [][]KeysetKey{
+		{KeyAsc("score"), KeyAsc("id")},
+		{KeyDesc("score"), KeyAsc("id")},
+		{KeyDesc("created"), KeyDesc("id")},
+		{KeyAsc("created"), KeyDesc("score"), KeyAsc("id")},
+		{KeyAsc("name"), KeyDesc("id")},
+		{KeyDesc("created_naive"), KeyAsc("id")},
+		{KeyAsc("uid")},
+	}
+
+	for _, v := range s.clientVariants()[:2] {
+		s.Run(v.name, func() {
+			t := s.T()
+			_, err := s.adminClient.Conn.ExecContext(s.ctx, "TRUNCATE keyset_rows RESTART IDENTITY")
+			require.NoError(t, err)
+			q := s.newQuerier(v.dsn)
+			r, err := NewRepository[ksPgRow](q, "keyset_rows")
+			require.NoError(t, err)
+			require.NoError(t, r.Insert(s.ctx, ksPgSeed(total)...))
+
+			// I1: every key set and page size walks the table exactly once,
+			// in List's order.
+			for _, keys := range keySets {
+				want := ksPgIDs(ksOrdered(t, s.ctx, r, keys))
+				require.Len(t, want, total)
+				for _, size := range []int{1, 7, 50, 300} {
+					got := ksWalk(t, size, func(c string) (*KeysetPage[ksPgRow], error) {
+						return r.ListKeyset(s.ctx, nil, keys, size, c)
+					})
+					assert.Equal(t, want, ksPgIDs(got), "keys %v, page size %d", keys, size)
+				}
+			}
+
+			// the filter is applied with the seek predicate
+			where := gohan.Col("score").Lt(5)
+			keys := keySets[0]
+			got := ksWalk(t, 9, func(c string) (*KeysetPage[ksPgRow], error) {
+				return r.ListKeyset(s.ctx, where, keys, 9, c)
+			})
+			wantRows, err := r.List(s.ctx, r.Select().Where(where).OrderBy(gohan.Col("score").Asc(), gohan.Col("id").Asc()))
+			require.NoError(t, err)
+			assert.Equal(t, ksPgIDs(wantRows), ksPgIDs(got))
+
+			// I2: rows inserted before the cursor are not seen, rows inserted
+			// after it are seen once, deleted rows are not seen.
+			first, err := r.ListKeyset(s.ctx, nil, keys, 10, "")
+			require.NoError(t, err)
+			ordered := ksOrdered(t, s.ctx, r, keys)
+			doomed := ordered[len(ordered)-1].ID
+			before := &ksPgRow{Score: -1, Name: "before", Created: time.Now().UTC(), CreatedNaive: time.Now().UTC(), UID: uuid.New()}
+			afterRow := &ksPgRow{Score: 6, Name: "after", Created: time.Now().UTC(), CreatedNaive: time.Now().UTC(), UID: uuid.New()}
+			require.NoError(t, r.Insert(s.ctx, before, afterRow))
+			_, err = r.Delete(s.ctx, gohan.Col("id").Eq(doomed))
+			require.NoError(t, err)
+			rest := ksWalk(t, 10, func(c string) (*KeysetPage[ksPgRow], error) {
+				if c == "" {
+					c = first.NextCursor
+				}
+				return r.ListKeyset(s.ctx, nil, keys, 10, c)
+			})
+			names := map[string]int{}
+			for _, row := range append(first.Items, rest...) {
+				names[row.Name]++
+				assert.NotEqual(t, doomed, row.ID)
+			}
+			assert.Zero(t, names["before"])
+			assert.Equal(t, 1, names["after"])
+			assert.Len(t, append(first.Items, rest...), total) // +1 after, -1 deleted
+
+			// I3: a grid walk returns what QueryGrid returns with the cap
+			// raised.
+			g, err := NewGrid[ksPgRow]()
+			require.NoError(t, err)
+			g.WithTiebreaker("id").WithMaxLimit(0)
+			gq := &GridQuery{
+				FilterFields: map[string]any{"score": []any{float64(1), float64(2), float64(3), float64(6)}},
+				Sort:         []SortField{{Field: "created", Order: SortDescending}, {Field: "name", Order: SortAscending}},
+			}
+			wantGrid, err := r.QueryGrid(s.ctx, g, gq)
+			require.NoError(t, err)
+			require.NotEmpty(t, wantGrid)
+			pq := *gq
+			pq.Limit = 7
+			gotGrid := ksWalk(t, 7, func(c string) (*KeysetPage[ksPgRow], error) {
+				return r.QueryGridKeyset(s.ctx, g, &pq, c)
+			})
+			assert.Equal(t, ksPgIDs(wantGrid), ksPgIDs(gotGrid))
+
+			// I4: forged extreme values give a page or ErrInvalidCursor, never
+			// a database error.
+			forged := []struct {
+				keys []KeysetKey
+				vals []string
+			}{
+				{[]KeysetKey{KeyAsc("score"), KeyAsc("id")}, []string{"2147483647", "9223372036854775807"}},
+				{[]KeysetKey{KeyAsc("score"), KeyAsc("id")}, []string{"-2147483648", "-9223372036854775808"}},
+				{[]KeysetKey{KeyDesc("created"), KeyDesc("id")}, []string{"0001-01-01T00:00:00Z", "1"}},
+				{[]KeysetKey{KeyDesc("created"), KeyDesc("id")}, []string{"9999-12-31T23:59:59.999999Z", "1"}},
+				{[]KeysetKey{KeyAsc("created"), KeyDesc("score"), KeyAsc("id")}, []string{"9999-12-31T23:59:59.999999999Z", "0", "0"}},
+				{[]KeysetKey{KeyDesc("created_naive"), KeyAsc("id")}, []string{"0001-01-01T00:00:00Z", "0"}},
+				{[]KeysetKey{KeyDesc("created_naive"), KeyAsc("id")}, []string{"9999-12-31T23:59:59.999999999Z", "0"}},
+				{[]KeysetKey{KeyAsc("uid")}, []string{"ffffffff-ffff-ffff-ffff-ffffffffffff"}},
+				{[]KeysetKey{KeyAsc("uid")}, []string{"00000000-0000-0000-0000-000000000000"}},
+			}
+			for _, f := range forged {
+				page, err := r.ListKeyset(s.ctx, nil, f.keys, 1, "")
+				require.NoError(t, err)
+				cursor := ksForge(t, page.NextCursor, f.vals...)
+				_, err = r.ListKeyset(s.ctx, nil, f.keys, 5, cursor)
+				if err != nil {
+					assert.ErrorIs(t, err, ErrInvalidCursor, "keys %v vals %v", f.keys, f.vals)
+				}
+			}
 		})
 	}
 }

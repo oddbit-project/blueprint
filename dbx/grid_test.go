@@ -873,3 +873,55 @@ func TestGridTiebreakerConfig(t *testing.T) {
 		assert.False(t, errors.As(err, &gerr))
 	})
 }
+
+func TestGridCaseInsensitiveSearch(t *testing.T) {
+	build := func(t *testing.T, g *Grid[row], d gohan.Dialect, st uint) string {
+		t.Helper()
+		sb, err := g.Build(rowBase(), &GridQuery{SearchType: st, SearchText: "Ali"})
+		require.NoError(t, err)
+		gotSQL, _, err := sb.Build(d)
+		require.NoError(t, err)
+		return gotSQL
+	}
+	newGrid := func(t *testing.T) *Grid[row] {
+		g, err := NewGrid[row]()
+		require.NoError(t, err)
+		return g
+	}
+
+	t.Run("default search is case-sensitive LIKE", func(t *testing.T) {
+		assert.Contains(t, build(t, newGrid(t), gohan.Postgres(), SearchAny), `"name" LIKE $1`)
+	})
+
+	cases := []struct {
+		name string
+		d    gohan.Dialect
+		st   uint
+		want string
+	}{
+		{"postgres any", gohan.Postgres(), SearchAny, `"name" ILIKE $1`},
+		{"postgres start", gohan.Postgres(), SearchStart, `"name" ILIKE $1`},
+		{"postgres end", gohan.Postgres(), SearchEnd, `"name" ILIKE $1`},
+		// SQLite renders LIKE with or without folding (its LIKE already ignores
+		// ASCII case), so this case pins the rendering; it cannot detect
+		// WithCaseInsensitiveSearch being ignored.
+		{"sqlite", gohan.SQLite(), SearchAny, "`name` LIKE ?"},
+		{"clickhouse", gohan.ClickHouse(), SearchAny, `"name" ILIKE ?`},
+	}
+	for _, c := range cases {
+		t.Run("fold "+c.name, func(t *testing.T) {
+			assert.Contains(t, build(t, newGrid(t).WithCaseInsensitiveSearch(), c.d, c.st), c.want)
+		})
+	}
+
+	t.Run("fold keeps prefix and suffix semantics", func(t *testing.T) {
+		g := newGrid(t).WithCaseInsensitiveSearch()
+		for st, want := range map[uint]string{SearchStart: "Ali%", SearchEnd: "%Ali", SearchAny: "%Ali%"} {
+			sb, err := g.Build(rowBase(), &GridQuery{SearchType: st, SearchText: "Ali"})
+			require.NoError(t, err)
+			_, args, err := sb.Build(gohan.Postgres())
+			require.NoError(t, err)
+			assert.Equal(t, want, args[0], "search type %d", st)
+		}
+	})
+}
