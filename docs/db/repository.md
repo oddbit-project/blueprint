@@ -1,5 +1,9 @@
 # db.Repository
 
+!!! warning "Legacy"
+    This page documents the legacy goqu-based `db` package, kept for existing code. New code should
+    use [`dbx`](dbx.md) and [`gohan`](gohan.md); see [Migrating from db to dbx](migrating-to-dbx.md).
+
 Repository pattern implementation with blueprint and goqu. The Repository provides a comprehensive interface-driven abstraction for database operations, composed of multiple specialized interfaces for different operation types.
 
 ## Overview
@@ -1298,7 +1302,7 @@ if err != nil {
 
 ## See Also
 
-- [Database Package Overview](index.md)
+- [Legacy db Package Overview](legacy-overview.md)
 - [Structs and Tags](structs-and-tags.md)
 - [Client Interface Documentation](client.md)
 - [Query Builder Documentation](query-builder.md)

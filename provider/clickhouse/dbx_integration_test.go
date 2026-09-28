@@ -553,3 +553,103 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxTimePrecision() {
 	}
 	assert.ElementsMatch(s.T(), []uint32{1, 2}, gotIDs, "ids remaining after Delete(t9 < tm)")
 }
+
+// TestDbxTimeOutsideUnixNanoRange checks that bound time.Time args outside
+// the range of time.Time.UnixNano (roughly 1678-2262) keep their instant, in
+// UTC and in other locations. See querier.go's dateNamed. Stored values are
+// read back with toString: clickhouse-go v2.40.3's columnar insert and
+// time.Time scanning themselves go wrong past 2262, so neither is a usable
+// baseline here.
+func (s *ClickhouseRepositoryTestSuite) TestDbxTimeOutsideUnixNanoRange() {
+	const table = "dbx_time_range"
+	s.createTable(table, `
+CREATE TABLE %s (
+	id UInt32,
+	t3 DateTime64(3, 'UTC')
+) ENGINE = MergeTree ORDER BY id
+`)
+	defer s.dropTable(table)
+
+	type rec struct {
+		ID uint32    `ch:"id" db:"id"`
+		T3 time.Time `ch:"t3" db:"t3"`
+	}
+	q := s.client.Querier()
+	r, err := dbx.NewRepository[rec](q, table)
+	require.NoError(s.T(), err)
+
+	zone := time.FixedZone("UTC+5", 5*3600)
+	lisbon, err := time.LoadLocation("Europe/Lisbon")
+	require.NoError(s.T(), err)
+	cases := []struct {
+		name string
+		at   time.Time
+	}{
+		{"far future UTC", time.Date(2290, 1, 2, 3, 4, 5, 123000000, time.UTC)},
+		{"far future non-UTC", time.Date(2290, 1, 2, 3, 4, 5, 123000000, time.UTC).In(zone)},
+		{"early UTC", time.Date(1901, 1, 2, 3, 4, 5, 123000000, time.UTC)},
+		{"early non-UTC", time.Date(1901, 1, 2, 3, 4, 5, 123000000, time.UTC).In(zone)},
+		{"in range non-UTC", time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC).In(zone)},
+		{"far future named zone", time.Date(2290, 1, 2, 3, 4, 5, 123000000, time.UTC).In(lisbon)},
+		{"far future Local", time.Date(2290, 1, 2, 3, 4, 5, 123000000, time.UTC).Local()},
+		{"early Local", time.Date(1901, 1, 2, 3, 4, 5, 123000000, time.UTC).Local()},
+		{"in range Local", time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC).Local()},
+		{"pre-2001 Local", time.Date(1990, 1, 2, 3, 4, 5, 123000000, time.UTC).Local()},
+		{"epoch Local", time.Unix(0, 500000000).Local()},
+	}
+	for i, c := range cases {
+		id := uint32(i + 1)
+		want := c.at.UTC().Format("2006-01-02 15:04:05.000")
+
+		// baseline written as a plain literal, no time binding involved
+		_, err := q.Exec(s.ctx, fmt.Sprintf("INSERT INTO %s VALUES (%d, '%s')", table, id, want))
+		require.NoError(s.T(), err, c.name)
+
+		// a bound time.Time must compare equal to the stored instant
+		cnt, err := r.Count(s.ctx, gohan.And(gohan.Col("id").Eq(id), gohan.Col("t3").Eq(c.at)))
+		require.NoError(s.T(), err, c.name)
+		assert.Equal(s.T(), int64(1), cnt, "%s: bound arg must match the stored instant", c.name)
+
+		// and a bound time.Time must be stored as that instant
+		_, err = r.Exec(s.ctx, gohan.Insert(table).Columns("id", "t3").Values(id+100, c.at))
+		require.NoError(s.T(), err, c.name)
+		var got []struct {
+			S string `ch:"s" db:"s"`
+		}
+		require.NoError(s.T(), q.Select(s.ctx, &got, fmt.Sprintf("SELECT toString(t3) AS s FROM %s WHERE id = %d", table, id+100)))
+		require.Len(s.T(), got, 1, c.name)
+		assert.Equal(s.T(), want, got[0].S, "%s: stored value", c.name)
+	}
+}
+
+// TestDbxTimeZoneDateSemantics checks that a bound time.Time in a named zone
+// is compared to a Date column (and passed to toDate) as the calendar day in
+// that zone, not in UTC. See querier.go's dateNamed.
+func (s *ClickhouseRepositoryTestSuite) TestDbxTimeZoneDateSemantics() {
+	const table = "dbx_time_zone_date"
+	s.createTable(table, `
+CREATE TABLE %s (
+	id UInt32,
+	d  Date
+) ENGINE = MergeTree ORDER BY id
+`)
+	defer s.dropTable(table)
+
+	q := s.client.Querier()
+	_, err := q.Exec(s.ctx, fmt.Sprintf("INSERT INTO %s VALUES (1, '2024-06-01')", table))
+	require.NoError(s.T(), err)
+
+	lisbon, err := time.LoadLocation("Europe/Lisbon")
+	require.NoError(s.T(), err)
+	midnight := time.Date(2024, 6, 1, 0, 0, 0, 0, lisbon) // 2024-05-31 23:00 UTC
+
+	type rec struct {
+		ID uint32    `ch:"id" db:"id"`
+		D  time.Time `ch:"d" db:"d"`
+	}
+	r, err := dbx.NewRepository[rec](q, table)
+	require.NoError(s.T(), err)
+	cnt, err := r.Count(s.ctx, gohan.Col("d").Eq(midnight))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(1), cnt, "Date column compared with a Lisbon-midnight time")
+}

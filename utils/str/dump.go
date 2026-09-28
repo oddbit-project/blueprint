@@ -5,6 +5,6 @@ import (
 )
 
 func DumpJSON(src any) string {
-	result, _ := json.MarshalIndent(src, " ", " ")
+	result, _ := json.MarshalIndent(src, "", " ")
 	return string(result)
 }

@@ -22,7 +22,7 @@ type Config struct {
 	TTL            uint   `json:"ttl"`            // TTl in seconds
 	TimeoutSeconds uint   `json:"timeoutSeconds"` // TimeoutSeconds seconds to wait for operation
 	secure.DefaultCredentialConfig
-	tls.ServerConfig
+	tls.ClientConfig
 }
 
 type Client struct {
@@ -41,16 +41,13 @@ func NewConfig() *Config {
 			PasswordEnvVar: "",
 			PasswordFile:   "",
 		},
-		ServerConfig: tls.ServerConfig{
-			TLSCert:            "",
-			TLSKey:             "",
-			TlsKeyCredential:   tls.TlsKeyCredential{},
-			TLSAllowedCACerts:  nil,
-			TLSCipherSuites:    nil,
-			TLSMinVersion:      "",
-			TLSMaxVersion:      "",
-			TLSAllowedDNSNames: nil,
-			TLSEnable:          false,
+		ClientConfig: tls.ClientConfig{
+			TLSCA:                 "",
+			TLSCert:               "",
+			TLSKey:                "",
+			TlsKeyCredential:      tls.TlsKeyCredential{},
+			TLSEnable:             false,
+			TLSInsecureSkipVerify: false,
 		},
 		TTL:            3600 * 24 * 30, // 1 month
 		TimeoutSeconds: 10,
@@ -76,6 +73,11 @@ func NewClient(config *Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	tlsConfig, err := config.TLSConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	var key []byte
 	var cred *secure.Credential
 	var pwd string
@@ -98,13 +100,11 @@ func NewClient(config *Config) (*Client, error) {
 		timeout: time.Duration(config.TimeoutSeconds) * time.Second,
 		ttl:     time.Duration(config.TTL) * time.Second,
 		Redis: redis.NewClient(&redis.Options{
-			Addr:     config.Address,
-			Password: pwd,
-			DB:       config.DB,
+			Addr:      config.Address,
+			Password:  pwd,
+			DB:        config.DB,
+			TLSConfig: tlsConfig,
 		}),
-	}
-	for i := range pwd {
-		[]byte(pwd)[i] = 0
 	}
 	return client, nil
 }
@@ -126,14 +126,8 @@ func (c *Client) Key(key string) string {
 	return c.config.KeyPrefix + key
 }
 
-// Prune stub method for compatibility with kv.KV interface
+// Prune stub method for compatibility with kv.KV interface; Redis expires keys itself
 func (c *Client) Prune() error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
-
-	if err := c.Redis.FlushDB(ctx).Err(); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -165,6 +159,13 @@ func (c *Client) SetTTL(key string, value []byte, ttl time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	return c.Redis.Set(ctx, c.Key(key), value, ttl).Err()
+}
+
+// SetNX sets a value with custom TTL only if the key does not exist; returns true if the key was set
+func (c *Client) SetNX(key string, value []byte, ttl time.Duration) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+	return c.Redis.SetNX(ctx, c.Key(key), value, ttl).Result()
 }
 
 // Delete removes a key

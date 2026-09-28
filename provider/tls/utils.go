@@ -140,9 +140,8 @@ func (c TlsKeyCredential) Fetch() (string, error) {
 				}
 			}
 		} else {
-			// read from env var and clear it
+			// read from env var
 			plainText = env.GetEnvVar(envVar)
-			_ = env.SetEnvVar(envVar, "")
 		}
 	}
 	return plainText, nil

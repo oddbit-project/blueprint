@@ -21,11 +21,11 @@ clientConfig := &tls.ClientConfig{
 }
 
 // For encrypted keys, set the key password
-clientConfig.TlsKeyCredential.Key = "keypassword"
+clientConfig.TlsKeyCredential.Password = "keypassword"
 // Or use environment variables
-clientConfig.TlsKeyCredential.KeyEnvVar = "KEY_PASSWORD"
+clientConfig.TlsKeyCredential.PasswordEnvVar = "KEY_PASSWORD"
 // Or use a file
-clientConfig.TlsKeyCredential.KeyFile = "/path/to/keypassword.txt"
+clientConfig.TlsKeyCredential.PasswordFile = "/path/to/keypassword.txt"
 
 // Generate the TLS configuration
 tlsConfig, err := clientConfig.TLSConfig()
@@ -52,18 +52,18 @@ serverConfig := &tls.ServerConfig{
     TLSKey: "/path/to/server.key",                     // Server private key
     TLSAllowedCACerts: []string{"/path/to/ca.crt"},    // CA certs for client verification
     TLSCipherSuites: []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"}, // Custom cipher suites
-    TLSMinVersion: "1.3",                              // Minimum TLS version
-    TLSMaxVersion: "1.3",                              // Maximum TLS version
+    TLSMinVersion: "TLS13",                            // Minimum TLS version ("TLS12" or "TLS13")
+    TLSMaxVersion: "TLS13",                            // Maximum TLS version ("TLS12" or "TLS13")
     TLSAllowedDNSNames: []string{"client.example.com"}, // Allowed client cert names
     TLSEnable: true,                                   // Enable TLS
 }
 
 // For encrypted keys, set the key password
-serverConfig.TlsKeyCredential.Key = "keypassword"
+serverConfig.TlsKeyCredential.Password = "keypassword"
 // Or use environment variables
-serverConfig.TlsKeyCredential.KeyEnvVar = "KEY_PASSWORD"
+serverConfig.TlsKeyCredential.PasswordEnvVar = "KEY_PASSWORD"
 // Or use a file
-serverConfig.TlsKeyCredential.KeyFile = "/path/to/keypassword.txt"
+serverConfig.TlsKeyCredential.PasswordFile = "/path/to/keypassword.txt"
 
 // Generate the TLS configuration
 tlsConfig, err := serverConfig.TLSConfig()
@@ -75,6 +75,16 @@ if err != nil {
 // ...
 ```
 
+`TLSMinVersion` and `TLSMaxVersion` accept `"TLS12"` or `"TLS13"`; any other value (including `"1.2"` or `"1.3"`)
+makes `TLSConfig()` return `ErrInvalidTlsVersion`. `TLSCipherSuites` accepts the names of the supported AEAD suites
+(for example `"TLS_AES_128_GCM_SHA256"` or `"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"`); an unknown name returns
+`ErrInvalidCipher`. Versions and cipher suites are validated and applied even when `TLSEnable` is set without any
+certificate, key or CA files.
+
+The key password is read from the first non-empty source: `Password`, then `PasswordEnvVar`, then `PasswordFile`.
+An environment variable is read from the process environment and is not cleared after reading, so the password can be
+fetched again (for example when the configuration is rebuilt).
+
 ## Security Features
 
 ### Enhanced Certificate Verification
@@ -85,9 +95,15 @@ The server configuration includes advanced certificate verification that checks:
 - Allowed DNS names in client certificates
 - Certificate integrity
 
+This check is installed only when both `TLSAllowedCACerts` and `TLSAllowedDNSNames` are set. A client certificate is
+accepted if **any** of its DNS names (Subject Alternative Names) is in `TLSAllowedDNSNames`; a certificate with no
+matching DNS name (including one with no DNS SANs at all) is rejected with `ErrForbiddenDNS`. Expired or not yet valid
+certificates are rejected with `ErrExpiredCert`.
+
 ### Secure Defaults
 
-- TLS 1.3 is used by default for both clients and servers
+- Servers default to a minimum of TLS 1.3 when `TLSMinVersion` is empty; `ClientConfig` has no version fields and
+  uses Go's client defaults
 - Strong cipher suites are preferred
 - Client authentication is properly enforced when enabled
 

@@ -45,3 +45,14 @@ type BatchInserter interface {
 	// InsertBatch inserts rows (each a *T) into table in one operation.
 	InsertBatch(ctx context.Context, table string, rows []any) error
 }
+
+// RetryClassifier is implemented by Querier adapters that can tell a
+// transient transaction failure (serialization failure, deadlock, lock
+// contention) from a permanent one. WithTxRetry only retries when the
+// Querier it is given implements RetryClassifier and IsRetryable reports
+// true for the attempt's error.
+type RetryClassifier interface {
+	// IsRetryable reports whether a transaction that failed with err may
+	// succeed if run again from the start.
+	IsRetryable(err error) bool
+}

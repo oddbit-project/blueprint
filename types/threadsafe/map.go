@@ -43,6 +43,9 @@ func (m *Map[K, V]) Get(key K) (V, bool) {
 func (m *Map[K, V]) Set(key K, value V) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.data == nil {
+		m.data = make(map[K]V)
+	}
 	m.data[key] = value
 }
 

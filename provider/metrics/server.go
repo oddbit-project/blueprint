@@ -19,7 +19,9 @@ const (
 	DefaultPort         = 2201
 	DefaultEndpoint     = "/metrics"
 
-	ErrNilConfig = utils.Error("Config is nil")
+	ErrNilConfig       = utils.Error("Config is nil")
+	ErrMissingEndpoint = utils.Error("Endpoint is empty")
+	ErrMissingTLSCert  = utils.Error("TLS is enabled but TLSCert or TLSKey is empty")
 )
 
 type Config struct {
@@ -61,6 +63,21 @@ func NewConfig() *Config {
 }
 
 func (c *Config) Validate() error {
+	if c.Endpoint == "" {
+		return ErrMissingEndpoint
+	}
+	if c.TLSEnable && (c.TLSCert == "" || c.TLSKey == "") {
+		return ErrMissingTLSCert
+	}
+	if c.Port == 0 {
+		c.Port = DefaultPort
+	}
+	if c.ReadTimeout <= 0 {
+		c.ReadTimeout = DefaultReadTimeout
+	}
+	if c.WriteTimeout <= 0 {
+		c.WriteTimeout = DefaultWriteTimeout
+	}
 	return nil
 }
 
@@ -73,7 +90,7 @@ func NewServer(cfg *Config) (*Server, error) {
 }
 
 // NewCustomServer creates a new custom server based on the provided config, Prometheus gatherer, and handler options.
-// It validates the config using the ParseToken method, then creates a new http.ServeMux and registers the Prometheus handler with it.
+// It validates the config using the Validate method, then creates a new http.ServeMux and registers the Prometheus handler with it.
 // The server is created with the specified host, port, router, read timeout, write timeout, and TLS config.
 // Finally, it returns a pointer to the created Server instance.
 // Example usage:
@@ -81,7 +98,7 @@ func NewServer(cfg *Config) (*Server, error) {
 //	cfg := &Config{...}
 //	gatherer := prometheus.DefaultGatherer
 //	opts := promhttp.HandlerOpts{...}
-//	server, err := NewCustomServer(*cfg, gatherer, opts)
+//	server, err := NewCustomServer(cfg, gatherer, opts)
 //	if err != nil {
 //	    // handle error
 //	}
@@ -120,7 +137,7 @@ func NewCustomServer(cfg *Config, gatherer prometheus.Gatherer, opts promhttp.Ha
 // It uses the http.ListenAndServe function if the server's TLSConfig is nil,
 // otherwise it uses the http.ListenAndServeTLS function.
 // The method returns an error if the server fails to start.
-// If the server is shut down using the Shutdown method, the returned error is http.ErrServerClosed.
+// If the server is shut down using the Shutdown method, it returns nil.
 func (s *Server) Start() error {
 	var err error
 	if s.server.TLSConfig == nil {

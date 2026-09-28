@@ -545,7 +545,7 @@ func TestRepositoryQueryGrid(t *testing.T) {
 	g, err := NewGrid[gridUser]()
 	require.NoError(t, err)
 
-	mock.ExpectQuery(`SELECT "id", "name", "email" FROM "users" WHERE "email" = $1 ORDER BY "name" ASC`).
+	mock.ExpectQuery(`SELECT "id", "name", "email" FROM "users" WHERE "email" = $1 ORDER BY "name" ASC LIMIT 1000 OFFSET 0`).
 		WithArgs("bob@x.com").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).AddRow(int64(1), "Bob", "bob@x.com"))
 

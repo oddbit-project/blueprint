@@ -13,6 +13,12 @@ type KV interface {
 	Prune() error
 }
 
+// AtomicSetter is implemented by KV backends that support an atomic set-if-not-exists operation
+type AtomicSetter interface {
+	// SetNX sets a key value with ttl only if the key does not exist; returns true if the key was set
+	SetNX(k string, v []byte, ttl time.Duration) (bool, error)
+}
+
 type record struct {
 	data    []byte
 	created time.Time
@@ -57,18 +63,35 @@ func (mkv *memkv) SetTTL(k string, v []byte, ttl time.Duration) error {
 // Get fetches a value
 func (mkv *memkv) Get(k string) ([]byte, error) {
 	mkv.m.RLock()
-	defer mkv.m.RUnlock()
 	v, ok := mkv.data[k]
+	mkv.m.RUnlock()
 	if !ok {
 		return nil, nil // not found
 	}
-	if v.ttl >= 0 {
-		if v.ttl < time.Since(v.created) {
+	if v.expired(time.Now()) {
+		mkv.m.Lock()
+		if mkv.data[k] == v {
 			delete(mkv.data, k)
-			return nil, nil // not found
 		}
+		mkv.m.Unlock()
+		return nil, nil // not found
 	}
 	return v.data, nil
+}
+
+// SetNX sets a key value with ttl only if the key does not exist or is expired
+func (mkv *memkv) SetNX(k string, v []byte, ttl time.Duration) (bool, error) {
+	mkv.m.Lock()
+	defer mkv.m.Unlock()
+	if r, ok := mkv.data[k]; ok && !r.expired(time.Now()) {
+		return false, nil
+	}
+	mkv.data[k] = &record{
+		data:    v,
+		created: time.Now(),
+		ttl:     ttl,
+	}
+	return true, nil
 }
 
 // Del remove a value
@@ -82,16 +105,17 @@ func (mkv *memkv) Delete(k string) error {
 // Prune removes expired records
 func (mkv *memkv) Prune() error {
 	now := time.Now()
-	expired := make([]string, 0)
-	mkv.m.RLock()
+	mkv.m.Lock()
+	defer mkv.m.Unlock()
 	for k, v := range mkv.data {
-		if v.ttl > 0 && v.ttl < now.Sub(v.created) {
-			expired = append(expired, k)
+		if v.expired(now) {
+			delete(mkv.data, k)
 		}
 	}
-	mkv.m.RUnlock()
-	for _, id := range expired {
-		_ = mkv.Delete(id)
-	}
 	return nil
+}
+
+// expired returns true if the record has a positive ttl that elapsed; ttl <= 0 means no expiry
+func (r *record) expired(now time.Time) bool {
+	return r.ttl > 0 && now.Sub(r.created) > r.ttl
 }

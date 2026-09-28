@@ -18,6 +18,7 @@ type Server struct {
 }
 
 // NewServer creates a new prometheus server using httpserver
+// If cfg.Enabled is false, it returns a nil server and a nil error.
 //
 // Example usage:
 //
@@ -30,6 +31,9 @@ type Server struct {
 func NewServer(cfg *Config, logger *log.Logger, cs ...prometheus.Collector) (*Server, error) {
 	if cfg == nil {
 		cfg = NewConfig()
+	}
+	if !cfg.Enabled {
+		return nil, nil
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -69,6 +73,9 @@ func NewServer(cfg *Config, logger *log.Logger, cs ...prometheus.Collector) (*Se
 
 // NewServer creates and returns a new Server instance with the given logger and optional prometheus collectors.
 func (c *Config) NewServer(logger *log.Logger, cs ...prometheus.Collector) (*Server, error) {
+	if !c.Enabled {
+		return nil, nil
+	}
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}

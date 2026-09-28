@@ -396,7 +396,9 @@ func setupWebAppMiddleware(server *httpserver.Server, logger *log.Logger) {
     backend := kv.NewMemoryKV()
     sessionConfig := session.NewConfig()
     sessionConfig.Secure = false // For development over HTTP
-    sessionManager := server.UseSession(sessionConfig, backend, logger)
+    if _, err := server.UseSession(sessionConfig, backend, logger); err != nil {
+        logger.Fatal(err, "failed to initialize sessions")
+    }
     
     // 4. CSRF protection
     server.UseCSRFProtection()

@@ -46,9 +46,8 @@ func (c DefaultCredentialConfig) Fetch() (string, error) {
 				}
 			}
 		} else {
-			// read from env var and clear it
+			// read from env var
 			plainText = env.GetEnvVar(envVar)
-			_ = env.SetEnvVar(envVar, "")
 		}
 	}
 	return plainText, nil
@@ -80,9 +79,8 @@ func (c KeyConfig) Fetch() (string, error) {
 				}
 			}
 		} else {
-			// read from env var and clear it
+			// read from env var
 			plainText = env.GetEnvVar(envVar)
-			_ = env.SetEnvVar(envVar, "")
 		}
 	}
 	return plainText, nil

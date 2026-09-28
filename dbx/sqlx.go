@@ -3,6 +3,7 @@ package dbx
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/jmoiron/sqlx"
 
@@ -17,8 +18,9 @@ type SQLQuerier struct {
 }
 
 var (
-	_ Querier    = (*SQLQuerier)(nil)
-	_ TxBeginner = (*SQLQuerier)(nil)
+	_ Querier         = (*SQLQuerier)(nil)
+	_ TxBeginner      = (*SQLQuerier)(nil)
+	_ RetryClassifier = (*SQLQuerier)(nil)
 )
 
 // NewSQL returns a Querier/TxBeginner over conn, building statements for
@@ -74,6 +76,47 @@ func (q *SQLQuerier) BeginTx(ctx context.Context, opts *sql.TxOptions) (TxQuerie
 		return nil, err
 	}
 	return &sqlTx{tx: tx, d: q.d}, nil
+}
+
+const (
+	// pgSerializationFailure and pgDeadlockDetected are the PostgreSQL
+	// SQLSTATEs of a transaction aborted by a serialization conflict or a
+	// deadlock; both succeed when the transaction is run again.
+	pgSerializationFailure = "40001"
+	pgDeadlockDetected     = "40P01"
+
+	// sqliteBusy and sqliteLocked are the SQLite primary result codes
+	// SQLITE_BUSY and SQLITE_LOCKED; extended codes carry the primary code
+	// in their low byte.
+	sqliteBusy   = 5
+	sqliteLocked = 6
+)
+
+// IsRetryable implements RetryClassifier, classifying err by q's dialect:
+//   - PostgreSQL: a driver error with SQLSTATE 40001 (serialization_failure)
+//     or 40P01 (deadlock_detected), matched through its SQLState() method,
+//     which both pgx's *pgconn.PgError and lib/pq's *pq.Error provide;
+//   - SQLite: a driver error whose Code() (modernc.org/sqlite's *Error, as
+//     used by provider/sqlite) is SQLITE_BUSY or SQLITE_LOCKED, including
+//     their extended codes such as SQLITE_BUSY_SNAPSHOT.
+//
+// Any other error, or dialect, is not retryable.
+func (q *SQLQuerier) IsRetryable(err error) bool {
+	switch q.d.Name() {
+	case "postgres":
+		var pgErr interface{ SQLState() string }
+		if errors.As(err, &pgErr) {
+			state := pgErr.SQLState()
+			return state == pgSerializationFailure || state == pgDeadlockDetected
+		}
+	case "sqlite":
+		var liteErr interface{ Code() int }
+		if errors.As(err, &liteErr) {
+			code := liteErr.Code() & 0xff
+			return code == sqliteBusy || code == sqliteLocked
+		}
+	}
+	return false
 }
 
 // sqlxExecer is the subset of *sqlx.DB / *sqlx.Tx that execRowsAffected

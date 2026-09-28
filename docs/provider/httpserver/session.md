@@ -85,8 +85,7 @@ func setupRedisSession(server *httpserver.Server, logger *log.Logger) {
     // Redis configuration
     redisConfig := redis.NewConfig()
     redisConfig.Address = "redis:6379"
-    redisConfig.Database = 1
-    redisConfig.PoolSize = 10
+    redisConfig.DB = 1
     
     // Create Redis client
     redisClient, err := redis.NewClient(redisConfig)
@@ -675,19 +674,29 @@ backend := kv.NewMemoryKV()
 redisConfig := redis.NewConfig()
 redisConfig.Address = "redis-cluster:6379"
 redisConfig.Password = "redis-password"
-redisConfig.Database = 1
-redisConfig.PoolSize = 20
+redisConfig.DB = 1
 
 backend, err := redis.NewClient(redisConfig)
 // Pros: Distributed, persistent, scalable
 // Cons: Network latency, additional infrastructure
 ```
 
+Redis expires session keys through the TTL set on each write, so the store's periodic `Prune()` call
+is a no-op for the Redis backend.
+
 ### Custom Backend
 
 ```go
+// CustomKV must implement all methods of kv.KV
+var _ kv.KV = (*CustomKV)(nil)
+
 type CustomKV struct {
     // Your implementation
+}
+
+func (c *CustomKV) Set(key string, value []byte) error {
+    // Store without TTL
+    return nil
 }
 
 func (c *CustomKV) SetTTL(key string, value []byte, ttl time.Duration) error {
@@ -696,7 +705,7 @@ func (c *CustomKV) SetTTL(key string, value []byte, ttl time.Duration) error {
 }
 
 func (c *CustomKV) Get(key string) ([]byte, error) {
-    // Retrieve value
+    // Retrieve value; return nil, nil if the key is missing or expired
     return nil, nil
 }
 
@@ -1043,7 +1052,14 @@ func getSessionConfig(env string) *session.Config {
 ### Debug Logging
 
 ```go
-logger := log.New("session")
-logger.SetLevel(log.LevelDebug)
-sessionManager := server.UseSession(config, backend, logger)
+logConfig := log.NewDefaultConfig()
+logConfig.Level = "debug"
+logger, err := logConfig.ModuleLogger("session")
+if err != nil {
+    panic(err)
+}
+sessionManager, err := server.UseSession(config, backend, logger)
+if err != nil {
+    logger.Fatal(err, "failed to setup sessions")
+}
 ```

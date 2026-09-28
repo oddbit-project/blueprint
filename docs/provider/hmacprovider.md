@@ -27,7 +27,7 @@ The HMAC Provider implements HMAC-SHA256 signatures with two operation modes:
 
 ### Key Features
 
-- **Replay Attack Prevention**: Nonce-based protection with atomic check-and-set
+- **Replay Attack Prevention**: Nonce-based protection with atomic check-and-set (memory and Redis stores, and KV backends implementing `kv.AtomicSetter`)
 - **Timing Attack Resistance**: Constant-time comparisons for security
 - **DoS Protection**: Configurable input size limits (default: 32MB)
 - **Pluggable Storage**: Memory, Redis, and generic KV backends
@@ -65,7 +65,7 @@ The HMAC Provider consists of several components working together:
 - **Timing Attack Resistance**: Constant-time HMAC verification
 - **Input Size Limits**: Prevents memory exhaustion attacks
 - **Timestamp Validation**: Configurable time windows for clock drift
-- **Atomic Operations**: Thread-safe nonce consumption
+- **Atomic Operations**: Thread-safe nonce consumption; the generic KV store is atomic only when the backend implements `kv.AtomicSetter`
 - **Secure Storage**: Integration with encrypted credential system
 - **Fail-Safe Defaults**: Secure configuration out of the box
 
@@ -333,7 +333,8 @@ provider := hmacprovider.NewHmacProvider(keyProvider,
 **Eviction Policies:**
 - `EvictNone()`: No automatic eviction (default)
 - `EvictAll()`: Remove all nonces when at capacity
-- `EvictHalfLife()`: Remove nonces older than TTL/2
+- `EvictHalfLife()`: Remove nonces older than TTL/2. An evicted nonce can be replayed while its timestamp is still
+  accepted, so keep the TTL well above twice the timestamp tolerance (the defaults, 4h TTL and 5m tolerance, are safe)
 
 **Best For:** Single-instance applications, development, low-traffic APIs
 
@@ -350,7 +351,7 @@ import (
 // Configure Redis client
 config := redis.NewConfig()
 config.Address = "localhost:6379"
-config.Database = 1
+config.DB = 1
 
 redisClient, err := redis.NewClient(config)
 if err != nil {
@@ -358,10 +359,11 @@ if err != nil {
 }
 
 // Create Redis nonce store
-redisStore := store.NewRedisStore(
-	redisClient, 
-	1*time.Hour,     // TTL
-    "hmac:nonce:",   // Key prefix
+redisStore := store.NewRedisNonceStore(
+	redisClient,
+	1*time.Hour,                      // TTL
+	store.WithPrefix("hmac:nonce:"),  // key prefix (default "nonce:")
+	store.WithTimeout(2*time.Second), // per-operation timeout (default 5s)
 )
 
 provider := hmacprovider.NewHmacProvider(keyProvider,
@@ -371,9 +373,11 @@ provider := hmacprovider.NewHmacProvider(keyProvider,
 
 **Features:**
 - Atomic SetNX operations
-- Configurable key prefix for namespacing
+- Configurable key prefix for namespacing (`WithPrefix`); the client's `KeyPrefix` is not applied to nonce keys
 - Automatic TTL management
-- Network timeout handling
+- Network timeout handling (`WithTimeout`); on a Redis error the nonce is rejected
+
+Calling `Close()` on the nonce store closes the Redis client passed to `NewRedisNonceStore`.
 
 **Best For:** Multi-instance deployments, high-traffic APIs, production systems
 
@@ -396,6 +400,11 @@ provider := hmacprovider.NewHmacProvider(keyProvider,
 	hmacprovider.WithNonceStore(kvStore),
 )
 ```
+
+If the backend implements `kv.AtomicSetter` (`SetNX`), the nonce check-and-set is a single atomic
+operation; both `kv.NewMemoryKV()` and the Redis client implement it. Other backends fall back to a
+`Get` followed by `SetTTL`, which is not atomic: two concurrent requests with the same nonce can both
+be accepted.
 
 **Best For:** Custom storage requirements, existing KV infrastructure
 

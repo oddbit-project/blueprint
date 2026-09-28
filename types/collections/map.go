@@ -26,6 +26,9 @@ func (m *Map[K, V]) Contains(key K) bool {
 func (m *Map[K, V]) Add(key K, value V) {
 	m.Lock()
 	defer m.Unlock()
+	if m.data == nil {
+		m.data = make(map[K]V)
+	}
 	m.data[key] = value
 }
 

@@ -84,6 +84,20 @@ func main() {
 }
 ```
 
+## dbx repositories
+
+New code should use typed [`dbx` repositories](../db/dbx.md#clickhouse) over the client's
+`Querier()` rather than the repository below: statements are built with gohan (values always
+bound, identifiers always escaped), and `dbx.NewRepository` checks that a record's `ch` tags map
+the same columns as its `db` tags (`Querier.CheckRecord`, `ErrRecordMapping`).
+
+```go
+q := client.Querier()
+repo, err := dbx.NewRepository[Event](q, "events")
+```
+
+See [Migrating to dbx](../db/migrating-to-dbx.md) for moving existing code.
+
 ## Repository Interface
 
 The client provides a Repository interface that implements the following operations:

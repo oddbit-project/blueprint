@@ -94,8 +94,8 @@ serverConfig := &httpserver.ServerConfig{
             "demo-client.example.com",
             "client.blueprint.demo",
         },
-        TLSMinVersion: "1.3",                // Use TLS 1.3
-        TLSMaxVersion: "1.3",
+        TLSMinVersion: "TLS13",              // Use TLS 1.3
+        TLSMaxVersion: "TLS13",
         TLSCipherSuites: []string{           // Strong cipher suites
             "TLS_AES_256_GCM_SHA384",
             "TLS_CHACHA20_POLY1305_SHA256",

@@ -4,6 +4,24 @@ All notable changes to the Blueprint PostgreSQL provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+## [v0.10.0] - 2026-09-28
+
+Requires Blueprint core v0.12.0.
+
+### Added
+
+- `WithTxSession`: runs a function in a transaction after applying transaction-local custom settings
+  (`set_config(..., true)`, bound values, sorted order) and an optional `SET LOCAL ROLE`, so
+  tenant/RLS session state cannot leak across pooled connections. Setting names must be custom
+  (dotted) parameter names, distinct ignoring case; the role must be at most 63 bytes, without a
+  dot, and not `*`. Adds `ErrInvalidSettingName`, `ErrInvalidRoleName` and `ErrNotPostgres`.
+
+### Changed
+
+- Bumped `gohan` to v0.3.0.
+
 ## [v0.9.1] - 2026-09-28
 
 Requires Blueprint core v0.11.1.

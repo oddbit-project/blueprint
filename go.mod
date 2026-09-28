@@ -53,7 +53,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/oddbit-project/gohan v0.2.0
+	github.com/oddbit-project/gohan v0.3.0
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 )
@@ -199,6 +199,7 @@ replace (
 	github.com/oddbit-project/blueprint/provider/mqtt => ./provider/mqtt
 	github.com/oddbit-project/blueprint/provider/nats => ./provider/nats
 	github.com/oddbit-project/blueprint/provider/pgsql => ./provider/pgsql
+	github.com/oddbit-project/blueprint/provider/prometheus => ./provider/prometheus
 	github.com/oddbit-project/blueprint/provider/redis => ./provider/redis
 	github.com/oddbit-project/blueprint/provider/s3 => ./provider/s3
 	github.com/oddbit-project/blueprint/provider/smtp => ./provider/smtp

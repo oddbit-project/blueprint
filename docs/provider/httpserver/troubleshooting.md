@@ -231,10 +231,14 @@ func debugSessionStorage(c *gin.Context) {
 ```go
 // Wrong order - CSRF before sessions
 server.UseCSRFProtection()
-server.UseSession(config, backend, logger)
+if _, err := server.UseSession(config, backend, logger); err != nil {
+    return err
+}
 
 // Correct order - sessions before CSRF
-server.UseSession(config, backend, logger)
+if _, err := server.UseSession(config, backend, logger); err != nil {
+    return err
+}
 server.UseCSRFProtection()
 ```
 
@@ -287,7 +291,9 @@ func debugCSRFToken(c *gin.Context) {
 2. **Verify middleware order:**
 ```go
 // Sessions must come before CSRF protection
-server.UseSession(config, backend, logger)
+if _, err := server.UseSession(config, backend, logger); err != nil {
+    return err
+}
 server.UseCSRFProtection()
 ```
 

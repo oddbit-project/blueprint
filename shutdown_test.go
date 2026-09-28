@@ -1,11 +1,17 @@
 package blueprint
 
 import (
+	"bytes"
+	"errors"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/oddbit-project/blueprint/types/callstack"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -137,4 +143,177 @@ func TestShutdownManager(t *testing.T) {
 		assert.True(t, executed)
 		assert.Nil(t, appDestructors)
 	})
+}
+
+func TestShutdown_LogsDestructorErrors(t *testing.T) {
+	originalDestructors := appDestructors
+	originalLogger := zlog.Logger
+	defer func() {
+		appDestructors = originalDestructors
+		zlog.Logger = originalLogger
+	}()
+
+	var buf bytes.Buffer
+	zlog.Logger = zerolog.New(&buf)
+	appDestructors = callstack.NewCallStack()
+
+	RegisterDestructor(func() error { return errors.New("destructor failure") })
+	Shutdown(nil)
+
+	assert.Contains(t, buf.String(), "Error while shutting down")
+	assert.Contains(t, buf.String(), "destructor failure")
+}
+
+func TestRegisterDestructor_AfterShutdown(t *testing.T) {
+	originalDestructors := appDestructors
+	defer func() {
+		appDestructors = originalDestructors
+	}()
+
+	appDestructors = callstack.NewCallStack()
+	Shutdown(nil)
+
+	assert.NotPanics(t, func() {
+		RegisterDestructor(func() error { return nil })
+	})
+	assert.Nil(t, GetDestructorManager())
+}
+
+func TestRegisterDestructor_ConcurrentWithShutdown(t *testing.T) {
+	originalDestructors := appDestructors
+	defer func() {
+		appDestructors = originalDestructors
+	}()
+
+	appDestructors = callstack.NewCallStack()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			RegisterDestructor(func() error { return nil })
+			GetDestructorManager()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		Shutdown(nil)
+	}()
+	wg.Wait()
+	assert.Nil(t, GetDestructorManager())
+}
+
+func TestShutdown_DestructorRegistersDestructor(t *testing.T) {
+	originalDestructors := appDestructors
+	defer func() {
+		appDestructors = originalDestructors
+	}()
+
+	appDestructors = callstack.NewCallStack()
+
+	lateRan := false
+	RegisterDestructor(func() error {
+		RegisterDestructor(func() error {
+			lateRan = true
+			return nil
+		})
+		_ = GetDestructorManager()
+		return nil
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		Shutdown(nil)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown deadlocked when a destructor called RegisterDestructor")
+	}
+	assert.False(t, lateRan)
+	assert.Nil(t, GetDestructorManager())
+}
+
+func TestShutdown_ConcurrentCallerDoesNotWait(t *testing.T) {
+	originalDestructors := appDestructors
+	defer func() {
+		appDestructors = originalDestructors
+	}()
+
+	appDestructors = callstack.NewCallStack()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var finished atomic.Bool
+	RegisterDestructor(func() error {
+		close(started)
+		<-release
+		finished.Store(true)
+		return nil
+	})
+
+	go Shutdown(nil)
+	<-started
+
+	second := make(chan struct{})
+	go func() {
+		defer close(second)
+		Shutdown(nil)
+	}()
+	select {
+	case <-second:
+	case <-time.After(2 * time.Second):
+		t.Fatal("second Shutdown blocked while destructors were running")
+	}
+
+	waited := make(chan struct{})
+	go func() {
+		defer close(waited)
+		waitShutdown()
+	}()
+	select {
+	case <-waited:
+		t.Fatal("waitShutdown returned before destructors finished")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case <-waited:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitShutdown did not return")
+	}
+	assert.True(t, finished.Load())
+}
+
+func TestShutdown_DestructorCallsShutdown(t *testing.T) {
+	originalDestructors := appDestructors
+	defer func() {
+		appDestructors = originalDestructors
+	}()
+
+	appDestructors = callstack.NewCallStack()
+
+	ran := false
+	RegisterDestructor(func() error {
+		Shutdown(nil)
+		ran = true
+		return nil
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		Shutdown(nil)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown deadlocked when a destructor called Shutdown")
+	}
+	assert.True(t, ran)
 }

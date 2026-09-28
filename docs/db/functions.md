@@ -1,5 +1,9 @@
 # Database Functions
 
+!!! warning "Legacy"
+    This page documents the legacy goqu-based `db` package, kept for existing code. New code should
+    use [`dbx`](dbx.md) and [`gohan`](gohan.md); see [Migrating from db to dbx](migrating-to-dbx.md).
+
 The database functions module provides low-level database operations and utilities for advanced use cases. These functions offer direct SQL execution capabilities with intelligent result scanning and type detection.
 
 ## Overview
@@ -641,4 +645,4 @@ func batchUpdateUsers(ctx context.Context, client db.Client, updates []UserUpdat
 - [Repository Documentation](repository.md)
 - [Query Builder Documentation](query-builder.md)
 - [Client Documentation](client.md)
-- [Database Package Overview](index.md)
+- [Legacy db Package Overview](legacy-overview.md)

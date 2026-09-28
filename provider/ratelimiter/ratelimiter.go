@@ -69,8 +69,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// NewRateLimiter creates a rate limiter with TTL and cleanup
+// NewRateLimiter creates a rate limiter with TTL and cleanup; if cfg is nil, default values are used
 func NewRateLimiter(cfg *Config) (*RateLimiter, error) {
+	if cfg == nil {
+		cfg = NewConfig()
+	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -153,10 +156,14 @@ func (r *RateLimiter) Shutdown() {
 	})
 }
 
-// ShutdownWithContext stops cleanup goroutine with timeout
+// ShutdownWithContext stops cleanup goroutine with timeout; returns immediately if Start was never called
 func (r *RateLimiter) ShutdownWithContext(ctx context.Context) error {
 	r.stopOnce.Do(func() {
 		close(r.stopCleanup)
+	})
+	// if never started, prevent a later start and mark cleanup as done
+	r.startOnce.Do(func() {
+		close(r.done)
 	})
 
 	select {

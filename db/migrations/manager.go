@@ -48,21 +48,21 @@ func DefaultProgressFn(msgType int, migrationName string, e error) {
 	var msg string
 	switch msgType {
 	case MsgRunMigration:
-		msg = console.Regular(fmt.Sprintf("Running migration '%s'...", migrationName))
+		msg = console.Regular("%s", fmt.Sprintf("Running migration '%s'...", migrationName))
 	case MsgFinishedMigration:
-		msg = console.Regular(fmt.Sprintf("Migration '%s' finished successfully", migrationName))
+		msg = console.Regular("%s", fmt.Sprintf("Migration '%s' finished successfully", migrationName))
 	case MsgSkipMigration:
-		msg = console.Info(fmt.Sprintf("Migration '%s' already run, skipping", migrationName))
+		msg = console.Info("%s", fmt.Sprintf("Migration '%s' already run, skipping", migrationName))
 
 	case MsgError:
 		msgE := "-"
 		if e != nil {
 			msgE = e.Error()
 		}
-		msg = console.Error(fmt.Sprintf("Error executing migration '%s': %s", migrationName, msgE))
+		msg = console.Error("%s", fmt.Sprintf("Error executing migration '%s': %s", migrationName, msgE))
 
 	default:
-		msg = console.Regular(fmt.Sprintf("Running migration '%s'...", migrationName))
+		msg = console.Regular("%s", fmt.Sprintf("Running migration '%s'...", migrationName))
 	}
 	fmt.Println(msg)
 }

@@ -1,4 +1,4 @@
-// Package duration provides a JSON-friendly duration type for goauth
+// Package duration provides a JSON-friendly duration type for
 // configuration. Values are stored as whole seconds (int64) so they
 // serialize as a plain integer, matching the OAuth/OIDC `expires_in`
 // convention and giving operators a config file they can read at a

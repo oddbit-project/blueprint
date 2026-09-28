@@ -4,6 +4,37 @@ All notable changes to the Blueprint Redis provider will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+## [v0.9.0] - 2026-09-28
+
+Requires Blueprint core v0.12.0.
+
+### Breaking changes
+
+- **`Config` embeds `tls.ClientConfig` instead of `tls.ServerConfig`.** The server-only fields
+  `TLSAllowedCACerts` (`tlsAllowedCACerts`), `TLSCipherSuites`, `TLSMinVersion`, `TLSMaxVersion`
+  and `TLSAllowedDNSNames` are gone; Go code using them no longer compiles, and JSON configs
+  using them are silently ignored. Use `TLSCA` (`tlsCa`) for the CA that signs the Redis server
+  certificate and `TLSInsecureSkipVerify` (`tlsInsecureSkipVerify`) to skip verification.
+  `TLSCert`/`TLSKey` are now the *client* certificate for mutual TLS.
+- **`TLSEnable` is now honoured.** It used to be ignored and the client connected in plaintext.
+  A config with `TLSEnable: true` pointing at a plaintext Redis will now fail to connect; turn it
+  off or enable TLS on the server.
+- **`Prune()` is a no-op.** It used to run `FLUSHDB`. Code that called `Prune()` to empty the
+  database must call `client.Redis.FlushDB` explicitly.
+
+### Added
+
+- `Client.SetNX`, implementing `kv.AtomicSetter` (added in the next core release).
+
+### Fixed
+
+- **`Prune()` ran `FLUSHDB`**, wiping the whole Redis database, including on every session-store
+  cleanup tick when used as the session backend. It is now a no-op; Redis expires keys itself.
+- `TLSEnable=true` connected in plaintext; the TLS configuration is now applied.
+- Removed a password-zeroing loop that had no effect.
+
 ## [v0.8.2] - 2026-09-20
 
 ### Security

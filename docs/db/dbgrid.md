@@ -1,5 +1,9 @@
 # db.Grid
 
+!!! warning "Legacy"
+    This page documents the legacy goqu-based `db` package, kept for existing code. New code should
+    use [`dbx`](dbx.md) and [`gohan`](gohan.md); see [Migrating from db to dbx](migrating-to-dbx.md).
+
 Data grid component for building dynamic SQL queries with filtering, sorting, searching, and pagination capabilities. The Grid component is integrated with the Repository through the GridOps interface.
 
 ## Overview
@@ -503,7 +507,7 @@ For more detailed information on using Grid with Repository, see the [Repository
 
 ## See Also
 
-- [Database Package Overview](index.md)
+- [Legacy db Package Overview](legacy-overview.md)
 - [Structs and Tags](structs-and-tags.md)
 - [Repository Documentation](repository.md)
 - [Field Specifications](fields.md)

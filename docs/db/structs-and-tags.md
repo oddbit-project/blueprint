@@ -37,7 +37,7 @@ type User struct {
     CreatedAt   time.Time `db:"created_at" json:"createdAt" goqu:"skipupdate" grid:"sort"`
     UpdatedAt   time.Time `db:"updated_at" json:"updatedAt" auto:"true"`
     DeletedAt   *time.Time `db:"deleted_at" json:"deletedAt,omitempty" goqu:"omitnil"`
-    ProfileData string    `db:"profile_data" json:"-" mapper:"json"`
+    ProfileData string    `db:"profile_data" json:"-"`
 }
 ```
 
@@ -66,17 +66,38 @@ type User struct {
 }
 ```
 
-### `ch` Tag (ClickHouse Alternative)
+### `ch` Tag (ClickHouse)
 
-Alternative database tag specifically for ClickHouse databases. When present, it takes precedence over the `db` tag for ClickHouse operations.
+The ClickHouse column name. Two different pieces of code read it, with opposite precedence:
+
+- **Blueprint's field metadata** (`db/field`, and `gohan/field` for `dbx`), which builds grids and
+  `dbx` column lists, uses the `db` tag. The `ch` tag is used only when a field has no `db` tag.
+- **clickhouse-go**, which scans and inserts rows for both the legacy `provider/clickhouse`
+  repository and `dbx`'s ClickHouse `Querier`, reads only the `ch` tag, falling back to the Go
+  field name as written (`Name`, not `name`). It ignores the `db` tag.
+
+**Legacy `provider/clickhouse` repository.** `Fetch*`, `Insert` and `InsertAsync` go through
+clickhouse-go, so there the `ch` tag is the column name. The grid (`QueryGrid`) resolves columns
+from the `db` tag, so a field whose `db` and `ch` names differ is scanned from one column and
+filtered or sorted on another.
+
+**`dbx` over ClickHouse** (`dbx.NewRepository[T](client.Querier(), table)`). `dbx` selects and
+inserts the columns named by the `db` tags, and clickhouse-go maps them back by the `ch` tags, so
+both must name the same column. Give every field a `ch` tag equal to its `db` tag, or use only
+`ch` tags:
 
 ```go
 type Event struct {
-    ID        int       `db:"id" ch:"event_id"`
-    Timestamp time.Time `db:"created_at" ch:"timestamp"`
-    Data      string    `db:"data" ch:"event_data"`
+    ID        uint64    `db:"id" ch:"id"`
+    Timestamp time.Time `db:"created_at" ch:"created_at"`
+    Data      string    `ch:"data"` // no db tag: the ch tag is the column for dbx too
 }
 ```
+
+`dbx.NewRepository` rejects a record that breaks this rule with `clickhouse.ErrRecordMapping`,
+naming each offending column: `db:"id" ch:"event_id"` is rejected, and so is a field with only a
+`db` tag whose Go name differs from the column (`Name string` with `db:"name"` is `Name` to
+clickhouse-go). See [dbx: Record types need matching `ch` tags](dbx.md#record-types-need-matching-ch-tags).
 
 ## Query Behavior Tags
 
@@ -86,18 +107,23 @@ Controls query generation behavior for insert and update operations.
 
 ```go
 type User struct {
-    ID        int       `db:"id" goqu:"skipinsert"`     // Never included in INSERT
-    CreatedAt time.Time `db:"created_at" goqu:"skipupdate"` // Never included in UPDATE
+    ID        int       `db:"id" goqu:"skipinsert"`     // Auto: never in INSERT or UPDATE
+    CreatedAt time.Time `db:"created_at" goqu:"skipupdate"` // Also auto: never in INSERT or UPDATE
     Phone     string    `db:"phone" goqu:"omitempty"`   // Skip if empty string
     Address   *string   `db:"address" goqu:"omitnil"`   // Skip if nil pointer
 }
 ```
 
 **Available Options:**
-- `skipinsert` - Exclude from INSERT operations (auto-generated fields)
-- `skipupdate` - Exclude from UPDATE operations (immutable fields)
-- `omitempty` - Skip field if it has zero value (empty string, 0, false)
-- `omitnil` - Skip field if it's nil (for pointer types)
+- `skipinsert`, `skipupdate` - Either one marks the field auto, like `auto:"true"`: it is left out
+  of both INSERT and UPDATE statements built by `db.Repository` (`Insert`, `UpdateRecord`, ...)
+  and by `dbx`. Only goqu's own dataset builders (`SqlInsert()`/`SqlUpdate()` with `Rows`/`Set`
+  of a struct) apply them separately.
+- `omitempty` - Skip field if it has zero value (empty string, 0, false), in INSERT and record
+  UPDATE
+- `omitnil` - Skip field if it's nil (for pointer types), in INSERT and record UPDATE
+
+Other `goqu` options are ignored by `db.Repository`'s builders and by `dbx`.
 
 ### `auto` Tag
 
@@ -204,18 +230,17 @@ type User struct {
 
 Specifies custom field transformation or mapping behavior.
 
+!!! warning
+    The `mapper` tag is not read by `db`, `dbx` or `gohan`: it has no effect on how a field is
+    stored or scanned. For a JSON column, use a type that implements `driver.Valuer` and
+    `sql.Scanner`, such as [`jsoncol.JSON[T]`](../types/types.md#jsoncol).
+
 ```go
 type User struct {
-    Preferences map[string]any `db:"preferences" mapper:"json"`  // JSON encode/decode
-    Tags        []string       `db:"tags" mapper:"csv"`          // CSV encode/decode
-    Metadata    interface{}    `db:"metadata" mapper:"custom"`   // Custom mapper
+    // instead of `db:"preferences" mapper:"json"`, which does nothing:
+    Preferences jsoncol.JSON[map[string]any] `db:"preferences"`
 }
 ```
-
-**Common Mappers:**
-- `json` - JSON serialization for complex types
-- `csv` - Comma-separated values for slices
-- `custom` - Application-defined transformation
 
 ## Complete Tag Reference
 
@@ -229,10 +254,13 @@ When multiple tags define the same property, the priority is:
 
 ### Field Processing Rules
 
-1. **Database Field Name:**
-   - `ch` tag (for ClickHouse)
+1. **Database Field Name** (`db/field` and `gohan/field`: `db.Repository`, grids and `dbx`):
    - `db` tag
-   - Struct field name (fallback)
+   - `ch` tag (only when there is no `db` tag)
+   - Lower-cased struct field name (fallback)
+
+   clickhouse-go, which scans and inserts ClickHouse rows, reads only the `ch` tag, then the
+   struct field name as written; see [`ch` Tag](#ch-tag-clickhouse).
 
 2. **Alias/Display Name:**
    - `alias` tag
@@ -284,12 +312,14 @@ type Product struct {
 
 ```go
 type User struct {
-    *BaseModel  // Pointer embedding - IGNORED by field scanner
+    *BaseModel  // Pointer embedding - not supported
     Name string `db:"name"`
 }
 ```
 
-**Note:** Pointer-to-struct embedding is skipped during field scanning.
+**Note:** Pointer-to-struct embedding is not supported. `db/field` does not descend into it and
+maps the pointer itself as one column (`basemodel`); `dbx.NewRepository` rejects the record with
+`gohan.ErrRecordShape`. Embed the struct by value.
 
 ## Best Practices
 
@@ -349,7 +379,7 @@ type User struct {
 type AuditFields struct {
     CreatedAt time.Time  `db:"created_at" goqu:"skipupdate" grid:"sort"`
     UpdatedAt time.Time  `db:"updated_at" auto:"true"`
-    CreatedBy int        `db:"created_by" goqu:"skipupdate"`
+    CreatedBy int        `db:"created_by"` // skipupdate would also drop it from INSERT
     UpdatedBy *int       `db:"updated_by" goqu:"omitnil"`
 }
 
@@ -379,15 +409,22 @@ type User struct {
 
 ### Multi-Database Support
 
+Use the same column name in the `db` and `ch` tags. The struct then works with `db.Repository`,
+the legacy ClickHouse repository and `dbx` on every database:
+
 ```go
 type Event struct {
-    ID        int       `db:"id" ch:"event_id"`                    // Different field names
-    Timestamp time.Time `db:"created_at" ch:"timestamp"`           // per database
-    UserID    int       `db:"user_id" ch:"user_id"`
+    ID        uint64    `db:"id" ch:"id"`
+    Timestamp time.Time `db:"created_at" ch:"created_at"`
+    UserID    uint64    `db:"user_id" ch:"user_id"`
     EventType string    `db:"event_type" ch:"event_type"`
-    Data      string    `db:"data" ch:"event_data" mapper:"json"`  // JSON in both
+    Data      string    `db:"data" ch:"data"`
 }
 ```
+
+Different names per database (`db:"id" ch:"event_id"`) are rejected by `dbx` on ClickHouse, and
+in the legacy ClickHouse repository they make the grid filter and sort on the `db` column while
+rows are read from the `ch` column (see [`ch` Tag](#ch-tag-clickhouse)).
 
 ### JSON/Complex Fields
 
@@ -395,9 +432,9 @@ type Event struct {
 type User struct {
     ID          int                    `db:"id"`
     Name        string                 `db:"name"`
-    Preferences map[string]interface{} `db:"preferences" mapper:"json"`
-    Tags        []string               `db:"tags" mapper:"json"`
-    Metadata    interface{}            `db:"metadata" mapper:"json"`
+    Preferences jsoncol.JSON[map[string]any] `db:"preferences"`
+    Tags        jsoncol.JSON[[]string]       `db:"tags"`
+    Metadata    jsoncol.JSON[any]            `db:"metadata"`
 }
 ```
 
@@ -429,15 +466,15 @@ Some types are treated specially and cannot be decomposed:
 type User struct {
     ID        int       `db:"id"`
     CreatedAt time.Time `db:"created_at"`  // Reserved type - treated as single field
-    Config    MyStruct  `db:"config"`      // Custom struct - decomposed if not reserved
+    Config    MyStruct  `db:"config"`      // Named struct field - one column (only embedded structs are decomposed)
 }
 ```
 
-**Reserved Types:**
-- `time.Time`
-- `sql.NullString`, `sql.NullInt64`, etc.
-- `decimal.Decimal` (if using shopspring/decimal)
-- Database-specific types (e.g., PostgreSQL arrays, JSON types)
+**Reserved Types:** only `time.Time` is reserved by default. A reserved type matters for embedded
+fields: an embedded struct is decomposed into its fields unless its type is reserved, in which
+case it is one column. A named (non-embedded) struct field such as `sql.NullString` or
+`decimal.Decimal` is always one column and needs no registration. Register other types to embed
+as single columns with `AddReservedType("pkg.Type")` (see the two registries below).
 
 **Two separate registries.** `field.AddReservedType(name)` (this package, `db/field`) registers
 a type with the legacy `db` package's own registry — it affects `db.Repository` and nothing
@@ -469,13 +506,10 @@ func TestUserStructMetadata(t *testing.T) {
     
     assert.ElementsMatch(t, expectedFields, actualFields)
     
-    // Test grid capabilities
+    // Test grid capabilities: sorting by id and name is accepted
     grid, err := db.NewGrid("users", user)
     assert.NoError(t, err)
-    
-    sortFields := grid.SortFields()
-    assert.Contains(t, sortFields, "id")
-    assert.Contains(t, sortFields, "name")
+    assert.NoError(t, grid.ValidQuery(&db.GridQuery{SortFields: map[string]string{"id": "asc", "name": "desc"}}))
 }
 ```
 

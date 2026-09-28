@@ -144,24 +144,61 @@ func TestMemoryStoreEvictionPolicies(t *testing.T) {
 		ttl := 1 * time.Hour
 		now := time.Now()
 		
+		// map values are expiry times (insert time + ttl)
 		store := &memStore{
 			nonces: map[string]time.Time{
-				"old-nonce":    now.Add(-ttl),           // Should be evicted (reached half-life)
-				"recent-nonce": now.Add(-ttl/4),         // Should remain (not at half-life)
+				"expired-nonce": now.Add(-ttl / 4),    // Should be evicted (already expired)
+				"old-nonce":     now.Add(ttl / 4),     // Should be evicted (inserted 3/4 ttl ago, past half-life)
+				"recent-nonce":  now.Add(3 * ttl / 4), // Should remain (inserted 1/4 ttl ago)
 			},
 			ttl: ttl,
 		}
-		
-		// Should have 2 items before eviction
-		assert.Len(t, store.nonces, 2)
-		
+
+		// Should have 3 items before eviction
+		assert.Len(t, store.nonces, 3)
+
 		policy(store)
-		
+
 		// Should have 1 item after eviction (recent one remains)
 		assert.Len(t, store.nonces, 1)
 		assert.Contains(t, store.nonces, "recent-nonce")
 		assert.NotContains(t, store.nonces, "old-nonce")
+		assert.NotContains(t, store.nonces, "expired-nonce")
 	})
+}
+
+func TestMemoryStoreEvictionAtCapacity(t *testing.T) {
+	tests := []struct {
+		name     string
+		policy   MemEvictPolicyFn
+		expected bool
+	}{
+		{"EvictAll", EvictAll(), true},
+		{"EvictHalfLife", EvictHalfLife(), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := NewMemoryNonceStore(
+				WithMaxSize(2),
+				WithTTL(1*time.Hour),
+				WithEvictPolicy(tt.policy),
+			)
+			defer store.Close()
+			assert.True(t, store.AddIfNotExists("nonce-1"))
+			assert.True(t, store.AddIfNotExists("nonce-2"))
+
+			done := make(chan bool, 1)
+			go func() {
+				done <- store.AddIfNotExists("nonce-3")
+			}()
+			select {
+			case result := <-done:
+				assert.Equal(t, tt.expected, result)
+			case <-time.After(2 * time.Second):
+				t.Fatal("AddIfNotExists deadlocked while running the eviction policy")
+			}
+		})
+	}
 }
 
 func TestMemoryStoreConcurrency(t *testing.T) {

@@ -1,5 +1,9 @@
 # UPDATE API Examples
 
+!!! warning "Legacy"
+    This page documents the legacy goqu-based `db` package, kept for existing code. New code should
+    use [`dbx`](dbx.md) and [`gohan`](gohan.md); see [Migrating from db to dbx](migrating-to-dbx.md).
+
 This document shows examples of using the improved UPDATE API with pointer parameters instead of variadic options.
 
 All examples use the `github.com/oddbit-project/blueprint/db/sqlbuilder` package.
@@ -142,7 +146,7 @@ builder.BuildSQLUpdate("users", user, whereConditions, &options) // custom optio
 
 ## See Also
 
-- [Database Package Overview](index.md)
+- [Legacy db Package Overview](legacy-overview.md)
 - [Query Builder Documentation](query-builder.md)
 - [Repository Documentation](repository.md)
 - [Database Functions](functions.md)

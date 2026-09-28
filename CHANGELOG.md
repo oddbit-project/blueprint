@@ -17,6 +17,209 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.12.0] - 2026-09-28
+
+> **Breaking release.** Most changes are bug fixes, but several change behaviour that existing
+> code may rely on. Read "Breaking changes" below before upgrading. Providers released with it
+> have their own breaking changes: `provider/redis` (TLS config), `provider/prometheus` (disabled
+> server, default host), `provider/metrics` (config validation) and `provider/clickhouse`
+> (record tag check, bound time zones); see their changelogs.
+
+### Module versions
+
+Released together with core v0.12.0:
+
+- `provider/redis` v0.9.0 (requires core v0.12.0)
+- `provider/hmacprovider` v0.10.0 (requires core v0.12.0 and `provider/redis` v0.9.0)
+- `provider/clickhouse` v0.10.0 (requires core v0.12.0)
+- `provider/pgsql` v0.10.0 (requires core v0.12.0)
+- `provider/sqlite` v0.10.0 (requires core v0.12.0)
+- `provider/prometheus` v0.10.0
+- `provider/metrics` v0.9.0
+
+The other providers are unchanged and work with core v0.12.0 at their current versions.
+
+### Breaking changes
+
+- **`provider/tls`: the mTLS `TLSAllowedDNSNames` check is fixed (security).** It was inverted:
+  a client certificate with a listed DNS name was rejected, and one with any unlisted name was
+  accepted. Deployments that happened to work with the inverted check will now reject clients
+  whose certificates carry no listed name. Check `TLSAllowedDNSNames` against the SANs of your
+  client certificates.
+- **`provider/tls`: `ServerConfig.TLSConfig()` validates versions and ciphers even without
+  certificates.** With `TLSEnable` set but no cert, key or CA, it used to return an empty
+  `tls.Config` and accept anything. It now applies the TLS 1.3 minimum and returns an error for
+  invalid `TLSMinVersion`/`TLSMaxVersion`/`TLSCipherSuites`. Version strings must be `"TLS12"` or
+  `"TLS13"`; `"1.2"`/`"1.3"` (shown in earlier docs) are rejected.
+- **`provider/kv`: TTL <= 0 now means "no expiry" in the memory store.** Previously
+  `SetTTL(k, v, 0)` expired on the next read and keys written with `Set` could never be read
+  back. Both are now kept until deleted, matching the Redis client. Code that used a zero TTL to
+  store a throwaway value must delete it explicitly.
+- **`callstack.CallStack.Run(false)`/`RunLinear(false)` return errors.** They return the callback
+  errors combined with `errors.Join`; they used to always return nil. Callers that treated any
+  non-nil result as fatal will now see destructor errors. Callbacks run on a snapshot taken
+  without holding the lock, so concurrent `Run` calls are no longer serialized, and `IsCalling()`
+  is only reliable when runs don't overlap.
+- **Shutdown order in `Container.Run`.** On SIGINT/SIGTERM/SIGHUP the application context is now
+  cancelled *before* destructors run (it used to be after). When the context is cancelled any
+  other way, destructors now run before exit (they used to be skipped). Goroutines watching the
+  context stop earlier, and destructors must not depend on the context still being live.
+- **`Shutdown` no longer waits when a shutdown is already in progress.** A call made while the
+  destructors are running returns immediately (nil `arg`) or logs the fatal error and exits at
+  once (non-nil `arg`, e.g. `AbortFatal`), instead of blocking until they finish. This fixes the
+  deadlock when a destructor calls `Shutdown`/`AbortFatal`. `Container.Run` still waits for an
+  in-progress shutdown before exiting; code that called `Shutdown(nil)` from another goroutine and
+  then exited must no longer rely on it waiting.
+- **`utils/env` no longer caches.** `GetEnvVar`/`SetEnvVar` read and write the process environment
+  directly, so changes made with `os.Setenv`/`os.Unsetenv` are now seen (they used to be ignored
+  after the first read).
+- **`dbx.Grid` caps rows by default.** A new `Grid` applies `dbx.DefaultMaxLimit` (1000):
+  `Limit == 0` or a larger `Limit` now returns at most 1000 rows instead of the whole table. Call
+  `WithMaxLimit(n)` to change the cap, or `WithMaxLimit(0)` to restore unlimited results.
+- **`dbx.Grid` rejects search text when the type has no searchable fields** ("no searchable
+  fields") instead of silently returning unfiltered rows.
+- **`dbx.Grid` validates filter func results**: a `gohan` type (an expression or subquery, which
+  was rendered as SQL instead of bound) or a map is rejected as "value is not valid", also inside a
+  list; a typed slice such as `[]string` or `[]uuid.UUID` now becomes an `IN` list instead of being
+  bound as a single value. Arrays, byte slices and `driver.Valuer`s (`uuid.UUID`,
+  `pq.StringArray`, `json.RawMessage`) still bind as one value.
+- **`dbx.Grid.WithMaxLimit` above `math.MaxInt64` and `WithTiebreaker` with an unmapped column**
+  are configuration errors reported by both `ValidQuery` and `Build`.
+- **`dbx.Grid` rejects `Offset`/`Limit` above `math.MaxInt64`** as a `GridError` (it used to fail
+  later with `gohan.ErrInvalidLimit`).
+- **`AbortFatal` after `Shutdown` exits with code 1** and logs the error; it used to exit with
+  255 silently.
+- **Environment-variable secrets are no longer cleared after `Fetch`** (`crypt/secure`,
+  `provider/tls` key passwords). A second `Fetch` returns the same secret instead of an empty
+  string. Clearing never removed the value from the process's initial environment block. If you
+  relied on the variable being empty afterwards, unset it yourself.
+- **`utils/fs.ReadString` trims `\r` and strips a leading UTF-8 BOM.** Secrets and passwords
+  read from files (`PasswordFile`, `KeyFile`, TLS key password files, `CredentialFromFile`) lose
+  a trailing `\r` or leading BOM they used to keep. A password that genuinely ends in `\r` will
+  now differ.
+- **`db`: `NewGrid` rejects grid fields whose alias is empty or `-`** (`json:"-"` or
+  `json:",omitempty"` on a field tagged `grid:"sort"`, `"filter"` or `"search"`), as `dbx` already
+  did. Such aliases are no longer mapped for non-grid fields. Give those fields an explicit json
+  name or drop the `grid` tag.
+- **`runtime`: struct tag parts are whitespace-trimmed.** `db:"id, auto"` now marks the field as
+  auto (excluded from INSERT) and `grid:"sort, filter"` now enables filtering; before, the part
+  after the space was silently ignored. Review tags written with spaces after commas.
+- **`utils.NotNil` panics on typed nils**, including nil pointers, maps, slices, funcs, chans and
+  interfaces wrapped in `any`. A nil slice or map passed to it now panics.
+- **`utils/debug.GetStackTrace(0)` no longer includes `GetStackTrace` itself**; `skip` values 0
+  and 1 both start at the caller. Frames under a user directory named `runtime/` are no longer
+  dropped.
+- **`utils/parallel.ForInt` waits for all iterations** before returning the first error (it used
+  to return immediately while the other goroutines kept running), and returns nil for
+  `to <= 0` instead of panicking.
+- **`console.BgDefault` is 49** (default background); it was 39 (the foreground reset).
+- **`runner.PeriodicRunner.Stop` after the parent context was cancelled returns nil once**
+  instead of the "not running" error, and a normal stop no longer logs an ERROR.
+- **`provider/ratelimiter`: `ShutdownWithContext` without `Start`** returns immediately, and a
+  later `Start` is then a no-op.
+
+### Added
+
+- `dbx` keyset (cursor) pagination: `Repository.ListKeyset` and `Repository.QueryGridKeyset` return a
+  `KeysetPage[T]` (items, next cursor, has-more) ordered by `KeysetKey`s (`KeyAsc`/`KeyDesc`).
+  Cursors are opaque, versioned base64url, strictly validated, and tied to the table, key columns,
+  directions and key types; string keys must be short and valid UTF-8, and on ClickHouse time keys
+  must lie in 1900-01-01..2262-04-11. New errors `ErrInvalidCursor`, `ErrCursorTooLarge`,
+  `ErrInvalidKeysetKey`, `ErrKeysetNotUnique`; new constants `MaxCursorBytes`, `MaxKeysetKeys`.
+- `dbx.GridError.Is`: a `GridError` with the new `"cursor"` scope matches `ErrInvalidCursor`.
+- `dbx.Grid.WithCaseInsensitiveSearch()`: grid search with `ILIKE` on PostgreSQL and ClickHouse
+  (`LIKE` on SQLite), via gohan v0.3.0's fold helpers.
+- `types/optional`: `Optional[T]`, a tri-state value (None / Null / Some) for PATCH bodies;
+  `IsZero` lets `json:",omitzero"` omit absent fields.
+- `types/jsoncol`: `JSON[T]`, a generic JSON column type (`driver.Valuer`/`sql.Scanner`) for
+  PostgreSQL `json`/`jsonb` and SQLite `TEXT`; use `*JSON[T]` for nullable columns. `Scan` fails
+  with `jsoncol.ErrScanType` for a source that is not `[]byte`, `string` or nil.
+- `dbx.Changeset[T]` (`NewChangeset`, `Set`, `Changes`) and `dbx.SetOptional` build validated
+  partial-update maps for `Repository.UpdateFields`, rejecting unknown columns (`ErrUnknownColumn`),
+  auto columns (`ErrAutoColumn`) and lossy or ill-typed values (`ErrValueType`; the message names the
+  column and types, never the value). `nil` is accepted only for pointer, interface, map and slice
+  fields and NULL-style structs (`sql.NullString`, `sql.Null[T]`); `json.Number` values
+  (`json.Decoder.UseNumber`) are parsed exactly.
+- `dbx.Changes(old, new)` returns the non-auto columns whose values differ between two records, for
+  load-modify-save updates (`ErrNilRecord` on nil input).
+- `dbx.Grid.Conds` returns a grid query's WHERE conditions (filters and search, no sort or paging);
+  `dbx.Repository.QueryGridWithCount` returns a grid page plus the total number of matching rows.
+- `dbx.Repository.InsertIgnore` inserts with `ON CONFLICT [(cols)] DO NOTHING` and reports whether
+  the row was inserted (PostgreSQL, SQLite).
+- `dbx.Repository.UpdateReturning` and `UpsertReturning` return the rows as stored, via `RETURNING`
+  (PostgreSQL, SQLite 3.35+); `UpsertReturning` returns `ErrNotFound` when the upsert resolves to
+  `DO NOTHING` on an existing row.
+- `dbx.Query[D]` / `dbx.QueryOne[D]` scan a gohan `SELECT` into a DTO type (joins, aggregates,
+  projections); on a `RecordChecker` Querier (ClickHouse) `D` is checked first.
+- `dbx.Repository.WithGroupedInserts` (opt-in) lets `Insert` take records that omit different
+  `omitnil`/`omitempty` columns, grouping them into separate INSERTs (`DEFAULT VALUES` for records
+  with no columns) inside one transaction; the default `Insert` and the ClickHouse batch path still
+  return `gohan.ErrInconsistentOmit`.
+- `dbx.RecordChecker`: optional Querier interface; `NewRepository` calls `CheckRecord` with the
+  record type and fails with its error.
+- `dbx.WithTxRetry`: runs a transaction and retries it with full-jitter backoff when it fails with a
+  transient error (PostgreSQL serialization failure `40001` / deadlock `40P01`, SQLite
+  `SQLITE_BUSY` / `SQLITE_LOCKED`). Retries happen only when the Querier implements the new
+  `dbx.RetryClassifier` interface, which `SQLQuerier` implements (`SQLQuerier.IsRetryable`);
+  inside an existing transaction it runs once and never retries.
+- `dbx.GridQuery.Sort` (`[]dbx.SortField`, JSON `"sort"`): sort fields in precedence order, beside
+  the `SortFields` map (which applies in alias order); the two cannot be combined, and a repeated
+  field is rejected.
+- `dbx.Grid.WithTiebreaker(cols...)`: appends a unique key to every grid query's `ORDER BY` so rows
+  with equal sort values keep a stable order across `LIMIT`/`OFFSET` pages.
+- `dbx.DefaultMaxLimit`.
+- `kv.AtomicSetter` optional interface (`SetNX(k, v, ttl) (bool, error)`), implemented by
+  `kv.NewMemoryKV()`.
+- `runner.ErrAlreadyRunning` and `runner.ErrNotRunning` (same messages as before, now matchable
+  with `errors.Is`).
+
+### Changed
+
+- Bumped `gohan` to v0.3.0 (adds `ContainsFold`/`HasPrefixFold`/`HasSuffixFold`).
+- `RegisterDestructor` called during or after `Shutdown` is a no-op (it used to panic).
+- `types/duration`: package doc no longer refers to goauth.
+
+### Fixed
+
+- **Security** `provider/tls`: the mTLS `TLSAllowedDNSNames` check was inverted. A client
+  certificate whose DNS name was in the list was rejected, and one with any name not in the list
+  was accepted.
+- `provider/tls`: `ServerConfig.TLSConfig()` applies and validates `TLSMinVersion`,
+  `TLSMaxVersion` and `TLSCipherSuites` (and the TLS 1.3 minimum) when TLS is enabled without
+  cert, key or CA files. It used to return an empty `tls.Config`.
+- `provider/kv`: memory KV `Get` deleted expired keys under a read lock (data race, could crash
+  with a concurrent map write).
+- `provider/kv`: keys stored with `Set` or a TTL <= 0 were unreadable. TTL <= 0 now means no
+  expiry in `Get` and `Prune`, matching Redis.
+- `provider/kv`: `Prune` could delete a key re-set with a fresh TTL while pruning.
+- `Shutdown` now logs errors returned by destructors.
+- A destructor calling `RegisterDestructor`, `Shutdown` or `AbortFatal` no longer deadlocks.
+- `db`: grid specs were cached by bare type name, so two structs with the same name in different
+  packages (or two anonymous structs) shared one spec; the cache is now keyed by type.
+- `RegisterDestructor` after `Shutdown` no longer panics; data race between
+  `RegisterDestructor`/`GetDestructorManager` and `Shutdown`.
+- `Container.Run` runs registered destructors when the application context is cancelled.
+- `AbortFatal` after `Shutdown` logs the error and exits 1 instead of exiting 255 silently.
+- `Container.Run` doc-comment example now compiles.
+- `runner.PeriodicRunner` no longer logs an ERROR "context canceled" on `Stop` or parent
+  cancellation; data race between `Start` and `Stop` (`Stop` could return nil while still
+  running, or block forever); `Stop` returns nil after a parent-context stop and no longer leaks
+  a goroutine when its context expires.
+- `console`: `BgDefault` is 49 (default background); it was 39, the foreground reset.
+- `db/migrations`: progress output no longer garbles migration names or errors containing `%`.
+- `utils/parallel`: `ForInt` waits for all goroutines before returning the first error, and
+  returns nil for `to <= 0` instead of panicking.
+- `utils/fs`: `ReadString` trims `\r` (CRLF files) and strips a leading UTF-8 BOM, so secret
+  files edited on Windows work.
+- `utils`: `NotNil` panics on typed nil pointers, maps, slices, funcs, chans and interfaces.
+- `dbx`: `GridQuery.Page` no longer overflows on a huge page number; the offset saturates.
+- `utils/str`: `DumpJSON` no longer indents continuation lines by an extra space.
+- `utils/debug`: `GetStackTrace` filters only Go runtime frames (user paths containing
+  `runtime/` are kept) and never includes its own frame.
+- `types/threadsafe`, `types/collections`: a zero-value `Map` no longer panics on `Set`/`Add`.
+- `provider/ratelimiter`: `NewRateLimiter(nil)` uses `NewConfig()` defaults instead of
+  panicking; `ShutdownWithContext` returns immediately if `Start` was never called.
+
 ## [v0.11.1] - 2026-09-28
 
 ### Module versions
