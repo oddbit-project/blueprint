@@ -6,14 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Changed
+### Added
 
+- `Querier.CheckRecord` (implements `dbx.RecordChecker`) and `ErrRecordMapping`: rejects record
+  types whose `db`-derived columns clickhouse-go's `ch`-tag mapper would map to a different field or
+  to none, naming each column, field and reason; passing results are cached per type.
+
+### Breaking changes
+
+- **`dbx.NewRepository` over a ClickHouse `Querier` fails with `ErrRecordMapping`** for record
+  types whose `ch` tags don't match their `db` columns (they used to scan into the wrong fields or
+  fail at query time), and for an embedded non-struct field, on which clickhouse-go's mapper panics.
+  `dbx.Query[D]`/`QueryOne[D]` run the same check on `D`.
 - **Bound `time.Local` and `time.FixedZone` values are sent as the same instant in UTC.**
   clickhouse-go rendered a `Local` time as a numeric string that ClickHouse misread or rejected for
   almost every date (comparisons with `time.Now()` values failed or matched nothing), and a fixed
   zone's name (e.g. `UTC+5`) is not a zone ClickHouse can load. Times in an IANA zone keep their
   zone, so `Date` comparisons are unchanged for them. A `Local` time compared with a `Date` column
   now uses its UTC calendar day.
+
+### Changed
+
+- Bumped `gohan` to v0.3.0.
 
 ### Fixed
 

@@ -320,6 +320,112 @@ lock.Unlock(ctx) // Lock still held
 lock.Unlock(ctx) // Lock released
 ```
 
+## Transaction-Local Session Settings
+
+`WithTxSession` runs a function inside a transaction after setting custom configuration parameters
+(e.g. `app.tenant_id`) and, optionally, switching role, all transaction-local. It is the building
+block for row-level security (RLS) policies that read the current tenant or user from the session.
+
+```go
+func WithTxSession(ctx context.Context, q dbx.Querier, settings map[string]string, role string,
+	fn func(tx dbx.Querier) error) error
+```
+
+It runs `dbx.WithTx` and, inside the transaction and before `fn`:
+
+1. runs `SELECT set_config($1, $2, true)` once per setting, in ascending name order. Name and
+   value are bound parameters, so a value containing quotes or semicolons is stored verbatim and
+   never parsed as SQL;
+2. if `role` is not empty, runs `SET LOCAL ROLE <role>`, with the role name quoted by the
+   Querier's gohan dialect (`Dialect.QuoteIdent`).
+
+`fn` receives the transaction; it commits when `fn` returns nil and rolls back otherwise, exactly
+as `dbx.WithTx`.
+
+### Usage
+
+```go
+import (
+	"github.com/oddbit-project/blueprint/dbx"
+	"github.com/oddbit-project/blueprint/provider/pgsql"
+)
+
+q, err := dbx.FromClient(client)
+if err != nil {
+	return err
+}
+
+err = pgsql.WithTxSession(ctx, q,
+	map[string]string{"app.tenant_id": tenantID, "app.user_id": userID},
+	"app_tenant", // role to run as; "" keeps the connection's role
+	func(tx dbx.Querier) error {
+		docs, err := dbx.NewRepository[Document](tx, "documents")
+		if err != nil {
+			return err
+		}
+		rows, err := docs.List(ctx, nil) // only this tenant's rows
+		if err != nil {
+			return err
+		}
+		return render(rows)
+	})
+```
+
+### RLS policy pattern
+
+Read the setting in the policy with `current_setting(name, true)`. The second argument
+(`missing_ok`) makes an unknown setting return NULL instead of raising an error. Once a
+transaction-local setting has been used on a connection, PostgreSQL keeps the name around and
+reports it as the empty string after the transaction ends, so wrap it in `nullif(..., '')`.
+Either way an unset tenant compares as NULL and the policy matches no rows:
+
+```sql
+CREATE ROLE app_tenant NOLOGIN;
+GRANT app_tenant TO app_login;          -- the role your DSN connects as
+GRANT SELECT, INSERT, UPDATE, DELETE ON documents TO app_tenant;
+
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON documents
+    USING (tenant_id = nullif(current_setting('app.tenant_id', true), '')::int);
+```
+
+Superusers and roles with `BYPASSRLS` ignore policies, and so does the table owner unless the table
+has `FORCE ROW LEVEL SECURITY`. That is why the example switches to a dedicated, unprivileged role.
+
+### Why not `SET`?
+
+A plain `SET app.tenant_id = '42'` (or `SET ROLE`) is session-level: it stays on the database
+connection until it is changed or the connection closes. `database/sql` returns connections to a pool
+without resetting them, so the next request that borrows the same connection runs with the previous
+request's tenant and role. `set_config(..., true)` and `SET LOCAL` only last until the end of the
+current transaction; PostgreSQL reverts them on commit and on rollback, so nothing is left behind
+for the next user of the connection.
+
+### Validation
+
+Invalid input is rejected before any statement is sent (no transaction is started):
+
+- **Setting names** must be custom parameter names: two or more dot-separated parts, each starting
+  with an ASCII letter or underscore, followed by ASCII letters, digits, underscores or `$`
+  (`app.tenant_id`, `myapp.v2.user`). Built-in parameters without a dot (`search_path`,
+  `statement_timeout`, `role`) are rejected, as are empty names. This follows PostgreSQL's rule
+  for custom parameters, limited to ASCII. Two names that differ only in case are rejected
+  (PostgreSQL treats them as one setting). Use constant names: a dotted name also matches
+  extension settings such as `auto_explain.log_min_duration`, which `set_config` would change too.
+  Error: `ErrInvalidSettingName`.
+- **Role** names are quoted as a single identifier, so they must not contain a dot or a NUL byte,
+  must not be `*`, and must be at most 63 bytes (PostgreSQL would otherwise truncate a longer
+  quoted name and switch to whichever role matches the prefix).
+  Error: `ErrInvalidRoleName`.
+- The Querier's dialect must be PostgreSQL. Error: `ErrNotPostgres`.
+
+### Inside an existing transaction
+
+If `q` is already a transaction (a `dbx.TxQuerier`, e.g. the `tx` of an enclosing `dbx.WithTx`),
+`WithTxSession` joins it rather than starting a new one. The settings and role still apply with
+`is_local = true`, but they last until the **outer** transaction ends, not just until `fn`
+returns. Code that runs later in that transaction sees the same tenant and role.
+
 ## Error Constants
 
 ```go
@@ -330,5 +436,10 @@ const (
     ErrInvalidMaxConns     = "Invalid maxConns"
     ErrInvalidConnLifeTime = "connLifeTime must be >= 1"
     ErrInvalidConnIdleTime = "connIdleTime must be >= 1"
+
+    // WithTxSession
+    ErrInvalidSettingName = "pgsql: invalid custom setting name"
+    ErrInvalidRoleName    = "pgsql: invalid role name"
+    ErrNotPostgres        = "pgsql: querier dialect is not PostgreSQL"
 )
 ```

@@ -20,7 +20,8 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 > **Breaking release.** Most changes are bug fixes, but several change behaviour that existing
 > code may rely on. Read "Breaking changes" below before upgrading. Providers released with it
 > have their own breaking changes: `provider/redis` (TLS config), `provider/prometheus` (disabled
-> server, default host) and `provider/metrics` (config validation); see their changelogs.
+> server, default host), `provider/metrics` (config validation) and `provider/clickhouse`
+> (record tag check, bound time zones); see their changelogs.
 
 ### Breaking changes
 
@@ -103,6 +104,48 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Added
 
+- `dbx` keyset (cursor) pagination: `Repository.ListKeyset` and `Repository.QueryGridKeyset` return a
+  `KeysetPage[T]` (items, next cursor, has-more) ordered by `KeysetKey`s (`KeyAsc`/`KeyDesc`).
+  Cursors are opaque, versioned base64url, strictly validated, and tied to the table, key columns,
+  directions and key types; string keys must be short and valid UTF-8, and on ClickHouse time keys
+  must lie in 1900-01-01..2262-04-11. New errors `ErrInvalidCursor`, `ErrCursorTooLarge`,
+  `ErrInvalidKeysetKey`, `ErrKeysetNotUnique`; new constants `MaxCursorBytes`, `MaxKeysetKeys`.
+- `dbx.GridError.Is`: a `GridError` with the new `"cursor"` scope matches `ErrInvalidCursor`.
+- `dbx.Grid.WithCaseInsensitiveSearch()`: grid search with `ILIKE` on PostgreSQL and ClickHouse
+  (`LIKE` on SQLite), via gohan v0.3.0's fold helpers.
+- `types/optional`: `Optional[T]`, a tri-state value (None / Null / Some) for PATCH bodies;
+  `IsZero` lets `json:",omitzero"` omit absent fields.
+- `types/jsoncol`: `JSON[T]`, a generic JSON column type (`driver.Valuer`/`sql.Scanner`) for
+  PostgreSQL `json`/`jsonb` and SQLite `TEXT`; use `*JSON[T]` for nullable columns. `Scan` fails
+  with `jsoncol.ErrScanType` for a source that is not `[]byte`, `string` or nil.
+- `dbx.Changeset[T]` (`NewChangeset`, `Set`, `Changes`) and `dbx.SetOptional` build validated
+  partial-update maps for `Repository.UpdateFields`, rejecting unknown columns (`ErrUnknownColumn`),
+  auto columns (`ErrAutoColumn`) and lossy or ill-typed values (`ErrValueType`; the message names the
+  column and types, never the value). `nil` is accepted only for pointer, interface, map and slice
+  fields and NULL-style structs (`sql.NullString`, `sql.Null[T]`); `json.Number` values
+  (`json.Decoder.UseNumber`) are parsed exactly.
+- `dbx.Changes(old, new)` returns the non-auto columns whose values differ between two records, for
+  load-modify-save updates (`ErrNilRecord` on nil input).
+- `dbx.Grid.Conds` returns a grid query's WHERE conditions (filters and search, no sort or paging);
+  `dbx.Repository.QueryGridWithCount` returns a grid page plus the total number of matching rows.
+- `dbx.Repository.InsertIgnore` inserts with `ON CONFLICT [(cols)] DO NOTHING` and reports whether
+  the row was inserted (PostgreSQL, SQLite).
+- `dbx.Repository.UpdateReturning` and `UpsertReturning` return the rows as stored, via `RETURNING`
+  (PostgreSQL, SQLite 3.35+); `UpsertReturning` returns `ErrNotFound` when the upsert resolves to
+  `DO NOTHING` on an existing row.
+- `dbx.Query[D]` / `dbx.QueryOne[D]` scan a gohan `SELECT` into a DTO type (joins, aggregates,
+  projections); on a `RecordChecker` Querier (ClickHouse) `D` is checked first.
+- `dbx.Repository.WithGroupedInserts` (opt-in) lets `Insert` take records that omit different
+  `omitnil`/`omitempty` columns, grouping them into separate INSERTs (`DEFAULT VALUES` for records
+  with no columns) inside one transaction; the default `Insert` and the ClickHouse batch path still
+  return `gohan.ErrInconsistentOmit`.
+- `dbx.RecordChecker`: optional Querier interface; `NewRepository` calls `CheckRecord` with the
+  record type and fails with its error.
+- `dbx.WithTxRetry`: runs a transaction and retries it with full-jitter backoff when it fails with a
+  transient error (PostgreSQL serialization failure `40001` / deadlock `40P01`, SQLite
+  `SQLITE_BUSY` / `SQLITE_LOCKED`). Retries happen only when the Querier implements the new
+  `dbx.RetryClassifier` interface, which `SQLQuerier` implements (`SQLQuerier.IsRetryable`);
+  inside an existing transaction it runs once and never retries.
 - `dbx.GridQuery.Sort` (`[]dbx.SortField`, JSON `"sort"`): sort fields in precedence order, beside
   the `SortFields` map (which applies in alias order); the two cannot be combined, and a repeated
   field is rejected.
@@ -116,6 +159,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Changed
 
+- Bumped `gohan` to v0.3.0 (adds `ContainsFold`/`HasPrefixFold`/`HasSuffixFold`).
 - `RegisterDestructor` called during or after `Shutdown` is a no-op (it used to panic).
 - `types/duration`: package doc no longer refers to goauth.
 

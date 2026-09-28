@@ -9,6 +9,8 @@ independent package:
 | `collections` | `github.com/oddbit-project/blueprint/types/collections` | Generic mutex-protected `Map` with error-returning lookups and convenience aliases |
 | `duration` | `github.com/oddbit-project/blueprint/types/duration` | Duration in whole seconds that serializes to JSON as an integer |
 | `callstack` | `github.com/oddbit-project/blueprint/types/callstack` | Ordered list of `func() error` callbacks, run in reverse (LIFO) or insertion order |
+| `optional` | `github.com/oddbit-project/blueprint/types/optional` | Tri-state `Optional[T]` (absent / null / value) for PATCH request bodies |
+| `jsoncol` | `github.com/oddbit-project/blueprint/types/jsoncol` | Generic `JSON[T]` database column stored as JSON text (PostgreSQL `json`/`jsonb`, SQLite `TEXT`) |
 
 ## threadsafe
 
@@ -378,3 +380,130 @@ Because `sync.Mutex` is embedded, `Lock`, `Unlock` and `TryLock` are also export
 - `IsCalling()` does not take the lock, so it is safe to call from inside a callback or from another goroutine
   to detect an in-progress run.
 - There is no way to remove a registered callback.
+
+## optional
+
+`Optional[T]` distinguishes the three things a field in a PATCH body can mean: absent (leave the value alone),
+explicitly `null` (clear it) and a value (set it). A plain `*T` cannot tell "absent" from `null`, since both decode
+to `nil`. The zero value of `Optional[T]` is None, so a field missing from the JSON input needs no special
+handling. See [dbx: Partial updates (PATCH)](../db/dbx.md#partial-updates-patch) for applying it to a
+repository.
+
+### Usage
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/oddbit-project/blueprint/types/optional"
+)
+
+type UserPatch struct {
+	Name  optional.Optional[string] `json:"name,omitzero"`
+	Phone optional.Optional[string] `json:"phone,omitzero"`
+	Age   optional.Optional[int]    `json:"age,omitzero"`
+}
+
+func main() {
+	var p UserPatch
+	_ = json.Unmarshal([]byte(`{"phone":null,"age":41}`), &p)
+
+	fmt.Println(p.Name.IsSet())   // false: absent (None)
+	fmt.Println(p.Phone.IsNull()) // true: explicit null
+	if age, ok := p.Age.Get(); ok {
+		fmt.Println(age) // 41
+	}
+
+	out, _ := json.Marshal(p)
+	fmt.Println(string(out)) // {"phone":null,"age":41} - None is omitted
+}
+```
+
+### API Reference
+
+```go
+type Optional[T any] struct {
+    // Contains unexported fields
+}
+
+func None[T any]() Optional[T]
+func Null[T any]() Optional[T]
+func Some[T any](v T) Optional[T]
+```
+
+| Method | Description |
+|--------|-------------|
+| `IsSet() bool` | `true` for Null and Some (the field was present) |
+| `IsNull() bool` | `true` for Null |
+| `IsSome() bool` | `true` for Some |
+| `IsZero() bool` | `true` for None; used by `json:",omitzero"` |
+| `Get() (T, bool)` | The value and `true` for Some; `T`'s zero value and `false` for None and Null |
+| `MarshalJSON() ([]byte, error)` | Some(v) encodes as `v`; Null (and None, when not omitted) as `null` |
+| `UnmarshalJSON([]byte) error` | `null` decodes as Null, any other value as Some |
+
+### Notes
+
+- Tag fields `json:",omitzero"` (Go 1.24+) so None is left out of the output. Without `omitzero`, None is
+  written as `null` and reads back as Null.
+- `Some` of a zero value (`Some(0)`, `Some("")`) is a value, not None.
+- On a decoding error (e.g. a string for an `Optional[int]`) the field keeps its previous state.
+
+## jsoncol
+
+`JSON[T]` is a column type that stores any JSON-encodable `T` as JSON text. It implements `driver.Valuer` and
+`sql.Scanner`, so it works with `dbx`, `db` and plain `database/sql` alike, on PostgreSQL `json`/`jsonb` and
+SQLite `TEXT` columns. It is not meant for ClickHouse, whose native driver does not go through
+`driver.Valuer`/`sql.Scanner` for its JSON type.
+
+### Usage
+
+```go
+type Prefs struct {
+	Theme string   `json:"theme"`
+	Tags  []string `json:"tags"`
+}
+
+type Account struct {
+	ID    int64                         `db:"id,auto"`
+	Prefs jsoncol.JSON[Prefs]           `db:"prefs"` // prefs jsonb NOT NULL
+	Meta  *jsoncol.JSON[map[string]any] `db:"meta"`  // meta jsonb (nullable)
+}
+
+acc := &Account{Prefs: jsoncol.JSON[Prefs]{V: Prefs{Theme: "dark"}}}
+err := repo.Insert(ctx, acc)
+
+got, err := repo.GetBy(ctx, map[string]any{"id": 1})
+fmt.Println(got.Prefs.V.Theme) // dark
+fmt.Println(got.Meta == nil)   // true: SQL NULL
+```
+
+### API Reference
+
+```go
+type JSON[T any] struct {
+    V T
+}
+
+const ErrScanType = utils.Error("jsoncol: unsupported scan source type")
+```
+
+| Method | Description |
+|--------|-------------|
+| `Value() (driver.Value, error)` | `json.Marshal(V)`, returned as a `string` |
+| `Scan(src any) error` | Decodes `[]byte` or `string` JSON into `V`; `nil` (SQL NULL) leaves `V` at its zero value; any other source fails with `ErrScanType` |
+| `MarshalJSON() ([]byte, error)` | Encodes `V` alone, so a record serializes as if the field were `T` |
+| `UnmarshalJSON([]byte) error` | Decodes into `V` |
+
+### Notes
+
+- `Value` always marshals `V`: a nil map, slice or pointer `T` is stored as the JSON literal `null`, not SQL
+  `NULL`. For a nullable column use `*JSON[T]`: a nil pointer binds SQL `NULL`, and scanning SQL `NULL` leaves
+  it nil.
+- `Value` returns a `string`, not `[]byte`: SQLite stores a `[]byte` as a `BLOB`, and PostgreSQL's simple
+  protocol sends a `[]byte` as `bytea`, which a `jsonb` column rejects.
+- `Scan` resets `V` to its zero value before decoding, so a reused value never keeps fields from an earlier row.
+- `jsonb` normalizes the document (key order, whitespace, duplicate keys); what you read back is equal as JSON,
+  not byte-for-byte.
