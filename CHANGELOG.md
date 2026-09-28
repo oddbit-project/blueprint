@@ -17,6 +17,15 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.11.1] - 2026-09-28
+
+### Module versions
+
+Released together with core v0.11.1 (each requires core v0.11.1):
+
+- `provider/pgsql` v0.9.1
+- `provider/sqlite` v0.9.1
+
 ### Changed
 
 - Bumped `gohan` to v0.2.0. It adds a stricter guard: `dbx.Repository.Delete`/`Update` with a
