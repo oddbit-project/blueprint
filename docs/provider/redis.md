@@ -77,15 +77,17 @@ config.DefaultCredentialConfig = secure.DefaultCredentialConfig{
 
 ### TLS Configuration
 
+The TLS settings are a `tls.ClientConfig` embedded in the Redis `Config`; they are applied to the
+connection only when `TLSEnable` is `true`.
+
 ```go
 config := redis.NewConfig()
 config.Address = "redis.example.com:6380"
-config.ServerConfig = tls.ServerConfig{
-	TLSEnable:         true,
-	TLSCert:           "/path/to/client.crt",
-	TLSKey:            "/path/to/client.key",
-	TLSAllowedCACerts: []string{"/path/to/ca.crt"},
-	TLSMinVersion:     "1.2",
+config.ClientConfig = tls.ClientConfig{
+	TLSEnable: true,
+	TLSCA:     "/path/to/ca.crt",     // CA used to verify the server certificate
+	TLSCert:   "/path/to/client.crt", // optional client certificate (mTLS)
+	TLSKey:    "/path/to/client.key", // optional client key (mTLS)
 }
 ```
 
@@ -102,6 +104,13 @@ config.ServerConfig = tls.ServerConfig{
 | `PasswordEnvVar` | `string` | `""`                | Environment variable for password |
 | `PasswordFile`   | `string` | `""`                | File path containing password     |
 | `TLSEnable`      | `bool`   | `false`             | Enable TLS encryption             |
+| `TLSCA`          | `string` | `""`                | CA certificate file used to verify the server |
+| `TLSCert`        | `string` | `""`                | Client certificate file (mTLS)    |
+| `TLSKey`         | `string` | `""`                | Client key file (mTLS)            |
+| `TLSInsecureSkipVerify` | `bool` | `false`      | Skip server certificate verification (testing only) |
+
+The JSON keys for the TLS fields are `tlsEnable`, `tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify`,
+and `tlsKeyPassword`/`tlsKeyPasswordEnvVar`/`tlsKeyPasswordFile` for an encrypted client key.
 
 ## Usage Examples
 
@@ -189,19 +198,27 @@ key := client.Key("custom:key") // Returns "myapp:custom:key"
 
 ### Using as KV Backend
 
-The Redis client implements Blueprint's key-value interface and can be used with other components:
+The Redis client implements Blueprint's `kv.KV` interface, and `kv.AtomicSetter` (`SetNX`), so it can
+be passed to any component that takes a `kv.KV` backend:
 
 ```go
-import "github.com/oddbit-project/blueprint/provider/hmacprovider"
+import (
+	"time"
 
-// Use Redis as HMAC nonce storage backend
-config := redis.NewConfig()
-client, _ := redis.NewClient(config)
+	"github.com/oddbit-project/blueprint/provider/hmacprovider/store"
+	"github.com/oddbit-project/blueprint/provider/kv"
+	"github.com/oddbit-project/blueprint/provider/redis"
+)
 
-hmacConfig := hmacprovider.NewHMACConfig()
-hmacConfig.NonceStorage = client // Redis client implements KV interface
+client, err := redis.NewClient(redis.NewConfig())
+if err != nil {
+	log.Fatal(err)
+}
 
-provider, _ := hmacprovider.NewProvider(hmacConfig)
+var backend kv.KV = client
+
+// e.g. as the backend of a generic KV nonce store; SetNX makes the nonce check atomic
+nonceStore := store.NewKvStore(backend, time.Hour)
 ```
 
 ### Connection Health Checking
@@ -218,16 +235,11 @@ if err := client.Connect(); err != nil {
 }
 ```
 
-### Database Maintenance
+### Expiration and Prune
 
-```go
-// Clear all keys in the current database
-// WARNING: This removes ALL keys in the selected DB
-err := client.Prune()
-if err != nil {
-	log.Fatal("Failed to prune database:", err)
-}
-```
+Redis expires keys itself, so `Prune()` is a no-op that always returns `nil`; it exists only to satisfy
+the `kv.KV` interface (the session store calls it on every cleanup tick). Use `SetTTL` to control
+expiry per key; a TTL of `0` stores the key without expiry. `Set` uses the configured default `TTL`.
 
 ## Security Considerations
 
@@ -239,23 +251,23 @@ config.PasswordEnvVar = "REDIS_PASSWORD"
 
 // Use secure file storage
 config.PasswordFile = "/run/secrets/redis_password"
-
-// Passwords are automatically cleared from memory after use
 ```
+
+The password is decrypted once in `NewClient` and handed to the go-redis client, which keeps it in its
+options to authenticate new pool connections.
 
 ### TLS Security
 
 ```go
-config.ServerConfig = tls.ServerConfig{
-	TLSEnable:     true,
-	TLSMinVersion: "1.2",
-	TLSCipherSuites: []string{
-		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-	},
-	TLSAllowedDNSNames: []string{"redis.example.com"},
+config.ClientConfig = tls.ClientConfig{
+	TLSEnable: true,
+	TLSCA:     "/path/to/ca.crt", // verify the server against this CA
 }
 ```
+
+The server certificate is verified against `TLSCA` (or the system roots when empty) and the host in
+`Address`. Leave `TLSInsecureSkipVerify` off outside of testing. Minimum version and cipher suites use the
+Go `crypto/tls` client defaults; they are not configurable on the Redis client.
 
 ### Key Security
 
@@ -269,30 +281,55 @@ config.ServerConfig = tls.ServerConfig{
 
 ```go
 import (
+	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/httpserver"
 	"github.com/oddbit-project/blueprint/provider/httpserver/session"
+	"github.com/oddbit-project/blueprint/provider/redis"
 )
 
-// Use Redis as session backend
-redisClient, _ := redis.NewClient(config)
-sessionConfig := session.NewConfig()
-sessionConfig.Backend = redisClient
+logger := log.New("app")
 
-server, _ := httpserver.NewServer(serverConfig)
-server.UseSession(sessionConfig)
+// Use Redis as session backend
+redisClient, err := redis.NewClient(redis.NewConfig())
+if err != nil {
+	logger.Fatal(err, "failed to create redis client")
+}
+
+server, err := httpserver.NewServer(httpserver.NewServerConfig(), logger)
+if err != nil {
+	logger.Fatal(err, "failed to create server")
+}
+
+// UseSession registers the session middleware and returns the session manager
+sessionManager, err := server.UseSession(session.NewConfig(), redisClient, logger)
+if err != nil {
+	logger.Fatal(err, "failed to enable sessions")
+}
 ```
+
+The session store calls `Prune()` on every cleanup tick; with Redis this is a no-op, and sessions
+expire through the TTL set on each key.
 
 ### With HMAC Provider for Nonce Storage
 
 ```go
-import "github.com/oddbit-project/blueprint/provider/hmacprovider"
+import (
+	"time"
 
-redisClient, _ := redis.NewClient(config)
+	"github.com/oddbit-project/blueprint/provider/hmacprovider"
+	"github.com/oddbit-project/blueprint/provider/hmacprovider/store"
+	"github.com/oddbit-project/blueprint/provider/redis"
+)
 
-hmacConfig := hmacprovider.NewHMACConfig()
-hmacConfig.NonceStorage = redisClient
+redisClient, err := redis.NewClient(redis.NewConfig())
+if err != nil {
+	log.Fatal(err)
+}
 
-hmacProvider, _ := hmacprovider.NewProvider(hmacConfig)
+// SetNX-based nonce store; keys are "nonce:<nonce>" by default (see store.WithPrefix)
+nonceStore := store.NewRedisNonceStore(redisClient, time.Hour)
+
+hmacProvider := hmacprovider.NewHmacProvider(keyProvider, hmacprovider.WithNonceStore(nonceStore))
 ```
 
 ## Error Handling

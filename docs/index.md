@@ -1,5 +1,7 @@
 # Blueprint Documentation
 
+Blueprint is a modular Go application framework for building web applications and microservices.
+
 ## Getting Started
 
 Blueprint is a modular Go framework. Starting from v0.8.0, you can import only the components you need:
@@ -16,6 +18,11 @@ go get github.com/oddbit-project/blueprint/provider/pgsql
 ```
 
 All existing imports continue to work without changes due to Go module rewrite rules.
+
+## Application
+
+- [Container & Shutdown](container.md) - Application lifecycle, signal handling and destructors
+- [Runner](runner/runner.md) - Periodic background tasks
 
 ## Development & Releases
 
@@ -37,6 +44,9 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [Database Functions](db/functions.md)
 - [Migration System](db/migrations.md)
 - [SQL Update API](db/sql-update-api.md)
+- [gohan Query Builder](db/gohan.md)
+- [dbx Repositories](db/dbx.md)
+- [Migrating to dbx](db/migrating-to-dbx.md)
 
 ## Security
 
@@ -62,7 +72,9 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [S3 Storage](provider/s3.md)
 
 ### Web & HTTP
-- Metrics *(documentation pending)*
+- [Metrics](provider/metrics.md) - Metrics endpoint serving the default Prometheus registry
+- [Prometheus](provider/prometheus.md) - Metrics endpoint built on the HTTP server provider
+- [Rate Limiter](provider/ratelimiter.md) - Per-client token-bucket rate limiting
 
 ### Authentication & Security
 - [HMAC Provider](provider/hmacprovider.md)
@@ -70,11 +82,13 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [JWT Provider](provider/jwtprovider.md)
 
 ### Utilities
+- [KV](provider/kv.md) - Key-value store interface and in-memory backend
 - [SMTP](provider/smtp.md)
 
 ## Logging
 
 - [Logging](log/logging.md)
+- [File Logging](log/file_logging.md)
 
 ## HTTP Server
 
@@ -87,9 +101,14 @@ All existing imports continue to work without changes due to Go module rewrite r
 - [Authentication](provider/httpserver/auth.md) - Token and JWT authentication providers
 - [Security & Headers](provider/httpserver/security.md) - Security middleware and CSRF protection
 - [Session Management](provider/httpserver/session.md) - Cookie-based session system
+- [Request Validation](provider/httpserver/validation.md) - Request binding and validation
 - [Request Utilities](provider/httpserver/request.md) - Request helper functions
 
 ## Utilities
 
 - [BatchWriter](batchwriter/batchwriter.md)
 - [ThreadPool](threadpool/threadpool.md)
+- [Console](console/console.md)
+- [Types](types/types.md)
+- [Utils](utils/utils.md)
+- [Runtime Tags](runtime/runtime.md)

@@ -486,16 +486,21 @@ All configuration structures follow the same priority order:
 ### Environment Variable Handling
 
 When using environment variables:
-- Variables are read once and then cleared for security
-- Empty variables are treated as not set
-- The `env.SetEnvVar(envVar, "")` call clears the variable after reading
+- Variables are read through the `utils/env` cache and are **not** cleared after reading, so calling `Fetch()`
+  again (e.g. on reconnect) returns the same value
+- An unset or empty variable yields an empty credential; when an environment variable name is configured, the
+  file source is not consulted
+- Because of the cache, changing the variable with `os.Setenv` after it was first read is not seen by `Fetch()`;
+  use `env.SetEnvVar` instead
+- The secret remains in the process environment (and in `/proc/self/environ` on Linux); prefer file-based
+  secrets where that matters
 
 ### File-Based Credentials
 
 When using file-based credentials:
 - Files must be readable by the application
 - File contents are read as plaintext
-- Leading/trailing whitespace is trimmed
+- A leading UTF-8 BOM and leading/trailing whitespace (spaces, tabs, `\r`, `\n`) are trimmed
 - Empty files result in empty credentials
 
 ### Custom Configuration

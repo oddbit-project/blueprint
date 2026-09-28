@@ -58,6 +58,10 @@ plugins:
 
 nav:
   - Home: index.md
+
+  - Application:
+    - Container & Shutdown: container.md
+    - Runner: runner/runner.md
   
   - Development:
     - Release Process: release-process.md
@@ -117,6 +121,10 @@ nav:
     - HMAC Provider: provider/hmacprovider.md
     - Htpasswd Provider: provider/htpasswd.md
     - Sqlite: provider/sqlite.md
+    - KV: provider/kv.md
+    - Rate Limiter: provider/ratelimiter.md
+    - Metrics: provider/metrics.md
+    - Prometheus: provider/prometheus.md
 
   - Logging:
     - Overview: log/logging.md
@@ -125,6 +133,10 @@ nav:
   - Utilities:
     - BatchWriter: batchwriter/batchwriter.md
     - ThreadPool: threadpool/threadpool.md
+    - Console: console/console.md
+    - Types: types/types.md
+    - Utils: utils/utils.md
+    - Runtime Tags: runtime/runtime.md
 
 extra:
   social:

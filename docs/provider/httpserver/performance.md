@@ -85,7 +85,7 @@ func createOptimizedRouter(logger *log.Logger) *gin.Engine {
 Optimize middleware order for best performance:
 
 ```go
-func optimizeMiddlewareOrder(server *httpserver.Server, logger *log.Logger) {
+func optimizeMiddlewareOrder(server *httpserver.Server, sessionConfig *session.Config, backend kv.KV, logger *log.Logger) error {
     // 1. Fast security headers (minimal overhead)
     server.UseDefaultSecurityHeaders()
     
@@ -100,8 +100,11 @@ func optimizeMiddlewareOrder(server *httpserver.Server, logger *log.Logger) {
     server.UseAuth(tokenAuth)
     
     // 5. Expensive middleware last
-    server.UseSession(sessionConfig, backend, logger)
+    if _, err := server.UseSession(sessionConfig, backend, logger); err != nil {
+        return err
+    }
     server.UseCSRFProtection()
+    return nil
 }
 ```
 

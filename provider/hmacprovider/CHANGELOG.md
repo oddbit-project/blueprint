@@ -4,6 +4,24 @@ All notable changes to the Blueprint HMAC provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+Requires the next Blueprint core release (uses `kv.AtomicSetter`).
+
+### Changed
+
+- The KV nonce store (`store.NewKvStore`) uses an atomic `SetNX` when the backend implements
+  `kv.AtomicSetter` (memory KV and the Redis client do). Other backends keep the previous
+  non-atomic check-then-set.
+
+### Fixed
+
+- The memory nonce store deadlocked (all requests hung) once full when using `EvictAll` or
+  `EvictHalfLife`.
+- `EvictHalfLife` only evicted already-expired entries; it now evicts nonces past half their TTL.
+  Keep the TTL well above twice the timestamp tolerance, or an evicted nonce could be replayed
+  while its timestamp is still accepted.
+
 ## [v0.9.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.

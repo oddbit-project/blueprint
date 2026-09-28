@@ -4,6 +4,24 @@ All notable changes to the prometheus provider will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** `NewServer`/`Config.NewServer` return `(nil, nil)` when `Enabled` is false. A
+  `Config` not built with `NewConfig()` (struct literal, or JSON without `"enabled": true`) now
+  has `Enabled=false`; nil-check the server before `Start`. `Register` takes no
+  config and is unaffected.
+- **Breaking:** `NewConfig()` defaults `Host` to `localhost` (new `DefaultHost`); previously the
+  endpoint bound all interfaces. Set `Host` explicitly if Prometheus scrapes from another host,
+  container or pod.
+- Requires Blueprint core v0.11.0 and `provider/httpserver` v0.9.4.
+
+### Fixed
+
+- `Config.Validate()` defaults a zero `Port` to `DefaultPort` (2220) instead of httpserver's 5000.
+- Added `replace` directives for core and httpserver so the module builds outside `go.work`.
+
 ## [v0.9.3] - 2026-09-20
 
 ### Security

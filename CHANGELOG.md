@@ -17,6 +17,71 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Added
+
+- `kv.AtomicSetter` optional interface (`SetNX(k, v, ttl) (bool, error)`), implemented by
+  `kv.NewMemoryKV()`.
+- `runner.ErrAlreadyRunning` and `runner.ErrNotRunning` (same messages as before, now matchable
+  with `errors.Is`).
+
+### Changed
+
+- `callstack.CallStack.Run(false)`/`RunLinear(false)` return the callback errors combined with
+  `errors.Join` (previously always nil). Callbacks run on a snapshot taken without holding the
+  lock, so concurrent `Run` calls are no longer serialized and `IsCalling()` is only reliable when
+  runs don't overlap.
+- `Container.Run` cancels the application context before running destructors on
+  SIGINT/SIGTERM/SIGHUP.
+- `RegisterDestructor` called during or after `Shutdown` is a no-op.
+- `crypt/secure`, `provider/tls`: fetching a secret from an environment variable no longer clears
+  the variable. Clearing did not remove it from the process environment block and made a second
+  `Fetch` return an empty secret (for example on S3 reconnect).
+- `db`: `NewGrid` rejects grid fields whose alias is empty or `-` (`json:"-"`,
+  `json:",omitempty"`); such aliases are no longer mapped for non-grid fields.
+- `runtime`: tag parts are whitespace-trimmed, so `db:"id, auto"` now sets `auto` (excluded from
+  INSERT) and `grid:"sort, filter"` now enables filtering.
+- `utils.NotNil` also panics on nil slices and maps.
+- `types/duration`: package doc no longer refers to goauth.
+
+### Fixed
+
+- **Security** `provider/tls`: the mTLS `TLSAllowedDNSNames` check was inverted. A client
+  certificate whose DNS name was in the list was rejected, and one with any name not in the list
+  was accepted.
+- `provider/tls`: `ServerConfig.TLSConfig()` applies and validates `TLSMinVersion`,
+  `TLSMaxVersion` and `TLSCipherSuites` (and the TLS 1.3 minimum) when TLS is enabled without
+  cert, key or CA files. It used to return an empty `tls.Config`.
+- `provider/kv`: memory KV `Get` deleted expired keys under a read lock (data race, could crash
+  with a concurrent map write).
+- `provider/kv`: keys stored with `Set` or a TTL <= 0 were unreadable. TTL <= 0 now means no
+  expiry in `Get` and `Prune`, matching Redis.
+- `provider/kv`: `Prune` could delete a key re-set with a fresh TTL while pruning.
+- `Shutdown` now logs errors returned by destructors.
+- A destructor calling `RegisterDestructor` no longer deadlocks. Calling `Shutdown`/`AbortFatal`
+  from a destructor still does.
+- `RegisterDestructor` after `Shutdown` no longer panics; data race between
+  `RegisterDestructor`/`GetDestructorManager` and `Shutdown`.
+- `Container.Run` runs registered destructors when the application context is cancelled.
+- `AbortFatal` after `Shutdown` logs the error and exits 1 instead of exiting 255 silently.
+- `Container.Run` doc-comment example now compiles.
+- `runner.PeriodicRunner` no longer logs an ERROR "context canceled" on `Stop` or parent
+  cancellation; data race between `Start` and `Stop` (`Stop` could return nil while still
+  running, or block forever); `Stop` returns nil after a parent-context stop and no longer leaks
+  a goroutine when its context expires.
+- `console`: `BgDefault` is 49 (default background); it was 39, the foreground reset.
+- `db/migrations`: progress output no longer garbles migration names or errors containing `%`.
+- `utils/parallel`: `ForInt` waits for all goroutines before returning the first error, and
+  returns nil for `to <= 0` instead of panicking.
+- `utils/fs`: `ReadString` trims `\r` (CRLF files) and strips a leading UTF-8 BOM, so secret
+  files edited on Windows work.
+- `utils`: `NotNil` panics on typed nil pointers, maps, slices, funcs, chans and interfaces.
+- `utils/str`: `DumpJSON` no longer indents continuation lines by an extra space.
+- `utils/debug`: `GetStackTrace` filters only Go runtime frames (user paths containing
+  `runtime/` are kept) and never includes its own frame.
+- `types/threadsafe`, `types/collections`: a zero-value `Map` no longer panics on `Set`/`Add`.
+- `provider/ratelimiter`: `NewRateLimiter(nil)` uses `NewConfig()` defaults instead of
+  panicking; `ShutdownWithContext` returns immediately if `Start` was never called.
+
 ## [v0.11.1] - 2026-09-28
 
 ### Module versions
