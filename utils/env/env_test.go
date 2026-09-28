@@ -25,10 +25,12 @@ func TestGetEnvVar(t *testing.T) {
 	err = os.Setenv(testEnvName, newValue)
 	assert.NoError(t, err)
 
-	// Second call should return cached value, not new value
-	cachedResult := GetEnvVar(testEnvName)
-	assert.Equal(t, testEnvValue, cachedResult)
-	assert.NotEqual(t, newValue, cachedResult)
+	// Second call sees the new value
+	assert.Equal(t, newValue, GetEnvVar(testEnvName))
+
+	// Unsetting is seen too
+	assert.NoError(t, os.Unsetenv(testEnvName))
+	assert.Equal(t, "", GetEnvVar(testEnvName))
 
 	// Test case: environment variable doesn't exist
 	nonExistentVar := "NON_EXISTENT_TEST_VAR"
