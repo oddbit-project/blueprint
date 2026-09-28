@@ -1,5 +1,10 @@
 # Database Client
 
+!!! note
+    `db.SqlClient` holds the connection for both [`dbx`](dbx.md) repositories (through
+    `dbx.FromClient(client)`) and the legacy `db.Repository`. The repository examples on this page use
+    the legacy API; see [dbx Repositories](dbx.md) for the recommended one.
+
 The Client interface provides the foundation for database connections in the Blueprint db package. It abstracts database connection management and provides a consistent interface across different database providers.
 
 ## Overview
@@ -363,4 +368,4 @@ Each provider client:
 - [Repository Documentation](repository.md)
 - [PostgreSQL Provider](../provider/pgsql.md)
 - [ClickHouse Provider](../provider/clickhouse.md)
-- [Database Package Overview](index.md)
+- [Database Overview](index.md)

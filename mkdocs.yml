@@ -27,7 +27,6 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
     - navigation.top
     - search.highlight
     - search.share
@@ -59,84 +58,84 @@ plugins:
 nav:
   - Home: index.md
 
-  - Application:
-    - Container & Shutdown: container.md
-    - Runner: runner/runner.md
-  
-  - Development:
-    - Release Process: release-process.md
-  
-  - Configuration:
-    - Config: config/config.md
-  
+  - Getting Started:
+    - Application Container: container.md
+    - Configuration: config/config.md
+    - Logging: log/logging.md
+    - File Logging: log/file_logging.md
+
   - Database:
     - Overview: db/index.md
-    - Structs and Tags: db/structs-and-tags.md
-    - Client Interface: db/client.md
-    - Repository Pattern: db/repository.md
-    - Data Grid System: db/dbgrid.md
-    - Field Specifications: db/fields.md
-    - Query Builder: db/query-builder.md
-    - Database Functions: db/functions.md
-    - Migration System: db/migrations.md
-    - SQL Update API: db/sql-update-api.md
-    - gohan Query Builder: db/gohan.md
     - dbx Repositories: db/dbx.md
-    - Migrating to dbx: db/migrating-to-dbx.md
+    - gohan Query Builder: db/gohan.md
+    - Database Client: db/client.md
+    - Structs and Tags: db/structs-and-tags.md
+    - Migrations: db/migrations.md
+    - Drivers:
+      - PostgreSQL: provider/pgsql.md
+      - SQLite: provider/sqlite.md
+      - ClickHouse: provider/clickhouse.md
+    - Migrating from db to dbx: db/migrating-to-dbx.md
+    - Legacy db Package:
+      - Overview: db/legacy-overview.md
+      - Repository: db/repository.md
+      - Data Grid: db/dbgrid.md
+      - Field Specifications: db/fields.md
+      - Query Builder: db/query-builder.md
+      - Database Functions: db/functions.md
+      - SQL Update API: db/sql-update-api.md
 
-  - Security:
-    - Secure Credentials: crypt/secure-credentials.md
-    - Password Hashing: crypt/password-hashing.md
-    - PIN Generation: crypt/pin.md
-    - htpasswd Authentication: provider/htpasswd.md
-    - TLS: provider/tls.md
-  
   - HTTP Server:
     - Overview: provider/httpserver/index.md
     - API Reference: provider/httpserver/api-reference.md
-    - Middleware Components: provider/httpserver/middleware.md
+    - Middleware: provider/httpserver/middleware.md
     - Authentication: provider/httpserver/auth.md
     - Security & Headers: provider/httpserver/security.md
-    - Session Management: provider/httpserver/session.md
+    - Sessions: provider/httpserver/session.md
     - Request Validation: provider/httpserver/validation.md
     - Request Utilities: provider/httpserver/request.md
-    - Integration Examples: provider/httpserver/examples.md
-    - Troubleshooting Guide: provider/httpserver/troubleshooting.md
-    - Performance Guide: provider/httpserver/performance.md
-  
-  - Providers:
-    - ClickHouse: provider/clickhouse.md
-    - etcd: provider/etcd.md
-    - Franz (Kafka): provider/franz.md
-    - Kafka (Legacy): provider/kafka.md
-    - Kafka Migration Guide: provider/kafka-to-franz-migration.md
-    - PostgreSQL: provider/pgsql.md
-    - Redis: provider/redis.md
-    - S3 Storage: provider/s3.md
-    - SMTP: provider/smtp.md
-    - MQTT: provider/mqtt.md
-    - NATS: provider/nats.md
-    - TLS: provider/tls.md
-    - JWT Provider: provider/jwtprovider.md
-    - HMAC Provider: provider/hmacprovider.md
-    - Htpasswd Provider: provider/htpasswd.md
-    - Sqlite: provider/sqlite.md
-    - KV: provider/kv.md
-    - Rate Limiter: provider/ratelimiter.md
-    - Metrics: provider/metrics.md
-    - Prometheus: provider/prometheus.md
+    - Examples: provider/httpserver/examples.md
+    - Troubleshooting: provider/httpserver/troubleshooting.md
+    - Performance: provider/httpserver/performance.md
 
-  - Logging:
-    - Overview: log/logging.md
-    - File Logging: log/file_logging.md
-  
+  - Security & Auth:
+    - Secure Credentials: crypt/secure-credentials.md
+    - Password Hashing: crypt/password-hashing.md
+    - PIN Generation: crypt/pin.md
+    - TLS: provider/tls.md
+    - JWT: provider/jwtprovider.md
+    - HMAC: provider/hmacprovider.md
+    - htpasswd: provider/htpasswd.md
+    - Rate Limiter: provider/ratelimiter.md
+
+  - Integrations:
+    - Messaging:
+      - Franz (Kafka): provider/franz.md
+      - Kafka (Legacy): provider/kafka.md
+      - Kafka to Franz Migration: provider/kafka-to-franz-migration.md
+      - MQTT: provider/mqtt.md
+      - NATS: provider/nats.md
+    - Storage & Cache:
+      - Redis: provider/redis.md
+      - etcd: provider/etcd.md
+      - KV Store: provider/kv.md
+      - S3: provider/s3.md
+    - Observability:
+      - Metrics: provider/metrics.md
+      - Prometheus: provider/prometheus.md
+    - Email:
+      - SMTP: provider/smtp.md
+
   - Utilities:
+    - Runner: runner/runner.md
     - BatchWriter: batchwriter/batchwriter.md
     - ThreadPool: threadpool/threadpool.md
     - Console: console/console.md
     - Types: types/types.md
     - Utils: utils/utils.md
     - Runtime Tags: runtime/runtime.md
+    - Contributing:
+      - Release Process: release-process.md
 
 extra:
   social:

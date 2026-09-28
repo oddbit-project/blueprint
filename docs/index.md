@@ -1,114 +1,92 @@
-# Blueprint Documentation
+# Blueprint
 
-Blueprint is a modular Go application framework for building web applications and microservices.
+Blueprint is a modular Go framework for building web applications and services. It gives you an
+application container with graceful shutdown, configuration, structured logging, a Gin-based HTTP
+server with security middleware and sessions, typed database repositories, and providers for
+messaging, storage, authentication and observability.
 
-## Getting Started
+## Install only what you use
 
-Blueprint is a modular Go framework. Starting from v0.8.0, you can import only the components you need:
+The core module holds the container, configuration, logging, the database layer (`dbx`, `db`) and
+utilities. Each provider is a separate Go module, so an application only pulls in the dependencies
+of the providers it imports:
 
 ```bash
-# Install core framework
-go get github.com/oddbit-project/blueprint
-
-# Install specific providers
-go get github.com/oddbit-project/blueprint/provider/httpserver
-go get github.com/oddbit-project/blueprint/provider/jwtprovider
-go get github.com/oddbit-project/blueprint/provider/kafka
-go get github.com/oddbit-project/blueprint/provider/pgsql
+go get github.com/oddbit-project/blueprint                        # core
+go get github.com/oddbit-project/blueprint/provider/httpserver     # HTTP server
+go get github.com/oddbit-project/blueprint/provider/pgsql          # PostgreSQL driver
 ```
 
-All existing imports continue to work without changes due to Go module rewrite rules.
+| Area | Modules (`github.com/oddbit-project/blueprint/provider/...`) |
+|---|---|
+| HTTP | `httpserver` |
+| Databases | `pgsql`, `sqlite`, `clickhouse` |
+| Messaging | `franz` (Kafka), `kafka` (legacy), `mqtt`, `nats` |
+| Storage & cache | `redis`, `etcd`, `s3` |
+| Authentication | `jwtprovider`, `hmacprovider`, `htpasswd` |
+| Observability | `metrics`, `prometheus` |
+| Email | `smtp` |
 
-## Application
+TLS, the key-value store interface and the rate limiter live in the core module
+(`provider/tls`, `provider/kv`, `provider/ratelimiter`).
 
-- [Container & Shutdown](container.md) - Application lifecycle, signal handling and destructors
-- [Runner](runner/runner.md) - Periodic background tasks
+## A minimal application
 
-## Development & Releases
+An HTTP server run by the application container, which stops it cleanly on SIGINT/SIGTERM:
 
-- [Release Process](release-process.md) - How to create releases and manage independent provider versioning
+```go
+package main
 
-## Configuration
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/oddbit-project/blueprint"
+    "github.com/oddbit-project/blueprint/log"
+    "github.com/oddbit-project/blueprint/provider/httpserver"
+    "github.com/oddbit-project/blueprint/utils"
+)
 
-- [Config](config/config.md)
+func main() {
+    utils.PanicOnError(log.Configure(log.NewDefaultConfig()))
+    logger := log.New("app")
 
-## Database
+    app := blueprint.NewContainer(nil)
 
-- [Database Package Overview](db/index.md)
-- [Structs and Tags](db/structs-and-tags.md)
-- [Client Interface](db/client.md)
-- [Repository Pattern](db/repository.md)
-- [Data Grid System](db/dbgrid.md)
-- [Field Specifications](db/fields.md)
-- [Query Builder](db/query-builder.md)
-- [Database Functions](db/functions.md)
-- [Migration System](db/migrations.md)
-- [SQL Update API](db/sql-update-api.md)
-- [gohan Query Builder](db/gohan.md)
-- [dbx Repositories](db/dbx.md)
-- [Migrating to dbx](db/migrating-to-dbx.md)
+    cfg := httpserver.NewServerConfig()
+    cfg.Host = "localhost"
+    cfg.Port = 8080
+    server, err := cfg.NewServer(logger)
+    app.AbortFatal(err)
 
-## Security
+    server.Route().GET("/hello", func(c *gin.Context) {
+        c.JSON(200, gin.H{"message": "hello"})
+    })
 
-- [Password Hashing](crypt/password-hashing.md)
-- [PIN Generation](crypt/pin.md)
-- [Secure Credentials](crypt/secure-credentials.md)
-- [TLS](provider/tls.md)
+    // runs on shutdown, after the application context is cancelled
+    blueprint.RegisterDestructor(func() error {
+        return server.Shutdown(app.GetContext())
+    })
 
-## Providers
+    app.Run(func(any) error {
+        go func() {
+            app.AbortFatal(server.Start())
+        }()
+        return nil
+    })
+}
+```
 
-### Message Queues & Communication
-- [Franz (Kafka)](provider/franz.md) - High-performance Kafka client with batch processing and transactions
-- [Kafka](provider/kafka.md) - Legacy Kafka client (see [migration guide](provider/kafka-to-franz-migration.md))
-- [MQTT](provider/mqtt.md)
-- [NATS](provider/nats.md)
+A fuller version reading its configuration from a JSON file is in
+[`samples/application`](https://github.com/oddbit-project/blueprint/tree/main/samples/application);
+the [`samples`](https://github.com/oddbit-project/blueprint/tree/main/samples) directory has
+runnable programs for most providers.
 
-### Databases & Storage
-- [ClickHouse](provider/clickhouse.md)
-- [etcd](provider/etcd.md)
-- [PostgreSQL](provider/pgsql.md)
-- [Redis](provider/redis.md)
-- [SQLite](provider/sqlite.md)
-- [S3 Storage](provider/s3.md)
+## Where to go next
 
-### Web & HTTP
-- [Metrics](provider/metrics.md) - Metrics endpoint serving the default Prometheus registry
-- [Prometheus](provider/prometheus.md) - Metrics endpoint built on the HTTP server provider
-- [Rate Limiter](provider/ratelimiter.md) - Per-client token-bucket rate limiting
-
-### Authentication & Security
-- [HMAC Provider](provider/hmacprovider.md)
-- [htpasswd](provider/htpasswd.md)
-- [JWT Provider](provider/jwtprovider.md)
-
-### Utilities
-- [KV](provider/kv.md) - Key-value store interface and in-memory backend
-- [SMTP](provider/smtp.md)
-
-## Logging
-
-- [Logging](log/logging.md)
-- [File Logging](log/file_logging.md)
-
-## HTTP Server
-
-- [HTTP Server Framework](provider/httpserver/index.md) - Complete overview and quick start
-- [API Reference](provider/httpserver/api-reference.md) - Complete server API documentation
-- [Middleware Components](provider/httpserver/middleware.md) - All middleware and utilities
-- [Integration Examples](provider/httpserver/examples.md) - REST API, web app, and microservice examples
-- [Troubleshooting Guide](provider/httpserver/troubleshooting.md) - Debugging and common issues
-- [Performance Guide](provider/httpserver/performance.md) - Optimization and production deployment
-- [Authentication](provider/httpserver/auth.md) - Token and JWT authentication providers
-- [Security & Headers](provider/httpserver/security.md) - Security middleware and CSRF protection
-- [Session Management](provider/httpserver/session.md) - Cookie-based session system
-- [Request Validation](provider/httpserver/validation.md) - Request binding and validation
-- [Request Utilities](provider/httpserver/request.md) - Request helper functions
-
-## Utilities
-
-- [BatchWriter](batchwriter/batchwriter.md)
-- [ThreadPool](threadpool/threadpool.md)
-- [Console](console/console.md)
-- [Types](types/types.md)
-- [Utils](utils/utils.md)
-- [Runtime Tags](runtime/runtime.md)
+| Section | What's there |
+|---|---|
+| **Getting Started** | [Application container](container.md), [configuration](config/config.md), [logging](log/logging.md) |
+| **Database** | [Overview](db/index.md): `dbx` repositories, the `gohan` query builder, migrations, drivers, and the [db → dbx migration guide](db/migrating-to-dbx.md) |
+| **HTTP Server** | [Server, routing and middleware](provider/httpserver/index.md), authentication, security headers and CSRF, sessions, validation |
+| **Security & Auth** | [Credentials](crypt/secure-credentials.md), [password hashing](crypt/password-hashing.md), [TLS](provider/tls.md), [JWT](provider/jwtprovider.md), [HMAC](provider/hmacprovider.md), [rate limiting](provider/ratelimiter.md) |
+| **Integrations** | Messaging ([Franz/Kafka](provider/franz.md), [MQTT](provider/mqtt.md), [NATS](provider/nats.md)), storage ([Redis](provider/redis.md), [etcd](provider/etcd.md), [S3](provider/s3.md)), [metrics](provider/metrics.md), [SMTP](provider/smtp.md) |
+| **Utilities** | [Periodic runner](runner/runner.md), [batch writer](batchwriter/batchwriter.md), [thread pool](threadpool/threadpool.md), helper packages |

@@ -1,5 +1,9 @@
 # db.FieldSpec
 
+!!! warning "Legacy"
+    This page documents the legacy goqu-based `db` package, kept for existing code. New code should
+    use [`dbx`](dbx.md) and [`gohan`](gohan.md); see [Migrating from db to dbx](migrating-to-dbx.md).
+
 Field specification component for mapping struct fields to database columns with extended functionality, used
 in the Grid component.
 
@@ -284,7 +288,7 @@ fmt.Println(mapping) // Output: map[u_id:userId u_name:userName u_email:userEmai
 
 ## See Also
 
-- [Database Package Overview](index.md)
+- [Legacy db Package Overview](legacy-overview.md)
 - [Structs and Tags](structs-and-tags.md)
 - [Repository Documentation](repository.md)
 - [Data Grid Documentation](dbgrid.md)

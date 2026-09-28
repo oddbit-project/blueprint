@@ -1,5 +1,9 @@
 # Query Builder
 
+!!! warning "Legacy"
+    This page documents the legacy goqu-based `db` package, kept for existing code. New code should
+    use [`dbx`](dbx.md) and [`gohan`](gohan.md); see [Migrating from db to dbx](migrating-to-dbx.md).
+
 The Query Builder (qb) package provides a powerful SQL generation system with dialect abstraction, type-safe query construction, 
 and advanced features like RETURNING clauses. It serves as the foundation for Repository operations and can be
 used directly for complex query construction.
@@ -638,4 +642,4 @@ func updateUserHandler(w http.ResponseWriter, r *http.Request) {
 - [Repository Documentation](repository.md)
 - [Database Functions](functions.md)
 - [Field Metadata](fields.md)
-- [Database Package Overview](index.md)
+- [Legacy db Package Overview](legacy-overview.md)
