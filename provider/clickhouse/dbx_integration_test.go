@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/stretchr/testify/assert"
@@ -443,4 +444,112 @@ func (s *ClickhouseRepositoryTestSuite) TestDbxUnsupported() {
 
 	err = dbx.WithTx(s.ctx, q, nil, func(tx dbx.Querier) error { return nil })
 	assert.True(s.T(), errors.Is(err, dbx.ErrTxUnsupported), "got %v", err)
+}
+
+// dbxTimeRecord is the record type for TestDbxTimePrecision: three
+// DateTime64 columns at different scales, one in a non-UTC timezone, and a
+// Date column, used to check that a dbx call binding a time.Time argument
+// through the Querier does not truncate it to whole seconds. See
+// querier.go's namedArgs.
+type dbxTimeRecord struct {
+	ID uint32    `ch:"id" db:"id"`
+	T3 time.Time `ch:"t3" db:"t3"`
+	T9 time.Time `ch:"t9" db:"t9"`
+	TL time.Time `ch:"tl" db:"tl"`
+	D  time.Time `ch:"d" db:"d"`
+}
+
+const dbxTimeDDL = `
+CREATE TABLE %s (
+	id UInt32,
+	t3 DateTime64(3, 'UTC'),
+	t9 DateTime64(9, 'UTC'),
+	tl DateTime64(6, 'Europe/Lisbon'),
+	d  Date
+) ENGINE = MergeTree ORDER BY id
+`
+
+// TestDbxTimePrecision reproduces the wrong query results caused by
+// clickhouse-go's native time.Time binding, which formats a time.Time as
+// "toDateTime('YYYY-MM-DD hh:mm:ss')" (whole seconds only), for every dbx
+// call that passes args through the Querier (Exec/Get/Select/QueryInt64;
+// InsertBatch is columnar and unaffected).
+func (s *ClickhouseRepositoryTestSuite) TestDbxTimePrecision() {
+	const table = "dbx_time_precision"
+	s.createTable(table, dbxTimeDDL)
+	defer s.dropTable(table)
+
+	q := s.client.Querier()
+	r, err := dbx.NewRepository[dbxTimeRecord](q, table)
+	require.NoError(s.T(), err)
+
+	tm := time.Date(2026, 9, 27, 12, 34, 56, 123456789, time.UTC)
+	tmBefore := tm.Add(-500 * time.Millisecond)
+	midnight := time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC)
+
+	// id 1: InsertBatch (columnar) - already full precision, the baseline.
+	require.NoError(s.T(), r.Insert(s.ctx, &dbxTimeRecord{ID: 1, T3: tm, T9: tm, TL: tm, D: midnight}))
+
+	// id 2: Repository.Exec / gohan.Insert - the path under test, at tm.
+	_, err = r.Exec(s.ctx, gohan.Insert(table).Columns("id", "t3", "t9", "tl", "d").
+		Values(uint32(2), tm, tm, tm, midnight))
+	require.NoError(s.T(), err)
+
+	// id 3: same path, an instant strictly before tm.
+	_, err = r.Exec(s.ctx, gohan.Insert(table).Columns("id", "t3", "t9", "tl", "d").
+		Values(uint32(3), tmBefore, tmBefore, tmBefore, midnight))
+	require.NoError(s.T(), err)
+
+	got, err := r.Get(s.ctx, r.Select().Where(gohan.Col("id").Eq(uint32(2))))
+	require.NoError(s.T(), err)
+	assert.True(s.T(), got.T9.Equal(tm), "id 2 t9 = %s, want %s (same instant as tm)", got.T9, tm)
+	wantT3 := tm.Truncate(time.Millisecond)
+	assert.True(s.T(), got.T3.Equal(wantT3),
+		"id 2 t3 = %s, want %s (tm truncated to milliseconds, same instant)", got.T3, wantT3)
+	wantTL := tm.Truncate(time.Microsecond)
+	assert.True(s.T(), got.TL.Equal(wantTL),
+		"id 2 tl = %s, want %s (tm truncated to microseconds, same instant)", got.TL, wantTL)
+
+	cnt, err := r.Count(s.ctx, gohan.Col("t9").Eq(tm))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(2), cnt, "Count(t9 = tm)")
+
+	cnt, err = r.Count(s.ctx, gohan.Col("t3").Eq(tm.Truncate(time.Millisecond)))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(2), cnt, "Count(t3 = tm.Truncate(ms))")
+
+	cnt, err = r.Count(s.ctx, gohan.Col("t3").Eq(tm))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(0), cnt, "Count(t3 = tm) exact-instant: t3 stores only milliseconds")
+
+	cnt, err = r.Count(s.ctx, gohan.Col("tl").Eq(tm.Truncate(time.Microsecond)))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(2), cnt, "Count(tl = tm.Truncate(us))")
+
+	cnt, err = r.Count(s.ctx, gohan.Col("d").Eq(midnight))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(3), cnt, "Count(d = midnight)")
+
+	list, err := r.List(s.ctx, r.Select().Where(gohan.Col("t9").Gte(tm)))
+	require.NoError(s.T(), err)
+	gotIDs := make([]uint32, 0, len(list))
+	for _, row := range list {
+		gotIDs = append(gotIDs, row.ID)
+	}
+	assert.ElementsMatch(s.T(), []uint32{1, 2}, gotIDs, "List(t9 >= tm)")
+
+	cnt, err = r.Count(s.ctx, gohan.Col("t9").Lt(tm))
+	require.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(1), cnt, "Count(t9 < tm)")
+
+	_, err = r.Delete(s.ctx, gohan.Col("t9").Lt(tm))
+	require.NoError(s.T(), err)
+
+	list, err = r.List(s.ctx, nil)
+	require.NoError(s.T(), err)
+	gotIDs = gotIDs[:0]
+	for _, row := range list {
+		gotIDs = append(gotIDs, row.ID)
+	}
+	assert.ElementsMatch(s.T(), []uint32{1, 2}, gotIDs, "ids remaining after Delete(t9 < tm)")
 }

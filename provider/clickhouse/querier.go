@@ -3,10 +3,12 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -22,6 +24,14 @@ import (
 //
 // Querier is not transactional: it does not implement dbx.TxBeginner or
 // dbx.TxQuerier.
+//
+// Statements built through Dialect() use named "@pN" placeholders
+// (gohan.ClickHouseNamed); time.Time arguments (bare, *time.Time, or a
+// driver.Valuer producing one) keep full precision and compare by exact
+// instant, rather than clickhouse-go's native whole-second binding.
+// Callers passing their own SQL with positional "?" placeholders keep
+// clickhouse-go's whole-second time binding; use "@name" with
+// clickhouse.DateNamed instead if full precision is needed there.
 type Querier struct {
 	conn clickhouse.Conn
 }
@@ -41,15 +51,74 @@ func (c *Client) Querier() *Querier {
 	return NewQuerier(c.Conn)
 }
 
-// Dialect returns gohan.ClickHouse().
+// Dialect returns gohan.ClickHouseNamed(): statements are built with
+// "@pN" placeholders bound by name, so namedArgs can convert time.Time
+// arguments to clickhouse.DateNamed and keep full precision.
 func (q *Querier) Dialect() gohan.Dialect {
-	return gohan.ClickHouse()
+	return gohan.ClickHouseNamed()
+}
+
+// namedArgs converts each gohan-built sql.NamedArg in args to the native
+// clickhouse-go binding: a time.Time value (bare, via *time.Time, or via a
+// non-nil-pointer driver.Valuer producing one) becomes
+// clickhouse.DateNamed(name, t, clickhouse.NanoSeconds), which the driver
+// renders as toDateTime64(..., 9) and keeps at full precision; a nil
+// *time.Time becomes clickhouse.Named(name, nil); anything else becomes
+// clickhouse.Named(name, value). Arguments that are not sql.NamedArg
+// (hand-written SQL with positional "?") pass through unchanged. args is
+// never mutated; a new slice is returned.
+func namedArgs(args []any) []any {
+	out := make([]any, len(args))
+	for i, a := range args {
+		na, ok := a.(sql.NamedArg)
+		if !ok {
+			out[i] = a
+			continue
+		}
+		switch v := na.Value.(type) {
+		case time.Time:
+			out[i] = clickhouse.DateNamed(na.Name, v, clickhouse.NanoSeconds)
+		case *time.Time:
+			if v == nil {
+				out[i] = clickhouse.Named(na.Name, nil)
+			} else {
+				out[i] = clickhouse.DateNamed(na.Name, *v, clickhouse.NanoSeconds)
+			}
+		default:
+			if t, ok := asValuerTime(na.Value); ok {
+				out[i] = clickhouse.DateNamed(na.Name, t, clickhouse.NanoSeconds)
+			} else {
+				out[i] = clickhouse.Named(na.Name, na.Value)
+			}
+		}
+	}
+	return out
+}
+
+// asValuerTime reports whether value is a non-nil pointer implementing
+// driver.Valuer whose Value() returns a time.Time with no error (for
+// example a valid sql.NullTime).
+func asValuerTime(value any) (time.Time, bool) {
+	rv := reflect.ValueOf(value)
+	if !rv.IsValid() || (rv.Kind() == reflect.Pointer && rv.IsNil()) {
+		return time.Time{}, false
+	}
+	valuer, ok := value.(driver.Valuer)
+	if !ok {
+		return time.Time{}, false
+	}
+	v, err := valuer.Value()
+	if err != nil {
+		return time.Time{}, false
+	}
+	t, ok := v.(time.Time)
+	return t, ok
 }
 
 // Exec runs query and always returns 0: ClickHouse does not report the
 // number of rows affected by a statement.
 func (q *Querier) Exec(ctx context.Context, query string, args ...any) (int64, error) {
-	if err := q.conn.Exec(ctx, query, args...); err != nil {
+	if err := q.conn.Exec(ctx, query, namedArgs(args)...); err != nil {
 		return 0, err
 	}
 	return 0, nil
@@ -64,7 +133,7 @@ func (q *Querier) Exec(ctx context.Context, query string, args ...any) (int64, e
 // type used with this Querier needs `ch` tags equal to its `db` tags (or
 // only `ch` tags), or the mapping silently diverges.
 func (q *Querier) Get(ctx context.Context, dest any, query string, args ...any) error {
-	row := q.conn.QueryRow(ctx, query, args...)
+	row := q.conn.QueryRow(ctx, query, namedArgs(args)...)
 	return row.ScanStruct(dest)
 }
 
@@ -86,13 +155,13 @@ func (q *Querier) Select(ctx context.Context, dest any, query string, args ...an
 	elemType := sv.Type().Elem()
 	if elemType.Kind() != reflect.Pointer {
 		// Element T (struct): delegate to conn.Select.
-		return q.conn.Select(ctx, dest, query, args...)
+		return q.conn.Select(ctx, dest, query, namedArgs(args)...)
 	}
 	if elemType.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("clickhouse: Select requires []T or []*T with T a struct, got %T", dest)
 	}
 
-	rows, err := q.conn.Query(ctx, query, args...)
+	rows, err := q.conn.Query(ctx, query, namedArgs(args)...)
 	if err != nil {
 		return err
 	}
@@ -113,7 +182,7 @@ func (q *Querier) Select(ctx context.Context, dest any, query string, args ...an
 // reported as dbx.ErrCountOverflow.
 func (q *Querier) QueryInt64(ctx context.Context, query string, args ...any) (int64, error) {
 	var n uint64
-	row := q.conn.QueryRow(ctx, query, args...)
+	row := q.conn.QueryRow(ctx, query, namedArgs(args)...)
 	if err := row.Scan(&n); err != nil {
 		if err == sql.ErrNoRows {
 			return 0, dbx.ErrNotFound

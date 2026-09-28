@@ -136,8 +136,8 @@ github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOF
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
 github.com/oddbit-project/blueprint/provider/sqlite v0.8.3 h1:hN6TAYHNgCPDUHAHLh6SSuBeLJU7zuMYh4sUEytBvms=
 github.com/oddbit-project/blueprint/provider/sqlite v0.8.3/go.mod h1:RncPv+DD539Vyp8SM5rOvY01jvmJi43rbHxlRC6rXFA=
-github.com/oddbit-project/gohan v0.1.0 h1:9g+RpZpO/wRYIv2h/8kOfwFlYlpcZMMQ8EkzYTmjEeQ=
-github.com/oddbit-project/gohan v0.1.0/go.mod h1:OKohrBF9y6LchsoeBkUQXdLcAbtPWsbMt+qaQdvY0Bo=
+github.com/oddbit-project/gohan v0.2.0 h1:OgHsqLNHxSVfnpuBw3iibLVosXEPyoblqmcsq7cNtAI=
+github.com/oddbit-project/gohan v0.2.0/go.mod h1:OKohrBF9y6LchsoeBkUQXdLcAbtPWsbMt+qaQdvY0Bo=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
