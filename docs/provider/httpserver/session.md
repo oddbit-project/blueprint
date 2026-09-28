@@ -179,6 +179,11 @@ type SessionStore interface {
 }
 ```
 
+A custom `Get` must return `session.ErrSessionNotFound` for an unknown ID and `session.ErrSessionExpired`
+for an expired session (matched with `errors.Is`): the middleware treats those two as normal, and logs a
+warning for any other error (see [Unreadable Sessions](#unreadable-sessions)). A store that returns, say,
+`sql.ErrNoRows` for an unknown ID would log one warning per request carrying an unknown cookie.
+
 `ManagerWithStore()` accepts any `SessionStore` implementation:
 
 ```go
@@ -517,6 +522,27 @@ openssl rand -base64 32
 # Set as environment variable
 export SESSION_ENCRYPTION_KEY="generated-key-here"
 ```
+
+### Unreadable Sessions
+
+When a request's session cookie cannot be turned into a session, the middleware starts a new one and
+sets a new cookie. An unknown session ID (`ErrSessionNotFound`) and an expired session
+(`ErrSessionExpired`) are normal and not logged. Any other failure is logged as a warning
+("Failed to read session, starting a new one", with the underlying error in the `error` field). The
+message never contains the session ID, but the error text from the backend or marshaller is logged as
+is, so a custom `kv.KV` or `SessionStore` must not put the key in its errors. Causes:
+
+- decryption failures (`secure.ErrAuthenticationFailed`, `secure.ErrDataTooShort`): the stored data was
+  tampered with or corrupted, or was written with a different `EncryptionKey` (for example after a key
+  rotation, or instances configured with different keys);
+- unmarshalling failures (a corrupt record, or a marshaller change);
+- backend read errors (for example Redis being unreachable);
+- a cookie that names a key another application stored in the same backend. With the Redis backend's
+  default empty `KeyPrefix` the cookie value is the raw Redis key, so a client can cause these warnings
+  on a shared Redis database: use a `KeyPrefix` that only sessions use (for example `"session:"`; not
+  one shared with the HMAC nonce store or other `kv.KV` users) or a dedicated database.
+
+A record the session store wrote is left in the backend until its TTL expires.
 
 ## Session Marshallers
 

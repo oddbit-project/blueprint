@@ -1,6 +1,7 @@
 package session
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/oddbit-project/blueprint/log"
 	"github.com/oddbit-project/blueprint/provider/kv"
@@ -78,9 +79,15 @@ func (m *Manager) Middleware() gin.HandlerFunc {
 		if err == nil && cookie != "" {
 			// Cookie exists, try to get the session
 			session, err = m.store.Get(cookie)
-			if err == nil {
+			switch {
+			case err == nil:
 				// Session found, set it to the context
 				sessionID = cookie
+			case !errors.Is(err, ErrSessionNotFound) && !errors.Is(err, ErrSessionExpired):
+				// Unreadable (tampered, wrong key, corrupt) or backend failure. Warn, not
+				// error: a client can cause it (e.g. a cookie naming another key in a
+				// shared Redis DB). The session ID is a bearer secret and is not logged.
+				m.logger.Warn("Failed to read session, starting a new one", map[string]interface{}{"error": err.Error()})
 			}
 		}
 

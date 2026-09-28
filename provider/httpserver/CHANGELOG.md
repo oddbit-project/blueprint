@@ -6,9 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [v0.10.1] - 2026-09-28
+
+Requires Blueprint core v0.11.0. Requires `provider/jwtprovider` v0.9.0, `provider/hmacprovider` v0.9.0 and `provider/htpasswd` v0.9.0.
+
 ### Fixed
 
 - `session.Store.StartCleanup` doc comment described it as a no-op.
+- The session middleware logged nothing when it discarded a session it could not read (decryption
+  failure after tampering or an `EncryptionKey` mismatch, corrupt data, backend read error) and
+  started a new one, so tampering and key mismatches were invisible. It now logs a warning with the
+  error ("Failed to read session, starting a new one"; the message never contains the session ID,
+  but a custom backend must not put the key in its error text). Unknown and expired
+  sessions are still not logged. A custom `SessionStore` must return `ErrSessionNotFound` /
+  `ErrSessionExpired` from `Get` for those cases, or every unknown cookie is logged. With the Redis
+  backend on a shared database, use a `KeyPrefix` that only sessions use, or a client can trigger
+  warnings with cookies that name other keys.
 
 ## [v0.10.0] - 2026-09-27
 
