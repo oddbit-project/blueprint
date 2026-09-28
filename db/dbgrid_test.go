@@ -639,3 +639,27 @@ func TestGrid_Build_Specific(t *testing.T) {
 	assert.Contains(t, sql, "LIMIT 10")
 	assert.Contains(t, sql, "OFFSET 20")
 }
+
+func TestGrid_SpecCacheDistinguishesSameNamedTypes(t *testing.T) {
+	first := func() any {
+		type record struct {
+			ID int `db:"id" json:"id" grid:"sort"`
+		}
+		return &record{}
+	}()
+	second := func() any {
+		type record struct {
+			Email string `db:"email" json:"email" grid:"filter"`
+		}
+		return &record{}
+	}()
+
+	grid1, err := NewGrid("t1", first)
+	assert.NoError(t, err)
+	grid2, err := NewGrid("t2", second)
+	assert.NoError(t, err)
+
+	assert.Contains(t, grid1.spec.aliasField, "id")
+	assert.Contains(t, grid2.spec.aliasField, "email")
+	assert.NotContains(t, grid2.spec.aliasField, "id")
+}

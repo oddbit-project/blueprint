@@ -26,14 +26,14 @@ func getFieldSpec(from any) (*fieldSpec, error) {
 		t = t.Elem()
 	}
 
-	if cached, ok := specCache.Load(t.Name()); ok {
+	if cached, ok := specCache.Load(t); ok {
 		return cached.(*fieldSpec), nil
 	}
 	v, err := newFieldSpecFromType(t)
 	if err != nil {
 		return nil, err
 	}
-	specCache.Store(t.Name(), v)
+	specCache.Store(t, v)
 
 	return v, err
 }
