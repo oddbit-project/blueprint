@@ -8,6 +8,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -58,11 +59,52 @@ func (q *Querier) Dialect() gohan.Dialect {
 	return gohan.ClickHouseNamed()
 }
 
+// dateNamed binds t as a DateTime64 literal at the smallest scale that holds
+// t exactly, but never below milliseconds: a DateTime64(9) literal overflows
+// after 2262 and a DateTime one after 2106, while DateTime64(3) covers
+// 1900-2299. t keeps its location (so Date comparisons and date functions see
+// the same calendar day as before), except where the driver's rendering fails,
+// in which case the same instant is bound in UTC: time.Local (clickhouse-go
+// renders it as a numeric string that ClickHouse misreads or rejects for
+// almost every date) and a location ClickHouse cannot load by name (such as a
+// time.FixedZone).
+func dateNamed(name string, t time.Time) any {
+	scale := clickhouse.MilliSeconds
+	switch ns := t.Nanosecond(); {
+	case ns%int(time.Microsecond) != 0:
+		scale = clickhouse.NanoSeconds
+	case ns%int(time.Millisecond) != 0:
+		scale = clickhouse.MicroSeconds
+	}
+	if t.Location() == time.Local || !namedLocation(t.Location()) {
+		t = t.UTC()
+	}
+	return clickhouse.DateNamed(name, t, scale)
+}
+
+// knownZones caches namedLocation's time.LoadLocation lookups by zone name.
+var knownZones sync.Map // map[string]bool
+
+// namedLocation reports whether loc is UTC or an IANA zone that can be
+// loaded by its name (which clickhouse-go sends to the server as is).
+func namedLocation(loc *time.Location) bool {
+	name := loc.String()
+	if name == "UTC" {
+		return true
+	}
+	if ok, found := knownZones.Load(name); found {
+		return ok.(bool)
+	}
+	_, err := time.LoadLocation(name)
+	knownZones.Store(name, err == nil)
+	return err == nil
+}
+
 // namedArgs converts each gohan-built sql.NamedArg in args to the native
 // clickhouse-go binding: a time.Time value (bare, via *time.Time, or via a
-// non-nil-pointer driver.Valuer producing one) becomes
-// clickhouse.DateNamed(name, t, clickhouse.NanoSeconds), which the driver
-// renders as toDateTime64(..., 9) and keeps at full precision; a nil
+// non-nil-pointer driver.Valuer producing one) becomes dateNamed(name, t),
+// which the driver renders as a toDateTime64 literal that keeps the instant
+// exactly; a nil
 // *time.Time becomes clickhouse.Named(name, nil); anything else becomes
 // clickhouse.Named(name, value). Arguments that are not sql.NamedArg
 // (hand-written SQL with positional "?") pass through unchanged. args is
@@ -77,16 +119,16 @@ func namedArgs(args []any) []any {
 		}
 		switch v := na.Value.(type) {
 		case time.Time:
-			out[i] = clickhouse.DateNamed(na.Name, v, clickhouse.NanoSeconds)
+			out[i] = dateNamed(na.Name, v)
 		case *time.Time:
 			if v == nil {
 				out[i] = clickhouse.Named(na.Name, nil)
 			} else {
-				out[i] = clickhouse.DateNamed(na.Name, *v, clickhouse.NanoSeconds)
+				out[i] = dateNamed(na.Name, *v)
 			}
 		default:
 			if t, ok := asValuerTime(na.Value); ok {
-				out[i] = clickhouse.DateNamed(na.Name, t, clickhouse.NanoSeconds)
+				out[i] = dateNamed(na.Name, t)
 			} else {
 				out[i] = clickhouse.Named(na.Name, na.Value)
 			}

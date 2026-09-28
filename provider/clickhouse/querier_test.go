@@ -128,6 +128,52 @@ func TestNamedArgs(t *testing.T) {
 		assert.True(t, nd.Value.Equal(tmNonUTC))
 	})
 
+	t.Run("NamedArg time.Time is bound at the smallest exact scale", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			ns    int
+			scale chgo.TimeUnit
+		}{
+			{"whole seconds", 0, chgo.MilliSeconds},
+			{"milliseconds", 123000000, chgo.MilliSeconds},
+			{"microseconds", 123456000, chgo.MicroSeconds},
+			{"nanoseconds", 123456789, chgo.NanoSeconds},
+		}
+		for _, c := range cases {
+			v := time.Date(2290, 1, 2, 3, 4, 5, c.ns, loc)
+			out := namedArgs([]any{sql.NamedArg{Name: "p1", Value: v}})
+			nd, ok := out[0].(chdriver.NamedDateValue)
+			require.True(t, ok, "%s: got %T", c.name, out[0])
+			assert.Equal(t, uint8(c.scale), nd.Scale, c.name)
+			assert.True(t, nd.Value.Equal(v), c.name)
+		}
+	})
+
+	t.Run("NamedArg time.Time keeps an IANA location; Local and fixed zones become UTC", func(t *testing.T) {
+		lisbon, err := time.LoadLocation("Europe/Lisbon")
+		require.NoError(t, err)
+		base := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+		cases := []struct {
+			name string
+			v    time.Time
+			want *time.Location
+		}{
+			{"UTC", base, time.UTC},
+			{"Local", base.Local(), time.UTC},
+			{"IANA zone", base.In(lisbon), lisbon},
+			{"fixed zone", base.In(loc), time.UTC},
+			{"Local after 2262", time.Date(2290, 1, 1, 0, 0, 0, 0, time.UTC).Local(), time.UTC},
+			{"Local before 1970", time.Date(1901, 1, 1, 0, 0, 0, 0, time.UTC).Local(), time.UTC},
+		}
+		for _, c := range cases {
+			out := namedArgs([]any{sql.NamedArg{Name: "p1", Value: c.v}})
+			nd, ok := out[0].(chdriver.NamedDateValue)
+			require.True(t, ok, "%s: got %T", c.name, out[0])
+			assert.Equal(t, c.want.String(), nd.Value.Location().String(), c.name)
+			assert.True(t, nd.Value.Equal(c.v), c.name)
+		}
+	})
+
 	t.Run("NamedArg *time.Time set becomes DateNamed", func(t *testing.T) {
 		out := namedArgs([]any{sql.NamedArg{Name: "p1", Value: &tm}})
 		nd, ok := out[0].(chdriver.NamedDateValue)

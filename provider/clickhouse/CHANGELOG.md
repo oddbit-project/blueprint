@@ -4,6 +4,25 @@ All notable changes to the Blueprint ClickHouse provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **Bound `time.Local` and `time.FixedZone` values are sent as the same instant in UTC.**
+  clickhouse-go rendered a `Local` time as a numeric string that ClickHouse misread or rejected for
+  almost every date (comparisons with `time.Now()` values failed or matched nothing), and a fixed
+  zone's name (e.g. `UTC+5`) is not a zone ClickHouse can load. Times in an IANA zone keep their
+  zone, so `Date` comparisons are unchanged for them. A `Local` time compared with a `Date` column
+  now uses its UTC calendar day.
+
+### Fixed
+
+- Bound `time.Time` arguments (dbx statements) after 2262 failed with `Decimal math overflow`:
+  every time was bound at scale 9. Times are now bound at the smallest exact scale (3, 6 or 9), so
+  millisecond/microsecond times bind across `DateTime64(3)`'s 1900-2299; nanosecond times still
+  overflow after 2262. clickhouse-go v2.40.3 itself mishandles `DateTime64` values after 2262 in
+  columnar inserts and when scanning into `time.Time`; see `docs/db/dbx.md`.
+
 ## [v0.9.1] - 2026-09-28
 
 Requires Blueprint core v0.11.0 and `gohan` v0.2.0. gohan v0.2.0 also makes `dbx.Repository.Delete`/`Update`
