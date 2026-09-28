@@ -5,6 +5,10 @@
          <lastmod>2026-09-28</lastmod>
     </url>
     <url>
+         <loc>https://oddbit-project.github.io/blueprint/container/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
          <loc>https://oddbit-project.github.io/blueprint/release-process/</loc>
          <lastmod>2026-09-28</lastmod>
     </url>
@@ -14,6 +18,10 @@
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/config/config/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/console/console/</loc>
          <lastmod>2026-09-28</lastmod>
     </url>
     <url>
@@ -54,6 +62,10 @@
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/db/gohan/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/db/legacy-overview/</loc>
          <lastmod>2026-09-28</lastmod>
     </url>
     <url>
@@ -121,6 +133,14 @@
          <lastmod>2026-09-28</lastmod>
     </url>
     <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/kv/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/metrics/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/mqtt/</loc>
          <lastmod>2026-09-28</lastmod>
     </url>
@@ -130,6 +150,14 @@
     </url>
     <url>
          <loc>https://oddbit-project.github.io/blueprint/provider/pgsql/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/prometheus/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/provider/ratelimiter/</loc>
          <lastmod>2026-09-28</lastmod>
     </url>
     <url>
@@ -197,7 +225,23 @@
          <lastmod>2026-09-28</lastmod>
     </url>
     <url>
+         <loc>https://oddbit-project.github.io/blueprint/runner/runner/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/runtime/runtime/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
          <loc>https://oddbit-project.github.io/blueprint/threadpool/threadpool/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/types/types/</loc>
+         <lastmod>2026-09-28</lastmod>
+    </url>
+    <url>
+         <loc>https://oddbit-project.github.io/blueprint/utils/utils/</loc>
          <lastmod>2026-09-28</lastmod>
     </url>
 </urlset>
