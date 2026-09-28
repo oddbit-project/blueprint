@@ -6,6 +6,7 @@ import (
 
 const (
 	DefaultEndpoint = "/metrics"
+	DefaultHost     = "localhost"
 	DefaultPort     = 2220
 	serverName      = "prometheus"
 )
@@ -18,6 +19,7 @@ type Config struct {
 
 func NewConfig() *Config {
 	cfg := httpserver.NewServerConfig()
+	cfg.Host = DefaultHost
 	cfg.Port = DefaultPort
 	cfg.ServerName = serverName
 
@@ -29,5 +31,8 @@ func NewConfig() *Config {
 }
 
 func (c *Config) Validate() error {
+	if c.Port == 0 {
+		c.Port = DefaultPort
+	}
 	return c.ServerConfig.Validate()
 }

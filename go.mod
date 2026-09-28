@@ -199,6 +199,7 @@ replace (
 	github.com/oddbit-project/blueprint/provider/mqtt => ./provider/mqtt
 	github.com/oddbit-project/blueprint/provider/nats => ./provider/nats
 	github.com/oddbit-project/blueprint/provider/pgsql => ./provider/pgsql
+	github.com/oddbit-project/blueprint/provider/prometheus => ./provider/prometheus
 	github.com/oddbit-project/blueprint/provider/redis => ./provider/redis
 	github.com/oddbit-project/blueprint/provider/s3 => ./provider/s3
 	github.com/oddbit-project/blueprint/provider/smtp => ./provider/smtp
