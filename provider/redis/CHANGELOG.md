@@ -4,6 +4,25 @@ All notable changes to the Blueprint Redis provider will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking:** `Config` embeds `tls.ClientConfig` instead of `tls.ServerConfig`. Server-only
+  fields (`TLSAllowedCACerts`, `TLSCipherSuites`, `TLSMinVersion`, `TLSMaxVersion`,
+  `TLSAllowedDNSNames`) are gone; use `TLSCA` and `TLSInsecureSkipVerify`.
+
+### Added
+
+- `Client.SetNX`, implementing `kv.AtomicSetter`.
+
+### Fixed
+
+- **`Prune()` ran `FLUSHDB`**, wiping the whole Redis database, including on every session-store
+  cleanup tick when used as the session backend. It is now a no-op; Redis expires keys itself.
+- `TLSEnable=true` connected in plaintext; the TLS configuration is now applied.
+- Removed a password-zeroing loop that had no effect.
+
 ## [v0.8.2] - 2026-09-20
 
 ### Security

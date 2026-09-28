@@ -18,18 +18,28 @@ func NewKvStore(kv kv.KV, ttl time.Duration) NonceStore {
 }
 
 func (s *kvStore) AddIfNotExists(nonce string) bool {
+	// Use atomic set-if-not-exists when the backend supports it
+	if setter, ok := s.kv.(kv.AtomicSetter); ok {
+		added, err := setter.SetNX(nonce, []byte("1"), s.ttl)
+		if err != nil {
+			// On error, fail safely - assume nonce exists to prevent replay attacks
+			return false
+		}
+		return added
+	}
+
 	// Check if nonce already exists
 	existing, err := s.kv.Get(nonce)
 	if err != nil {
 		// On error, fail safely - assume nonce exists to prevent replay attacks
 		return false
 	}
-	
+
 	// If nonce exists, reject
 	if existing != nil {
 		return false
 	}
-	
+
 	// Nonce doesn't exist, add it with TTL
 	// Use a simple marker value since we only care about existence
 	err = s.kv.SetTTL(nonce, []byte("1"), s.ttl)
@@ -37,7 +47,7 @@ func (s *kvStore) AddIfNotExists(nonce string) bool {
 		// If we can't store the nonce, fail safely
 		return false
 	}
-	
+
 	return true
 }
 

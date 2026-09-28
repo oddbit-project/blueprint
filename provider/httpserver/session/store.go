@@ -177,7 +177,8 @@ func (s *Store) Generate() (*SessionData, string) {
 	return session, id
 }
 
-// StartCleanup is a no-op for Client as Client handles expiration
+// StartCleanup starts a goroutine that calls the backend Prune() every CleanupIntervalSeconds;
+// Prune is a no-op for backends that expire keys themselves (e.g. Redis)
 func (s *Store) StartCleanup() {
 	s.cleanupMutex.Lock()
 	defer s.cleanupMutex.Unlock()
