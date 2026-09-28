@@ -15,10 +15,10 @@ require (
 	github.com/oddbit-project/blueprint/provider/clickhouse v0.8.4
 	github.com/oddbit-project/blueprint/provider/etcd v0.9.1
 	github.com/oddbit-project/blueprint/provider/franz v0.8.5
-	github.com/oddbit-project/blueprint/provider/hmacprovider v0.8.3
-	github.com/oddbit-project/blueprint/provider/htpasswd v0.8.3
+	github.com/oddbit-project/blueprint/provider/hmacprovider v0.9.0
+	github.com/oddbit-project/blueprint/provider/htpasswd v0.9.0
 	github.com/oddbit-project/blueprint/provider/httpserver v0.9.4
-	github.com/oddbit-project/blueprint/provider/jwtprovider v0.8.3
+	github.com/oddbit-project/blueprint/provider/jwtprovider v0.9.0
 	github.com/oddbit-project/blueprint/provider/kafka v0.8.4
 	github.com/oddbit-project/blueprint/provider/metrics v0.8.2
 	github.com/oddbit-project/blueprint/provider/mqtt v0.8.2
@@ -53,7 +53,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/oddbit-project/gohan v0.1.0
+	github.com/oddbit-project/gohan v0.2.0
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 )
@@ -124,7 +124,6 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oddbit-project/blueprint/provider/redis v0.8.2 // indirect
-	github.com/oddbit-project/blueprint/provider/smtp v0.9.1
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/paulmach/orb v0.12.0 // indirect
