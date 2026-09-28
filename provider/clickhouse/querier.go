@@ -100,7 +100,7 @@ func namedArgs(args []any) []any {
 // example a valid sql.NullTime).
 func asValuerTime(value any) (time.Time, bool) {
 	rv := reflect.ValueOf(value)
-	if !rv.IsValid() || rv.Kind() != reflect.Pointer || rv.IsNil() {
+	if !rv.IsValid() || (rv.Kind() == reflect.Pointer && rv.IsNil()) {
 		return time.Time{}, false
 	}
 	valuer, ok := value.(driver.Valuer)

@@ -154,6 +154,14 @@ func TestNamedArgs(t *testing.T) {
 		assert.Equal(t, tm, nd.Value)
 	})
 
+	t.Run("NamedArg valid sql.NullTime value (not pointer) becomes DateNamed", func(t *testing.T) {
+		out := namedArgs([]any{sql.NamedArg{Name: "p1", Value: sql.NullTime{Time: tm, Valid: true}}})
+		nd, ok := out[0].(chdriver.NamedDateValue)
+		require.True(t, ok, "got %T", out[0])
+		assert.Equal(t, "p1", nd.Name)
+		assert.Equal(t, tm, nd.Value)
+	})
+
 	t.Run("NamedArg invalid sql.NullTime falls through to Named", func(t *testing.T) {
 		nt := &sql.NullTime{Valid: false}
 		out := namedArgs([]any{sql.NamedArg{Name: "p1", Value: nt}})
