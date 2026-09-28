@@ -145,12 +145,12 @@ type User struct {
 }
 
 grid, err := dbx.NewGrid[User]()
-grid = grid.WithMaxLimit(100) // configure before concurrent use — WithMaxLimit/AddFilterFunc mutate the grid
+grid = grid.WithMaxLimit(100).WithTiebreaker("id") // configure before concurrent use — these mutate the grid
 
 q, err := dbx.NewGridQuery(dbx.SearchAny, 10, 0)
 q.SearchText = "ali"
 q.FilterFields = map[string]any{"id": float64(1)} // GridQuery is JSON-shaped: numbers are float64
-q.SortFields = map[string]string{"name": dbx.SortAscending}
+q.Sort = []dbx.SortField{{Field: "name", Order: dbx.SortAscending}}
 
 users, err := repo.QueryGrid(ctx, grid, q)
 ```
@@ -162,7 +162,7 @@ every other field, tagged or not, answers "field is not valid". `NewGrid` fails 
 silently — on a duplicate, empty or `"-"` alias among grid-flagged fields, or a searchable field
 that is neither string-kind nor a `database/sql/driver.Valuer`.
 
-`AddFilterFunc` and `WithMaxLimit` mutate the `Grid` in place — unlike `gohan`'s builders and
+`AddFilterFunc`, `WithMaxLimit` and `WithTiebreaker` mutate the `Grid` in place — unlike `gohan`'s builders and
 `Repository.With`, which are immutable/return a new value. Call them once at setup, before the
 grid is used concurrently.
 
@@ -176,11 +176,37 @@ Filter values are checked against an allowlist matching what `encoding/json` pro
 `dbx.MaxFilterValues` elements — so a Go `int` (as opposed to `float64`) is rejected; build
 `GridQuery` from `json.Unmarshal`ed request data (the common case) to get this for free, or use
 `float64` explicitly in a literal Go map, as above. `SearchText` is capped at `dbx.MaxSearchText` bytes;
-`GridQuery.SearchType` is range-checked by `ValidQuery`/`NewGridQuery`. `WithMaxLimit(n)` caps
-`Limit`: `n == 0` (the default) applies no cap, so `Limit == 0` returns every row; with a cap set,
-`Limit == 0` or `Limit > n` is treated as `Limit == n`. `GridQuery` fields decode from JSON as
-`{"searchType": ..., "searchText": ..., "filterFields": ..., "sortFields": ..., "offset": ...,
-"limit": ...}` — `searchType`'s JSON name, not `search_type`; decoding is case-insensitive like
+`GridQuery.SearchType` is range-checked by `ValidQuery`/`NewGridQuery`, and search text on a type with
+no searchable fields is rejected ("no searchable fields") rather than ignored. `Offset` and `Limit`
+above `math.MaxInt64` are rejected as a `GridError`, and `GridQuery.Page` saturates instead of
+overflowing.
+
+**Row cap.** A new `Grid` caps `Limit` at `dbx.DefaultMaxLimit` (1000): `Limit == 0` or
+`Limit > n` is treated as `Limit == n`. `WithMaxLimit(n)` changes the cap; `WithMaxLimit(0)`
+removes it, so `Limit == 0` returns every row.
+
+**Sort.** `Sort` (`[{"field": ..., "order": ...}]`) applies the fields in the order given, so the
+client controls precedence; a repeated field is rejected. `SortFields` (a map) is the older form and
+applies in alias order; a query may use one or the other, not both. The default order is
+descending. `WithTiebreaker(cols...)` appends T's db columns (grid-flagged or not), ascending, after
+the client's sort fields, skipping any already sorted; give it a unique key so rows with equal sort
+values keep a stable order across `LIMIT`/`OFFSET` pages. A column T does not map makes `Build`
+fail.
+
+**Filter funcs.** A `GridFilterFunc`'s result is checked too. It may return any value the driver
+binds as one value — a scalar, `time.Time`, an array, a byte slice (`[]byte`, `json.RawMessage`,
+`net.IP`) or any `driver.Valuer` (`uuid.UUID`, `pq.StringArray`, ...) — or any other slice of such
+values, which becomes an `IN` list (capped at `dbx.MaxFilterValues`). A `gohan` type (an expression
+or a subquery, which gohan would render as SQL rather than bind) or a map is rejected as "value is
+not valid", also inside a list.
+
+`WithMaxLimit` and `WithTiebreaker` report configuration errors (a cap above `math.MaxInt64`, a
+column T does not map) from both `ValidQuery` and `Build`, as plain errors rather than `GridError`s;
+each call replaces the previous setting.
+
+`GridQuery` fields decode from JSON as
+`{"searchType": ..., "searchText": ..., "filterFields": ..., "sort": ..., "sortFields": ...,
+"offset": ..., "limit": ...}` — `searchType`'s JSON name, not `search_type`; decoding is case-insensitive like
 the rest of `encoding/json`. Because JSON numbers decode as `float64`, a filter value like
 `{"id": 3.9}` matches `id = 3` on PostgreSQL (`pgx` truncates); register a `GridFilterFunc` via
 `AddFilterFunc` on integer columns to reject non-integer input if that matters.
@@ -231,12 +257,22 @@ type Event struct {
 - Statements are built with `gohan.ClickHouseNamed()` (`@pN` named placeholders), not
   `gohan.ClickHouse()`: this is what lets a bound `time.Time` keep full sub-second precision.
   clickhouse-go's native positional binding only ever sends whole seconds; named binding lets
-  `Querier` convert each argument to `clickhouse.DateNamed(name, t, clickhouse.NanoSeconds)`,
-  which the driver renders as `toDateTime64(..., 9)`. Comparisons are then **exact-instant**: a
+  `Querier` convert each argument to `clickhouse.DateNamed`, which the driver renders as a
+  `toDateTime64(...)` literal at the smallest scale that holds the value exactly, but never below
+  milliseconds (3, 6 or 9): a scale-9 literal overflows after 2262, so a time with nanosecond
+  precision can only be bound up to 2262, while millisecond or microsecond times bind across
+  `DateTime64(3)`'s 1900-2299. A time in an IANA zone (e.g. `Europe/Lisbon`) keeps its zone, so a
+  `Date` column or `toDate` sees the calendar day in that zone. A `time.Local` time (what
+  `time.Now()` returns) or a `time.FixedZone` time is bound as the same instant in UTC: clickhouse-go
+  renders `Local` as a numeric string ClickHouse misreads, and ClickHouse cannot load a fixed zone
+  by name. Comparisons are then **exact-instant**: a
   `DateTime64(3)` column storing `.123` does not equal a bound value of `.123456789` (only a value
   truncated to milliseconds). This conversion applies to `sql.NamedArg` values gohan builds
   (`time.Time`, `*time.Time`, or a `driver.Valuer` producing one, such as `sql.NullTime`); SQL you
   write yourself with positional `?` placeholders still gets clickhouse-go's whole-second binding.
+  clickhouse-go v2.40.3 itself mishandles `DateTime64` values after 2262 in columnar inserts
+  (`Insert`/`InsertBatch`) and when scanning into `time.Time`; use bound statements (`Exec`) to
+  write such values, and read them with `toString` or compare them in SQL.
 - `Querier` is not transactional (no `TxBeginner`/`TxQuerier`): `dbx.WithTx` fails with
   `dbx.ErrTxUnsupported` over it, matching ClickHouse having no transactions.
 

@@ -56,6 +56,20 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - **`utils/env` no longer caches.** `GetEnvVar`/`SetEnvVar` read and write the process environment
   directly, so changes made with `os.Setenv`/`os.Unsetenv` are now seen (they used to be ignored
   after the first read).
+- **`dbx.Grid` caps rows by default.** A new `Grid` applies `dbx.DefaultMaxLimit` (1000):
+  `Limit == 0` or a larger `Limit` now returns at most 1000 rows instead of the whole table. Call
+  `WithMaxLimit(n)` to change the cap, or `WithMaxLimit(0)` to restore unlimited results.
+- **`dbx.Grid` rejects search text when the type has no searchable fields** ("no searchable
+  fields") instead of silently returning unfiltered rows.
+- **`dbx.Grid` validates filter func results**: a `gohan` type (an expression or subquery, which
+  was rendered as SQL instead of bound) or a map is rejected as "value is not valid", also inside a
+  list; a typed slice such as `[]string` or `[]uuid.UUID` now becomes an `IN` list instead of being
+  bound as a single value. Arrays, byte slices and `driver.Valuer`s (`uuid.UUID`,
+  `pq.StringArray`, `json.RawMessage`) still bind as one value.
+- **`dbx.Grid.WithMaxLimit` above `math.MaxInt64` and `WithTiebreaker` with an unmapped column**
+  are configuration errors reported by both `ValidQuery` and `Build`.
+- **`dbx.Grid` rejects `Offset`/`Limit` above `math.MaxInt64`** as a `GridError` (it used to fail
+  later with `gohan.ErrInvalidLimit`).
 - **`AbortFatal` after `Shutdown` exits with code 1** and logs the error; it used to exit with
   255 silently.
 - **Environment-variable secrets are no longer cleared after `Fetch`** (`crypt/secure`,
@@ -89,6 +103,12 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Added
 
+- `dbx.GridQuery.Sort` (`[]dbx.SortField`, JSON `"sort"`): sort fields in precedence order, beside
+  the `SortFields` map (which applies in alias order); the two cannot be combined, and a repeated
+  field is rejected.
+- `dbx.Grid.WithTiebreaker(cols...)`: appends a unique key to every grid query's `ORDER BY` so rows
+  with equal sort values keep a stable order across `LIMIT`/`OFFSET` pages.
+- `dbx.DefaultMaxLimit`.
 - `kv.AtomicSetter` optional interface (`SetNX(k, v, ttl) (bool, error)`), implemented by
   `kv.NewMemoryKV()`.
 - `runner.ErrAlreadyRunning` and `runner.ErrNotRunning` (same messages as before, now matchable
@@ -132,6 +152,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - `utils/fs`: `ReadString` trims `\r` (CRLF files) and strips a leading UTF-8 BOM, so secret
   files edited on Windows work.
 - `utils`: `NotNil` panics on typed nil pointers, maps, slices, funcs, chans and interfaces.
+- `dbx`: `GridQuery.Page` no longer overflows on a huge page number; the offset saturates.
 - `utils/str`: `DumpJSON` no longer indents continuation lines by an extra space.
 - `utils/debug`: `GetStackTrace` filters only Go runtime frames (user paths containing
   `runtime/` are kept) and never includes its own frame.
