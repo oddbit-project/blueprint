@@ -5,7 +5,7 @@ Blueprint ships a set of small helper packages used throughout the framework and
 | Package | Import path | Purpose |
 |---------|-------------|---------|
 | `utils` | `github.com/oddbit-project/blueprint/utils` | Constant error type, panic helpers, secure random bytes |
-| `env` | `github.com/oddbit-project/blueprint/utils/env` | Cached environment variable access |
+| `env` | `github.com/oddbit-project/blueprint/utils/env` | Environment variable access |
 | `fs` | `github.com/oddbit-project/blueprint/utils/fs` | File/directory existence checks, reading trimmed strings from files |
 | `debug` | `github.com/oddbit-project/blueprint/utils/debug` | Call stack capture as strings |
 | `str` | `github.com/oddbit-project/blueprint/utils/str` | JSON dumping and character filtering |
@@ -117,11 +117,8 @@ Returns `n` bytes read from `crypto/rand`, or the read error. Used by `crypt/has
 
 ## env
 
-Reads environment variables through an in-process cache.
-
-On the first call to `GetEnvVar`, the whole environment (`os.Environ()`) is loaded into a package-level map.
-Subsequent lookups are served from that map; names not found in it fall back to `os.Getenv` and the result
-(including an empty string) is cached. `SetEnvVar` updates both the process environment and the cache.
+Thin wrappers over `os.Getenv` and `os.Setenv`, used by `crypt/secure` and `provider/tls` to read
+environment-variable credentials. Every call reads the current process environment.
 
 ### Usage
 
@@ -161,19 +158,17 @@ Returns the value of the environment variable, or an empty string if it is not s
 func SetEnvVar(name, value string) error
 ```
 
-Calls `os.Setenv` and, on success, updates the cache. Returns the `os.Setenv` error otherwise.
+Calls `os.Setenv` and returns its error.
 
 ### Notes
 
-- Values are cached for the lifetime of the process. Changes made with `os.Setenv`/`os.Unsetenv` (or by any code
-  not using `SetEnvVar`) after the first `GetEnvVar` call are **not** seen by `GetEnvVar`. This also applies to
-  the environment-variable credentials of `crypt/secure` and `provider/tls`, which are read through this cache:
-  change them with `SetEnvVar`, not `os.Setenv`.
+- Changes made with `os.Setenv`/`os.Unsetenv` are seen immediately (there is no cache).
 - `crypt/secure` and `provider/tls` do not clear the variable after reading it, so fetching the same credential
   again returns the same value.
-- An unset variable and a variable set to `""` are indistinguishable; there is no "lookup" variant.
-- There is no unset function. `SetEnvVar(name, "")` sets the variable to an empty string; it does not remove it.
-- The cache holds a copy of every environment variable, including secrets, in process memory.
+- An unset variable and a variable set to `""` are indistinguishable; use `os.LookupEnv` if you need to tell
+  them apart.
+- There is no unset function. `SetEnvVar(name, "")` sets the variable to an empty string; use `os.Unsetenv` to
+  remove it.
 
 ## fs
 

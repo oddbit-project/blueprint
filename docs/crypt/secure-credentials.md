@@ -486,12 +486,10 @@ All configuration structures follow the same priority order:
 ### Environment Variable Handling
 
 When using environment variables:
-- Variables are read through the `utils/env` cache and are **not** cleared after reading, so calling `Fetch()`
-  again (e.g. on reconnect) returns the same value
+- Variables are read from the process environment on every `Fetch()` and are **not** cleared after
+  reading, so calling `Fetch()` again (e.g. on reconnect) returns the same value
 - An unset or empty variable yields an empty credential; when an environment variable name is configured, the
   file source is not consulted
-- Because of the cache, changing the variable with `os.Setenv` after it was first read is not seen by `Fetch()`;
-  use `env.SetEnvVar` instead
 - The secret remains in the process environment (and in `/proc/self/environ` on Linux); prefer file-based
   secrets where that matters
 

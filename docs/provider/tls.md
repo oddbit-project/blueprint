@@ -82,7 +82,7 @@ makes `TLSConfig()` return `ErrInvalidTlsVersion`. `TLSCipherSuites` accepts the
 certificate, key or CA files.
 
 The key password is read from the first non-empty source: `Password`, then `PasswordEnvVar`, then `PasswordFile`.
-An environment variable is read through the `utils/env` cache and is not cleared after reading, so the password can be
+An environment variable is read from the process environment and is not cleared after reading, so the password can be
 fetched again (for example when the configuration is rebuilt).
 
 ## Security Features

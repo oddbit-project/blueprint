@@ -307,8 +307,10 @@ func Shutdown(arg error)
 ```
 
 Clears the destructor list and runs the destructors it held (in reverse order), so the destructors are
-executed only once. Calls are serialized: a concurrent caller waits until the running `Shutdown` has
-finished its destructors, and later calls find no destructors to run. Destructor errors are combined
+executed only once. A call made while the destructors are running (from a destructor, or from another
+goroutine) does not wait for them: with a nil `arg` it returns immediately, and with a non-nil `arg` it
+logs the fatal error and exits without running the remaining destructors. Later calls find no destructors
+to run. Destructor errors are combined
 with `errors.Join` and logged at error level. If `arg` is not nil, it is then logged with the global
 zerolog logger at fatal level, which exits the process with code 1; this happens on every call with a
 non-nil `arg`, including when the destructors have already run.
@@ -385,9 +387,12 @@ immediately. `Terminate` does **not** run destructors - call `Shutdown` first if
   functions do not run, and goroutines watching the application context are not waited for.
 - **`RegisterDestructor` during or after `Shutdown` is a no-op**, and `GetDestructorManager` returns `nil`
   after `Shutdown`.
-- **Limited re-entrancy.** A destructor may call `RegisterDestructor` (it is ignored), but must not call
-  `Shutdown` or `AbortFatal`: `Shutdown` is serialized by a mutex held while destructors run, so these
-  calls deadlock.
+- **Re-entrancy.** A destructor may call `RegisterDestructor` (it is ignored) and `Shutdown(nil)` (it
+  returns immediately). A destructor calling `AbortFatal` or `Shutdown(err)` logs the error and exits the
+  process with code 1 at once, skipping the destructors that have not run yet.
+- **`Run` waits for an in-progress shutdown.** If another goroutine started `Shutdown` and the context is
+  then cancelled, `Run` waits for those destructors to finish before exiting. Calling `Terminate` directly
+  does not wait.
 - **Destructors are global.** They are shared across all containers in the process, and run in reverse
   order, so destructors registered in `init()` functions (e.g. the `log` package's file closer) run last.
 - **`SIGHUP` terminates the application**; it is not treated as a reload signal.

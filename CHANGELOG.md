@@ -47,6 +47,15 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   cancelled *before* destructors run (it used to be after). When the context is cancelled any
   other way, destructors now run before exit (they used to be skipped). Goroutines watching the
   context stop earlier, and destructors must not depend on the context still being live.
+- **`Shutdown` no longer waits when a shutdown is already in progress.** A call made while the
+  destructors are running returns immediately (nil `arg`) or logs the fatal error and exits at
+  once (non-nil `arg`, e.g. `AbortFatal`), instead of blocking until they finish. This fixes the
+  deadlock when a destructor calls `Shutdown`/`AbortFatal`. `Container.Run` still waits for an
+  in-progress shutdown before exiting; code that called `Shutdown(nil)` from another goroutine and
+  then exited must no longer rely on it waiting.
+- **`utils/env` no longer caches.** `GetEnvVar`/`SetEnvVar` read and write the process environment
+  directly, so changes made with `os.Setenv`/`os.Unsetenv` are now seen (they used to be ignored
+  after the first read).
 - **`AbortFatal` after `Shutdown` exits with code 1** and logs the error; it used to exit with
   255 silently.
 - **Environment-variable secrets are no longer cleared after `Fetch`** (`crypt/secure`,
@@ -104,8 +113,9 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   expiry in `Get` and `Prune`, matching Redis.
 - `provider/kv`: `Prune` could delete a key re-set with a fresh TTL while pruning.
 - `Shutdown` now logs errors returned by destructors.
-- A destructor calling `RegisterDestructor` no longer deadlocks. Calling `Shutdown`/`AbortFatal`
-  from a destructor still does.
+- A destructor calling `RegisterDestructor`, `Shutdown` or `AbortFatal` no longer deadlocks.
+- `db`: grid specs were cached by bare type name, so two structs with the same name in different
+  packages (or two anonymous structs) shared one spec; the cache is now keyed by type.
 - `RegisterDestructor` after `Shutdown` no longer panics; data race between
   `RegisterDestructor`/`GetDestructorManager` and `Shutdown`.
 - `Container.Run` runs registered destructors when the application context is cancelled.
