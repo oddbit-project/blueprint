@@ -508,15 +508,31 @@ sessionConfig.EncryptionKey = secure.DefaultCredentialConfig{
 }
 ```
 
+The fetched key is used directly as the AES-256 key, so it must be exactly 32 bytes long; any other length makes
+`NewStore` fail with `secure.ErrInvalidKeyLength`. Values from `Password` and `PasswordFile` are trimmed of
+surrounding whitespace first; a value from `PasswordEnvVar` is used unchanged, so a trailing newline makes it 33 bytes.
+
 ### Key Generation
 
 ```bash
-# Generate a secure 32-byte key
-openssl rand -base64 32
+# Generate a random 32-character key (24 random bytes, base64-encoded: 192 bits of entropy;
+# a printable 32-character key cannot carry the full 256 bits)
+openssl rand -base64 24
 
 # Set as environment variable
 export SESSION_ENCRYPTION_KEY="generated-key-here"
 ```
+
+### Decryption Failures
+
+Sessions are encrypted with AES-256-GCM, which authenticates the data. When a stored session cannot be decrypted,
+`Store.Get` returns the decryption error:
+
+- tampered or corrupted data, or data written with a different key: `secure.ErrAuthenticationFailed`
+- data shorter than the nonce and authentication tag: `secure.ErrDataTooShort`
+
+Changing the encryption key therefore invalidates every existing session. The session middleware treats a session it
+cannot read as missing and issues a new one, so users are logged out after a key rotation.
 
 ## Session Marshallers
 
@@ -1039,12 +1055,19 @@ func getSessionConfig(env string) *session.Config {
    - Register custom types with `gob.Register()`
    - Register in `init()` function
 
-3. **Session expiration issues**
+3. **All sessions lost after a restart or deploy**
+   - The in-memory backend (the default for `NewManager`) loses every session on restart; use a persistent backend
+     such as Redis
+   - With a persistent backend, check that `EncryptionKey` resolves to the same 32-byte key on every instance;
+     sessions written with another key fail with `secure.ErrAuthenticationFailed`, and the middleware issues a new
+     session ID (the unreadable record stays in the backend until its TTL expires)
+
+4. **Session expiration issues**
    - Check system time synchronization
    - Review timeout configurations
    - Monitor cleanup logs
 
-4. **Performance issues**
+5. **Performance issues**
    - Monitor backend latency
    - Optimize session data size
    - Adjust cleanup intervals
