@@ -237,7 +237,7 @@ func TestShutdown_DestructorRegistersDestructor(t *testing.T) {
 	assert.Nil(t, GetDestructorManager())
 }
 
-func TestShutdown_ConcurrentCallersWaitForDestructors(t *testing.T) {
+func TestShutdown_ConcurrentCallerDoesNotWait(t *testing.T) {
 	originalDestructors := appDestructors
 	defer func() {
 		appDestructors = originalDestructors
@@ -263,18 +263,57 @@ func TestShutdown_ConcurrentCallersWaitForDestructors(t *testing.T) {
 		defer close(second)
 		Shutdown(nil)
 	}()
-
 	select {
 	case <-second:
-		t.Fatal("second Shutdown returned before destructors finished")
+	case <-time.After(2 * time.Second):
+		t.Fatal("second Shutdown blocked while destructors were running")
+	}
+
+	waited := make(chan struct{})
+	go func() {
+		defer close(waited)
+		waitShutdown()
+	}()
+	select {
+	case <-waited:
+		t.Fatal("waitShutdown returned before destructors finished")
 	case <-time.After(100 * time.Millisecond):
 	}
 
 	close(release)
 	select {
-	case <-second:
+	case <-waited:
 	case <-time.After(2 * time.Second):
-		t.Fatal("second Shutdown did not return")
+		t.Fatal("waitShutdown did not return")
 	}
 	assert.True(t, finished.Load())
+}
+
+func TestShutdown_DestructorCallsShutdown(t *testing.T) {
+	originalDestructors := appDestructors
+	defer func() {
+		appDestructors = originalDestructors
+	}()
+
+	appDestructors = callstack.NewCallStack()
+
+	ran := false
+	RegisterDestructor(func() error {
+		Shutdown(nil)
+		ran = true
+		return nil
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		Shutdown(nil)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown deadlocked when a destructor called Shutdown")
+	}
+	assert.True(t, ran)
 }

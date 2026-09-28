@@ -99,6 +99,7 @@ func (c *Container) Run(mainFn ...RuntimeFn) {
 		case <-c.Context.Done():
 			signal.Stop(monitor)
 			Shutdown(nil)
+			waitShutdown()
 			c.Terminate(nil)
 		}
 	}

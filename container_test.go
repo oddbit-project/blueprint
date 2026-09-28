@@ -75,6 +75,31 @@ func TestContainerHelperProcess(t *testing.T) {
 			return syscall.Kill(os.Getpid(), syscall.SIGTERM)
 		})
 
+	case "destructor-aborts":
+		RegisterDestructor(func() error {
+			c.AbortFatal(errors.New("destructor-abort-marker"))
+			return nil
+		})
+		c.Run(func(a interface{}) error {
+			a.(*Container).CancelCtx()
+			return nil
+		})
+
+	case "wait-in-progress-shutdown":
+		started := make(chan struct{})
+		RegisterDestructor(func() error {
+			close(started)
+			time.Sleep(200 * time.Millisecond)
+			fmt.Println("slow-destructor-done")
+			return nil
+		})
+		go Shutdown(nil)
+		c.Run(func(a interface{}) error {
+			<-started
+			a.(*Container).CancelCtx()
+			return nil
+		})
+
 	case "abort-after-shutdown":
 		Shutdown(nil)
 		c.AbortFatal(errors.New("abort-marker"))
@@ -105,4 +130,16 @@ func TestContainer_AbortFatal_AfterShutdownLogsError(t *testing.T) {
 	out, code := runContainerHelper(t, "abort-after-shutdown")
 	assert.NotEqual(t, 0, code, out)
 	assert.Contains(t, out, "abort-marker")
+}
+
+func TestContainer_DestructorCallsAbortFatal(t *testing.T) {
+	out, code := runContainerHelper(t, "destructor-aborts")
+	assert.Equal(t, 1, code, out)
+	assert.Contains(t, out, "destructor-abort-marker")
+}
+
+func TestContainer_Run_WaitsForInProgressShutdown(t *testing.T) {
+	out, code := runContainerHelper(t, "wait-in-progress-shutdown")
+	assert.Equal(t, 0, code, out)
+	assert.Contains(t, out, "slow-destructor-done")
 }
