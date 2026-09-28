@@ -15,6 +15,8 @@ const (
 	ErrInvalidInterval = utils.Error("interval must be positive")
 	ErrNilRunnerFn     = utils.Error("runner function must not be nil")
 	ErrNilLogger       = utils.Error("logger must not be nil")
+	ErrAlreadyRunning  = utils.Error("already running")
+	ErrNotRunning      = utils.Error("not running")
 )
 
 type RunnerFn func(ctx context.Context) error
@@ -24,8 +26,9 @@ type PeriodicRunner struct {
 	runFn       RunnerFn
 	logger      *log.Logger
 	status      atomic.Int32
+	mx          sync.Mutex
 	cancelFn    context.CancelFunc
-	wg          sync.WaitGroup
+	done        chan struct{}
 }
 
 func NewUpdater(updateInterval time.Duration, updateFn RunnerFn, logger *log.Logger) (*PeriodicRunner, error) {
@@ -46,23 +49,27 @@ func NewUpdater(updateInterval time.Duration, updateFn RunnerFn, logger *log.Log
 }
 
 func (u *PeriodicRunner) Start(ctx context.Context) error {
+	u.mx.Lock()
+	defer u.mx.Unlock()
+
 	if !u.status.CompareAndSwap(0, 1) {
-		return errors.New("already running")
+		return ErrAlreadyRunning
 	}
 
 	runCtx, cancelFn := context.WithCancel(ctx)
+	done := make(chan struct{})
 	u.cancelFn = cancelFn
+	u.done = done
 
-	u.wg.Add(1)
 	go func() {
-		defer u.wg.Done()
+		defer close(done)
 		defer u.status.Store(0)
 		defer func() {
 			if r := recover(); r != nil {
 				u.logger.Warnf("Recovered from panic in runner: %v", r)
 			}
 		}()
-		if err := u.run(runCtx); err != nil {
+		if err := u.run(runCtx); err != nil && !errors.Is(err, context.Canceled) {
 			u.logger.Error(err, "runner error")
 		}
 	}()
@@ -72,22 +79,23 @@ func (u *PeriodicRunner) Start(ctx context.Context) error {
 }
 
 func (u *PeriodicRunner) Stop(ctx context.Context) error {
-	if u.status.Load() == 0 {
-		return errors.New("not running")
-	}
+	u.mx.Lock()
+	cancelFn, done := u.cancelFn, u.done
+	u.mx.Unlock()
 
-	if u.cancelFn != nil {
-		u.cancelFn()
+	if cancelFn == nil {
+		return ErrNotRunning
 	}
-
-	done := make(chan struct{})
-	go func() {
-		u.wg.Wait()
-		close(done)
-	}()
+	cancelFn()
 
 	select {
 	case <-done:
+		u.mx.Lock()
+		if u.done == done {
+			u.cancelFn = nil
+			u.done = nil
+		}
+		u.mx.Unlock()
 		u.logger.Infof("periodic runner stopped")
 		return nil
 	case <-ctx.Done():

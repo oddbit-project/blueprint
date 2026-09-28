@@ -1,14 +1,20 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/oddbit-project/blueprint/log"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestMain configures logging once; log.Configure() writes process-wide zerolog
@@ -361,4 +367,137 @@ func TestStartStopRestart(t *testing.T) {
 	if count.Load() <= countAfterFirstRun {
 		t.Error("runner did not execute after restart")
 	}
+}
+
+// syncBuffer is a goroutine-safe log sink
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func TestErrorValues(t *testing.T) {
+	assert.Equal(t, "already running", ErrAlreadyRunning.Error())
+	assert.Equal(t, "not running", ErrNotRunning.Error())
+
+	runner, err := NewUpdater(50*time.Millisecond, func(ctx context.Context) error { return nil }, testLogger(t))
+	require.NoError(t, err)
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	assert.ErrorIs(t, runner.Stop(stopCtx), ErrNotRunning)
+	require.NoError(t, runner.Start(context.Background()))
+	assert.ErrorIs(t, runner.Start(context.Background()), ErrAlreadyRunning)
+	require.NoError(t, runner.Stop(stopCtx))
+	assert.ErrorIs(t, runner.Stop(stopCtx), ErrNotRunning)
+}
+
+func TestStop_NoErrorLogOnCancel(t *testing.T) {
+	out := &syncBuffer{}
+	logger := testLogger(t).WithOutput(out)
+	runner, err := NewUpdater(10*time.Millisecond, func(ctx context.Context) error { return nil }, logger)
+	require.NoError(t, err)
+
+	require.NoError(t, runner.Start(context.Background()))
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, runner.Stop(stopCtx))
+
+	assert.NotContains(t, out.String(), "runner error")
+	assert.NotContains(t, out.String(), "context canceled")
+}
+
+func TestParentContextCancel_StopAndRestart(t *testing.T) {
+	out := &syncBuffer{}
+	logger := testLogger(t).WithOutput(out)
+	runner, err := NewUpdater(10*time.Millisecond, func(ctx context.Context) error { return nil }, logger)
+	require.NoError(t, err)
+
+	parentCtx, cancelParent := context.WithCancel(context.Background())
+	require.NoError(t, runner.Start(parentCtx))
+	cancelParent()
+	require.Eventually(t, func() bool { return runner.status.Load() == 0 }, time.Second, 5*time.Millisecond)
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	assert.NoError(t, runner.Stop(stopCtx))
+	assert.NotContains(t, out.String(), "runner error")
+	assert.NotContains(t, out.String(), "context canceled")
+
+	require.NoError(t, runner.Start(context.Background()))
+	require.NoError(t, runner.Stop(stopCtx))
+}
+
+func TestConcurrentStartStop(t *testing.T) {
+	logger := testLogger(t).WithOutput(io.Discard)
+	fn := func(ctx context.Context) error { return nil }
+
+	for i := 0; i < 200; i++ {
+		runner, err := NewUpdater(time.Millisecond, fn, logger)
+		require.NoError(t, err)
+
+		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		var wg sync.WaitGroup
+		var startErr, stopErr error
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			startErr = runner.Start(context.Background())
+		}()
+		go func() {
+			defer wg.Done()
+			stopErr = runner.Stop(stopCtx)
+		}()
+		wg.Wait()
+
+		require.NoError(t, startErr)
+		require.NotErrorIs(t, stopErr, context.DeadlineExceeded, "Stop blocked on a started runner")
+		if stopErr == nil {
+			require.Equal(t, int32(0), runner.status.Load(), "Stop returned nil but runner is still running")
+		} else {
+			// Stop ran before Start
+			require.NoError(t, runner.Stop(stopCtx))
+		}
+		cancel()
+	}
+}
+
+func TestStopTimeout_NoGoroutineLeak(t *testing.T) {
+	release := make(chan struct{})
+	started := make(chan struct{})
+	var once sync.Once
+	fn := func(ctx context.Context) error {
+		once.Do(func() { close(started) })
+		<-release
+		return nil
+	}
+	runner, err := NewUpdater(time.Millisecond, fn, testLogger(t).WithOutput(io.Discard))
+	require.NoError(t, err)
+	require.NoError(t, runner.Start(context.Background()))
+	<-started
+
+	before := runtime.NumGoroutine()
+	for i := 0; i < 50; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+		assert.ErrorIs(t, runner.Stop(ctx), context.DeadlineExceeded)
+		cancel()
+	}
+	assert.Less(t, runtime.NumGoroutine()-before, 10)
+
+	close(release)
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, runner.Stop(stopCtx))
 }

@@ -69,14 +69,15 @@ func (c *Container) GetContext() context.Context {
 // each one will receive the Container object as the parameter:
 // Example:
 //
-//	object.Run(func(app interface{}) error{
-//			app := a.(*Container)
-//			app.AbortFatal(nil) // won't abort because arg is nil
-//			return nil
+//	container.Run(func(a interface{}) error {
+//		app := a.(*Container)
+//		app.AbortFatal(nil) // won't abort because arg is nil
+//		return nil
 //	})
 //
-// the main loop will wait for an os signal on the 'monitor' channel; when signal is
-// received, the application is terminated in an orderly fashion by invoking Terminate()
+// the main loop will wait for an os signal on the 'monitor' channel or for the application context
+// to be canceled; on signal, the application context is canceled first and the registered destructors
+// are then executed via Shutdown(); in both cases the application is terminated by invoking Terminate()
 func (c *Container) Run(mainFn ...RuntimeFn) {
 	// capture os signals
 	monitor := make(chan os.Signal, 1)
@@ -92,11 +93,12 @@ func (c *Container) Run(mainFn ...RuntimeFn) {
 		select {
 		case <-monitor:
 			log.Info().Msg("Shutting down application...")
-			Shutdown(nil)
 			c.CancelCtx()
+			Shutdown(nil)
 
 		case <-c.Context.Done():
 			signal.Stop(monitor)
+			Shutdown(nil)
 			c.Terminate(nil)
 		}
 	}
