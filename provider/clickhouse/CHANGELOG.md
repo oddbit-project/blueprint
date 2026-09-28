@@ -4,7 +4,10 @@ All notable changes to the Blueprint ClickHouse provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.9.1] - 2026-09-28
+
+Requires Blueprint core v0.11.0 and `gohan` v0.2.0. gohan v0.2.0 also makes `dbx.Repository.Delete`/`Update`
+reject a column-free condition such as `gohan.Raw("1=1")` with `gohan.ErrNoWhere`.
 
 ### Fixed
 
