@@ -4,6 +4,15 @@ All notable changes to the Blueprint SQLite provider will be documented in this 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.9.1] - 2026-09-28
+
+Requires Blueprint core v0.11.1.
+
+### Changed
+
+- Bumped `gohan` to v0.2.0 (see the core v0.11.1 changelog for the stricter
+  `Delete`/`Update` guard).
+
 ## [v0.9.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.
