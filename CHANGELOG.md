@@ -17,11 +17,27 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.12.0] - 2026-09-28
+
 > **Breaking release.** Most changes are bug fixes, but several change behaviour that existing
 > code may rely on. Read "Breaking changes" below before upgrading. Providers released with it
 > have their own breaking changes: `provider/redis` (TLS config), `provider/prometheus` (disabled
 > server, default host), `provider/metrics` (config validation) and `provider/clickhouse`
 > (record tag check, bound time zones); see their changelogs.
+
+### Module versions
+
+Released together with core v0.12.0:
+
+- `provider/redis` v0.9.0 (requires core v0.12.0)
+- `provider/hmacprovider` v0.10.0 (requires core v0.12.0 and `provider/redis` v0.9.0)
+- `provider/clickhouse` v0.10.0 (requires core v0.12.0)
+- `provider/pgsql` v0.10.0 (requires core v0.12.0)
+- `provider/sqlite` v0.10.0 (requires core v0.12.0)
+- `provider/prometheus` v0.10.0
+- `provider/metrics` v0.9.0
+
+The other providers are unchanged and work with core v0.12.0 at their current versions.
 
 ### Breaking changes
 

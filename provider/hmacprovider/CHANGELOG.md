@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-Requires the next Blueprint core release (uses `kv.AtomicSetter`).
+## [v0.10.0] - 2026-09-28
+
+Requires Blueprint core v0.12.0 (uses `kv.AtomicSetter`) and `provider/redis` v0.9.0.
 
 ### Breaking changes
 

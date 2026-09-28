@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [v0.9.0] - 2026-09-28
+
+Requires Blueprint core v0.12.0.
+
 ### Breaking changes
 
 - **`Config` embeds `tls.ClientConfig` instead of `tls.ServerConfig`.** The server-only fields

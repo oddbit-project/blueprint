@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v0.10.0] - 2026-09-28
+
 Requires Blueprint core v0.11.0 and `provider/httpserver` v0.9.4.
 
 ### Breaking changes
