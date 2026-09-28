@@ -244,6 +244,15 @@ func TestMap_ComplexTypes(t *testing.T) {
 	})
 }
 
+func TestMap_ZeroValue(t *testing.T) {
+	var m Map[string, int]
+	assert.NotPanics(t, func() { m.Add("key", 42) })
+	value, err := m.Get("key")
+	require.NoError(t, err)
+	assert.Equal(t, 42, value)
+	assert.Equal(t, 1, m.Len())
+}
+
 func TestMap_EdgeCases(t *testing.T) {
 	t.Run("empty map operations", func(t *testing.T) {
 		m := NewMap[string, int]()

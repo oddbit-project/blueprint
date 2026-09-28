@@ -149,6 +149,53 @@ func TestGrid_FieldMapping(t *testing.T) {
 	assert.Contains(t, grid.spec.searchFields, "name")
 }
 
+type gridHiddenFieldsRecord struct {
+	ID       int    `db:"id" json:"id" grid:"sort,filter"`
+	Password string `db:"password" json:"-"`
+	Secret   string `db:"secret" json:"-"`
+	Notes    string `db:"notes" json:",omitempty"`
+}
+
+type gridReservedAliasRecord struct {
+	ID     int    `db:"id" json:"id" grid:"sort"`
+	Hidden string `db:"hidden" json:"-" grid:"filter"`
+}
+
+type gridEmptyAliasRecord struct {
+	ID    int    `db:"id" json:"id" grid:"sort"`
+	Notes string `db:"notes" json:",omitempty" grid:"search"`
+}
+
+func TestGrid_ReservedAliases(t *testing.T) {
+	t.Run("non-grid fields with reserved or empty alias are not mapped", func(t *testing.T) {
+		grid, err := NewGrid("test_table", &gridHiddenFieldsRecord{})
+		assert.NoError(t, err)
+		if assert.NotNil(t, grid) {
+			assert.NotContains(t, grid.spec.aliasField, "-")
+			assert.NotContains(t, grid.spec.aliasField, "")
+			assert.Equal(t, "id", grid.spec.aliasField["id"])
+
+			err = grid.ValidQuery(&GridQuery{FilterFields: map[string]any{"-": "x"}})
+			assert.Error(t, err)
+		}
+	})
+
+	tests := []struct {
+		name   string
+		record any
+	}{
+		{"grid field with reserved alias", &gridReservedAliasRecord{}},
+		{"grid field with empty alias", &gridEmptyAliasRecord{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			grid, err := NewGrid("test_table", tt.record)
+			assert.Error(t, err)
+			assert.Nil(t, grid)
+		})
+	}
+}
+
 func TestGrid_AddFilterFunc(t *testing.T) {
 	grid, _ := NewGrid("test_table", &TestGridRecord{})
 

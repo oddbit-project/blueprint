@@ -102,6 +102,19 @@ func TestNewRateLimiter(t *testing.T) {
 		assert.Nil(t, rl)
 		assert.Equal(t, ErrInvalidRateLimit, err)
 	})
+
+	t.Run("nil config uses defaults", func(t *testing.T) {
+		var rl *RateLimiter
+		var err error
+		require.NotPanics(t, func() { rl, err = NewRateLimiter(nil) })
+		require.NoError(t, err)
+		require.NotNil(t, rl)
+		def := NewConfig()
+		assert.Equal(t, def.RateLimit, rl.rate)
+		assert.Equal(t, def.Burst, rl.burst)
+		assert.Equal(t, time.Duration(def.TTL)*time.Second, rl.ttl)
+		assert.Equal(t, time.Duration(def.CleanupInterval)*time.Second, rl.cleanupFreq)
+	})
 }
 
 func TestRateLimiter_GetLimiter(t *testing.T) {
@@ -317,6 +330,19 @@ func TestRateLimiter_ShutdownWithContext(t *testing.T) {
 
 		// Clean shutdown for cleanup
 		rl2.Shutdown()
+	})
+
+	t.Run("never started returns immediately", func(t *testing.T) {
+		rl4, err := NewRateLimiter(cfg)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		err = rl4.ShutdownWithContext(ctx)
+		assert.NoError(t, err)
+		assert.Less(t, time.Since(start), 500*time.Millisecond)
 	})
 
 	t.Run("context already canceled", func(t *testing.T) {

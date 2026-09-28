@@ -3,7 +3,9 @@ package parallel
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -97,4 +99,46 @@ func TestForInt(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	})
+}
+
+func TestForInt_WaitsForAllGoroutinesOnError(t *testing.T) {
+	expectedError := errors.New("fail fast")
+	var finished atomic.Int32
+
+	err := ForInt(10, func(i int) error {
+		if i == 0 {
+			return expectedError
+		}
+		time.Sleep(50 * time.Millisecond)
+		finished.Add(1)
+		return nil
+	})
+
+	assert.Equal(t, expectedError, err)
+	assert.Equal(t, int32(9), finished.Load(), "all started goroutines must finish before ForInt returns")
+}
+
+func TestForInt_NonPositive(t *testing.T) {
+	tests := []struct {
+		name string
+		to   int
+	}{
+		{"zero", 0},
+		{"negative", -1},
+		{"large negative", -100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			var err error
+			assert.NotPanics(t, func() {
+				err = ForInt(tt.to, func(i int) error {
+					called = true
+					return nil
+				})
+			})
+			assert.NoError(t, err)
+			assert.False(t, called)
+		})
+	}
 }

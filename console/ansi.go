@@ -26,7 +26,7 @@ const (
 	BgMagenta
 	BgCyan
 	BgWhite
-	BgDefault = 39
+	BgDefault = 49
 )
 
 const (

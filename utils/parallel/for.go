@@ -1,7 +1,6 @@
 package parallel
 
 import (
-	"context"
 	"sync"
 )
 
@@ -9,9 +8,11 @@ type ForIntFn func(i int) error
 
 // ForInt iterate a function in parallel using goroutines
 // Adapted from https://github.com/tsenart/nap scatter() function
+// It waits for all goroutines to finish and returns the first error, if any; to <= 0 returns nil
 func ForInt(to int, fn ForIntFn) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	if to <= 0 {
+		return nil
+	}
 
 	errChan := make(chan error, to)
 	var wg sync.WaitGroup
@@ -20,10 +21,7 @@ func ForInt(to int, fn ForIntFn) error {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			select {
-			case errChan <- fn(i):
-			case <-ctx.Done():
-			}
+			errChan <- fn(i)
 		}(i)
 	}
 
@@ -32,11 +30,11 @@ func ForInt(to int, fn ForIntFn) error {
 		close(errChan)
 	}()
 
+	var firstErr error
 	for err := range errChan {
-		if err != nil {
-			cancel() // cancel other goroutines
-			return err
+		if err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
-	return nil
+	return firstErr
 }

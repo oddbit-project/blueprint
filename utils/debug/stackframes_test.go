@@ -2,6 +2,7 @@ package debug
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 )
@@ -33,4 +34,44 @@ func TestGet(t *testing.T) {
 	}
 
 	assert.True(t, foundFunction, "Stack should contain our function")
+}
+
+func TestGetStackTrace_Filtering(t *testing.T) {
+	tests := []struct {
+		name     string
+		stack    []string
+		contains string
+		excluded []string
+	}{
+		{
+			name:     "direct call",
+			stack:    GetStackTrace(0),
+			contains: "TestGetStackTrace_Filtering",
+			excluded: []string{" runtime.", "debug.GetStackTrace"},
+		},
+		{
+			name:     "user file under a runtime/ directory",
+			stack:    stackFromRuntimeDir(),
+			contains: "/project/runtime/helper.go",
+			excluded: []string{" runtime.", "debug.GetStackTrace"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NotEmpty(t, tt.stack)
+			assert.Contains(t, tt.stack[0], tt.contains, "first frame must be the caller, got: %v", tt.stack)
+			for _, frame := range tt.stack {
+				for _, ex := range tt.excluded {
+					assert.NotContains(t, frame, ex)
+				}
+			}
+		})
+	}
+}
+
+// stackFromRuntimeDir is reported as living in a user directory named "runtime"
+//
+//line /tmp/project/runtime/helper.go:1
+func stackFromRuntimeDir() []string {
+	return GetStackTrace(0)
 }

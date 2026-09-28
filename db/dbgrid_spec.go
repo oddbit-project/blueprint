@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"github.com/oddbit-project/blueprint/db/field"
 	"reflect"
 	"sync"
@@ -60,6 +61,14 @@ func newFieldSpecFromType(t reflect.Type) (*fieldSpec, error) {
 		// Skip fields without db tags
 		if meta.DbName == meta.Name && len(meta.DbOptions) == 0 {
 			// No db tag present, skip this field
+			continue
+		}
+
+		// empty or reserved alias (e.g. json:"-" or json:",omitempty") cannot be used as a grid alias
+		if meta.Alias == "" || meta.Alias == "-" {
+			if meta.Sortable || meta.Filterable || meta.Searchable {
+				return nil, fmt.Errorf("db: grid field %q has an empty or reserved alias", meta.Name)
+			}
 			continue
 		}
 

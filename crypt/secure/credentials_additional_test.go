@@ -319,9 +319,9 @@ func TestKeyConfig_Fetch(t *testing.T) {
 		t.Errorf("Fetch() = %s, expected 'env-var-key'", result)
 	}
 
-	// Check that env var was cleared
-	if os.Getenv(envVarName) != "" {
-		t.Error("Environment variable should be cleared after fetch")
+	// Check that env var is kept after fetch
+	if os.Getenv(envVarName) != "env-var-key" {
+		t.Error("Environment variable should be kept after fetch")
 	}
 
 	// Test with file

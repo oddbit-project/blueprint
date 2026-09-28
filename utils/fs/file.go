@@ -31,7 +31,7 @@ func ReadString(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// remove spaces and \t, \n, if present
-	return strings.Trim(string(data), " \t\n"), nil
+	// remove leading UTF-8 BOM and spaces, \t, \r, \n, if present
+	return strings.Trim(strings.TrimPrefix(string(data), "\uFEFF"), " \t\r\n"), nil
 
 }

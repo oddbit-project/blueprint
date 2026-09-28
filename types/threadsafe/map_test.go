@@ -90,3 +90,12 @@ func TestMapCopy(t *testing.T) {
 		assert.Equal(t, origValue, copyValue)
 	}
 }
+
+func TestMapZeroValue(t *testing.T) {
+	var m Map[string, int]
+	assert.NotPanics(t, func() { m.Set("key", 42) })
+	value, ok := m.Get("key")
+	assert.True(t, ok)
+	assert.Equal(t, 42, value)
+	assert.Equal(t, 1, m.Length())
+}

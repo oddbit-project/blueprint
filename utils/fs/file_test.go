@@ -2,6 +2,7 @@ package fs
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -81,4 +82,30 @@ func TestReadString(t *testing.T) {
 
 	_, err = ReadString(tempDir)
 	assert.Error(t, err)
+}
+
+func TestReadString_LineEndingsAndBOM(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{"LF", "secret\n", "secret"},
+		{"CRLF", "secret\r\n", "secret"},
+		{"CR", "secret\r", "secret"},
+		{"multiple CRLF", "secret\r\n\r\n", "secret"},
+		{"BOM", "\xEF\xBB\xBFsecret", "secret"},
+		{"BOM and CRLF", "\xEF\xBB\xBFsecret\r\n", "secret"},
+		{"BOM only in middle kept", "sec\xEF\xBB\xBFret", "sec\xEF\xBB\xBFret"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fname := filepath.Join(t.TempDir(), "secret.txt")
+			require.NoError(t, os.WriteFile(fname, []byte(tt.content), 0600))
+
+			result, err := ReadString(fname)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
