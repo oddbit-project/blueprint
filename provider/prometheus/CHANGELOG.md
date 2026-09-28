@@ -6,20 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
+Requires Blueprint core v0.11.0 and `provider/httpserver` v0.9.4.
 
-- **Breaking:** `NewServer`/`Config.NewServer` return `(nil, nil)` when `Enabled` is false. A
-  `Config` not built with `NewConfig()` (struct literal, or JSON without `"enabled": true`) now
-  has `Enabled=false`; nil-check the server before `Start`. `Register` takes no
-  config and is unaffected.
-- **Breaking:** `NewConfig()` defaults `Host` to `localhost` (new `DefaultHost`); previously the
-  endpoint bound all interfaces. Set `Host` explicitly if Prometheus scrapes from another host,
+### Breaking changes
+
+- **`NewServer`/`Config.NewServer` return `(nil, nil)` when `Enabled` is false.** `Enabled` used
+  to be ignored. A `Config` not built with `NewConfig()` (a struct literal, or a zero value
+  filled from JSON without `"enabled": true`) has `Enabled=false`, so calling `Start` on the
+  result now panics with a nil pointer. Set `Enabled: true` or build the config with
+  `NewConfig()`, and nil-check the server. `Register` takes no config and is unaffected.
+- **`NewConfig()` defaults `Host` to `localhost`** (new `DefaultHost`); the endpoint used to bind
+  all interfaces. Set `Host` (for example `"0.0.0.0"`) if Prometheus scrapes from another host,
   container or pod.
-- Requires Blueprint core v0.11.0 and `provider/httpserver` v0.9.4.
+- **A zero `Port` becomes `DefaultPort` (2220)** in `Validate()`; it used to become httpserver's
+  default, 5000.
+- **The module now requires core v0.11.0**, which is itself a breaking release.
 
 ### Fixed
 
-- `Config.Validate()` defaults a zero `Port` to `DefaultPort` (2220) instead of httpserver's 5000.
 - Added `replace` directives for core and httpserver so the module builds outside `go.work`.
 
 ## [v0.9.3] - 2026-09-20

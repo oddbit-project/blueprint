@@ -6,15 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Changed
+### Breaking changes
 
-- **Breaking:** `Config` embeds `tls.ClientConfig` instead of `tls.ServerConfig`. Server-only
-  fields (`TLSAllowedCACerts`, `TLSCipherSuites`, `TLSMinVersion`, `TLSMaxVersion`,
-  `TLSAllowedDNSNames`) are gone; use `TLSCA` and `TLSInsecureSkipVerify`.
+- **`Config` embeds `tls.ClientConfig` instead of `tls.ServerConfig`.** The server-only fields
+  `TLSAllowedCACerts` (`tlsAllowedCACerts`), `TLSCipherSuites`, `TLSMinVersion`, `TLSMaxVersion`
+  and `TLSAllowedDNSNames` are gone; Go code using them no longer compiles, and JSON configs
+  using them are silently ignored. Use `TLSCA` (`tlsCa`) for the CA that signs the Redis server
+  certificate and `TLSInsecureSkipVerify` (`tlsInsecureSkipVerify`) to skip verification.
+  `TLSCert`/`TLSKey` are now the *client* certificate for mutual TLS.
+- **`TLSEnable` is now honoured.** It used to be ignored and the client connected in plaintext.
+  A config with `TLSEnable: true` pointing at a plaintext Redis will now fail to connect; turn it
+  off or enable TLS on the server.
+- **`Prune()` is a no-op.** It used to run `FLUSHDB`. Code that called `Prune()` to empty the
+  database must call `client.Redis.FlushDB` explicitly.
 
 ### Added
 
-- `Client.SetNX`, implementing `kv.AtomicSetter`.
+- `Client.SetNX`, implementing `kv.AtomicSetter` (added in the next core release).
 
 ### Fixed
 

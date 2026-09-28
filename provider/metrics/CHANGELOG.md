@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`Config.Validate()` rejects configs it used to accept.** An empty `Endpoint` returns
+  `ErrMissingEndpoint` (it used to panic in `NewServer`), and `TLSEnable` without `TLSCert` and
+  `TLSKey` returns `ErrMissingTLSCert` (it used to fail only at `Start`).
+- **`Config.Validate()` fills in defaults.** A zero `Port` becomes 2201, so `Port: 0` no longer
+  picks an ephemeral port, and non-positive `ReadTimeout`/`WriteTimeout` become 600 seconds.
+
 ### Fixed
 
 - `Config.Validate()` returns `ErrMissingEndpoint` for an empty `Endpoint` (it used to panic in

@@ -17,6 +17,67 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+> **Breaking release.** Most changes are bug fixes, but several change behaviour that existing
+> code may rely on. Read "Breaking changes" below before upgrading. Providers released with it
+> have their own breaking changes: `provider/redis` (TLS config), `provider/prometheus` (disabled
+> server, default host) and `provider/metrics` (config validation); see their changelogs.
+
+### Breaking changes
+
+- **`provider/tls`: the mTLS `TLSAllowedDNSNames` check is fixed (security).** It was inverted:
+  a client certificate with a listed DNS name was rejected, and one with any unlisted name was
+  accepted. Deployments that happened to work with the inverted check will now reject clients
+  whose certificates carry no listed name. Check `TLSAllowedDNSNames` against the SANs of your
+  client certificates.
+- **`provider/tls`: `ServerConfig.TLSConfig()` validates versions and ciphers even without
+  certificates.** With `TLSEnable` set but no cert, key or CA, it used to return an empty
+  `tls.Config` and accept anything. It now applies the TLS 1.3 minimum and returns an error for
+  invalid `TLSMinVersion`/`TLSMaxVersion`/`TLSCipherSuites`. Version strings must be `"TLS12"` or
+  `"TLS13"`; `"1.2"`/`"1.3"` (shown in earlier docs) are rejected.
+- **`provider/kv`: TTL <= 0 now means "no expiry" in the memory store.** Previously
+  `SetTTL(k, v, 0)` expired on the next read and keys written with `Set` could never be read
+  back. Both are now kept until deleted, matching the Redis client. Code that used a zero TTL to
+  store a throwaway value must delete it explicitly.
+- **`callstack.CallStack.Run(false)`/`RunLinear(false)` return errors.** They return the callback
+  errors combined with `errors.Join`; they used to always return nil. Callers that treated any
+  non-nil result as fatal will now see destructor errors. Callbacks run on a snapshot taken
+  without holding the lock, so concurrent `Run` calls are no longer serialized, and `IsCalling()`
+  is only reliable when runs don't overlap.
+- **Shutdown order in `Container.Run`.** On SIGINT/SIGTERM/SIGHUP the application context is now
+  cancelled *before* destructors run (it used to be after). When the context is cancelled any
+  other way, destructors now run before exit (they used to be skipped). Goroutines watching the
+  context stop earlier, and destructors must not depend on the context still being live.
+- **`AbortFatal` after `Shutdown` exits with code 1** and logs the error; it used to exit with
+  255 silently.
+- **Environment-variable secrets are no longer cleared after `Fetch`** (`crypt/secure`,
+  `provider/tls` key passwords). A second `Fetch` returns the same secret instead of an empty
+  string. Clearing never removed the value from the process's initial environment block. If you
+  relied on the variable being empty afterwards, unset it yourself.
+- **`utils/fs.ReadString` trims `\r` and strips a leading UTF-8 BOM.** Secrets and passwords
+  read from files (`PasswordFile`, `KeyFile`, TLS key password files, `CredentialFromFile`) lose
+  a trailing `\r` or leading BOM they used to keep. A password that genuinely ends in `\r` will
+  now differ.
+- **`db`: `NewGrid` rejects grid fields whose alias is empty or `-`** (`json:"-"` or
+  `json:",omitempty"` on a field tagged `grid:"sort"`, `"filter"` or `"search"`), as `dbx` already
+  did. Such aliases are no longer mapped for non-grid fields. Give those fields an explicit json
+  name or drop the `grid` tag.
+- **`runtime`: struct tag parts are whitespace-trimmed.** `db:"id, auto"` now marks the field as
+  auto (excluded from INSERT) and `grid:"sort, filter"` now enables filtering; before, the part
+  after the space was silently ignored. Review tags written with spaces after commas.
+- **`utils.NotNil` panics on typed nils**, including nil pointers, maps, slices, funcs, chans and
+  interfaces wrapped in `any`. A nil slice or map passed to it now panics.
+- **`utils/debug.GetStackTrace(0)` no longer includes `GetStackTrace` itself**; `skip` values 0
+  and 1 both start at the caller. Frames under a user directory named `runtime/` are no longer
+  dropped.
+- **`utils/parallel.ForInt` waits for all iterations** before returning the first error (it used
+  to return immediately while the other goroutines kept running), and returns nil for
+  `to <= 0` instead of panicking.
+- **`console.BgDefault` is 49** (default background); it was 39 (the foreground reset).
+- **`runner.PeriodicRunner.Stop` after the parent context was cancelled returns nil once**
+  instead of the "not running" error, and a normal stop no longer logs an ERROR.
+- **`provider/ratelimiter`: `ShutdownWithContext` without `Start`** returns immediately, and a
+  later `Start` is then a no-op.
+
 ### Added
 
 - `kv.AtomicSetter` optional interface (`SetNX(k, v, ttl) (bool, error)`), implemented by
@@ -26,21 +87,7 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Changed
 
-- `callstack.CallStack.Run(false)`/`RunLinear(false)` return the callback errors combined with
-  `errors.Join` (previously always nil). Callbacks run on a snapshot taken without holding the
-  lock, so concurrent `Run` calls are no longer serialized and `IsCalling()` is only reliable when
-  runs don't overlap.
-- `Container.Run` cancels the application context before running destructors on
-  SIGINT/SIGTERM/SIGHUP.
-- `RegisterDestructor` called during or after `Shutdown` is a no-op.
-- `crypt/secure`, `provider/tls`: fetching a secret from an environment variable no longer clears
-  the variable. Clearing did not remove it from the process environment block and made a second
-  `Fetch` return an empty secret (for example on S3 reconnect).
-- `db`: `NewGrid` rejects grid fields whose alias is empty or `-` (`json:"-"`,
-  `json:",omitempty"`); such aliases are no longer mapped for non-grid fields.
-- `runtime`: tag parts are whitespace-trimmed, so `db:"id, auto"` now sets `auto` (excluded from
-  INSERT) and `grid:"sort, filter"` now enables filtering.
-- `utils.NotNil` also panics on nil slices and maps.
+- `RegisterDestructor` called during or after `Shutdown` is a no-op (it used to panic).
 - `types/duration`: package doc no longer refers to goauth.
 
 ### Fixed

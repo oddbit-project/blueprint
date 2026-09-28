@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 Requires the next Blueprint core release (uses `kv.AtomicSetter`).
 
+### Breaking changes
+
+- **`EvictHalfLife` now evicts nonces that are still valid.** It used to evict only
+  already-expired entries, so a full memory store rejected new requests. It now evicts nonces
+  past half their TTL, so an evicted nonce could be replayed while its timestamp is still
+  accepted. Keep the TTL well above twice the timestamp tolerance (the defaults, 4h TTL and 5m
+  tolerance, are safe), or use `EvictNone` to keep rejecting when full.
+
 ### Changed
 
 - The KV nonce store (`store.NewKvStore`) uses an atomic `SetNX` when the backend implements
@@ -18,9 +26,8 @@ Requires the next Blueprint core release (uses `kv.AtomicSetter`).
 
 - The memory nonce store deadlocked (all requests hung) once full when using `EvictAll` or
   `EvictHalfLife`.
-- `EvictHalfLife` only evicted already-expired entries; it now evicts nonces past half their TTL.
-  Keep the TTL well above twice the timestamp tolerance, or an evicted nonce could be replayed
-  while its timestamp is still accepted.
+- `EvictHalfLife` only evicted already-expired entries; it now evicts nonces past half their TTL
+  (see "Breaking changes").
 
 ## [v0.9.0] - 2026-09-27
 
