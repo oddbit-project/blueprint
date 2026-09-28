@@ -173,7 +173,8 @@ func (q *Querier) Exec(ctx context.Context, query string, args ...any) (int64, e
 // columns to dest's fields by the `ch` struct tag (falling back to the Go
 // field name), not the `db` tag gohan/dbx build column lists from. A record
 // type used with this Querier needs `ch` tags equal to its `db` tags (or
-// only `ch` tags), or the mapping silently diverges.
+// only `ch` tags), or the mapping silently diverges; dbx.NewRepository
+// rejects such a type through CheckRecord.
 func (q *Querier) Get(ctx context.Context, dest any, query string, args ...any) error {
 	row := q.conn.QueryRow(ctx, query, namedArgs(args)...)
 	return row.ScanStruct(dest)
@@ -258,7 +259,8 @@ func (q *Querier) QueryInt64(ctx context.Context, query string, args ...any) (in
 // gohan.InsertColumns, but AppendStruct (clickhouse-go) writes each column
 // by matching the row's `ch` tag (falling back to the Go field name). A
 // record type used here needs `ch` tags equal to its `db` tags (or only
-// `ch` tags), or a column in the list has no matching struct field to read.
+// `ch` tags), or a column in the list has no matching struct field to read;
+// dbx.NewRepository rejects such a type through CheckRecord.
 func (q *Querier) InsertBatch(ctx context.Context, table string, rows []any) error {
 	if len(rows) == 0 {
 		return nil
