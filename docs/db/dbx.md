@@ -228,8 +228,15 @@ type Event struct {
 - `Count`/`Exists` read `COUNT(*)` — `Exists`'s wrapping subquery is specifically shaped so
   `QueryInt64` reads a `COUNT` column even though a bare `SELECT 1` on ClickHouse is `UInt8`, not
   the `UInt64` `COUNT(*)` returns.
-- A bound `time.Time` is sent at second precision — a `clickhouse-go` v2.40.3 limitation, not a
-  `dbx`/`gohan` choice.
+- Statements are built with `gohan.ClickHouseNamed()` (`@pN` named placeholders), not
+  `gohan.ClickHouse()`: this is what lets a bound `time.Time` keep full sub-second precision.
+  clickhouse-go's native positional binding only ever sends whole seconds; named binding lets
+  `Querier` convert each argument to `clickhouse.DateNamed(name, t, clickhouse.NanoSeconds)`,
+  which the driver renders as `toDateTime64(..., 9)`. Comparisons are then **exact-instant**: a
+  `DateTime64(3)` column storing `.123` does not equal a bound value of `.123456789` (only a value
+  truncated to milliseconds). This conversion applies to `sql.NamedArg` values gohan builds
+  (`time.Time`, `*time.Time`, or a `driver.Valuer` producing one, such as `sql.NullTime`); SQL you
+  write yourself with positional `?` placeholders still gets clickhouse-go's whole-second binding.
 - `Querier` is not transactional (no `TxBeginner`/`TxQuerier`): `dbx.WithTx` fails with
   `dbx.ErrTxUnsupported` over it, matching ClickHouse having no transactions.
 

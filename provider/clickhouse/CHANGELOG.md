@@ -4,6 +4,30 @@ All notable changes to the Blueprint ClickHouse provider will be documented in t
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`dbx.Querier` truncated time arguments to whole seconds** (#89). Passing a `time.Time`
+  through `Exec`/`Get`/`Select`/`QueryInt64` used clickhouse-go's native positional binding, which
+  formats it as `toDateTime('YYYY-MM-DD hh:mm:ss')` regardless of the target column's scale, so a
+  time-based `Count`/`Exists`/`Get`/`List`/`Delete` condition (and a `Repository.Exec` insert)
+  silently dropped sub-second precision. `InsertBatch` was not affected (it writes columns
+  directly).
+
+### Changed
+
+- **`Querier.Dialect()` now returns `gohan.ClickHouseNamed()`** instead of `gohan.ClickHouse()`,
+  so every statement `dbx.Repository` builds through it uses `@pN` named placeholders. A
+  `time.Time` argument (bare, `*time.Time`, or a `driver.Valuer` producing one, such as
+  `sql.NullTime`) is now bound with `clickhouse.DateNamed(..., clickhouse.NanoSeconds)` and keeps
+  full precision. This is a behaviour change from the previous (broken) whole-second binding:
+  comparisons are now **exact-instant** — a `DateTime64(3)` column storing `.123` is not equal to
+  a bound value of `.123456789` (it equals that value truncated to milliseconds). Callers who pass
+  their own hand-written SQL with positional `?` placeholders are unaffected and keep
+  clickhouse-go's whole-second time binding; use `@name` with `clickhouse.DateNamed` directly if
+  full precision is needed there.
+
 ## [v0.9.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.

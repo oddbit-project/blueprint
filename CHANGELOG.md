@@ -17,6 +17,12 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped `gohan` to v0.2.0. It adds a stricter guard: `dbx.Repository.Delete`/`Update` with a
+  column-free condition (for example `gohan.Raw("1=1")`) now fails with `gohan.ErrNoWhere` unless
+  `gohan.All()` is used.
+
 ## [v0.11.0] - 2026-09-27
 
 > **Breaking release.** No exported API was removed, but the SQL-injection fix in the
