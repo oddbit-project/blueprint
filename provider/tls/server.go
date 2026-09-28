@@ -65,27 +65,6 @@ func (c *ServerConfig) TLSConfig() (*tls.Config, error) {
 	}
 
 	tlsConfig := &tls.Config{}
-	// empty config
-	if c.TLSCert == "" && c.TLSKey == "" && len(c.TLSAllowedCACerts) == 0 {
-		return tlsConfig, nil
-	}
-
-	if len(c.TLSAllowedCACerts) != 0 {
-		pool, err := LoadTLSCertPool(c.TLSAllowedCACerts)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig.ClientCAs = pool
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	}
-
-	if c.TLSCert != "" && c.TLSKey != "" {
-		err := LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TlsKeyCredential)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if len(c.TLSCipherSuites) != 0 {
 		cipherSuites, err := ParseCiphers(c.TLSCipherSuites)
 		if err != nil {
@@ -122,6 +101,27 @@ func (c *ServerConfig) TLSConfig() (*tls.Config, error) {
 		return nil, ErrInvalidTlsVersion
 	}
 
+	// empty config
+	if c.TLSCert == "" && c.TLSKey == "" && len(c.TLSAllowedCACerts) == 0 {
+		return tlsConfig, nil
+	}
+
+	if len(c.TLSAllowedCACerts) != 0 {
+		pool, err := LoadTLSCertPool(c.TLSAllowedCACerts)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.ClientCAs = pool
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	if c.TLSCert != "" && c.TLSKey != "" {
+		err := LoadTLSCertificate(tlsConfig, c.TLSCert, c.TLSKey, c.TlsKeyCredential)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Since clientAuth is tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	// there must be certs to validate.
 	if len(c.TLSAllowedCACerts) > 0 && len(c.TLSAllowedDNSNames) > 0 {
@@ -154,7 +154,7 @@ func (c *ServerConfig) verifyPeerCertificate(rawCerts [][]byte, _ [][]*x509.Cert
 	// Check DNS names
 	if len(c.TLSAllowedDNSNames) > 0 {
 		for _, name := range cert.DNSNames {
-			if !slices.Contains(c.TLSAllowedDNSNames, name) {
+			if slices.Contains(c.TLSAllowedDNSNames, name) {
 				return nil
 			}
 		}
