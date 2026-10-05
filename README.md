@@ -324,7 +324,7 @@ Blueprint's base library provides the following components for application devel
 
 ### **Application Lifecycle**
 - **[Container](docs/index.md)** - Application lifecycle management with graceful startup/shutdown
-- **[Configuration](docs/config/config.md)** - JSON and environment-based configuration with validation
+- **[Configuration](docs/config/config.md)** - JSON and environment-based configuration with validation and removed-key checks
 - **[Logging](docs/log/logging.md)** - Structured logging with file rotation and levels
 
 ### **Database**
