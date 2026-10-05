@@ -388,13 +388,16 @@ if err := config.CheckRemovedKeys(p, map[string]string{
 - Call it on the root provider before starting services; paths are relative to the provider passed.
 - Matching ignores case like `encoding/json`; when the config spells a key differently, the error
   shows the registered path as well.
-- Every hit is reported, in sorted order.
+- Every hit is reported, ordered by registered path (byte order), then by the spelling in the config.
 - It is not strict decoding: unregistered unknown keys are still ignored.
 - Limitations: JSON provider only (other providers return an error wrapping `config.ErrNotImplemented`);
   a key containing `.` cannot be registered; arrays are not descended into; there are no wildcard
   segments, so a field under a keyed map section such as `events.policies.<type>` cannot be
   registered; a path through a section the application decodes into a `map` (exact-case) may flag
-  case variants the application treats as different keys.
+  case variants the application treats as different keys; `GetKey`, `GetConfigNode` and
+  `KeyExists` match the top-level key exactly, so a case variant of a section the application
+  reads that way (`{"Server": …}` read with `GetKey("server", …)`) is flagged although it is
+  never read.
 
 ## Using Wrappers
 
