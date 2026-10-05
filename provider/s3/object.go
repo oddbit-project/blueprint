@@ -194,17 +194,32 @@ func (b *Bucket) HeadObject(ctx context.Context, name string, versionID ...strin
 
 // CopyObject copies an object within S3
 func (b *Bucket) CopyObject(ctx context.Context, srcName, dstBucket, dstName string, opts ...ObjectOptions) error {
+	_, err := b.CopyObjectVersion(ctx, CopySource{Name: srcName}, dstBucket, dstName, opts...)
+	return err
+}
+
+// CopyObjectVersion copies an object (optionally a specific version) and returns the version it created.
+// Copies are single-request (5 GiB source limit on AWS).
+func (b *Bucket) CopyObjectVersion(ctx context.Context, srcObj CopySource, dstBucket, dstName string, opts ...ObjectOptions) (ObjectVersion, error) {
 	if !b.IsConnected() {
-		return ErrClientNotConnected
+		return ObjectVersion{}, ErrClientNotConnected
 	}
+
+	startTime := logOperationStart(b.logger, "copy_object", srcObj.Name, log.KV{
+		"bucket_name":    b.bucketName,
+		"dst_bucket":     dstBucket,
+		"dst_name":       dstName,
+		"src_version_id": srcObj.VersionID,
+	})
 
 	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
 	defer cancel()
 
 	// Create copy source
 	src := minio.CopySrcOptions{
-		Bucket: b.bucketName,
-		Object: srcName,
+		Bucket:    b.bucketName,
+		Object:    srcObj.Name,
+		VersionID: srcObj.VersionID,
 	}
 
 	// Create copy destination options
@@ -213,23 +228,49 @@ func (b *Bucket) CopyObject(ctx context.Context, srcName, dstBucket, dstName str
 		Object: dstName,
 	}
 
+	endKV := log.KV{
+		"bucket_name": b.bucketName,
+		"dst_bucket":  dstBucket,
+		"dst_name":    dstName,
+	}
+
 	// Apply options if provided
 	if len(opts) > 0 {
 		// Decryption key for an SSE-C encrypted source object
 		if opts[0].SourceSSECustomerKey != "" {
 			srcSSE, err := sseCustomerKey(opts[0].SourceSSECustomerKey)
 			if err != nil {
-				return err
+				logOperationEnd(b.logger, "copy_object", srcObj.Name, startTime, err, endKV)
+				return ObjectVersion{}, err
 			}
 			src.Encryption = srcSSE
 		}
 		if err := b.applyMinIOCopyOptions(&dst, opts[0]); err != nil {
-			return err
+			logOperationEnd(b.logger, "copy_object", srcObj.Name, startTime, err, endKV)
+			return ObjectVersion{}, err
 		}
 	}
 
-	_, err := b.minioClient.CopyObject(ctx, dst, src)
-	return err
+	info, err := b.minioClient.CopyObject(ctx, dst, src)
+	// S3 may answer 200 OK with an error body; minio-go then yields an empty ETag
+	if err == nil && info.ETag == "" {
+		err = ErrEmptyCopyResult
+	}
+	if info.VersionID != "" {
+		endKV["version_id"] = info.VersionID
+	}
+	logOperationEnd(b.logger, "copy_object", srcObj.Name, startTime, err, endKV)
+	if err != nil {
+		return ObjectVersion{}, err
+	}
+
+	return ObjectVersion{
+		Bucket:    dstBucket,
+		Key:       dstName,
+		VersionID: info.VersionID,
+		ETag:      info.ETag,
+		Size:      -1,
+	}, nil
 }
 
 // applyMinIOPutOptions applies ObjectOptions to MinIO PutObjectOptions
@@ -301,6 +342,16 @@ func (b *Bucket) applyMinIOCopyOptions(dst *minio.CopyDestOptions, objectOpts Ob
 	if len(objectOpts.Tags) > 0 {
 		dst.UserTags = objectOpts.Tags
 		dst.ReplaceTags = true
+	}
+
+	if objectOpts.LockMode != "" {
+		dst.Mode = minio.RetentionMode(objectOpts.LockMode)
+	}
+	if !objectOpts.RetainUntilDate.IsZero() {
+		dst.RetainUntilDate = objectOpts.RetainUntilDate
+	}
+	if objectOpts.LegalHold != "" {
+		dst.LegalHold = minio.LegalHoldStatus(objectOpts.LegalHold)
 	}
 
 	// Server-side encryption for the destination object

@@ -76,33 +76,7 @@ func (b *Bucket) GetObjectRetention(ctx context.Context, name string, versionID 
 
 // SetObjectLegalHold enables or disables legal hold on an object
 func (b *Bucket) SetObjectLegalHold(ctx context.Context, name string, enabled bool) error {
-	if !b.IsConnected() {
-		return ErrClientNotConnected
-	}
-
-	startTime := logOperationStart(b.logger, "set_object_legal_hold", name, log.KV{
-		"bucket_name": b.bucketName,
-		"enabled":     enabled,
-	})
-
-	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
-	defer cancel()
-
-	status := minio.LegalHoldDisabled
-	if enabled {
-		status = minio.LegalHoldEnabled
-	}
-
-	err := b.minioClient.PutObjectLegalHold(ctx, b.bucketName, name, minio.PutObjectLegalHoldOptions{
-		Status: &status,
-	})
-
-	logOperationEnd(b.logger, "set_object_legal_hold", name, startTime, err, log.KV{
-		"bucket_name": b.bucketName,
-		"enabled":     enabled,
-	})
-
-	return err
+	return b.SetObjectLegalHoldVersion(ctx, name, "", enabled)
 }
 
 // GetObjectLegalHold returns true if legal hold is enabled on an object.
@@ -204,4 +178,37 @@ func (b *Bucket) GetObjectLockConfig(ctx context.Context) (*ObjectLockConfig, er
 	}
 
 	return cfg, nil
+}
+
+// SetObjectLegalHoldVersion enables or disables legal hold on a specific object version
+func (b *Bucket) SetObjectLegalHoldVersion(ctx context.Context, name, versionID string, enabled bool) error {
+	if !b.IsConnected() {
+		return ErrClientNotConnected
+	}
+
+	kv := log.KV{
+		"bucket_name": b.bucketName,
+		"enabled":     enabled,
+	}
+	if versionID != "" {
+		kv["version_id"] = versionID
+	}
+	startTime := logOperationStart(b.logger, "set_object_legal_hold", name, kv)
+
+	ctx, cancel := getContextWithTimeout(b.timeout, ctx)
+	defer cancel()
+
+	status := minio.LegalHoldDisabled
+	if enabled {
+		status = minio.LegalHoldEnabled
+	}
+
+	err := b.minioClient.PutObjectLegalHold(ctx, b.bucketName, name, minio.PutObjectLegalHoldOptions{
+		VersionID: versionID,
+		Status:    &status,
+	})
+
+	logOperationEnd(b.logger, "set_object_legal_hold", name, startTime, err, kv)
+
+	return err
 }
