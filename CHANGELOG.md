@@ -17,6 +17,12 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Added
+
+- `config.CheckRemovedKeys` rejects a config that still contains a removed or renamed key
+  (dotted path, case-insensitive like `encoding/json`), naming the key and its replacement hint;
+  new sentinels `config.ErrRemovedKey` and `config.ErrInvalidKeyPath` (#93).
+
 ## [v0.12.0] - 2026-09-28
 
 > **Breaking release.** Most changes are bug fixes, but several change behaviour that existing
