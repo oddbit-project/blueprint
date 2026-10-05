@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-Planned as v0.10.0: `BucketInterface` gains methods, which breaks custom implementations.
+## [v0.10.0] - 2026-10-05
+
+Requires Blueprint core v0.11.0. `BucketInterface` gains methods, which breaks custom implementations.
 
 ### Added
 
