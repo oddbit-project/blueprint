@@ -4,6 +4,32 @@ All notable changes to the Blueprint S3 provider will be documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+Planned as v0.10.0: `BucketInterface` gains methods, which breaks custom implementations.
+
+### Added
+
+- `Bucket.PutObjectInfo` and `Bucket.CopyObjectVersion` return the written `ObjectVersion`
+  (bucket, key, version id, ETag, size); `CopySource` copies a specific source version (#94).
+- `Bucket.SetObjectLegalHoldVersion` sets or clears a legal hold on a specific version (#94).
+- `ErrEmptyCopyResult`: a copy whose response carries no ETag (S3 "200 OK" with an error body) now fails.
+
+### Changed
+
+- **Breaking:** `BucketInterface` gains `PutObjectInfo`, `CopyObjectVersion` and
+  `SetObjectLegalHoldVersion`; custom implementations must add them.
+- `CopyObject` now logs `copy_object` start/end events; put end events log `version_id`.
+- `CopyObject` with `LockMode`/`RetainUntilDate` or `LegalHold` into a bucket without Object Lock
+  now fails (`Bucket is missing ObjectLockConfiguration`); the options used to be dropped.
+
+### Fixed
+
+- `CopyObject` ignored `ObjectOptions.LockMode`, `RetainUntilDate` and `LegalHold`, producing an
+  unlocked copy without error; they are now applied to the destination. `LockMode` and
+  `RetainUntilDate` are sent only together: a copy with just one of them is still written unlocked.
+- Docs: `GetObjectLegalHold` returns `false`, not an error, when no hold was ever set.
+
 ## [v0.9.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.

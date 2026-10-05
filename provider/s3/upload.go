@@ -20,13 +20,16 @@ func (b *Bucket) basePutOptions() minio.PutObjectOptions {
 	return opts
 }
 
-// PutObject uploads an object to S3
-func (b *Bucket) PutObject(ctx context.Context, objectName string, reader io.Reader, size int64, opts ...ObjectOptions) error {
+// put runs one upload with the existing order: connected check, start log,
+// upload timeout, options (an options error is logged), upload, end log.
+// opts may be nil; threads > 0 overrides NumThreads after options are applied.
+func (b *Bucket) put(ctx context.Context, op, name string, reader io.Reader, size int64,
+	opts *ObjectOptions, threads int) (minio.UploadInfo, error) {
 	if !b.IsConnected() {
-		return ErrClientNotConnected
+		return minio.UploadInfo{}, ErrClientNotConnected
 	}
 
-	startTime := logOperationStart(b.logger, "put_object", objectName, log.KV{
+	startTime := logOperationStart(b.logger, op, name, log.KV{
 		"bucket_name": b.bucketName,
 	})
 
@@ -34,139 +37,78 @@ func (b *Bucket) PutObject(ctx context.Context, objectName string, reader io.Rea
 	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
 	defer cancel()
 
-	// Create MinIO put options
 	putOpts := b.basePutOptions()
 
-	// Apply options if provided
-	if len(opts) > 0 {
-		if err := b.applyMinIOPutOptions(&putOpts, opts[0]); err != nil {
-			logOperationEnd(b.logger, "put_object", objectName, startTime, err, log.KV{
+	if opts != nil {
+		if err := b.applyMinIOPutOptions(&putOpts, *opts); err != nil {
+			logOperationEnd(b.logger, op, name, startTime, err, log.KV{
 				"bucket_name": b.bucketName,
 			})
-			return err
+			return minio.UploadInfo{}, err
 		}
 	}
 
-	// MinIO automatically handles multipart uploads based on size
-	_, err := b.minioClient.PutObject(ctx, b.bucketName, objectName, reader, size, putOpts)
+	if threads > 0 {
+		putOpts.NumThreads = uint(threads)
+	}
 
-	logOperationEnd(b.logger, "put_object", objectName, startTime, err, log.KV{
-		"bucket_name": b.bucketName,
-	})
+	info, err := b.minioClient.PutObject(ctx, b.bucketName, name, reader, size, putOpts)
 
+	kv := log.KV{"bucket_name": b.bucketName}
+	if info.VersionID != "" {
+		kv["version_id"] = info.VersionID
+	}
+	logOperationEnd(b.logger, op, name, startTime, err, kv)
+
+	return info, err
+}
+
+func firstObjectOptions(opts []ObjectOptions) *ObjectOptions {
+	if len(opts) > 0 {
+		return &opts[0]
+	}
+	return nil
+}
+
+// PutObject uploads an object to S3
+func (b *Bucket) PutObject(ctx context.Context, objectName string, reader io.Reader, size int64, opts ...ObjectOptions) error {
+	_, err := b.put(ctx, "put_object", objectName, reader, size, firstObjectOptions(opts), 0)
 	return err
+}
+
+// PutObjectInfo uploads an object and returns the version it created
+func (b *Bucket) PutObjectInfo(ctx context.Context, objectName string, reader io.Reader, size int64, opts ...ObjectOptions) (ObjectVersion, error) {
+	info, err := b.put(ctx, "put_object_info", objectName, reader, size, firstObjectOptions(opts), 0)
+	if err != nil {
+		return ObjectVersion{}, err
+	}
+	return ObjectVersion{
+		Bucket:    b.bucketName,
+		Key:       objectName,
+		VersionID: info.VersionID,
+		ETag:      info.ETag,
+		Size:      info.Size,
+	}, nil
 }
 
 // PutObjectStream uploads an object using streaming (no size required)
 func (b *Bucket) PutObjectStream(ctx context.Context, objectName string, reader io.Reader, opts ...ObjectOptions) error {
-	if !b.IsConnected() {
-		return ErrClientNotConnected
-	}
-
-	startTime := logOperationStart(b.logger, "put_object_stream", objectName, log.KV{
-		"bucket_name": b.bucketName,
-	})
-
-	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
-	defer cancel()
-
-	// Create MinIO put options
-	putOpts := b.basePutOptions()
-
-	// Apply options if provided
-	if len(opts) > 0 {
-		if err := b.applyMinIOPutOptions(&putOpts, opts[0]); err != nil {
-			logOperationEnd(b.logger, "put_object_stream", objectName, startTime, err, log.KV{
-				"bucket_name": b.bucketName,
-			})
-			return err
-		}
-	}
-
 	// Use -1 for unknown size streaming uploads
-	_, err := b.minioClient.PutObject(ctx, b.bucketName, objectName, reader, -1, putOpts)
-
-	logOperationEnd(b.logger, "put_object_stream", objectName, startTime, err, log.KV{
-		"bucket_name": b.bucketName,
-	})
-
+	_, err := b.put(ctx, "put_object_stream", objectName, reader, -1, firstObjectOptions(opts), 0)
 	return err
 }
 
 // PutObjectMultipart uploads an object using multipart upload with progress tracking
 func (b *Bucket) PutObjectMultipart(ctx context.Context, objectName string, reader io.Reader, size int64, opts ...ObjectOptions) error {
-	if !b.IsConnected() {
-		return ErrClientNotConnected
-	}
-
-	startTime := logOperationStart(b.logger, "put_object_multipart", objectName, log.KV{
-		"bucket_name": b.bucketName,
-	})
-
-	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
-	defer cancel()
-
-	// Create MinIO put options
-	putOpts := b.basePutOptions()
-
-	// Apply options if provided
-	if len(opts) > 0 {
-		if err := b.applyMinIOPutOptions(&putOpts, opts[0]); err != nil {
-			logOperationEnd(b.logger, "put_object_multipart", objectName, startTime, err, log.KV{
-				"bucket_name": b.bucketName,
-			})
-			return err
-		}
-	}
-
-	// Note: MinIO handles multipart uploads automatically
-	_, err := b.minioClient.PutObject(ctx, b.bucketName, objectName, reader, size, putOpts)
-
-	logOperationEnd(b.logger, "put_object_multipart", objectName, startTime, err, log.KV{
-		"bucket_name": b.bucketName,
-	})
-
+	// MinIO handles multipart uploads automatically
+	_, err := b.put(ctx, "put_object_multipart", objectName, reader, size, firstObjectOptions(opts), 0)
 	return err
 }
 
-// progressReader removed - was causing data corruption issues in multipart uploads
-
 // PutObjectAdvanced provides advanced upload functionality with detailed control
 func (b *Bucket) PutObjectAdvanced(ctx context.Context, objectName string, reader io.Reader, size int64, opts UploadOptions) error {
-	if !b.IsConnected() {
-		return ErrClientNotConnected
-	}
-
-	startTime := logOperationStart(b.logger, "put_object_advanced", objectName, log.KV{
-		"bucket_name": b.bucketName,
-	})
-
-	ctx, cancel := getContextWithTimeout(b.uploadTimeout, ctx)
-	defer cancel()
-
-	// Create MinIO put options with advanced settings
-	putOpts := b.basePutOptions()
-
-	// Apply basic object options
-	if err := b.applyMinIOPutOptions(&putOpts, opts.ObjectOptions); err != nil {
-		logOperationEnd(b.logger, "put_object_advanced", objectName, startTime, err, log.KV{
-			"bucket_name": b.bucketName,
-		})
-		return err
-	}
-
-	// Override multipart tuning from UploadOptions when provided.
 	// Note: MinIO-Go's PutObject does not expose LeavePartsOnError or a per-call
 	// MaxUploadParts, so those UploadOptions fields are not applied.
-	if opts.Concurrency > 0 {
-		putOpts.NumThreads = uint(opts.Concurrency)
-	}
-
-	_, err := b.minioClient.PutObject(ctx, b.bucketName, objectName, reader, size, putOpts)
-
-	logOperationEnd(b.logger, "put_object_advanced", objectName, startTime, err, log.KV{
-		"bucket_name": b.bucketName,
-	})
-
+	_, err := b.put(ctx, "put_object_advanced", objectName, reader, size, &opts.ObjectOptions, opts.Concurrency)
 	return err
 }

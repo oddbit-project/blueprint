@@ -58,7 +58,27 @@ const (
 	ErrInvalidBucketName   = utils.Error("invalid bucket bucketName")
 	ErrInvalidObjectKey    = utils.Error("invalid object key")
 	ErrClientNotConnected  = utils.Error("client not connected")
+	ErrEmptyCopyResult     = utils.Error("copy returned no result")
 )
+
+// ObjectVersion identifies the object version a put or copy wrote.
+// VersionID is empty when the bucket is not versioned (a versioning-suspended bucket
+// may report "" or "null"): callers that pin versions must treat either as "not pinned".
+// ETag is not a content MD5 for multipart uploads or SSE-KMS/SSE-C objects.
+// Size is -1 for copies (S3 does not report it).
+type ObjectVersion struct {
+	Bucket    string
+	Key       string
+	VersionID string
+	ETag      string
+	Size      int64
+}
+
+// CopySource names the object, and optionally the version, to copy from this bucket.
+type CopySource struct {
+	Name      string
+	VersionID string // empty = latest
+}
 
 // BucketInfo represents information about an S3 bucket
 type BucketInfo struct {
@@ -204,6 +224,8 @@ type BucketInterface interface {
 	PutObjectStream(ctx context.Context, name string, reader io.Reader, opts ...ObjectOptions) error
 	GetObjectStream(ctx context.Context, name string, writer io.Writer) error
 	CopyObject(ctx context.Context, srcName, dstBucket, dstName string, opts ...ObjectOptions) error
+	PutObjectInfo(ctx context.Context, name string, reader io.Reader, size int64, opts ...ObjectOptions) (ObjectVersion, error)
+	CopyObjectVersion(ctx context.Context, src CopySource, dstBucket, dstName string, opts ...ObjectOptions) (ObjectVersion, error)
 
 	// Advanced download operations
 	GetObjectRange(ctx context.Context, name string, start, end int64) (io.ReadCloser, error)
@@ -223,6 +245,7 @@ type BucketInterface interface {
 	SetObjectRetention(ctx context.Context, name string, opts RetentionOptions) error
 	GetObjectRetention(ctx context.Context, name string, versionID ...string) (*ObjectRetention, error)
 	SetObjectLegalHold(ctx context.Context, name string, enabled bool) error
+	SetObjectLegalHoldVersion(ctx context.Context, name, versionID string, enabled bool) error
 	GetObjectLegalHold(ctx context.Context, name string, versionID ...string) (bool, error)
 	SetObjectLockConfig(ctx context.Context, mode string, validity uint, unit string) error
 	GetObjectLockConfig(ctx context.Context) (*ObjectLockConfig, error)

@@ -395,7 +395,7 @@ Blueprint also includes the following modular providers:
 - **[PostgreSQL](docs/provider/pgsql.md)** - PostgreSQL database integration with connection pooling
 - **[SQLite](docs/provider/sqlite.md)** - Embedded SQLite database via pure-Go driver (no CGO)
 - **[ClickHouse](docs/provider/clickhouse.md)** - ClickHouse database for analytics workloads
-- **[S3](docs/provider/s3.md)** - S3-compatible object storage (AWS S3, MinIO, etc.)
+- **[S3](docs/provider/s3.md)** - S3-compatible object storage (AWS S3, MinIO, etc.) with Object Lock (WORM) and object versions
 - **[etcd](docs/provider/etcd.md)** - Distributed key-value store integration
 
 ### **Web & HTTP**  
