@@ -7,6 +7,8 @@ const (
 	ErrNotImplemented = utils.Error("Config method or type not implemented")
 	ErrInvalidType    = utils.Error("Invalid destination type")
 	ErrInvalidDefault = utils.Error("Invalid default value")
+	ErrRemovedKey     = utils.Error("Removed config key present")
+	ErrInvalidKeyPath = utils.Error("Invalid config key path")
 )
 
 type ConfigProvider interface {

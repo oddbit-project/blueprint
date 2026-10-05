@@ -17,6 +17,23 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.13.0] - 2026-10-05
+
+### Module versions
+
+Released together with core v0.13.0:
+
+- `provider/s3` v0.10.0 (requires core v0.11.0). `BucketInterface` gains methods, which breaks
+  custom implementations; see its changelog.
+
+The other providers are unchanged and work with core v0.13.0 at their current versions.
+
+### Added
+
+- `config.CheckRemovedKeys` rejects a config that still contains a removed or renamed key
+  (dotted path, case-insensitive like `encoding/json`), naming the key and its replacement hint;
+  new sentinels `config.ErrRemovedKey` and `config.ErrInvalidKeyPath` (#93).
+
 ## [v0.12.0] - 2026-09-28
 
 > **Breaking release.** Most changes are bug fixes, but several change behaviour that existing

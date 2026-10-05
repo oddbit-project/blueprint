@@ -369,6 +369,36 @@ type Config struct {
 
 Defaults are applied recursively to nested value structs and nested `*struct` fields. If a default cannot be parsed into the target field type, the provider returns `config.ErrInvalidDefault`.
 
+### Removed and Renamed Keys
+
+The JSON provider silently ignores keys the destination struct does not declare, so a stale config
+that still carries a removed or renamed key boots on the default value with no error. Use
+`config.CheckRemovedKeys` to reject such configs at startup:
+
+```golang
+p, err := provider.NewJsonProvider("config.json")
+if err != nil { return err }
+if err := config.CheckRemovedKeys(p, map[string]string{
+	"nats.maxDeliver": "use events.policies.<type>.maxDeliver",
+}); err != nil {
+	return err // Removed config key present: "nats.maxDeliver": use events.policies.<type>.maxDeliver
+}
+```
+
+- Call it on the root provider before starting services; paths are relative to the provider passed.
+- Matching ignores case like `encoding/json`; when the config spells a key differently, the error
+  shows the registered path as well.
+- Every hit is reported, ordered by registered path (byte order), then by the spelling in the config.
+- It is not strict decoding: unregistered unknown keys are still ignored.
+- Limitations: JSON provider only (other providers return an error wrapping `config.ErrNotImplemented`);
+  a key containing `.` cannot be registered; arrays are not descended into; there are no wildcard
+  segments, so a field under a keyed map section such as `events.policies.<type>` cannot be
+  registered; a path through a section the application decodes into a `map` (exact-case) may flag
+  case variants the application treats as different keys; `GetKey`, `GetConfigNode` and
+  `KeyExists` match the top-level key exactly, so a case variant of a section the application
+  reads that way (`{"Server": …}` read with `GetKey("server", …)`) is flagged although it is
+  never read.
+
 ## Using Wrappers
 
 ### StrOrFile
