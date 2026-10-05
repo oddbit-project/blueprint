@@ -62,8 +62,8 @@ const (
 )
 
 // ObjectVersion identifies the object version a put or copy wrote.
-// VersionID is empty when the bucket is not versioned or versioning is suspended:
-// callers that pin versions must treat "" as "not pinned".
+// VersionID is empty when the bucket is not versioned (a versioning-suspended bucket
+// may report "" or "null"): callers that pin versions must treat either as "not pinned".
 // ETag is not a content MD5 for multipart uploads or SSE-KMS/SSE-C objects.
 // Size is -1 for copies (S3 does not report it).
 type ObjectVersion struct {
