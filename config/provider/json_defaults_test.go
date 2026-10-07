@@ -33,8 +33,8 @@ func getNoPanic(t *testing.T, data string, dest interface{}) error {
 
 func TestJsonProvider_Issue100_UnexportedNestedStructDoesNotPanic(t *testing.T) {
 	type cfg struct {
-		Name string `json:"name"`
-		priv issue100Defaults
+		Name string           `json:"name"`
+		priv issue100Defaults //nolint:unused // the unexported field under test
 	}
 	out := &cfg{}
 	if err := getNoPanic(t, `{"name":"x"}`, out); err != nil {
@@ -61,8 +61,8 @@ func TestJsonProvider_Issue100_UnexportedPointerDoesNotPanic(t *testing.T) {
 
 func TestJsonProvider_Issue100_GetKeyUnexportedNestedStructDoesNotPanic(t *testing.T) {
 	type section struct {
-		Name string `json:"name" default:"n"`
-		priv issue100Defaults
+		Name string           `json:"name" default:"n"`
+		priv issue100Defaults //nolint:unused // the unexported field under test
 	}
 	p, err := NewJsonProvider([]byte(`{"section":{}}`))
 	if err != nil {
@@ -182,7 +182,7 @@ func TestJsonProvider_Issue100_EmbeddedUnexportedTypeGetsDefaults(t *testing.T) 
 
 func TestJsonProvider_Issue100_DashNamedFieldGetsDefault(t *testing.T) {
 	type cfg struct {
-		Dash string `json:"-," default:"d"`
+		Dash string `json:"-," default:"d"` //nolint:staticcheck // a field named "-" is the case under test
 	}
 	out := &cfg{}
 	if err := getNoPanic(t, `{}`, out); err != nil {

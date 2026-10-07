@@ -118,7 +118,7 @@ func applyStructDefaults(v reflect.Value) error {
 		field := v.Type().Field(i)
 		// fields encoding/json skips are not configuration; an embedded struct of an
 		// unexported type is kept, since its exported fields are decoded and settable
-		if field.Tag.Get("json") == "-" || (!field.IsExported() && !(field.Anonymous && field.Type.Kind() == reflect.Struct)) {
+		if field.Tag.Get("json") == "-" || (!field.IsExported() && (!field.Anonymous || field.Type.Kind() != reflect.Struct)) {
 			continue
 		}
 		fieldValue := v.Field(i)
