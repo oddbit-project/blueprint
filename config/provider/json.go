@@ -108,7 +108,7 @@ func applyDefaults(dest interface{}) error {
 	return applyStructDefaults(v)
 }
 
-// applyStructDefaults applies defaults to the fields of v that encoding/json decodes
+// applyStructDefaults applies defaults to the exported fields of v, nested structs included
 func applyStructDefaults(v reflect.Value) error {
 	if v.Kind() != reflect.Struct {
 		return nil
@@ -116,8 +116,9 @@ func applyStructDefaults(v reflect.Value) error {
 
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
-		// fields encoding/json skips are not configuration; an embedded struct of an
-		// unexported type is kept, since its exported fields are decoded and settable
+		// json:"-" fields and unexported fields are not configuration; an embedded struct
+		// value of an unexported type is kept, since its exported fields are decoded and
+		// settable (an embedded pointer to one is not)
 		if field.Tag.Get("json") == "-" || (!field.IsExported() && (!field.Anonymous || field.Type.Kind() != reflect.Struct)) {
 			continue
 		}

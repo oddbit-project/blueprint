@@ -17,6 +17,13 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `config/provider`: `JsonProvider.Get` and `GetKey` no longer allocate a nested pointer section
+  that is absent from the JSON, unless a `default:` tag inside it sets a non-zero value. Code
+  that reads such a section without a nil check (it used to be allocated with zero values)
+  must check for nil, or give the section a default (#100).
+
 ### Added
 
 - `log.LogHostnameKey` (`"hostname"`), the field name `IncludeHostname` writes (#97).
@@ -30,13 +37,11 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   shows `hostname=...`; set `includeHostname: false` to keep the previous output. Code that
   adds its own `hostname` field should stop doing so, or disable the option, to avoid a
   duplicate key (#97).
-
 - `config/provider`: `JsonProvider.Get` and `GetKey` no longer panic on a config struct with an
-  unexported struct field, an unexported pointer field, or an embedded field of an unexported
-  type (the unexported pointer case since v0.8.7, the others in earlier versions too). Fields
-  tagged `json:"-"` are no longer given defaults or allocated, and an absent nested pointer
-  section is left nil unless a `default:` tag inside it sets a non-zero value. Code that relied
-  on such a section always being allocated must now check for nil (#100).
+  unexported field of any kind (struct, pointer or scalar with a `default:` tag) or an embedded
+  field of an unexported type, value or pointer (the pointer cases since v0.8.7, the others in
+  earlier versions too). Fields tagged `json:"-"` are no longer given defaults or allocated
+  (#100).
 
 ## [v0.13.0] - 2026-10-05
 

@@ -225,3 +225,35 @@ func TestJsonProvider_Issue100_AbsentSectionWithZeroDefaultsStaysNil(t *testing.
 		t.Error("section whose defaults are all zero values was allocated")
 	}
 }
+
+type issue100Embedded struct {
+	Retries int `json:"retries" default:"3"`
+}
+
+func TestJsonProvider_Issue100_EmbeddedUnexportedPointerSkipped(t *testing.T) {
+	type cfg struct {
+		Name string `json:"name"`
+		*issue100Embedded
+	}
+	out := &cfg{}
+	if err := getNoPanic(t, `{"name":"x"}`, out); err != nil {
+		t.Fatal("Get():", err)
+	}
+	if out.issue100Embedded != nil {
+		t.Error("embedded pointer to an unexported struct was allocated")
+	}
+}
+
+func TestJsonProvider_Issue100_UnexportedScalarSkipped(t *testing.T) {
+	type cfg struct {
+		Name string `json:"name"`
+		mode string `default:"m"` //nolint:unused // the unexported field under test
+	}
+	out := &cfg{}
+	if err := getNoPanic(t, `{"name":"x"}`, out); err != nil {
+		t.Fatal("Get():", err)
+	}
+	if out.mode != "" {
+		t.Errorf("unexported field got default %q", out.mode)
+	}
+}
