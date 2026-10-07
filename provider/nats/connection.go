@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -22,6 +23,19 @@ type connectParams struct {
 	PingInterval uint // seconds
 	MaxPingsOut  uint
 	Timeout      uint // milliseconds
+}
+
+// serverURLs splits a comma-separated server list, as nats.Connect does:
+// entries are trimmed of spaces, and empty entries dropped.
+func serverURLs(url string) []string {
+	result := make([]string, 0)
+	for _, u := range strings.Split(url, ",") {
+		u = strings.TrimSpace(u)
+		if len(u) > 0 {
+			result = append(result, u)
+		}
+	}
+	return result
 }
 
 // connect opens a NATS connection using the shared parameters. It transparently
@@ -60,7 +74,7 @@ func connect(p connectParams) (*nats.Conn, error) {
 	}
 
 	opts := nats.Options{
-		Url:            p.URL,
+		Servers:        serverURLs(p.URL),
 		AllowReconnect: true,
 		MaxReconnect:   DefaultConnectRetry,
 		ReconnectWait:  DefaultTimeout,

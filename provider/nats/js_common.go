@@ -46,7 +46,7 @@ type JSConnectionConfig struct {
 
 // Validate verifies the connection config.
 func (c JSConnectionConfig) Validate() error {
-	if len(c.URL) == 0 {
+	if len(serverURLs(c.URL)) == 0 {
 		return ErrMissingJSURL
 	}
 	if !slices.Contains(validAuthTypes, c.AuthType) {

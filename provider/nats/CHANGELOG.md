@@ -4,6 +4,22 @@ All notable changes to the Blueprint NATS provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- `url` accepts a comma-separated server list (e.g. a cluster seed list), split as
+  `nats.Connect` does, for `ProducerConfig`, `ConsumerConfig` and `JSConnectionConfig`.
+  Previously a list failed to connect with "too many colons in address". `Validate()` now
+  rejects a `url` with no non-empty entry (such as `" , "`) with the existing missing-URL
+  error. The servers are tried in random order (#99).
+
+### Changed
+
+- A comma in `url` now always separates servers. A URL whose credentials contain a comma
+  (`nats://user:p,ss@host`) connected before and now fails; percent-encode the comma as
+  `%2C` (#99).
+
 ## [v0.9.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.

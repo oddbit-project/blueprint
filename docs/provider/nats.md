@@ -27,7 +27,7 @@ type, `Password`/`Token` come from the embedded
 
 ```go
 type ProducerConfig struct {
-	URL      string // NATS server URL (e.g., "nats://localhost:4222")
+	URL      string // NATS server URL or comma-separated list (e.g., "nats://localhost:4222")
 	Subject  string // Default subject to publish to
 	AuthType string // Authentication type: "none", "basic", "token"
 	Username string // Username for basic auth
@@ -49,6 +49,22 @@ type ProducerConfig struct {
 }
 ```
 
+### Server lists
+
+`URL` accepts a comma-separated list of servers, e.g. the seed list of a cluster:
+`"nats://n1:4222,nats://n2:4222,nats://n3:4222"`. It is split on every comma, as
+`nats.Connect` does: spaces around entries are trimmed and empty entries dropped. This
+applies to the producer, consumer and JetStream configurations alike.
+
+- The servers are tried in random order (nats.go's default), not in the order listed, and
+  on disconnect the client reconnects to the others.
+- Every entry must be a valid URL of the same transport: one malformed entry, or a mix of
+  `ws://` and `nats://` entries, fails the whole connection.
+- Credentials can be given per entry (`nats://user:pass@n1:4222`). A comma inside a
+  username, password or token must be percent-encoded as `%2C`, or the entry is split at it.
+- A `URL` with no non-empty entry (such as `" , "`) fails `Validate()` with the config's
+  missing-URL error.
+
 ### Consumer Configuration
 
 As with `ProducerConfig`, the shape below is flattened for readability. In
@@ -61,7 +77,7 @@ you assign `cfg.ConsumerOptions = nats.ConsumerOptions{QueueGroup: "..."}`
 
 ```go
 type ConsumerConfig struct {
-	URL        string // NATS server URL (e.g., "nats://localhost:4222")
+	URL        string // NATS server URL or comma-separated list (e.g., "nats://localhost:4222")
 	Subject    string // Subject pattern to subscribe to
 	AuthType   string // Authentication type: "none", "basic", "token"
 	Username   string // Username for basic auth
@@ -316,7 +332,7 @@ with the same URL/auth/TLS fields used by the core types.
 
 ```go
 type JSConnectionConfig struct {
-    URL          string // NATS server URL
+    URL          string // NATS server URL or comma-separated list
     AuthType     string // "none" | "basic" | "token"
     Username     string // for basic auth
     // embedded secure.DefaultCredentialConfig: Password / Token
@@ -633,7 +649,7 @@ JetStream-specific error sentinels (all declared in `provider/nats/js_common.go`
 
 | Constant | Meaning |
 |---|---|
-| `ErrMissingJSURL` | `JSConnectionConfig.URL` was empty |
+| `ErrMissingJSURL` | `JSConnectionConfig.URL` was empty or held no non-empty entry |
 | `ErrMissingStreamName` | `JSConsumerConfig.StreamName` / `StreamConfig.Name` was empty when required |
 | `ErrJSNoConsumer` | Consumer handle was not initialized |
 | `ErrAlreadyConsuming` | `Consume()` called while a session is already active |

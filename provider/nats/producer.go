@@ -51,7 +51,7 @@ func (p ProducerOptions) ApplyOptions(opts *nats.Options) {
 }
 
 func (c ProducerConfig) Validate() error {
-	if len(c.URL) == 0 {
+	if len(serverURLs(c.URL)) == 0 {
 		return ErrMissingProducerURL
 	}
 	if len(c.Subject) == 0 {
