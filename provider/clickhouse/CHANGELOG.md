@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `WithCluster` on the migration manager now works. It emitted `ON CLUSTER <name>.(`, a
+  syntax error, so a manager with a cluster could not start. The cluster name is now quoted,
+  so names such as `c-1` work (#98).
+
+### Changed
+
+- **Breaking for existing `WithCluster` users:** before this release the option could not
+  create a log, but it opened an existing node-local `TinyLog` without complaint. Such a node
+  now fails in `NewMigrationManager` with `ErrMigrationTableNotReplicated` until its log is
+  converted (see below).
+- In cluster mode the migration log is a `ReplicatedMergeTree` shared by every node
+  (`/clickhouse/blueprint/<cluster>/<database>/db_migration`, replica `{shard}_{replica}`),
+  instead of a `TinyLog` per node that only the connected node saw. Cluster mode needs
+  Keeper, the `shard` and `replica` macros on every node, and the `SYSTEM SYNC REPLICA`
+  privilege: `List()` and `MigrationExists()` wait for replication before reading. It does
+  not work in a database using the `Replicated` engine. A node whose existing log is not the
+  shared one (node-local, pre-module, or replicated under another Keeper path) makes
+  `NewMigrationManager` fail with the new `ErrMigrationTableNotReplicated`; convert such logs
+  by hand before enabling `WithCluster` (docs/db/migrations.md, "Moving an existing log to
+  cluster mode") (#98).
+
 ## [v0.10.0] - 2026-09-28
 
 Requires Blueprint core v0.12.0.

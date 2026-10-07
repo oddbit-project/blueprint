@@ -345,6 +345,93 @@ RENAME TABLE db_migration_fixed TO db_migration;
 Check for the condition with
 `SELECT count() FROM db_migration WHERE module = ''` before and after.
 
+#### Cluster mode
+
+`clickhouse.WithCluster("<cluster>")` keeps the migration log in one replicated table shared by
+every node of the cluster, across shards, so any node can run the migrations, and a process
+that connects through a load balancer or fails over to another node sees the same log:
+
+```go
+manager, err := clickhouse.NewMigrationManager(ctx, client, clickhouse.WithCluster("c1"))
+```
+
+When no log exists on the connected node, the manager creates it on every node:
+
+```sql
+CREATE TABLE IF NOT EXISTS db_migration ON CLUSTER `c1` (...)
+ENGINE = ReplicatedMergeTree('/clickhouse/blueprint/c1/<database>/db_migration', '{shard}_{replica}')
+ORDER BY (module, name)
+```
+
+Requirements:
+
+- Self-managed ClickHouse; cluster mode has not been tested on ClickHouse Cloud.
+- ClickHouse Keeper (or ZooKeeper) and distributed DDL configured, as for any `ON CLUSTER` DDL.
+- The `shard` and `replica` macros defined on every node; `{shard}_{replica}` must be unique
+  across the cluster.
+- A database that does not use the `Replicated` database engine. It rejects the explicit
+  Keeper path unless `database_replicated_allow_replicated_engine_arguments` is enabled.
+- The connecting user may run `SYSTEM SYNC REPLICA`: `List()` and `MigrationExists()` first wait
+  until the connected node has every row registered through other nodes. If that cannot happen
+  (Keeper unavailable, or the only node holding a row is down), they wait or fail rather than
+  read a log that may be incomplete.
+- Every node reachable whenever a manager starts on a node that has no log yet, since the log
+  is then created `ON CLUSTER`. If a node is down or rejects the DDL, `NewMigrationManager`
+  returns the distributed DDL error after `distributed_ddl_task_timeout`, though the log may
+  already exist on the reachable nodes; the next start succeeds.
+- Read access to `system.replicas`, where the manager checks that the log is the shared one.
+- Plain cluster and database names: they are written into the Keeper path, so quotes, `/` or
+  `{...}` macros in them break it.
+- Every manager on the database, whatever its `WithModule`, using `WithCluster` with the same
+  cluster. A manager without it reads the shared log without waiting for replication, and one
+  that starts first on a fresh node creates a node-local log that the others then reject.
+
+The Keeper path is fixed per cluster name and database, so a node added to the cluster later
+joins the existing log the first time a manager connects through it. Two deployments that
+share a Keeper ensemble must not use the same cluster name and database. A node that is
+rebuilt with the same macros still has its old replica registered in Keeper; remove it with
+`SYSTEM DROP REPLICA '<shard>_<replica>' FROM ZKPATH '/clickhouse/blueprint/<cluster>/<database>/db_migration'`
+before the log is created on it again.
+
+The option affects only the migration log. Migrations that create tables on every node must
+say `ON CLUSTER` themselves. Do not run migrations through two nodes at the same moment.
+
+##### Moving an existing log to cluster mode
+
+A manager with `WithCluster` refuses to start on a node whose `db_migration` table is not the
+shared cluster log, returning `clickhouse.ErrMigrationTableNotReplicated` and leaving the table
+untouched. This covers a `TinyLog` created without the option (including a pre-module one) and a
+replicated table under another Keeper path. Convert each such node by hand before enabling the
+option, one node at a time. The steps run on that node only, so they work whether or not other
+nodes already have the shared log:
+
+```sql
+-- joins the shared log if another node already created it, and starts it otherwise
+CREATE TABLE db_migration_shared (created DateTime, module String, name String, sha2 String, contents String)
+ENGINE = ReplicatedMergeTree('/clickhouse/blueprint/<cluster>/<database>/db_migration', '{shard}_{replica}')
+ORDER BY (module, name);
+
+SYSTEM SYNC REPLICA db_migration_shared;
+
+INSERT INTO db_migration_shared (created, module, name, sha2, contents)
+SELECT created, if(module = '', 'base', module), name, sha2, contents FROM db_migration
+WHERE (if(module = '', 'base', module), name) NOT IN (SELECT module, name FROM db_migration_shared);
+
+EXCHANGE TABLES db_migration AND db_migration_shared;
+DROP TABLE db_migration_shared SYNC;
+```
+
+For a pre-module table (no `module` column), use `'base'` in place of both `if(...)`
+expressions. `db_migration` stays in place until the atomic `EXCHANGE`, so a manager starting
+meanwhile still sees the old log. Avoid running migrations on the node while it is being
+converted. If the `CREATE` fails with `REPLICA_ALREADY_EXISTS`, the node's replica is still
+registered in Keeper from an earlier attempt; remove it with `SYSTEM DROP REPLICA` as above.
+Rows other nodes have already recorded are not copied twice.
+
+Convert every node that has an old log before the first start in cluster mode. A node without
+a log simply joins the shared one, so rows recorded only in another node's unconverted log
+would not be seen, and those migrations would run again.
+
 ## Migration Workflow
 
 ### Basic Migration Execution
