@@ -138,7 +138,7 @@ cfg.Level = "debug"           // log level: debug, info, warn, error
 cfg.Format = "pretty"        // output format: pretty or json
 cfg.IncludeTimestamp = true   // include timestamp in logs
 cfg.IncludeCaller = true      // include caller information
-cfg.IncludeHostname = true    // include hostname
+cfg.IncludeHostname = true    // add a "hostname" field (os.Hostname())
 
 // Configure the global logger
 err := log.Configure(cfg)
@@ -151,6 +151,11 @@ if err != nil {
 to change while other goroutines are logging — call it once, during startup. Building a logger with `cfg.Logger()` or
 `cfg.ModuleLogger()` has no process-wide effect, and such a logger uses zerolog's default timestamp layout rather than
 `cfg.TimeFormat`.
+
+With `IncludeHostname`, every line carries a `hostname` field (`log.LogHostnameKey`) holding `os.Hostname()`. This
+applies to loggers built with `cfg.Logger()` or `cfg.ModuleLogger()`, and to `log.New()` / `log.NewWithComponent()`
+loggers created after `log.Configure()`; a logger created before `Configure()` does not carry it. Do not add a
+`hostname` field of your own while it is enabled, or JSON lines carry the key twice.
 
 With `IncludeCaller`, the `caller` field reports the code that called the logging method. `cfg.CallerSkipFrames`
 (default 3) controls that; raise it if you wrap the logger in helpers of your own, one per extra call level.

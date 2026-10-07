@@ -17,6 +17,20 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Added
+
+- `log.LogHostnameKey` (`"hostname"`), the field name `IncludeHostname` writes (#97).
+
+### Fixed
+
+- `log`: `IncludeHostname` now adds a `hostname` field to every line written by loggers built
+  from the configuration (`Config.Logger()`, `Config.ModuleLogger()`, and `log.New()` /
+  `log.NewWithComponent()` after `log.Configure()`). It was accepted but ignored. The default
+  is `true`, so on upgrade JSON lines gain the field and the default pretty console output
+  shows `hostname=...`; set `includeHostname: false` to keep the previous output. Code that
+  adds its own `hostname` field should stop doing so, or disable the option, to avoid a
+  duplicate key (#97).
+
 ## [v0.13.0] - 2026-10-05
 
 ### Module versions
