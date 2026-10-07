@@ -69,7 +69,7 @@ func (c ConsumerOptions) ApplyOptions(opts *nats.Options) {
 
 // Validate checks if the consumer configuration is valid
 func (c ConsumerConfig) Validate() error {
-	if len(c.URL) == 0 {
+	if len(serverURLs(c.URL)) == 0 {
 		return ErrMissingConsumerURL
 	}
 	if len(c.Subject) == 0 {
