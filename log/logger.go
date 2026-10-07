@@ -26,6 +26,7 @@ const (
 	LogTraceIDKey      = "trace_id"
 	LogModuleKey       = "module"
 	LogComponentKey    = "component"
+	LogHostnameKey     = "hostname"
 	LogTimestampFormat = time.RFC3339Nano
 	// LogCallerSkipFrames skips zerolog's own frames plus the Logger method, so the
 	// caller field reports the code that called it
@@ -237,6 +238,10 @@ func (c *Config) Logger() (*Logger, error) {
 	if c.IncludeCaller {
 		// per-logger skip count; the equivalent global is shared by every logger
 		logger = logger.With().CallerWithSkipFrameCount(c.CallerSkipFrames).Logger()
+	}
+
+	if c.IncludeHostname {
+		logger = logger.With().Str(LogHostnameKey, hostname).Logger()
 	}
 
 	return &Logger{
