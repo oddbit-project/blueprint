@@ -142,7 +142,7 @@ func (s *ClickhouseClusterMigrationTestSuite) TearDownSuite() {
 }
 
 func (s *ClickhouseClusterMigrationTestSuite) SetupTest() {
-	for _, tbl := range []string{MigrationTable, MigrationTable + "_new", "issue98_sample"} {
+	for _, tbl := range []string{MigrationTable, "issue98_sample"} {
 		require.NoError(s.T(), s.node1.Conn.Exec(s.ctx,
 			fmt.Sprintf("DROP TABLE IF EXISTS %s ON CLUSTER %s SYNC", tbl, testCluster)))
 	}
@@ -276,13 +276,35 @@ func (s *ClickhouseClusterMigrationTestSuite) TestIssue98_ReadsWaitForReplicatio
 
 	r := s.record("lag.sql", "SELECT 1")
 	require.NoError(s.T(), mgr1.RegisterMigration(s.ctx, r))
-	time.AfterFunc(2*time.Second, func() {
+	timer := time.AfterFunc(2*time.Second, func() {
 		_ = s.node2.Conn.Exec(s.ctx, "SYSTEM START FETCHES "+MigrationTable)
 	})
+	defer timer.Stop()
 
 	exists, err := mgr2.MigrationExists(s.ctx, r.Name, r.SHA2)
 	require.NoError(s.T(), err)
 	assert.True(s.T(), exists, "node 2 read the log before it had replicated")
+}
+
+func (s *ClickhouseClusterMigrationTestSuite) TestIssue98_ListWaitsForReplication() {
+	mgr1, err := NewMigrationManager(s.ctx, s.node1, WithCluster(testCluster))
+	require.NoError(s.T(), err)
+	mgr2, err := NewMigrationManager(s.ctx, s.node2, WithCluster(testCluster))
+	require.NoError(s.T(), err)
+
+	// hold node 2's copy behind node 1 until after List (the path Run uses) has started
+	require.NoError(s.T(), s.node2.Conn.Exec(s.ctx, "SYSTEM STOP FETCHES "+MigrationTable))
+	defer func() { _ = s.node2.Conn.Exec(s.ctx, "SYSTEM START FETCHES "+MigrationTable) }()
+
+	require.NoError(s.T(), mgr1.RegisterMigration(s.ctx, s.record("lag.sql", "SELECT 1")))
+	timer := time.AfterFunc(2*time.Second, func() {
+		_ = s.node2.Conn.Exec(s.ctx, "SYSTEM START FETCHES "+MigrationTable)
+	})
+	defer timer.Stop()
+
+	list, err := mgr2.List(s.ctx)
+	require.NoError(s.T(), err)
+	assert.Len(s.T(), list, 1, "node 2 listed the log before it had replicated")
 }
 
 func (s *ClickhouseClusterMigrationTestSuite) TestIssue98_ClusterNameNeedsQuoting() {

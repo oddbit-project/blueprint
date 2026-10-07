@@ -24,11 +24,11 @@ const (
 	sqlClusterEngine = "ReplicatedMergeTree('" + sqlClusterPath + "', '{shard}_{replica}') ORDER BY (module, name)"
 )
 
-// ErrMigrationTableNotReplicated is returned in cluster mode when the migration table on
+// ErrMigrationTableNotClusterLog is returned in cluster mode when the migration table on
 // the connected node is not the replicated cluster log (a node-local or pre-module table,
 // or one replicated under another Keeper path);
 // docs/db/migrations.md describes the manual conversion
-const ErrMigrationTableNotReplicated = utils.Error("clickhouse: migration table is not the replicated cluster log")
+const ErrMigrationTableNotClusterLog = utils.Error("clickhouse: migration table is not the replicated cluster log")
 
 type chMigrationManager struct {
 	client  *Client
@@ -125,7 +125,7 @@ func (b *chMigrationManager) checkClusterTable(ctx context.Context, currentDb st
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%w: %s.%s", ErrMigrationTableNotReplicated, currentDb, MigrationTable)
+		return fmt.Errorf("%w: %s.%s", ErrMigrationTableNotClusterLog, currentDb, MigrationTable)
 	}
 	return nil
 }

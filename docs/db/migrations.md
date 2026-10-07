@@ -349,7 +349,7 @@ Check for the condition with
 
 `clickhouse.WithCluster("<cluster>")` keeps the migration log in one replicated table shared by
 every node of the cluster, across shards, so any node can run the migrations, and a process
-that connects through a load balancer or fails over to another node sees the same log:
+that starts on another node, or moves to one, sees the same log:
 
 ```go
 manager, err := clickhouse.NewMigrationManager(ctx, client, clickhouse.WithCluster("c1"))
@@ -377,9 +377,14 @@ Requirements:
   read a log that may be incomplete.
 - Every node reachable whenever a manager starts on a node that has no log yet, since the log
   is then created `ON CLUSTER`. If a node is down or rejects the DDL, `NewMigrationManager`
-  returns the distributed DDL error after `distributed_ddl_task_timeout`, though the log may
-  already exist on the reachable nodes; the next start succeeds.
+  returns the distributed DDL error (for an unreachable node, after
+  `distributed_ddl_task_timeout`), though the log may already exist on the other nodes; the
+  next start succeeds.
 - Read access to `system.replicas`, where the manager checks that the log is the shared one.
+- A client whose connections all reach the same node: a single host, and no load balancer
+  that spreads connections across nodes. The replication wait and the read that follows use
+  separate pooled connections, so when they reach different nodes the read can still see a
+  node that is behind, and migrations run again.
 - Plain cluster and database names: they are written into the Keeper path, so quotes, `/` or
   `{...}` macros in them break it.
 - Every manager on the database, whatever its `WithModule`, using `WithCluster` with the same
@@ -395,15 +400,19 @@ before the log is created on it again.
 
 The option affects only the migration log. Migrations that create tables on every node must
 say `ON CLUSTER` themselves. Do not run migrations through two nodes at the same moment.
+`List()` returns records in no particular order in cluster mode (a `TinyLog` returns them in
+insertion order).
 
 ##### Moving an existing log to cluster mode
 
 A manager with `WithCluster` refuses to start on a node whose `db_migration` table is not the
-shared cluster log, returning `clickhouse.ErrMigrationTableNotReplicated` and leaving the table
+shared cluster log, returning `clickhouse.ErrMigrationTableNotClusterLog` and leaving the table
 untouched. This covers a `TinyLog` created without the option (including a pre-module one) and a
 replicated table under another Keeper path. Convert each such node by hand before enabling the
 option, one node at a time. The steps run on that node only, so they work whether or not other
-nodes already have the shared log:
+nodes already have the shared log. `EXCHANGE TABLES` needs an `Atomic` database (the default
+since ClickHouse 20.10); on an `Ordinary` database it fails, leaving `db_migration` untouched, and
+`DROP TABLE db_migration_shared SYNC` undoes the earlier steps:
 
 ```sql
 -- joins the shared log if another node already created it, and starts it otherwise

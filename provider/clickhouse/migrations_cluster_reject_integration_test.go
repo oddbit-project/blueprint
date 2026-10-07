@@ -15,7 +15,7 @@ func (s *ClickhouseClusterMigrationTestSuite) TestIssue98_RejectsNodeLocalLog() 
 	require.NoError(s.T(), local.RegisterMigration(s.ctx, r))
 
 	_, err = NewMigrationManager(s.ctx, s.node1, WithCluster(testCluster), WithModule("issue98"))
-	assert.ErrorIs(s.T(), err, ErrMigrationTableNotReplicated)
+	assert.ErrorIs(s.T(), err, ErrMigrationTableNotClusterLog)
 
 	// the node-local log is left as it was
 	assert.Equal(s.T(), "TinyLog", s.engine(s.node1))
@@ -34,7 +34,7 @@ func (s *ClickhouseClusterMigrationTestSuite) TestIssue98_RejectsLegacyLog() {
 		MigrationTable, r.Name, r.SHA2, r.Contents)))
 
 	_, err := NewMigrationManager(s.ctx, s.node1, WithCluster(testCluster))
-	assert.ErrorIs(s.T(), err, ErrMigrationTableNotReplicated)
+	assert.ErrorIs(s.T(), err, ErrMigrationTableNotClusterLog)
 
 	hasModule, err := ColumnExists(s.ctx, s.node1, "default", MigrationTable, "module")
 	require.NoError(s.T(), err)
@@ -49,5 +49,5 @@ func (s *ClickhouseClusterMigrationTestSuite) TestIssue98_RejectsLogReplicatedEl
 		MigrationTable, MigrationTable)))
 
 	_, err := NewMigrationManager(s.ctx, s.node1, WithCluster(testCluster))
-	assert.ErrorIs(s.T(), err, ErrMigrationTableNotReplicated)
+	assert.ErrorIs(s.T(), err, ErrMigrationTableNotClusterLog)
 }
