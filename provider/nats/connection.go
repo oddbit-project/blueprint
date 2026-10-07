@@ -25,8 +25,8 @@ type connectParams struct {
 	Timeout      uint // milliseconds
 }
 
-// serverURLs splits a comma-separated server list, as nats.Connect does:
-// entries are trimmed of spaces, and empty entries dropped.
+// serverURLs splits a comma-separated server list: entries are trimmed of spaces,
+// and empty entries dropped.
 func serverURLs(url string) []string {
 	result := make([]string, 0)
 	for _, u := range strings.Split(url, ",") {

@@ -52,16 +52,19 @@ type ProducerConfig struct {
 ### Server lists
 
 `URL` accepts a comma-separated list of servers, e.g. the seed list of a cluster:
-`"nats://n1:4222,nats://n2:4222,nats://n3:4222"`. It is split on every comma, as
-`nats.Connect` does: spaces around entries are trimmed and empty entries dropped. This
-applies to the producer, consumer and JetStream configurations alike.
+`"nats://n1:4222,nats://n2:4222,nats://n3:4222"`. It is split on every comma: spaces around
+entries are trimmed and empty entries dropped. This applies to the producer, consumer and
+JetStream configurations alike.
 
 - The servers are tried in random order (nats.go's default), not in the order listed, and
   on disconnect the client reconnects to the others.
 - Every entry must be a valid URL of the same transport: one malformed entry, or a mix of
   `ws://` and `nats://` entries, fails the whole connection.
-- Credentials can be given per entry (`nats://user:pass@n1:4222`). A comma inside a
-  username, password or token must be percent-encoded as `%2C`, or the entry is split at it.
+- One `tls://` entry makes TLS required for every entry in the list (nats.go applies it to
+  the whole pool), so a `nats://` server without TLS then fails to connect.
+- Credentials can be given per entry (`nats://user:pass@n1:4222`). A comma inside
+  credentials embedded in `URL` must be percent-encoded as `%2C`, or the entry is split at
+  it. The `Username`, `Password` and `Token` fields are not split and need no encoding.
 - A `URL` with no non-empty entry (such as `" , "`) fails `Validate()` with the config's
   missing-URL error.
 
