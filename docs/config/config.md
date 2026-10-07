@@ -95,6 +95,12 @@ func main() {
 
 Invalid `default:` tags now return `config.ErrInvalidDefault` instead of being ignored silently. Treat malformed defaults as configuration errors and fail fast during startup.
 
+Defaults apply to exported fields, nested structs included. Unexported fields and fields tagged `json:"-"` are
+left alone, except that the exported fields of an embedded struct value (not an embedded pointer) are covered. A nil
+pointer to a nested struct (a section absent from the JSON) stays nil unless one of its `default:` tags
+sets a non-zero value; it is then allocated with those defaults. A section whose defaults are all zero values
+(`default:"0"`, `default:"false"`, `default:""`) stays nil.
+
 ### Multiple Data Sources
 
 ```golang

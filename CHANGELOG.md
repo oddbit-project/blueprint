@@ -31,6 +31,13 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   adds its own `hostname` field should stop doing so, or disable the option, to avoid a
   duplicate key (#97).
 
+- `config/provider`: `JsonProvider.Get` and `GetKey` no longer panic on a config struct with an
+  unexported struct field, an unexported pointer field, or an embedded field of an unexported
+  type (the unexported pointer case since v0.8.7, the others in earlier versions too). Fields
+  tagged `json:"-"` are no longer given defaults or allocated, and an absent nested pointer
+  section is left nil unless a `default:` tag inside it sets a non-zero value. Code that relied
+  on such a section always being allocated must now check for nil (#100).
+
 ## [v0.13.0] - 2026-10-05
 
 ### Module versions
