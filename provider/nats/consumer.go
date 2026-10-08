@@ -45,13 +45,30 @@ type Message struct {
 type ConsumerFunc func(ctx context.Context, msg Message) error
 
 type Consumer struct {
-	URL      string
-	Subject  string
-	Queue    string
-	Conn     *nats.Conn
-	Logger   *log.Logger
-	subs     []*nats.Subscription
-	subsLock sync.Mutex
+	URL       string
+	Subject   string
+	Queue     string
+	Conn      *nats.Conn
+	Logger    *log.Logger
+	subs      []*nats.Subscription // SubscribeSync subscriptions
+	handlers  map[*nats.Subscription]*handlerSub
+	handlerWg sync.WaitGroup
+	closing   bool          // Disconnect has started; guarded by subsLock
+	stopped   chan struct{} // closed when the first Disconnect returns; guarded by subsLock
+	subsLock  sync.Mutex
+}
+
+// handlerSub is a Subscribe subscription and the channel its handler goroutine reads
+type handlerSub struct {
+	sub       *nats.Subscription
+	ch        chan *nats.Msg
+	closeOnce sync.Once
+}
+
+// closeChan closes the handler channel; the caller must ensure nats.go can no longer
+// deliver to it (the subscription was removed), or the read loop panics
+func (h *handlerSub) closeChan() {
+	h.closeOnce.Do(func() { close(h.ch) })
 }
 
 // ApplyOptions sets additional connection parameters
@@ -114,6 +131,7 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 		PingInterval: cfg.PingInterval,
 		MaxPingsOut:  cfg.MaxPingsOut,
 		Timeout:      cfg.Timeout,
+		DrainTimeout: cfg.DrainTimeout,
 	})
 	if err != nil {
 		logger.Error(err, "Failed to connect to NATS", log.KV{
@@ -124,12 +142,13 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 	}
 
 	return &Consumer{
-		URL:     cfg.URL,
-		Subject: cfg.Subject,
-		Queue:   cfg.QueueGroup,
-		Conn:    conn,
-		Logger:  logger,
-		subs:    make([]*nats.Subscription, 0),
+		URL:      cfg.URL,
+		Subject:  cfg.Subject,
+		Queue:    cfg.QueueGroup,
+		Conn:     conn,
+		Logger:   logger,
+		subs:     make([]*nats.Subscription, 0),
+		handlers: make(map[*nats.Subscription]*handlerSub),
 	}, nil
 }
 
@@ -142,19 +161,40 @@ func (c *Consumer) IsConnected() bool {
 	return c.Conn.IsConnected()
 }
 
-// Disconnect disconnects from NATS server
+// Disconnect stops the subscriptions, lets the Subscribe handlers finish the messages
+// already delivered while the connection is still open, then drains and closes the
+// connection. Handlers get up to drainTimeout; closing the connection can take up to
+// 5 seconds more. Once Disconnect has started, Subscribe and SubscribeSync return
+// ErrConsumerClosed
 func (c *Consumer) Disconnect() {
-	// Check if consumer is nil or already disconnected
-	if c == nil || c.Conn == nil {
+	if c == nil {
 		return
 	}
 
-	// Check if already draining
-	if c.Conn.IsDraining() {
+	c.subsLock.Lock()
+	conn := c.Conn
+	if conn == nil {
+		c.subsLock.Unlock()
 		return
 	}
+	if c.closing {
+		// another Disconnect is running; return when it has finished
+		stopped := c.stopped
+		c.subsLock.Unlock()
+		<-stopped
+		return
+	}
+	c.closing = true
+	c.stopped = make(chan struct{})
+	defer close(c.stopped)
+	syncSubs := c.subs
+	c.subs = make([]*nats.Subscription, 0)
+	handlers := make([]*handlerSub, 0, len(c.handlers))
+	for _, h := range c.handlers {
+		handlers = append(handlers, h)
+	}
+	c.subsLock.Unlock()
 
-	// Log disconnect if logger is available
 	if c.Logger != nil {
 		c.Logger.Info("Closing consumer connection", log.KV{
 			"subject": c.Subject,
@@ -162,26 +202,65 @@ func (c *Consumer) Disconnect() {
 		})
 	}
 
-	// Unsubscribe from all subscriptions
-	c.subsLock.Lock()
-	for _, sub := range c.subs {
+	deadline := time.Now().Add(conn.Opts.DrainTimeout)
+
+	// messages left on a SubscribeSync subscription cannot be read through the
+	// provider once Disconnect has started
+	for _, sub := range syncSubs {
 		if err := sub.Unsubscribe(); err != nil && c.Logger != nil {
 			c.Logger.Error(err, "Error unsubscribing from NATS subject", log.KV{
 				"subject": sub.Subject,
 			})
 		}
 	}
-	c.subs = make([]*nats.Subscription, 0)
-	c.subsLock.Unlock()
 
-	// Use Drain for graceful shutdown
-	if err := c.Conn.Drain(); err != nil && c.Logger != nil {
-		c.Logger.Error(err, "Error during NATS connection drain", nil)
+	// the server stops sending; messages in flight are still delivered
+	for _, h := range handlers {
+		if err := h.sub.Drain(); err != nil && c.Logger != nil {
+			c.Logger.Error(err, "Error draining NATS subscription", log.KV{
+				"subject": h.sub.Subject,
+			})
+		}
 	}
 
-	// Close and clean up
-	c.Conn.Close()
+	// nats.go removes a drained channel subscription after one flush round trip;
+	// only then can nothing more be written to its channel
+	for _, h := range handlers {
+		for h.sub.IsValid() && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	// the handlers work through their buffer while the connection is open, so
+	// replies and handler publishes still go out
+	for _, h := range handlers {
+		if !h.sub.IsValid() {
+			h.closeChan()
+		}
+	}
+	done := make(chan struct{})
+	go func() {
+		c.handlerWg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Until(deadline)):
+	}
+
+	if err := conn.Drain(); err != nil && c.Logger != nil {
+		c.Logger.Error(err, "Error during NATS connection drain", nil)
+	}
+	waitClosed(conn, drainFlushTimeout)
+
+	// the closed connection no longer delivers to any subscription
+	for _, h := range handlers {
+		h.closeChan()
+	}
+
+	c.subsLock.Lock()
 	c.Conn = nil
+	c.subsLock.Unlock()
 }
 
 // Convert nats.Msg to Message
@@ -197,9 +276,12 @@ func convertMessage(msg *nats.Msg) Message {
 
 // Subscribe subscribes to the subject and processes messages with the handler function
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
-	if !c.IsConnected() {
+	c.subsLock.Lock()
+	defer c.subsLock.Unlock()
+	if c.closing || !c.IsConnected() {
 		return ErrConsumerClosed
 	}
+	conn := c.Conn
 
 	// Create a message channel
 	msgChan := make(chan *nats.Msg, 100)
@@ -210,10 +292,10 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 	if c.Queue != "" {
 		// Queue subscription
-		sub, err = c.Conn.QueueSubscribeSyncWithChan(c.Subject, c.Queue, msgChan)
+		sub, err = conn.QueueSubscribeSyncWithChan(c.Subject, c.Queue, msgChan)
 	} else {
 		// Regular subscription
-		sub, err = c.Conn.ChanSubscribe(c.Subject, msgChan)
+		sub, err = conn.ChanSubscribe(c.Subject, msgChan)
 	}
 
 	if err != nil {
@@ -225,10 +307,12 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 		return err
 	}
 
-	// Add subscription to the list
-	c.subsLock.Lock()
-	c.subs = append(c.subs, sub)
-	c.subsLock.Unlock()
+	h := &handlerSub{sub: sub, ch: msgChan}
+	if c.handlers == nil {
+		c.handlers = make(map[*nats.Subscription]*handlerSub)
+	}
+	c.handlers[sub] = h
+	c.handlerWg.Add(1)
 
 	// Log subscription
 	c.Logger.Info("Subscribed to NATS subject", log.KV{
@@ -238,24 +322,26 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 	// Process messages in a goroutine
 	go func() {
+		defer c.handlerWg.Done()
 		defer func() {
-			// Unsubscribe and remove from list when done
-			if err := sub.Unsubscribe(); err != nil {
-				c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
-					"subject": c.Subject,
-				})
+			// the channel is closed here only once nats.go can no longer deliver to
+			// it; otherwise Disconnect closes it
+			if !sub.IsValid() {
+				h.closeChan()
+			} else if err := sub.Unsubscribe(); err != nil {
+				// ErrConnectionDraining is expected while Disconnect drains
+				if !errors.Is(err, nats.ErrConnectionDraining) {
+					c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
+						"subject": c.Subject,
+					})
+				}
+			} else {
+				h.closeChan()
 			}
 
 			c.subsLock.Lock()
-			for i, s := range c.subs {
-				if s == sub {
-					c.subs = append(c.subs[:i], c.subs[i+1:]...)
-					break
-				}
-			}
+			delete(c.handlers, sub)
 			c.subsLock.Unlock()
-
-			close(msgChan)
 		}()
 
 		for {
@@ -278,7 +364,7 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 				// If there's a reply subject, send an empty acknowledgment (optional)
 				if msg.Reply != "" {
-					if err := c.Conn.Publish(msg.Reply, nil); err != nil {
+					if err := conn.Publish(msg.Reply, nil); err != nil {
 						c.Logger.Error(err, "Failed to acknowledge message", log.KV{
 							"reply": msg.Reply,
 						})
@@ -299,7 +385,9 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 // SubscribeSync subscribes synchronously and returns a subscription that can be used to fetch messages
 func (c *Consumer) SubscribeSync() (*nats.Subscription, error) {
-	if !c.IsConnected() {
+	c.subsLock.Lock()
+	defer c.subsLock.Unlock()
+	if c.closing || !c.IsConnected() {
 		return nil, ErrConsumerClosed
 	}
 
@@ -323,9 +411,7 @@ func (c *Consumer) SubscribeSync() (*nats.Subscription, error) {
 	}
 
 	// Add subscription to the list
-	c.subsLock.Lock()
 	c.subs = append(c.subs, sub)
-	c.subsLock.Unlock()
 
 	return sub, nil
 }

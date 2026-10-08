@@ -38,7 +38,7 @@ type ProducerConfig struct {
 	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
 	MaxPingsOut  uint // MaxPingsOut value, defaults to 2
 	Timeout      uint // Connection timeout in milliseconds, defaults to 2000
-	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
+	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000; Disconnect waits up to this plus 5 seconds for the drain to finish
 
 	// TLS Configuration (embedded tls.ClientConfig)
 	TLSEnable             bool   // Enable TLS; the server must then offer TLS
@@ -92,7 +92,7 @@ type ConsumerConfig struct {
 	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
 	MaxPingsOut  uint // MaxPingsOut value, defaults to 2
 	Timeout      uint // Connection timeout in milliseconds, defaults to 2000
-	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
+	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000; how long Disconnect lets handlers finish (see Disconnecting)
 
 	// TLS Configuration (embedded tls.ClientConfig)
 	TLSEnable             bool   // Enable TLS; the server must then offer TLS
@@ -201,16 +201,17 @@ func main() {
     // Create logger
 	logger := log.New("nats-consumer")
 
+    // Create context with cancellation, before the consumer: deferred calls run in
+    // reverse, so Disconnect then drains while the handlers' context is still live
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
     // Create consumer
 	consumer, err := nats.NewConsumer(config, logger)
 	if err != nil {
 		logger.Fatal(err, "Failed to create NATS consumer", nil)
 	}
 	defer consumer.Disconnect()
-    
-    // Create context with cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
     
     // Define message handler
 	handler := func(ctx context.Context, msg nats.Message) error {
@@ -232,6 +233,39 @@ func main() {
 	time.Sleep(time.Minute)
 }
 ```
+
+### Disconnecting
+
+`Disconnect` shuts the consumer down in this order:
+
+1. From now on `Subscribe` and `SubscribeSync` return `ErrConsumerClosed`, and a
+   second `Disconnect` call waits for this one to finish.
+2. `SubscribeSync` subscriptions are unsubscribed; messages not yet read with
+   `NextMsg` are dropped.
+3. Each `Subscribe` subscription is drained: the server stops sending, and
+   messages already in flight are still delivered to the handler, up to its
+   100-message buffer (nats.go drops the rest as a slow consumer).
+4. The handlers work through the messages already delivered to them. The
+   connection is still open, so reply acknowledgements and anything a handler
+   publishes still go out.
+5. The connection is drained, which flushes pending publishes, and closed.
+
+Steps 3 and 4 share one deadline of `drainTimeout`; closing the connection can
+take up to 5 seconds more, so `Disconnect` blocks for at most `drainTimeout`
+plus 5 seconds. If the deadline passes first, the connection is closed anyway:
+handlers keep receiving the messages left in their buffer after `Disconnect`
+returns, and their replies and publishes fail.
+
+`Disconnect` does not cancel the context passed to `Subscribe`, and a handler stops as soon
+as that context is cancelled, leaving its buffered messages unhandled. For a graceful
+shutdown, keep that context live until `Disconnect` returns: call `Disconnect` first (or
+register `defer consumer.Disconnect()` after `defer cancel()`), and do not pass the context
+your signal handling cancels. Do not call `Disconnect` from inside a handler: it waits for
+every handler to finish, including the one calling it, so it sits out the whole
+`drainTimeout`, and that handler's later replies run on a closed connection.
+
+`Producer.Disconnect` drains the connection, flushing pending publishes, and
+waits up to `drainTimeout` plus 5 seconds for it to close.
 
 ### Synchronous Message Consumption
 

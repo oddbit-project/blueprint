@@ -95,6 +95,7 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		PingInterval: cfg.PingInterval,
 		MaxPingsOut:  cfg.MaxPingsOut,
 		Timeout:      cfg.Timeout,
+		DrainTimeout: cfg.DrainTimeout,
 	})
 	if err != nil {
 		logger.Error(err, "Failed to connect to NATS", log.KV{
@@ -112,7 +113,8 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 	}, nil
 }
 
-// Disconnect closes the connection to NATS
+// Disconnect drains the connection to NATS and closes it; it can block up to
+// drainTimeout plus 5 seconds
 func (p *Producer) Disconnect() {
 	// Check if producer is nil or already disconnected
 	if p == nil || p.Conn == nil {
@@ -137,7 +139,7 @@ func (p *Producer) Disconnect() {
 	}
 
 	// Close and clean up
-	p.Conn.Close()
+	waitClosed(p.Conn, p.Conn.Opts.DrainTimeout+drainFlushTimeout)
 	p.Conn = nil
 }
 
