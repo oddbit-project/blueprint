@@ -394,6 +394,9 @@ credentials from an on-path attacker only while certificates are verified;
 `TLSInsecureSkipVerify` gives that protection up. TLS settings
 (`TLSCA`, `TLSCert`, `TLSKey`, `TLSInsecureSkipVerify` or a key password) without
 `TLSEnable` make `Validate()` fail with `ErrTLSNotEnabled`, instead of being ignored.
+With `TLSEnable`, `TLSCert` and `TLSKey` must be set together, and a key password requires both:
+otherwise `Validate()` fails with `tls.ErrTLSIncompleteKeyPair`, instead of connecting without the
+client certificate (#115).
 
 ## JetStream
 
@@ -487,7 +490,8 @@ by the constructors before any network round-trips. Invalid policy strings
 return `ErrInvalidAckPolicy` / `ErrInvalidDeliverPolicy` / `ErrInvalidRetention`
 / `ErrInvalidStorage`; missing required fields return `ErrMissingJSURL`,
 `ErrMissingStreamName`, or `ErrMissingProducerTopic`; TLS settings without
-`TLSEnable` return `ErrTLSNotEnabled`.
+`TLSEnable` return `ErrTLSNotEnabled`, and an incomplete client certificate/key
+pair with it returns `tls.ErrTLSIncompleteKeyPair`.
 
 ### Producer usage
 

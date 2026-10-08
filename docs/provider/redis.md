@@ -81,6 +81,9 @@ The TLS settings are a `tls.ClientConfig` embedded in the Redis `Config`; they a
 connection only when `TLSEnable` is `true`, and setting any of them (`TLSCA`, `TLSCert`, `TLSKey`,
 `TLSInsecureSkipVerify` or a key password) without it makes `Validate()` fail with
 `tls.ErrTLSNotEnabled`, instead of connecting without them in plaintext (#116).
+With `TLSEnable`, `TLSCert` and `TLSKey` must be set together, and a key password requires both:
+otherwise `Validate()` fails with `tls.ErrTLSIncompleteKeyPair`, instead of connecting without the
+client certificate (#115).
 
 ```go
 config := redis.NewConfig()

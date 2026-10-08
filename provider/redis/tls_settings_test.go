@@ -56,3 +56,22 @@ func TestIssue116_TLSSettingsAcceptedWithEnableOrNone(t *testing.T) {
 		}
 	}
 }
+
+// tlsIncompleteKeyPairs returns one ClientConfig per incomplete client certificate/key pair, each with TLSEnable
+func tlsIncompleteKeyPairs() map[string]tls.ClientConfig {
+	return map[string]tls.ClientConfig{
+		"cert without key":          {TLSEnable: true, TLSCert: "/c.pem"},
+		"key without cert":          {TLSEnable: true, TLSKey: "/k.pem"},
+		"key password without pair": {TLSEnable: true, TlsKeyCredential: tls.TlsKeyCredential{Password: "<dummy>"}},
+	}
+}
+
+func TestIssue115_TLSIncompleteKeyPairRejected(t *testing.T) {
+	for name, c := range tlsIncompleteKeyPairs() {
+		for kind, validate := range validators(c) {
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				assert.ErrorIs(t, validate(), tls.ErrTLSIncompleteKeyPair)
+			})
+		}
+	}
+}

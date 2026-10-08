@@ -25,6 +25,19 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   parse, an invalid value, or the key of a section itself) does not count. Code that reads such a section
   without a nil check (it used to be allocated with zero values) must check for nil, or give the section a
   default (#107).
+- `provider/tls`: with `tlsEnable`, `ClientConfig.ValidateEnabled()` now rejects a `tlsCert` without
+  `tlsKey`, a `tlsKey` without `tlsCert`, and a key password (`tlsKeyPassword`,
+  `tlsKeyPasswordEnvVar` or `tlsKeyPasswordFile`) without both, with the new
+  `ErrTLSIncompleteKeyPair`. `TLSConfig()` ignores them, so the connection went without a client
+  certificate. The clickhouse, etcd, franz, kafka, mqtt, nats, redis, s3 and smtp providers call
+  `ValidateEnabled()` from their config validation, so they reject such a config when built with
+  this core release, whether the provider or the application requires it: set both `tlsCert` and
+  `tlsKey`, or remove the client certificate settings (#115).
+
+### Added
+
+- `provider/tls`: `ErrTLSIncompleteKeyPair`, returned by `ClientConfig.ValidateEnabled()` for an
+  incomplete client certificate/key pair (#115).
 
 ### Fixed
 
