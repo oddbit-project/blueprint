@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   network path, received CONNECT, username and password or token included, in plaintext, on
   the first connect and on every reconnect. With `tlsInsecureSkipVerify` an on-path attacker
   can still present any certificate (#104).
+- TLS settings without `tlsEnable` are now rejected instead of silently leaving the
+  connection in plaintext; see Breaking changes (#110).
 
 ### Breaking changes
 
@@ -24,14 +26,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     certificate the client cannot verify (private CA without `tlsCa`, connecting by IP to a
     certificate with only DNS names) fails with an `x509` error. Set `tlsCa` or connect by
     the certificate's name.
-  - Against a server that requests a client certificate during the TLS handshake, a
-    client without one fails with `tls: certificate required`. Set `tlsCert` and
-    `tlsKey` (#110).
+  - Against a server that offers TLS without requiring it but requires a client
+    certificate, a client without one fails with `tls: certificate required`. Set
+    `tlsCert` and `tlsKey` (#110).
 - TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password)
   without `tlsEnable` now fail `Validate()` with the new `ErrTLSNotEnabled`, for the
-  producer, consumer and JetStream configs. They used to be ignored silently, leaving the
-  connection, and its credentials, in plaintext. Set `tlsEnable`, or remove the settings
-  (#110).
+  producer, consumer and JetStream configs. They used to be ignored silently: the
+  connection, and its credentials, stayed in plaintext unless a `tls://` URL or the server
+  forced TLS, and even then the CA, client certificate and skip-verify settings were not
+  applied. Set `tlsEnable`, or remove the settings (#110).
 
 ### Added
 

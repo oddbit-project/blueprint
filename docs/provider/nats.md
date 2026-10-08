@@ -400,7 +400,10 @@ type JSConnectionConfig struct {
     Username     string // for basic auth
     // embedded secure.DefaultCredentialConfig: Password (the token for AuthType "token")
     ClientName   string // defaults to "natsJSProducer" / "natsJSConsumer"
-    // embedded tls.ClientConfig: TLSEnable, TLSCert, TLSKey, TLSCA, etc.
+    // embedded tls.ClientConfig: TLSEnable, TLSCert, TLSKey, TLSCA, TLSInsecureSkipVerify,
+    // and for an encrypted client key one of ClientConfig.TlsKeyCredential.Password,
+    // .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,
+    // tlsKeyPasswordFile)
     PingInterval uint   // seconds
     MaxPingsOut  uint
     Timeout      uint   // milliseconds
@@ -465,7 +468,8 @@ Both config types expose a `Validate()` method that is called automatically
 by the constructors before any network round-trips. Invalid policy strings
 return `ErrInvalidAckPolicy` / `ErrInvalidDeliverPolicy` / `ErrInvalidRetention`
 / `ErrInvalidStorage`; missing required fields return `ErrMissingJSURL`,
-`ErrMissingStreamName`, or `ErrMissingProducerTopic`.
+`ErrMissingStreamName`, or `ErrMissingProducerTopic`; TLS settings without
+`TLSEnable` return `ErrTLSNotEnabled`.
 
 ### Producer usage
 

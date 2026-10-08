@@ -18,14 +18,19 @@ func validators(tls tlsProvider.ClientConfig) map[string]func() error {
 
 func TestIssue110_TLSSettingsWithoutEnableRejected(t *testing.T) {
 	cases := map[string]tlsProvider.ClientConfig{
-		"ca":           {TLSCA: "/ca.pem"},
-		"cert and key": {TLSCert: "/c.pem", TLSKey: "/k.pem"},
-		"skip verify":  {TLSInsecureSkipVerify: true},
-		"key password": {TlsKeyCredential: tlsProvider.TlsKeyCredential{Password: "<dummy>"}},
+		"ca":                   {TLSCA: "/ca.pem"},
+		"cert":                 {TLSCert: "/c.pem"},
+		"key":                  {TLSKey: "/k.pem"},
+		"skip verify":          {TLSInsecureSkipVerify: true},
+		"key password":         {TlsKeyCredential: tlsProvider.TlsKeyCredential{Password: "<dummy>"}},
+		"key password env var": {TlsKeyCredential: tlsProvider.TlsKeyCredential{PasswordEnvVar: "KEY_PASSWORD"}},
+		"key password file":    {TlsKeyCredential: tlsProvider.TlsKeyCredential{PasswordFile: "/key-password"}},
 	}
 	for name, tls := range cases {
 		for kind, validate := range validators(tls) {
-			assert.ErrorIs(t, validate(), ErrTLSNotEnabled, "%s: %s", kind, name)
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				assert.ErrorIs(t, validate(), ErrTLSNotEnabled)
+			})
 		}
 	}
 }
@@ -36,7 +41,9 @@ func TestIssue110_TLSSettingsAcceptedWithEnableOrNone(t *testing.T) {
 		"no tls settings": {},
 	} {
 		for kind, validate := range validators(tls) {
-			assert.NoError(t, validate(), "%s: %s", kind, name)
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				assert.NoError(t, validate())
+			})
 		}
 	}
 }

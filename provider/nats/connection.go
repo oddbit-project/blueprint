@@ -44,7 +44,8 @@ func serverURLs(url string) []string {
 }
 
 // validateTLS rejects TLS settings given without tlsEnable: TLSConfig() ignores them, so
-// the connection would silently stay in plaintext
+// the connection stays in plaintext unless the URL scheme or the server forces TLS, and
+// even then the CA, client certificate and skip-verify settings are not applied
 func validateTLS(c tlsProvider.ClientConfig) error {
 	key := c.TlsKeyCredential
 	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||

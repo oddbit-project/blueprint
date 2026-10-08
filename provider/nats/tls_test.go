@@ -34,8 +34,9 @@ const (
 
 // fakeServerResult is what the fake server saw from the client
 type fakeServerResult struct {
-	plainConnect bool // a CONNECT line arrived before any TLS handshake
-	tlsConnect   bool // a CONNECT line arrived over TLS
+	plainConnect bool      // a CONNECT line arrived before any TLS handshake
+	tlsConnect   bool      // a CONNECT line arrived over TLS
+	closedAt     time.Time // when the server closed the connection
 }
 
 // selfSignedCert returns the server certificate and the path of a PEM file holding it,
@@ -78,7 +79,10 @@ func fakeServer(t *testing.T, mode fakeTLSMode) (string, string, <-chan fakeServ
 		if err != nil {
 			return
 		}
-		defer func() { _ = c.Close() }()
+		defer func() {
+			res.closedAt = time.Now()
+			_ = c.Close()
+		}()
 		_ = c.SetDeadline(time.Now().Add(5 * time.Second))
 
 		info := `{"server_id":"x","version":"2.10.0","proto":1,"max_payload":1048576,"auth_required":true`
