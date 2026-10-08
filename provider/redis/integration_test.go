@@ -232,7 +232,10 @@ func TestRedisTLSIntegration(t *testing.T) {
 			cfg.Address = address
 			cfg.TimeoutSeconds = 5
 			cfg.TLSEnable = tt.tlsEnable
-			cfg.TLSCA = caPath
+			// TLS settings without tlsEnable are rejected by Validate (#116)
+			if tt.tlsEnable {
+				cfg.TLSCA = caPath
+			}
 
 			client, err := NewClient(cfg)
 			require.NoError(t, err)

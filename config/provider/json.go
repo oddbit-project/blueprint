@@ -105,12 +105,23 @@ func applyDefaults(dest interface{}) error {
 	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
+	return applyStructDefaults(v)
+}
+
+// applyStructDefaults applies defaults to the exported fields of v, nested structs included
+func applyStructDefaults(v reflect.Value) error {
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
 
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
+		// json:"-" fields and unexported fields are not configuration; an embedded struct
+		// value of an unexported type is kept, since its exported fields are decoded and
+		// settable (an embedded pointer to one is not)
+		if field.Tag.Get("json") == "-" || (!field.IsExported() && (!field.Anonymous || field.Type.Kind() != reflect.Struct)) {
+			continue
+		}
 		fieldValue := v.Field(i)
 
 		// Check if field has a default value and is zero
@@ -122,17 +133,24 @@ func applyDefaults(dest interface{}) error {
 
 		// Recursively apply defaults to nested structs
 		if fieldValue.Kind() == reflect.Struct {
-			if fieldValue.CanAddr() {
-				if err := applyDefaults(fieldValue.Addr().Interface()); err != nil {
-					return err
-				}
+			if err := applyStructDefaults(fieldValue); err != nil {
+				return err
 			}
 		} else if fieldValue.Kind() == reflect.Pointer && fieldValue.Type().Elem().Kind() == reflect.Struct {
-			if fieldValue.IsNil() {
-				fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+			if !fieldValue.IsNil() {
+				if err := applyStructDefaults(fieldValue.Elem()); err != nil {
+					return err
+				}
+				continue
 			}
-			if err := applyDefaults(fieldValue.Interface()); err != nil {
+			// an absent section stays nil, so callers can tell it apart, unless a
+			// default inside it sets a non-zero value
+			section := reflect.New(fieldValue.Type().Elem())
+			if err := applyStructDefaults(section.Elem()); err != nil {
 				return err
+			}
+			if !section.Elem().IsZero() {
+				fieldValue.Set(section)
 			}
 		}
 	}

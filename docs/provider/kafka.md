@@ -108,6 +108,10 @@ func main() {
 }
 ```
 
+TLS settings (`TLSCA`, `TLSCert`, `TLSKey`, `TLSInsecureSkipVerify` or a key password) require
+`TLSEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`, instead of connecting
+without them in plaintext (#116).
+
 ## Using the Kafka Consumer
 
 ```go
@@ -362,7 +366,8 @@ err = admin.DeleteTopic("old-topic")
 
 ## Security Best Practices
 
-1. Always enable TLS in production environments
+1. Always enable TLS in production environments; TLS settings without `TLSEnable` are rejected
+   (see the producer example)
 2. Use SCRAM authentication instead of PLAIN when possible
 3. Store passwords in environment variables or secure files
 4. Rotate credentials regularly

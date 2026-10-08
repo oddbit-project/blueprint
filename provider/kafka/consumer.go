@@ -201,7 +201,7 @@ func (c ConsumerConfig) Validate() error {
 		}
 	}
 
-	return nil
+	return c.ValidateEnabled()
 }
 
 func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {

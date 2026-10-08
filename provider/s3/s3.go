@@ -47,6 +47,7 @@ const (
 // Error constants
 const (
 	ErrNilConfig           = utils.Error("Config is nil")
+	ErrTLSRequiresSSL      = utils.Error("tlsEnable requires useSSL")
 	ErrMissingEndpoint     = utils.Error("missing endpoint")
 	ErrMissingRegion       = utils.Error("missing region")
 	ErrInvalidTimeout      = utils.Error("invalid timeout")

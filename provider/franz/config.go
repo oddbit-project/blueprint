@@ -212,7 +212,7 @@ func (c *ProducerConfig) Validate() error {
 	if c.Compression != "" && !slices.Contains(validCompression, c.Compression) {
 		return ErrInvalidCompression
 	}
-	return nil
+	return c.ValidateEnabled()
 }
 
 // DefaultProducerConfig returns producer config with sensible defaults
@@ -339,7 +339,7 @@ func (c *ConsumerConfig) Validate() error {
 	if c.IsolationLevel != "" && !slices.Contains(validIsolation, c.IsolationLevel) {
 		return ErrInvalidIsolation
 	}
-	return nil
+	return c.ValidateEnabled()
 }
 
 // DefaultConsumerConfig returns consumer config with sensible defaults
@@ -432,7 +432,10 @@ type AdminConfig struct {
 
 // Validate validates admin configuration
 func (c *AdminConfig) Validate() error {
-	return c.BaseConfig.Validate()
+	if err := c.BaseConfig.Validate(); err != nil {
+		return err
+	}
+	return c.ValidateEnabled()
 }
 
 // DefaultAdminConfig returns admin config with sensible defaults

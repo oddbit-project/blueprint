@@ -2,6 +2,7 @@ package nats
 
 import (
 	"github.com/oddbit-project/blueprint/crypt/secure"
+	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"github.com/oddbit-project/blueprint/utils"
 	"time"
 )
@@ -16,6 +17,7 @@ const (
 	ErrProducerClosed       = utils.Error("Producer is already closed")
 
 	ErrInvalidAuthType = utils.Error("Invalid authentication type")
+	ErrTLSNotEnabled   = tlsProvider.ErrTLSNotEnabled
 	ErrNilConfig       = utils.Error("Config is nil")
 
 	DefaultTimeout      = time.Second * 30

@@ -20,39 +20,61 @@ The NATS client provides a simple interface for connecting to NATS servers, publ
 ### Producer Configuration
 
 The effective shape below is flattened for readability. In the actual Go
-type, `Password`/`Token` come from the embedded
+type, `Password` (also the token for `AuthType` "token") comes from the embedded
 `secure.DefaultCredentialConfig`, the TLS fields come from the embedded
 `tls.ClientConfig`, and the connection-tuning fields come from the embedded
 `ProducerOptions` struct.
 
 ```go
 type ProducerConfig struct {
-	URL      string // NATS server URL (e.g., "nats://localhost:4222")
+	URL      string // NATS server URL or comma-separated list (e.g., "nats://localhost:4222")
 	Subject  string // Default subject to publish to
 	AuthType string // Authentication type: "none", "basic", "token"
 	Username string // Username for basic auth
 	Password string // Password for basic auth (embedded secure.DefaultCredentialConfig)
-	Token    string // Auth token (embedded secure.DefaultCredentialConfig)
+	// for AuthType "token", the token is the Password above
 
 	// Connection settings (embedded ProducerOptions)
 	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
 	MaxPingsOut  uint // MaxPingsOut value, defaults to 2
 	Timeout      uint // Connection timeout in milliseconds, defaults to 2000
-	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
+	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000; Disconnect waits up to this plus 5 seconds for the drain to finish
 
 	// TLS Configuration (embedded tls.ClientConfig)
-	TLSEnabled            bool   // Enable TLS
+	TLSEnable             bool   // Enable TLS; the server must then offer TLS
 	TLSInsecureSkipVerify bool   // Skip certificate verification
-	TLSCertFile           string // Client certificate file path
-	TLSKeyFile            string // Client key file path
-	TLSCaFile             string // CA certificate file path
+	TLSCert               string // Client certificate file path
+	TLSKey                string // Client key file path
+	TLSCA                 string // CA certificate file path
+	// for an encrypted client key, one of ClientConfig.TlsKeyCredential.Password,
+	// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,
+	// tlsKeyPasswordFile); cfg.Password is the auth password, not this one
 }
 ```
+
+### Server lists
+
+`URL` accepts a comma-separated list of servers, e.g. the seed list of a cluster:
+`"nats://n1:4222,nats://n2:4222,nats://n3:4222"`. It is split on every comma: spaces around
+entries are trimmed and empty entries dropped. This applies to the producer, consumer and
+JetStream configurations alike.
+
+- The servers are tried in random order (nats.go's default), not in the order listed, and
+  on disconnect the client reconnects to the others.
+- Every entry must be a valid URL of the same transport: one malformed entry, or a mix of
+  `ws://` and `nats://` entries, fails the whole connection.
+- One `tls://` entry makes TLS required for every entry in the list (nats.go applies it to
+  the whole pool), so a `nats://` server without TLS then fails to connect.
+- Credentials can be given per entry (`nats://user:pass@n1:4222`). A comma inside
+  credentials embedded in `URL` must be percent-encoded as `%2C`, or the entry is split at
+  it. The `Username` and `Password` fields are not split and need no encoding.
+- A `URL` with no non-empty entry (such as `" , "`) fails `Validate()` with the config's
+  missing-URL error.
 
 ### Consumer Configuration
 
 As with `ProducerConfig`, the shape below is flattened for readability. In
-the actual Go type, `Password`/`Token` come from the embedded
+the actual Go type, `Password` (also the token for `AuthType` "token") comes from the embedded
 `secure.DefaultCredentialConfig`, the TLS fields come from the embedded
 `tls.ClientConfig`, and `QueueGroup` together with the connection-tuning
 fields come from the embedded `ConsumerOptions` struct. To set a queue group
@@ -61,26 +83,29 @@ you assign `cfg.ConsumerOptions = nats.ConsumerOptions{QueueGroup: "..."}`
 
 ```go
 type ConsumerConfig struct {
-	URL        string // NATS server URL (e.g., "nats://localhost:4222")
+	URL        string // NATS server URL or comma-separated list (e.g., "nats://localhost:4222")
 	Subject    string // Subject pattern to subscribe to
 	AuthType   string // Authentication type: "none", "basic", "token"
 	Username   string // Username for basic auth
 	Password   string // Password for basic auth (embedded secure.DefaultCredentialConfig)
-	Token      string // Auth token (embedded secure.DefaultCredentialConfig)
+	// for AuthType "token", the token is the Password above
 	QueueGroup string // Queue group (embedded ConsumerOptions.QueueGroup)
 
 	// Connection settings (embedded ConsumerOptions)
 	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
 	MaxPingsOut  uint // MaxPingsOut value, defaults to 2
 	Timeout      uint // Connection timeout in milliseconds, defaults to 2000
-	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
+	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000; how long Disconnect lets handlers finish (see Disconnecting)
 
 	// TLS Configuration (embedded tls.ClientConfig)
-	TLSEnabled            bool   // Enable TLS
+	TLSEnable             bool   // Enable TLS; the server must then offer TLS
 	TLSInsecureSkipVerify bool   // Skip certificate verification
-	TLSCertFile           string // Client certificate file path
-	TLSKeyFile            string // Client key file path
-	TLSCaFile             string // CA certificate file path
+	TLSCert               string // Client certificate file path
+	TLSKey                string // Client key file path
+	TLSCA                 string // CA certificate file path
+	// for an encrypted client key, one of ClientConfig.TlsKeyCredential.Password,
+	// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,
+	// tlsKeyPasswordFile); cfg.Password is the auth password, not this one
 }
 ```
 
@@ -182,16 +207,17 @@ func main() {
     // Create logger
 	logger := log.New("nats-consumer")
 
+    // Create context with cancellation, before the consumer: deferred calls run in
+    // reverse, so Disconnect then drains while the handlers' context is still live
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
     // Create consumer
 	consumer, err := nats.NewConsumer(config, logger)
 	if err != nil {
 		logger.Fatal(err, "Failed to create NATS consumer", nil)
 	}
 	defer consumer.Disconnect()
-    
-    // Create context with cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
     
     // Define message handler
 	handler := func(ctx context.Context, msg nats.Message) error {
@@ -213,6 +239,45 @@ func main() {
 	time.Sleep(time.Minute)
 }
 ```
+
+### Disconnecting
+
+`Disconnect` shuts the consumer down in this order:
+
+1. From now on `Subscribe` and `SubscribeSync` return `ErrConsumerClosed`, and a
+   second `Disconnect` call waits for this one to finish.
+2. `SubscribeSync` subscriptions are unsubscribed; messages not yet read with
+   `NextMsg` are dropped.
+3. Each `Subscribe` subscription is drained: the server stops sending, and
+   messages already in flight are still delivered to the handler, up to its
+   100-message buffer (nats.go drops the rest as a slow consumer).
+4. The handlers work through the messages already delivered to them. The
+   connection is still open, so reply acknowledgements and anything a handler
+   publishes still go out.
+5. The connection is drained, which flushes pending publishes, and closed.
+
+Steps 3 and 4 share one deadline of `drainTimeout`; closing the connection
+normally takes up to 5 seconds more, so `Disconnect` normally blocks for at most
+`drainTimeout` plus 5 seconds (a socket write to a server that stopped reading can
+add up to the 1-minute write timeout). If the deadline passes first, the connection is closed anyway:
+handlers keep receiving the messages left in their buffer after `Disconnect`
+returns, and their replies and publishes fail.
+
+`Disconnect` does not cancel the context passed to `Subscribe`, and a handler stops as soon
+as that context is cancelled, leaving its buffered messages unhandled. For a graceful
+shutdown, keep that context live until `Disconnect` returns: call `Disconnect` first (or
+register `defer consumer.Disconnect()` after `defer cancel()`), and do not pass the context
+your signal handling cancels. Do not call `Disconnect` from inside a handler: it waits for
+every handler to finish, including the one calling it, so it sits out the whole
+`drainTimeout`, and that handler's later replies run on a closed connection.
+
+`Producer.Disconnect` drains the connection, flushing pending publishes, and
+waits up to `drainTimeout` plus 5 seconds for it to close; a second call waits for
+the first to finish.
+
+This applies to `Consumer` and `Producer`. The JetStream types' `Disconnect`
+closes the connection at once (pending writes are flushed); a JetStream consumer's
+unacknowledged messages are redelivered by the server.
 
 ### Synchronous Message Consumption
 
@@ -267,7 +332,8 @@ config := &nats.ProducerConfig{
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeBasic,
 	Username: "user",
-	Password: "password",
+	// the password is read from the embedded secure.DefaultCredentialConfig
+	DefaultCredentialConfig: nats.StringPasswordConfig("password"),
 }
 ```
 
@@ -278,7 +344,8 @@ config := &nats.ProducerConfig{
 	URL:      "nats://localhost:4222",
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeToken,
-	Token:    "my-auth-token",
+	// the token is read from the embedded secure.DefaultCredentialConfig
+	DefaultCredentialConfig: nats.StringPasswordConfig("my-auth-token"),
 }
 ```
 
@@ -286,17 +353,29 @@ config := &nats.ProducerConfig{
 
 ```go
 config := &nats.ProducerConfig{
-	URL:      "nats://localhost:4222",
+	URL:      "tls://localhost:4222",
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeNone,
-	// TLS Configuration
-	TLSEnabled:            true,
-	TLSInsecureSkipVerify: false,
-	TLSCertFile:           "/path/to/client.crt",
-	TLSKeyFile:            "/path/to/client.key",
-	TLSCaFile:             "/path/to/ca.crt",
+	// TLS Configuration (embedded tls.ClientConfig)
+	ClientConfig: tls.ClientConfig{
+		TLSEnable:             true,
+		TLSInsecureSkipVerify: false,
+		TLSCert:               "/path/to/client.crt",
+		TLSKey:                "/path/to/client.key",
+		TLSCA:                 "/path/to/ca.crt",
+	},
 }
 ```
+
+`tls` here is Blueprint's `provider/tls` package. With `TLSEnable` set the connection requires
+TLS: a `nats://` or `tls://` server that neither requires nor offers TLS is refused with
+`nats: secure connection not available`, and no credentials are sent to it (for `ws://` the
+TLS handshake fails instead). A server that offers TLS without requiring it is connected to
+over TLS, so its certificate must verify against `TLSCA` (or the system roots). This protects
+credentials from an on-path attacker only while certificates are verified;
+`TLSInsecureSkipVerify` gives that protection up. TLS settings
+(`TLSCA`, `TLSCert`, `TLSKey`, `TLSInsecureSkipVerify` or a key password) without
+`TLSEnable` make `Validate()` fail with `ErrTLSNotEnabled`, instead of being ignored.
 
 ## JetStream
 
@@ -316,12 +395,15 @@ with the same URL/auth/TLS fields used by the core types.
 
 ```go
 type JSConnectionConfig struct {
-    URL          string // NATS server URL
+    URL          string // NATS server URL or comma-separated list
     AuthType     string // "none" | "basic" | "token"
     Username     string // for basic auth
-    // embedded secure.DefaultCredentialConfig: Password / Token
+    // embedded secure.DefaultCredentialConfig: Password (the token for AuthType "token")
     ClientName   string // defaults to "natsJSProducer" / "natsJSConsumer"
-    // embedded tls.ClientConfig: TLSEnabled, TLSCertFile, etc.
+    // embedded tls.ClientConfig: TLSEnable, TLSCert, TLSKey, TLSCA, TLSInsecureSkipVerify,
+    // and for an encrypted client key one of ClientConfig.TlsKeyCredential.Password,
+    // .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,
+    // tlsKeyPasswordFile)
     PingInterval uint   // seconds
     MaxPingsOut  uint
     Timeout      uint   // milliseconds
@@ -386,7 +468,8 @@ Both config types expose a `Validate()` method that is called automatically
 by the constructors before any network round-trips. Invalid policy strings
 return `ErrInvalidAckPolicy` / `ErrInvalidDeliverPolicy` / `ErrInvalidRetention`
 / `ErrInvalidStorage`; missing required fields return `ErrMissingJSURL`,
-`ErrMissingStreamName`, or `ErrMissingProducerTopic`.
+`ErrMissingStreamName`, or `ErrMissingProducerTopic`; TLS settings without
+`TLSEnable` return `ErrTLSNotEnabled`.
 
 ### Producer usage
 
@@ -527,7 +610,7 @@ func main() {
 
     // Block on SIGINT/SIGTERM. When a signal arrives cancel() stops the
     // consume session via the watcher goroutine, and the deferred
-    // Disconnect() drains the connection.
+    // Disconnect() closes the connection.
     sigCh := make(chan os.Signal, 1)
     signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
     <-sigCh
@@ -633,7 +716,7 @@ JetStream-specific error sentinels (all declared in `provider/nats/js_common.go`
 
 | Constant | Meaning |
 |---|---|
-| `ErrMissingJSURL` | `JSConnectionConfig.URL` was empty |
+| `ErrMissingJSURL` | `JSConnectionConfig.URL` was empty or held no non-empty entry |
 | `ErrMissingStreamName` | `JSConsumerConfig.StreamName` / `StreamConfig.Name` was empty when required |
 | `ErrJSNoConsumer` | Consumer handle was not initialized |
 | `ErrAlreadyConsuming` | `Consume()` called while a session is already active |
@@ -642,6 +725,6 @@ JetStream-specific error sentinels (all declared in `provider/nats/js_common.go`
 | `ErrInvalidRetention` | `StreamConfig.Retention` was not `""`, `"limits"`, `"interest"`, or `"workqueue"` |
 | `ErrInvalidStorage` | `StreamConfig.Storage` was not `""`, `"file"`, or `"memory"` |
 
-The existing core-NATS sentinels (`ErrMissingProducerTopic`, `ErrInvalidAuthType`,
+The core-NATS sentinels (`ErrMissingProducerTopic`, `ErrInvalidAuthType`, `ErrTLSNotEnabled`,
 `ErrNilConfig`, `ErrConsumerClosed`, `ErrProducerClosed`) are also returned by
 the JetStream paths where appropriate.

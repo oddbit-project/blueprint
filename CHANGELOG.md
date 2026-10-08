@@ -17,6 +17,36 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `config/provider`: `JsonProvider.Get` and `GetKey` no longer allocate a nested pointer section
+  that is absent from the JSON, unless a `default:` tag inside it sets a non-zero value. Code
+  that reads such a section without a nil check (it used to be allocated with zero values)
+  must check for nil, or give the section a default (#100).
+
+### Added
+
+- `provider/tls`: `ClientConfig.ValidateEnabled()` and `ErrTLSNotEnabled`, the check that TLS
+  settings are not given without `tlsEnable` (which `TLSConfig()` would silently ignore). The
+  clickhouse, etcd, franz, kafka, mqtt, nats, redis, s3 and smtp providers call it from their
+  config validation (#116).
+- `log.LogHostnameKey` (`"hostname"`), the field name `IncludeHostname` writes (#97).
+
+### Fixed
+
+- `log`: `IncludeHostname` now adds a `hostname` field to every line written by loggers built
+  from the configuration (`Config.Logger()`, `Config.ModuleLogger()`, and `log.New()` /
+  `log.NewWithComponent()` after `log.Configure()`). It was accepted but ignored. The default
+  is `true`, so on upgrade JSON lines gain the field and the default pretty console output
+  shows `hostname=...`; set `includeHostname: false` to keep the previous output. Code that
+  adds its own `hostname` field should stop doing so, or disable the option, to avoid a
+  duplicate key (#97).
+- `config/provider`: `JsonProvider.Get` and `GetKey` no longer panic on a config struct with an
+  unexported field of any kind (struct, pointer or scalar with a `default:` tag) or an embedded
+  field of an unexported type, value or pointer (the pointer cases since v0.8.7, the others in
+  earlier versions too). Fields tagged `json:"-"` are no longer given defaults or allocated
+  (#100).
+
 ## [v0.13.0] - 2026-10-05
 
 ### Module versions

@@ -28,6 +28,10 @@ func NewClient(cfg *Config) (*Client, error) {
 	if cfg == nil {
 		cfg = DefaultConfig()
 	}
+	// checked here as well as in Validate, which this constructor does not call
+	if err := cfg.ValidateEnabled(); err != nil {
+		return nil, err
+	}
 
 	password, err := cfg.Fetch()
 	if err != nil {

@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
+### Breaking changes
+
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) without
+  `tlsEnable` now fail `Validate()` with `tls.ErrTLSNotEnabled`. They used to be ignored
+  silently: with `useSSL` the client used TLS on the system roots, without the CA, client
+  certificate or skip-verify setting, so a private-CA endpoint failed the handshake; without
+  `useSSL` the requests went over plain http. Set `tlsEnable`, or remove the settings (#116).
+- `tlsEnable` with `useSSL` false now fails `Validate()` with the new `ErrTLSRequiresSSL`. The
+  TLS settings were dropped and requests went over plain http. Set `useSSL`, or unset
+  `tlsEnable` (#116).
+
 ## [v0.10.0] - 2026-10-05
 
 Requires Blueprint core v0.11.0. `BucketInterface` gains methods, which breaks custom implementations.

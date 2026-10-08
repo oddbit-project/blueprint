@@ -4,6 +4,79 @@ All notable changes to the Blueprint NATS provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
+### Security
+
+- With TLS enabled (`tlsEnable`), the connection now requires TLS. Before, a `nats://` URL used
+  TLS only when the server's INFO demanded it, so a server without TLS, or an attacker on the
+  network path, received CONNECT, username and password or token included, in plaintext, on
+  the first connect and on every reconnect. With `tlsInsecureSkipVerify` an on-path attacker
+  can still present any certificate (#104).
+- TLS settings without `tlsEnable` are now rejected instead of silently leaving the
+  connection in plaintext; see Breaking changes (#110).
+
+### Breaking changes
+
+- With `tlsEnable` set, three kinds of deployment that connected in plaintext before now
+  fail to connect (#104, #110):
+  - Against a server that does not offer TLS, the error is `nats: secure connection not
+    available`. Enable TLS on the server, or unset `tlsEnable`.
+  - Against a server that offers TLS without requiring it, the client now uses TLS, so a
+    certificate the client cannot verify (private CA without `tlsCa`, connecting by IP to a
+    certificate with only DNS names) fails with an `x509` error. Set `tlsCa` or connect by
+    the certificate's name.
+  - Against a server that offers TLS without requiring it but requires a client
+    certificate, a client without one fails with `tls: certificate required`. Set
+    `tlsCert` and `tlsKey` (#110).
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password)
+  without `tlsEnable` now fail `Validate()` with the new `ErrTLSNotEnabled`, for the
+  producer, consumer and JetStream configs. They used to be ignored silently: the
+  connection, and its credentials, stayed in plaintext unless a `tls://` URL or the server
+  forced TLS, and even then the CA, client certificate and skip-verify settings were not
+  applied. Set `tlsEnable`, or remove the settings (#110).
+
+### Added
+
+- `url` accepts a comma-separated server list (e.g. a cluster seed list), split as
+  `nats.Connect` does, for `ProducerConfig`, `ConsumerConfig` and `JSConnectionConfig`.
+  Previously a list failed to connect with "too many colons in address". `Validate()` now
+  rejects a `url` with no non-empty entry (such as `" , "`) with the existing missing-URL
+  error. The servers are tried in random order (#99).
+
+### Changed
+
+- A comma in `url` now always separates servers. A URL whose credentials contain a comma
+  (`nats://user:p,ss@host`) connected before and now fails; percent-encode the comma as
+  `%2C` (#99).
+- `Consumer.Disconnect` now shuts down gracefully: it drains the `Subscribe`
+  subscriptions, lets the handlers finish the messages already delivered to them while
+  the connection is still open, then drains and closes the connection. Previously it
+  unsubscribed and closed at once, so buffered messages were handled on a closed
+  connection and their reply acknowledgements failed. Unread `SubscribeSync` messages are
+  dropped. `Producer.Disconnect` now waits for its drain to finish. Both can block for up
+  to `drainTimeout` plus 5 seconds; lower `drainTimeout` if your shutdown has a tighter
+  deadline. To get the graceful drain, keep the `Subscribe` context live until
+  `Disconnect` returns (a handler still stops, dropping its buffer, once that context is
+  cancelled), and do not call `Disconnect` from inside a handler (#105).
+- Once `Consumer.Disconnect` has started, `Subscribe` and `SubscribeSync` return
+  `ErrConsumerClosed`; a second `Disconnect` on a consumer or producer waits for the first
+  to finish (#105).
+- The JetStream types' `Disconnect` closes the connection directly instead of starting a
+  drain it then cut short (pending writes are still flushed) (#105).
+- Connections now start from nats.go's default options, which also turns on reconnect
+  jitter (100ms, 1s with TLS) and a 1-minute write timeout (#105).
+
+### Fixed
+
+- `pingInterval` now defaults to 2 minutes as documented, for producers, consumers and
+  JetStream connections. Client pings were off when it was unset, so a stale connection
+  was only noticed by TCP (#105).
+- A configured `drainTimeout` is now applied to the connection (default 30000ms); it was
+  ignored (#105).
+
 ## [v0.9.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.

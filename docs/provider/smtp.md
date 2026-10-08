@@ -104,7 +104,8 @@ config.SSLOnConnect = true // implicit TLS on port 465
 
 `TLSEnable` controls whether the certificate settings above are used; when it is `false`, go-mail's own defaults apply
 (server name taken from the host, TLS 1.2 minimum, system trust store), and configuring any of `TLSCA`, `TLSCert`,
-`TLSKey` or `TLSInsecureSkipVerify` without it is rejected with `ErrTLSNotEnabled` rather than silently ignored.
+`TLSKey`, `TLSInsecureSkipVerify` or a key password without it is rejected with `ErrTLSNotEnabled` rather than
+silently ignored.
 
 Note that `TLSEnable` does not, on its own, decide whether the connection is encrypted — that is the STARTTLS policy
 below, which requires TLS by default. The two are configured separately:

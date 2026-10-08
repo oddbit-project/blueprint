@@ -95,6 +95,11 @@ WithTLS(
 )
 ```
 
+`WithTLS` sets `TLSEnable`. TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a
+key password) require `tlsEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`,
+instead of connecting without them, which with bare `host:port` endpoints means plaintext. This
+applies to `Config.NewClient` and to the package-level `NewClient` (#116).
+
 ### Client-Side Encryption
 
 ```go

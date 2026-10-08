@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -22,6 +23,24 @@ type connectParams struct {
 	PingInterval uint // seconds
 	MaxPingsOut  uint
 	Timeout      uint // milliseconds
+	DrainTimeout uint // milliseconds
+}
+
+// drainFlushTimeout is the fixed flush timeout nats.go applies when a draining
+// connection moves from its subscriptions to its publishes
+const drainFlushTimeout = 5 * time.Second
+
+// serverURLs splits a comma-separated server list: entries are trimmed of spaces,
+// and empty entries dropped.
+func serverURLs(url string) []string {
+	result := make([]string, 0)
+	for _, u := range strings.Split(url, ",") {
+		u = strings.TrimSpace(u)
+		if len(u) > 0 {
+			result = append(result, u)
+		}
+	}
+	return result
 }
 
 // connect opens a NATS connection using the shared parameters. It transparently
@@ -59,13 +78,11 @@ func connect(p connectParams) (*nats.Conn, error) {
 		}
 	}
 
-	opts := nats.Options{
-		Url:            p.URL,
-		AllowReconnect: true,
-		MaxReconnect:   DefaultConnectRetry,
-		ReconnectWait:  DefaultTimeout,
-		Name:           p.Name,
-	}
+	opts := nats.GetDefaultOptions()
+	opts.Servers = serverURLs(p.URL)
+	opts.MaxReconnect = DefaultConnectRetry
+	opts.ReconnectWait = DefaultTimeout
+	opts.Name = p.Name
 
 	switch p.AuthType {
 	case AuthTypeBasic:
@@ -79,6 +96,9 @@ func connect(p connectParams) (*nats.Conn, error) {
 		return nil, terr
 	} else if tls != nil {
 		opts.TLSConfig = tls
+		// without Secure, nats.go uses TLS only when the server's INFO demands it, and a
+		// server (or an attacker) that does not would receive credentials in plaintext
+		opts.Secure = true
 	}
 
 	if p.PingInterval > 0 {
@@ -90,10 +110,22 @@ func connect(p connectParams) (*nats.Conn, error) {
 	if p.Timeout > 0 {
 		opts.Timeout = time.Duration(p.Timeout) * time.Millisecond
 	}
+	if p.DrainTimeout > 0 {
+		opts.DrainTimeout = time.Duration(p.DrainTimeout) * time.Millisecond
+	}
 
 	conn, err := opts.Connect()
 	if err != nil {
 		return nil, err
 	}
 	return conn, nil
+}
+
+// waitClosed waits up to timeout for a draining connection to close, then closes it
+func waitClosed(conn *nats.Conn, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for !conn.IsClosed() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	conn.Close()
 }

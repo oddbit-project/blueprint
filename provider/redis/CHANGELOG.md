@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
+### Breaking changes
+
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) without
+  `tlsEnable` now fail `Validate()` with `tls.ErrTLSNotEnabled`. They used to be ignored
+  silently: the client connected in plaintext, password included. Set `tlsEnable`, or remove the
+  settings (#116).
+
 ## [v0.9.0] - 2026-09-28
 
 Requires Blueprint core v0.12.0.

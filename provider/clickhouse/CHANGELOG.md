@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
+### Added
+
+- `ErrMigrationTableNotClusterLog`, returned by `NewMigrationManager` in cluster mode when the
+  node's existing migration table is not the shared cluster log (#98).
+
+### Breaking changes
+
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) without
+  `tlsEnable` now fail `Validate()` with `tls.ErrTLSNotEnabled`. They used to be ignored
+  silently: the client connected in plaintext, username and password included. Set `tlsEnable`,
+  or remove the settings (#116).
+
+- **Existing `WithCluster` users:** before this release the option could not create a log, but
+  it opened an existing node-local `TinyLog` without complaint. Such a node now fails in
+  `NewMigrationManager` with `ErrMigrationTableNotClusterLog` until its log is converted
+  (docs/db/migrations.md, "Moving an existing log to cluster mode") (#98).
+
+### Changed
+
+- In cluster mode the migration log is a `ReplicatedMergeTree` shared by every node
+  (`/clickhouse/blueprint/<cluster>/<database>/db_migration`, replica `{shard}_{replica}`),
+  instead of a `TinyLog` per node that only the connected node saw. Cluster mode needs
+  Keeper, the `shard` and `replica` macros on every node, the `SYSTEM SYNC REPLICA`
+  privilege (`List()` and `MigrationExists()` wait for replication before reading), and a
+  client whose connections all reach one node. In a database using the `Replicated` engine it
+  needs `database_replicated_allow_replicated_engine_arguments`. A node whose existing log is
+  not the shared one (node-local, pre-module, or replicated under another Keeper path) is
+  rejected; convert it by hand before enabling `WithCluster` (#98).
+
+### Fixed
+
+- `WithCluster` on the migration manager now works. It emitted `ON CLUSTER <name>.(`, a
+  syntax error, so a manager with a cluster could not start. The cluster name is now quoted,
+  so names such as `c-1` work (#98).
+
 ## [v0.10.0] - 2026-09-28
 
 Requires Blueprint core v0.12.0.

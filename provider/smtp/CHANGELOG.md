@@ -4,6 +4,16 @@ All notable changes to the Blueprint SMTP provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
+### Changed
+
+- `ErrTLSNotEnabled` is now the core `tls.ErrTLSNotEnabled`, and the check uses the shared
+  `tls.ClientConfig.ValidateEnabled()`. The value and the rejected settings are unchanged, so
+  `errors.Is(err, smtp.ErrTLSNotEnabled)` matches as before (#116).
+
 ## [v0.10.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.
