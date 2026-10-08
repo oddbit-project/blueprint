@@ -26,10 +26,14 @@ The MQTT client uses the following configuration:
     "tlsCert": "",
     "tlsKey": "",
     "tlsKeyPassword": "",
-    "tlsInsecureVerify": true
+    "tlsInsecureSkipVerify": false
   }
 }
 ```
+
+TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) require
+`tlsEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`, instead of connecting
+without them; with protocol `tcp` that means plaintext (#116).
 
 # Using the MQTT client
 
@@ -187,13 +191,13 @@ The full configuration structure:
 ```go
 type Config struct {
     Brokers              []string `json:"brokers"`              // Broker addresses
-    Protocol             string   `json:"protocol"`             // Protocol (tcp, ssl, ws, wss)
+    Protocol             string   `json:"protocol"`             // Protocol (tcp, ssl)
     Username             string   `json:"username"`             // MQTT username
     Password             string   `json:"password"`             // MQTT password
-    Timeout              int64    `json:"timeout"`              // Operation timeout in seconds
-    ConnectionTimeout    int64    `json:"connectionTimeout"`    // Connection timeout in seconds
-    QoS                  byte     `json:"qos"`                  // Quality of Service (0, 1, 2)
-    ClientId             string   `json:"clientId"`             // Client identifier
+    Timeout              int      `json:"timeout"`              // Operation timeout in seconds
+    ConnectionTimeout    int      `json:"connectionTimeout"`    // Connection timeout in seconds
+    QoS                  int      `json:"qos"`                  // Quality of Service (0, 1, 2)
+    ClientID             string   `json:"clientId"`             // Client identifier
     Retain               bool     `json:"retain"`               // Retain messages
     KeepAlive            int64    `json:"keepAlive"`            // Keep-alive interval in seconds
     AutoReconnect        bool     `json:"autoReconnect"`        // Auto-reconnect on disconnect
@@ -202,8 +206,9 @@ type Config struct {
     TLSCA                string   `json:"tlsCa"`                // CA certificate path
     TLSCert              string   `json:"tlsCert"`              // Client certificate path
     TLSKey               string   `json:"tlsKey"`               // Client key path
-    TLSKeyPassword       string   `json:"tlsKeyPassword"`       // Key password
-    TLSInsecureSkipVerify bool    `json:"tlsInsecureVerify"`   // Skip certificate verification
+    // for an encrypted client key, one of TlsKeyCredential.Password, .PasswordEnvVar or
+    // .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar, tlsKeyPasswordFile)
+    TLSInsecureSkipVerify bool    `json:"tlsInsecureSkipVerify"` // Skip certificate verification
 }
 ```
 

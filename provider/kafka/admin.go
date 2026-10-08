@@ -32,7 +32,7 @@ func (c AdminConfig) Validate() error {
 	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
-	return nil
+	return c.ValidateEnabled()
 }
 func NewAdmin(cfg *AdminConfig, logger *log.Logger) (*Admin, error) {
 	if cfg == nil {

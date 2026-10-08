@@ -4,6 +4,19 @@ All notable changes to the Blueprint ETCD provider will be documented in this fi
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
+### Breaking changes
+
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) without
+  `tlsEnable` now fail `Validate()` and the package-level `NewClient` with
+  `tls.ErrTLSNotEnabled`. They used to be ignored silently: with bare `host:port` endpoints the
+  client connected in plaintext, username and password included; with `https://` endpoints it
+  used TLS on the system roots, without the CA, client certificate or skip-verify setting. Set
+  `tlsEnable`, or remove the settings (#116).
+
 ## [v0.10.0] - 2026-09-27
 
 Requires Blueprint core v0.11.0.

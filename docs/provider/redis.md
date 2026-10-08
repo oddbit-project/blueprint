@@ -78,7 +78,9 @@ config.DefaultCredentialConfig = secure.DefaultCredentialConfig{
 ### TLS Configuration
 
 The TLS settings are a `tls.ClientConfig` embedded in the Redis `Config`; they are applied to the
-connection only when `TLSEnable` is `true`.
+connection only when `TLSEnable` is `true`, and setting any of them (`TLSCA`, `TLSCert`, `TLSKey`,
+`TLSInsecureSkipVerify` or a key password) without it makes `Validate()` fail with
+`tls.ErrTLSNotEnabled`, instead of connecting without them in plaintext (#116).
 
 ```go
 config := redis.NewConfig()

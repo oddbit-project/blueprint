@@ -135,7 +135,7 @@ func (c *Config) Validate() error {
 	if c.KeepAlive < 0 {
 		return fmt.Errorf("keep alive must be greater than zero")
 	}
-	return nil
+	return c.ValidateEnabled()
 }
 
 func NewClient(cfg *Config) (*Client, error) {

@@ -31,7 +31,13 @@ package tls
 
 import (
 	"crypto/tls"
+
+	"github.com/oddbit-project/blueprint/utils"
 )
+
+// ErrTLSNotEnabled is returned by ClientConfig.ValidateEnabled for TLS settings given
+// without TLSEnable
+const ErrTLSNotEnabled = utils.Error("TLS settings require tlsEnable")
 
 // ClientConfig represents the configuration for a tls client configuration
 type ClientConfig struct {
@@ -41,6 +47,18 @@ type ClientConfig struct {
 	TlsKeyCredential             // tls key password
 	TLSEnable             bool   `json:"tlsEnable"`
 	TLSInsecureSkipVerify bool   `json:"tlsInsecureSkipVerify"`
+}
+
+// ValidateEnabled rejects TLS settings given without TLSEnable: TLSConfig() ignores
+// them, so the connection would silently go without the configured CA, client
+// certificate or verification setting, usually in plaintext
+func (c *ClientConfig) ValidateEnabled() error {
+	key := c.TlsKeyCredential
+	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||
+		key.Password != "" || key.PasswordEnvVar != "" || key.PasswordFile != "") {
+		return ErrTLSNotEnabled
+	}
+	return nil
 }
 
 // TLSConfig returns a tls.Config{} struct from the ClientConfig

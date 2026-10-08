@@ -103,6 +103,10 @@ func main() {
 }
 ```
 
+TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) require
+`tlsEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`, instead of connecting
+without them in plaintext (#116).
+
 ### Synchronous Production
 
 ```go

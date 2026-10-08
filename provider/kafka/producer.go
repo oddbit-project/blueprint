@@ -93,7 +93,7 @@ func (c ProducerConfig) Validate() error {
 		return ErrInvalidAuthType
 	}
 
-	return nil
+	return c.ValidateEnabled()
 }
 
 func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {

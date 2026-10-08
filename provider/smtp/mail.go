@@ -32,7 +32,7 @@ const (
 	ErrCredentialsUnused = utils.Error("Username configured without an auth type")
 	ErrInvalidTLSPolicy  = utils.Error("Invalid TLS policy")
 	ErrInvalidTLSConfig  = utils.Error("Invalid TLS configuration")
-	ErrTLSNotEnabled     = utils.Error("TLS settings require tlsEnable")
+	ErrTLSNotEnabled     = tlsProvider.ErrTLSNotEnabled
 	ErrInvalidTimeout    = utils.Error("Invalid timeout")
 )
 
@@ -139,10 +139,8 @@ func (c *Config) Validate() error {
 	}
 	// the certificate settings are only read when TLS is enabled; setting them without
 	// TLSEnable is a misconfiguration, as they would be silently ignored
-	keyCredential := c.TlsKeyCredential
-	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||
-		keyCredential.Password != "" || keyCredential.PasswordEnvVar != "" || keyCredential.PasswordFile != "") {
-		return ErrTLSNotEnabled
+	if err := c.ValidateEnabled(); err != nil {
+		return err
 	}
 	// From validation (if provided)
 	if c.From != "" && !isValidEmail(c.From) {

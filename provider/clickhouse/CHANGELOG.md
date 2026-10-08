@@ -6,12 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
 ### Added
 
 - `ErrMigrationTableNotClusterLog`, returned by `NewMigrationManager` in cluster mode when the
   node's existing migration table is not the shared cluster log (#98).
 
 ### Breaking changes
+
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) without
+  `tlsEnable` now fail `Validate()` with `tls.ErrTLSNotEnabled`. They used to be ignored
+  silently: the client connected in plaintext, username and password included. Set `tlsEnable`,
+  or remove the settings (#116).
 
 - **Existing `WithCluster` users:** before this release the option could not create a log, but
   it opened an existing node-local `TinyLog` without complaint. Such a node now fails in

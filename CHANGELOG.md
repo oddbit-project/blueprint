@@ -26,6 +26,10 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ### Added
 
+- `provider/tls`: `ClientConfig.ValidateEnabled()` and `ErrTLSNotEnabled`, the check that TLS
+  settings are not given without `tlsEnable` (which `TLSConfig()` would silently ignore). The
+  clickhouse, etcd, franz, kafka, mqtt, nats, redis, s3 and smtp providers call it from their
+  config validation (#116).
 - `log.LogHostnameKey` (`"hostname"`), the field name `IncludeHostname` writes (#97).
 
 ### Fixed
