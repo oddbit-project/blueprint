@@ -17,6 +17,28 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `config/provider`: `EnvProvider.Get` and `GetKey` no longer allocate a nested pointer section that no
+  variable writes to, unless a `default:` tag inside it sets a non-zero value, as `JsonProvider` does for
+  absent JSON sections since v0.14.0. A variable that writes nothing (a field kind the provider does not
+  parse, an invalid value, or the key of a section itself) does not count. Code that reads such a section
+  without a nil check (it used to be allocated with zero values) must check for nil, or give the section a
+  default (#107).
+
+### Fixed
+
+- `config/provider`: `EnvProvider.Get` and `GetKey` no longer panic on a config struct with an unexported field
+  (struct, pointer, or scalar with a `default:` tag or a matching variable) or an embedded field of an
+  unexported type, and no longer panic on the NATS `JSConsumerConfig` and `StreamConfig`. Unexported fields are
+  left alone, and so is an embedded pointer to an unexported type; the exported fields of an embedded struct
+  value of an unexported type are now read, under the type name as prefix like any
+  embedded struct. Unlike `JsonProvider`, fields tagged `json:"-"` (such as the NATS `Native` sections) are
+  still read from the environment (#107).
+- `config/provider`: a variable for a slice of anything but strings (for example the NATS `Native.BackOff`) is
+  now ignored instead of panicking, and a variable named after a nested section itself (`APP_DATABASE=x`) no
+  longer stops the section's fields (`APP_DATABASE_HOST`) from being read (#107).
+
 ## [v0.14.0] - 2026-10-08
 
 ### Module versions
