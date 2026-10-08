@@ -68,6 +68,9 @@ func (c ProducerConfig) Validate() error {
 	if !slices.Contains(validAuthTypes, c.AuthType) {
 		return ErrInvalidAuthType
 	}
+	if err := validateTLS(c.ClientConfig); err != nil {
+		return err
+	}
 
 	return nil
 }
