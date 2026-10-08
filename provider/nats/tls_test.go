@@ -64,8 +64,9 @@ func selfSignedCert(t *testing.T) (tls.Certificate, string) {
 
 // fakeServer speaks enough of the NATS protocol to complete one handshake. In the
 // TLS modes it advertises TLS in INFO and expects the client to start a TLS handshake
-// before CONNECT, as nats-server does.
-func fakeServer(t *testing.T, mode fakeTLSMode) (string, string, <-chan fakeServerResult) {
+// before CONNECT, as nats-server does. connectURLs (bare host:port) are advertised in
+// INFO as other cluster members, for the client to discover.
+func fakeServer(t *testing.T, mode fakeTLSMode, connectURLs ...string) (string, string, <-chan fakeServerResult) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ln.Close() })
@@ -91,6 +92,9 @@ func fakeServer(t *testing.T, mode fakeTLSMode) (string, string, <-chan fakeServ
 			info += `,"tls_available":true`
 		case fakeTLSRequired:
 			info += `,"tls_required":true`
+		}
+		if len(connectURLs) > 0 {
+			info += `,"connect_urls":["` + strings.Join(connectURLs, `","`) + `"]`
 		}
 		if _, err := c.Write([]byte("INFO " + info + "}\r\n")); err != nil {
 			return
