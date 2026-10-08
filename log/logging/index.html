@@ -3417,7 +3417,7 @@
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nx">cfg</span><span class="p">.</span><span class="nx">Format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"pretty"</span><span class="w">        </span><span class="c1">// output format: pretty or json</span>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nx">cfg</span><span class="p">.</span><span class="nx">IncludeTimestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">   </span><span class="c1">// include timestamp in logs</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="nx">cfg</span><span class="p">.</span><span class="nx">IncludeCaller</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">      </span><span class="c1">// include caller information</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nx">cfg</span><span class="p">.</span><span class="nx">IncludeHostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">    </span><span class="c1">// include hostname</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nx">cfg</span><span class="p">.</span><span class="nx">IncludeHostname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">    </span><span class="c1">// add a "hostname" field (os.Hostname())</span>
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1">// Configure the global logger</span>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">Configure</span><span class="p">(</span><span class="nx">cfg</span><span class="p">)</span>
@@ -3429,6 +3429,10 @@
 to change while other goroutines are logging — call it once, during startup. Building a logger with <code>cfg.Logger()</code> or
 <code>cfg.ModuleLogger()</code> has no process-wide effect, and such a logger uses zerolog's default timestamp layout rather than
 <code>cfg.TimeFormat</code>.</p>
+<p>With <code>IncludeHostname</code>, every line carries a <code>hostname</code> field (<code>log.LogHostnameKey</code>) holding <code>os.Hostname()</code>. This
+applies to loggers built with <code>cfg.Logger()</code> or <code>cfg.ModuleLogger()</code>, and to <code>log.New()</code> / <code>log.NewWithComponent()</code>
+loggers created after <code>log.Configure()</code>; a logger created before <code>Configure()</code> does not carry it. Do not add a
+<code>hostname</code> field of your own while it is enabled, or JSON lines carry the key twice.</p>
 <p>With <code>IncludeCaller</code>, the <code>caller</code> field reports the code that called the logging method. <code>cfg.CallerSkipFrames</code>
 (default 3) controls that; raise it if you wrap the logger in helpers of your own, one per extra call level.</p>
 <h2 id="formatted-logging-methods">Formatted Logging Methods<a class="headerlink" href="#formatted-logging-methods" title="Permanent link">&para;</a></h2>
@@ -3514,7 +3518,7 @@ to change while other goroutines are logging — call it once, during startup. B
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="July 27, 2026 12:21:52 UTC">July 27, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 7, 2026 15:12:48 UTC">October 7, 2026</span>
   </span>
 
     

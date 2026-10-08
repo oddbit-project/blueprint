@@ -2254,6 +2254,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#server-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#consumer-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2325,6 +2336,17 @@
     <span class="md-ellipsis">
       
         Creating a Consumer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disconnecting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disconnecting
       
     </span>
   </a>
@@ -3338,6 +3360,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#server-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#consumer-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3409,6 +3442,17 @@
     <span class="md-ellipsis">
       
         Creating a Consumer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disconnecting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disconnecting
       
     </span>
   </a>
@@ -3651,62 +3695,86 @@
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <h3 id="producer-configuration">Producer Configuration<a class="headerlink" href="#producer-configuration" title="Permanent link">&para;</a></h3>
 <p>The effective shape below is flattened for readability. In the actual Go
-type, <code>Password</code>/<code>Token</code> come from the embedded
+type, <code>Password</code> (also the token for <code>AuthType</code> "token") comes from the embedded
 <code>secure.DefaultCredentialConfig</code>, the TLS fields come from the embedded
 <code>tls.ClientConfig</code>, and the connection-tuning fields come from the embedded
 <code>ProducerOptions</code> struct.</p>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ProducerConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL (e.g., "nats://localhost:4222")</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL or comma-separated list (e.g., "nats://localhost:4222")</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="w">  </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Default subject to publish to</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Authentication type: "none", "basic", "token"</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nx">Username</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Username for basic auth</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nx">Password</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Password for basic auth (embedded secure.DefaultCredentialConfig)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nx">Token</span><span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Auth token (embedded secure.DefaultCredentialConfig)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="c1">// for AuthType "token", the token is the Password above</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="c1">// Connection settings (embedded ProducerOptions)</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// PingInterval in seconds, defaults to 2 minutes</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// MaxPingsOut value, defaults to 2</span>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Connection timeout in milliseconds, defaults to 2000</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000; Disconnect waits up to this plus 5 seconds for the drain to finish</span>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="c1">// TLS Configuration (embedded tls.ClientConfig)</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="w">            </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">    </span><span class="nx">TLSEnable</span><span class="w">             </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS; the server must then offer TLS</span>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Skip certificate verification</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="w">           </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="w">            </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="p">}</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nx">TLSCert</span><span class="w">               </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nx">TLSKey</span><span class="w">                </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="nx">TLSCA</span><span class="w">                 </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">    </span><span class="c1">// for an encrypted client key, one of ClientConfig.TlsKeyCredential.Password,</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">    </span><span class="c1">// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">    </span><span class="c1">// tlsKeyPasswordFile); cfg.Password is the auth password, not this one</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="p">}</span>
 </span></code></pre></div>
+<h3 id="server-lists">Server lists<a class="headerlink" href="#server-lists" title="Permanent link">&para;</a></h3>
+<p><code>URL</code> accepts a comma-separated list of servers, e.g. the seed list of a cluster:
+<code>"nats://n1:4222,nats://n2:4222,nats://n3:4222"</code>. It is split on every comma: spaces around
+entries are trimmed and empty entries dropped. This applies to the producer, consumer and
+JetStream configurations alike.</p>
+<ul>
+<li>The servers are tried in random order (nats.go's default), not in the order listed, and
+  on disconnect the client reconnects to the others.</li>
+<li>Every entry must be a valid URL of the same transport: one malformed entry, or a mix of
+  <code>ws://</code> and <code>nats://</code> entries, fails the whole connection.</li>
+<li>One <code>tls://</code> entry makes TLS required for every entry in the list (nats.go applies it to
+  the whole pool), so a <code>nats://</code> server without TLS then fails to connect.</li>
+<li>Credentials can be given per entry (<code>nats://user:pass@n1:4222</code>). A comma inside
+  credentials embedded in <code>URL</code> must be percent-encoded as <code>%2C</code>, or the entry is split at
+  it. The <code>Username</code> and <code>Password</code> fields are not split and need no encoding.</li>
+<li>A <code>URL</code> with no non-empty entry (such as <code>" , "</code>) fails <code>Validate()</code> with the config's
+  missing-URL error.</li>
+</ul>
 <h3 id="consumer-configuration">Consumer Configuration<a class="headerlink" href="#consumer-configuration" title="Permanent link">&para;</a></h3>
 <p>As with <code>ProducerConfig</code>, the shape below is flattened for readability. In
-the actual Go type, <code>Password</code>/<code>Token</code> come from the embedded
+the actual Go type, <code>Password</code> (also the token for <code>AuthType</code> "token") comes from the embedded
 <code>secure.DefaultCredentialConfig</code>, the TLS fields come from the embedded
 <code>tls.ClientConfig</code>, and <code>QueueGroup</code> together with the connection-tuning
 fields come from the embedded <code>ConsumerOptions</code> struct. To set a queue group
 you assign <code>cfg.ConsumerOptions = nats.ConsumerOptions{QueueGroup: "..."}</code>
 (see the example below).</p>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ConsumerConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">        </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL (e.g., "nats://localhost:4222")</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">        </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL or comma-separated list (e.g., "nats://localhost:4222")</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="w">    </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Subject pattern to subscribe to</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Authentication type: "none", "basic", "token"</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nx">Username</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Username for basic auth</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nx">Password</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Password for basic auth (embedded secure.DefaultCredentialConfig)</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nx">Token</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Auth token (embedded secure.DefaultCredentialConfig)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="c1">// for AuthType "token", the token is the Password above</span>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nx">QueueGroup</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Queue group (embedded ConsumerOptions.QueueGroup)</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="c1">// Connection settings (embedded ConsumerOptions)</span>
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// PingInterval in seconds, defaults to 2 minutes</span>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// MaxPingsOut value, defaults to 2</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Connection timeout in milliseconds, defaults to 2000</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w"> </span><span class="kt">uint</span><span class="w"> </span><span class="c1">// Drain timeout in milliseconds, defaults to 30000; how long Disconnect lets handlers finish (see Disconnecting)</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="c1">// TLS Configuration (embedded tls.ClientConfig)</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="w">            </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nx">TLSEnable</span><span class="w">             </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Enable TLS; the server must then offer TLS</span>
 </span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="c1">// Skip certificate verification</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="w">           </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="w">            </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="p">}</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nx">TLSCert</span><span class="w">               </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client certificate file path</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nx">TLSKey</span><span class="w">                </span><span class="kt">string</span><span class="w"> </span><span class="c1">// Client key file path</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="nx">TLSCA</span><span class="w">                 </span><span class="kt">string</span><span class="w"> </span><span class="c1">// CA certificate file path</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">    </span><span class="c1">// for an encrypted client key, one of ClientConfig.TlsKeyCredential.Password,</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="c1">// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">    </span><span class="c1">// tlsKeyPasswordFile); cfg.Password is the auth password, not this one</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="producer-usage">Producer Usage<a class="headerlink" href="#producer-usage" title="Permanent link">&para;</a></h2>
 <h3 id="creating-a-producer">Creating a Producer<a class="headerlink" href="#creating-a-producer" title="Permanent link">&para;</a></h3>
@@ -3796,37 +3864,72 @@ you assign <code>cfg.ConsumerOptions = nats.ConsumerOptions{QueueGroup: "..."}</
 </span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">    </span><span class="c1">// Create logger</span>
 </span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">"nats-consumer"</span><span class="p">)</span>
 </span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">    </span><span class="c1">// Create consumer</span>
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">    </span><span class="nx">consumer</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">NewConsumer</span><span class="p">(</span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"Failed to create NATS consumer"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="nx">consumer</span><span class="p">.</span><span class="nx">Disconnect</span><span class="p">()</span>
-</span><span id="__span-4-30"><a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>
-</span><span id="__span-4-31"><a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a><span class="w">    </span><span class="c1">// Create context with cancellation</span>
-</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a><span class="w">    </span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">cancel</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">WithCancel</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">())</span>
-</span><span id="__span-4-33"><a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="nx">cancel</span><span class="p">()</span>
-</span><span id="__span-4-34"><a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>
-</span><span id="__span-4-35"><a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a><span class="w">    </span><span class="c1">// Define message handler</span>
-</span><span id="__span-4-36"><a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a><span class="w">    </span><span class="nx">handler</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">Message</span><span class="p">)</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-4-37"><a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Info</span><span class="p">(</span><span class="s">"Received message"</span><span class="p">,</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">KV</span><span class="p">{</span>
-</span><span id="__span-4-38"><a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a><span class="w">            </span><span class="s">"subject"</span><span class="p">:</span><span class="w"> </span><span class="nx">msg</span><span class="p">.</span><span class="nx">Subject</span><span class="p">,</span>
-</span><span id="__span-4-39"><a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a><span class="w">            </span><span class="s">"data"</span><span class="p">:</span><span class="w">    </span><span class="kt">string</span><span class="p">(</span><span class="nx">msg</span><span class="p">.</span><span class="nx">Data</span><span class="p">),</span>
-</span><span id="__span-4-40"><a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a><span class="w">        </span><span class="p">})</span>
-</span><span id="__span-4-41"><a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span>
-</span><span id="__span-4-42"><a id="__codelineno-4-42" name="__codelineno-4-42" href="#__codelineno-4-42"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-4-43"><a id="__codelineno-4-43" name="__codelineno-4-43" href="#__codelineno-4-43"></a>
-</span><span id="__span-4-44"><a id="__codelineno-4-44" name="__codelineno-4-44" href="#__codelineno-4-44"></a><span class="w">    </span><span class="c1">// Subscribe to subject</span>
-</span><span id="__span-4-45"><a id="__codelineno-4-45" name="__codelineno-4-45" href="#__codelineno-4-45"></a><span class="w">    </span><span class="nx">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">consumer</span><span class="p">.</span><span class="nx">Subscribe</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">handler</span><span class="p">)</span>
-</span><span id="__span-4-46"><a id="__codelineno-4-46" name="__codelineno-4-46" href="#__codelineno-4-46"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-4-47"><a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"Failed to subscribe"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
-</span><span id="__span-4-48"><a id="__codelineno-4-48" name="__codelineno-4-48" href="#__codelineno-4-48"></a><span class="w">        </span><span class="k">return</span>
-</span><span id="__span-4-49"><a id="__codelineno-4-49" name="__codelineno-4-49" href="#__codelineno-4-49"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-4-50"><a id="__codelineno-4-50" name="__codelineno-4-50" href="#__codelineno-4-50"></a>
-</span><span id="__span-4-51"><a id="__codelineno-4-51" name="__codelineno-4-51" href="#__codelineno-4-51"></a><span class="w">    </span><span class="c1">// Keep running for 1 minute</span>
-</span><span id="__span-4-52"><a id="__codelineno-4-52" name="__codelineno-4-52" href="#__codelineno-4-52"></a><span class="w">    </span><span class="nx">time</span><span class="p">.</span><span class="nx">Sleep</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">)</span>
-</span><span id="__span-4-53"><a id="__codelineno-4-53" name="__codelineno-4-53" href="#__codelineno-4-53"></a><span class="p">}</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">    </span><span class="c1">// Create context with cancellation, before the consumer: deferred calls run in</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">    </span><span class="c1">// reverse, so Disconnect then drains while the handlers' context is still live</span>
+</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="w">    </span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">cancel</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">WithCancel</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">())</span>
+</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="nx">cancel</span><span class="p">()</span>
+</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>
+</span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="w">    </span><span class="c1">// Create consumer</span>
+</span><span id="__span-4-30"><a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a><span class="w">    </span><span class="nx">consumer</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">NewConsumer</span><span class="p">(</span><span class="nx">config</span><span class="p">,</span><span class="w"> </span><span class="nx">logger</span><span class="p">)</span>
+</span><span id="__span-4-31"><a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"Failed to create NATS consumer"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
+</span><span id="__span-4-33"><a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-4-34"><a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a><span class="w">    </span><span class="k">defer</span><span class="w"> </span><span class="nx">consumer</span><span class="p">.</span><span class="nx">Disconnect</span><span class="p">()</span>
+</span><span id="__span-4-35"><a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>
+</span><span id="__span-4-36"><a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a><span class="w">    </span><span class="c1">// Define message handler</span>
+</span><span id="__span-4-37"><a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a><span class="w">    </span><span class="nx">handler</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">Message</span><span class="p">)</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-38"><a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Info</span><span class="p">(</span><span class="s">"Received message"</span><span class="p">,</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">KV</span><span class="p">{</span>
+</span><span id="__span-4-39"><a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a><span class="w">            </span><span class="s">"subject"</span><span class="p">:</span><span class="w"> </span><span class="nx">msg</span><span class="p">.</span><span class="nx">Subject</span><span class="p">,</span>
+</span><span id="__span-4-40"><a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a><span class="w">            </span><span class="s">"data"</span><span class="p">:</span><span class="w">    </span><span class="kt">string</span><span class="p">(</span><span class="nx">msg</span><span class="p">.</span><span class="nx">Data</span><span class="p">),</span>
+</span><span id="__span-4-41"><a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a><span class="w">        </span><span class="p">})</span>
+</span><span id="__span-4-42"><a id="__codelineno-4-42" name="__codelineno-4-42" href="#__codelineno-4-42"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span>
+</span><span id="__span-4-43"><a id="__codelineno-4-43" name="__codelineno-4-43" href="#__codelineno-4-43"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-4-44"><a id="__codelineno-4-44" name="__codelineno-4-44" href="#__codelineno-4-44"></a>
+</span><span id="__span-4-45"><a id="__codelineno-4-45" name="__codelineno-4-45" href="#__codelineno-4-45"></a><span class="w">    </span><span class="c1">// Subscribe to subject</span>
+</span><span id="__span-4-46"><a id="__codelineno-4-46" name="__codelineno-4-46" href="#__codelineno-4-46"></a><span class="w">    </span><span class="nx">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">consumer</span><span class="p">.</span><span class="nx">Subscribe</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">handler</span><span class="p">)</span>
+</span><span id="__span-4-47"><a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-48"><a id="__codelineno-4-48" name="__codelineno-4-48" href="#__codelineno-4-48"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"Failed to subscribe"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
+</span><span id="__span-4-49"><a id="__codelineno-4-49" name="__codelineno-4-49" href="#__codelineno-4-49"></a><span class="w">        </span><span class="k">return</span>
+</span><span id="__span-4-50"><a id="__codelineno-4-50" name="__codelineno-4-50" href="#__codelineno-4-50"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-4-51"><a id="__codelineno-4-51" name="__codelineno-4-51" href="#__codelineno-4-51"></a>
+</span><span id="__span-4-52"><a id="__codelineno-4-52" name="__codelineno-4-52" href="#__codelineno-4-52"></a><span class="w">    </span><span class="c1">// Keep running for 1 minute</span>
+</span><span id="__span-4-53"><a id="__codelineno-4-53" name="__codelineno-4-53" href="#__codelineno-4-53"></a><span class="w">    </span><span class="nx">time</span><span class="p">.</span><span class="nx">Sleep</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span><span class="p">)</span>
+</span><span id="__span-4-54"><a id="__codelineno-4-54" name="__codelineno-4-54" href="#__codelineno-4-54"></a><span class="p">}</span>
 </span></code></pre></div>
+<h3 id="disconnecting">Disconnecting<a class="headerlink" href="#disconnecting" title="Permanent link">&para;</a></h3>
+<p><code>Disconnect</code> shuts the consumer down in this order:</p>
+<ol>
+<li>From now on <code>Subscribe</code> and <code>SubscribeSync</code> return <code>ErrConsumerClosed</code>, and a
+   second <code>Disconnect</code> call waits for this one to finish.</li>
+<li><code>SubscribeSync</code> subscriptions are unsubscribed; messages not yet read with
+   <code>NextMsg</code> are dropped.</li>
+<li>Each <code>Subscribe</code> subscription is drained: the server stops sending, and
+   messages already in flight are still delivered to the handler, up to its
+   100-message buffer (nats.go drops the rest as a slow consumer).</li>
+<li>The handlers work through the messages already delivered to them. The
+   connection is still open, so reply acknowledgements and anything a handler
+   publishes still go out.</li>
+<li>The connection is drained, which flushes pending publishes, and closed.</li>
+</ol>
+<p>Steps 3 and 4 share one deadline of <code>drainTimeout</code>; closing the connection
+normally takes up to 5 seconds more, so <code>Disconnect</code> normally blocks for at most
+<code>drainTimeout</code> plus 5 seconds (a socket write to a server that stopped reading can
+add up to the 1-minute write timeout). If the deadline passes first, the connection is closed anyway:
+handlers keep receiving the messages left in their buffer after <code>Disconnect</code>
+returns, and their replies and publishes fail.</p>
+<p><code>Disconnect</code> does not cancel the context passed to <code>Subscribe</code>, and a handler stops as soon
+as that context is cancelled, leaving its buffered messages unhandled. For a graceful
+shutdown, keep that context live until <code>Disconnect</code> returns: call <code>Disconnect</code> first (or
+register <code>defer consumer.Disconnect()</code> after <code>defer cancel()</code>), and do not pass the context
+your signal handling cancels. Do not call <code>Disconnect</code> from inside a handler: it waits for
+every handler to finish, including the one calling it, so it sits out the whole
+<code>drainTimeout</code>, and that handler's later replies run on a closed connection.</p>
+<p><code>Producer.Disconnect</code> drains the connection, flushing pending publishes, and
+waits up to <code>drainTimeout</code> plus 5 seconds for it to close; a second call waits for
+the first to finish.</p>
+<p>This applies to <code>Consumer</code> and <code>Producer</code>. The JetStream types' <code>Disconnect</code>
+closes the connection at once (pending writes are flushed); a JetStream consumer's
+unacknowledged messages are redelivered by the server.</p>
 <h3 id="synchronous-message-consumption">Synchronous Message Consumption<a class="headerlink" href="#synchronous-message-consumption" title="Permanent link">&para;</a></h3>
 <p><code>NextMsg</code> returns the upstream <code>nats.ErrTimeout</code> sentinel when the timeout
 expires without a message arriving. Because the Blueprint provider package
@@ -3871,30 +3974,43 @@ be imported under a different alias to reach its error constants:</p>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="p">:</span><span class="w">  </span><span class="s">"my.subject"</span><span class="p">,</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeBasic</span><span class="p">,</span>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nx">Username</span><span class="p">:</span><span class="w"> </span><span class="s">"user"</span><span class="p">,</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nx">Password</span><span class="p">:</span><span class="w"> </span><span class="s">"password"</span><span class="p">,</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="c1">// the password is read from the embedded secure.DefaultCredentialConfig</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="nx">DefaultCredentialConfig</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">StringPasswordConfig</span><span class="p">(</span><span class="s">"password"</span><span class="p">),</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <h3 id="token-authentication">Token Authentication<a class="headerlink" href="#token-authentication" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">nats</span><span class="p">.</span><span class="nx">ProducerConfig</span><span class="p">{</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nx">URL</span><span class="p">:</span><span class="w">      </span><span class="s">"nats://localhost:4222"</span><span class="p">,</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="p">:</span><span class="w">  </span><span class="s">"my.subject"</span><span class="p">,</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeToken</span><span class="p">,</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nx">Token</span><span class="p">:</span><span class="w">    </span><span class="s">"my-auth-token"</span><span class="p">,</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">}</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="c1">// the token is read from the embedded secure.DefaultCredentialConfig</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="nx">DefaultCredentialConfig</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">StringPasswordConfig</span><span class="p">(</span><span class="s">"my-auth-token"</span><span class="p">),</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="tls-configuration">TLS Configuration<a class="headerlink" href="#tls-configuration" title="Permanent link">&para;</a></h2>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nx">config</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">nats</span><span class="p">.</span><span class="nx">ProducerConfig</span><span class="p">{</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nx">URL</span><span class="p">:</span><span class="w">      </span><span class="s">"nats://localhost:4222"</span><span class="p">,</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="nx">URL</span><span class="p">:</span><span class="w">      </span><span class="s">"tls://localhost:4222"</span><span class="p">,</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="p">:</span><span class="w">  </span><span class="s">"my.subject"</span><span class="p">,</span>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nx">AuthType</span><span class="p">:</span><span class="w"> </span><span class="nx">nats</span><span class="p">.</span><span class="nx">AuthTypeNone</span><span class="p">,</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="c1">// TLS Configuration</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nx">TLSEnabled</span><span class="p">:</span><span class="w">            </span><span class="kc">true</span><span class="p">,</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nx">TLSInsecureSkipVerify</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="nx">TLSCertFile</span><span class="p">:</span><span class="w">           </span><span class="s">"/path/to/client.crt"</span><span class="p">,</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="nx">TLSKeyFile</span><span class="p">:</span><span class="w">            </span><span class="s">"/path/to/client.key"</span><span class="p">,</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="nx">TLSCaFile</span><span class="p">:</span><span class="w">             </span><span class="s">"/path/to/ca.crt"</span><span class="p">,</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="p">}</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="c1">// TLS Configuration (embedded tls.ClientConfig)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nx">ClientConfig</span><span class="p">:</span><span class="w"> </span><span class="nx">tls</span><span class="p">.</span><span class="nx">ClientConfig</span><span class="p">{</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">        </span><span class="nx">TLSEnable</span><span class="p">:</span><span class="w">             </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">        </span><span class="nx">TLSInsecureSkipVerify</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">        </span><span class="nx">TLSCert</span><span class="p">:</span><span class="w">               </span><span class="s">"/path/to/client.crt"</span><span class="p">,</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">        </span><span class="nx">TLSKey</span><span class="p">:</span><span class="w">                </span><span class="s">"/path/to/client.key"</span><span class="p">,</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">        </span><span class="nx">TLSCA</span><span class="p">:</span><span class="w">                 </span><span class="s">"/path/to/ca.crt"</span><span class="p">,</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="p">}</span>
 </span></code></pre></div>
+<p><code>tls</code> here is Blueprint's <code>provider/tls</code> package. With <code>TLSEnable</code> set the connection requires
+TLS: a <code>nats://</code> or <code>tls://</code> server that neither requires nor offers TLS is refused with
+<code>nats: secure connection not available</code>, and no credentials are sent to it (for <code>ws://</code> the
+TLS handshake fails instead). A server that offers TLS without requiring it is connected to
+over TLS, so its certificate must verify against <code>TLSCA</code> (or the system roots). This protects
+credentials from an on-path attacker only while certificates are verified;
+<code>TLSInsecureSkipVerify</code> gives that protection up. TLS settings
+(<code>TLSCA</code>, <code>TLSCert</code>, <code>TLSKey</code>, <code>TLSInsecureSkipVerify</code> or a key password) without
+<code>TLSEnable</code> make <code>Validate()</code> fail with <code>ErrTLSNotEnabled</code>, instead of being ignored.</p>
 <h2 id="jetstream">JetStream<a class="headerlink" href="#jetstream" title="Permanent link">&para;</a></h2>
 <p>JetStream is NATS' built-in persistent streaming layer. The Blueprint NATS
 provider exposes JetStream through two dedicated types that are independent
@@ -3907,16 +4023,19 @@ acknowledgements and automatic redelivery on failure.</p>
 <p>The JetStream types share a common connection config (<code>JSConnectionConfig</code>)
 with the same URL/auth/TLS fields used by the core types.</p>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">JSConnectionConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">          </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span><span class="nx">URL</span><span class="w">          </span><span class="kt">string</span><span class="w"> </span><span class="c1">// NATS server URL or comma-separated list</span>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nx">AuthType</span><span class="w">     </span><span class="kt">string</span><span class="w"> </span><span class="c1">// "none" | "basic" | "token"</span>
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nx">Username</span><span class="w">     </span><span class="kt">string</span><span class="w"> </span><span class="c1">// for basic auth</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="c1">// embedded secure.DefaultCredentialConfig: Password / Token</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="c1">// embedded secure.DefaultCredentialConfig: Password (the token for AuthType "token")</span>
 </span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="nx">ClientName</span><span class="w">   </span><span class="kt">string</span><span class="w"> </span><span class="c1">// defaults to "natsJSProducer" / "natsJSConsumer"</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="c1">// embedded tls.ClientConfig: TLSEnabled, TLSCertFile, etc.</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w">   </span><span class="c1">// seconds</span>
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w">   </span><span class="c1">// milliseconds</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">}</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="c1">// embedded tls.ClientConfig: TLSEnable, TLSCert, TLSKey, TLSCA, TLSInsecureSkipVerify,</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="c1">// and for an encrypted client key one of ClientConfig.TlsKeyCredential.Password,</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">    </span><span class="c1">// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="c1">// tlsKeyPasswordFile)</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="nx">PingInterval</span><span class="w"> </span><span class="kt">uint</span><span class="w">   </span><span class="c1">// seconds</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">    </span><span class="nx">MaxPingsOut</span><span class="w">  </span><span class="kt">uint</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">    </span><span class="nx">Timeout</span><span class="w">      </span><span class="kt">uint</span><span class="w">   </span><span class="c1">// milliseconds</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="p">}</span>
 </span></code></pre></div>
 <h4 id="producer-configuration_1">Producer configuration<a class="headerlink" href="#producer-configuration_1" title="Permanent link">&para;</a></h4>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">JSProducerConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
@@ -3969,7 +4088,8 @@ on startup, which is convenient for development and tests.</p>
 by the constructors before any network round-trips. Invalid policy strings
 return <code>ErrInvalidAckPolicy</code> / <code>ErrInvalidDeliverPolicy</code> / <code>ErrInvalidRetention</code>
 / <code>ErrInvalidStorage</code>; missing required fields return <code>ErrMissingJSURL</code>,
-<code>ErrMissingStreamName</code>, or <code>ErrMissingProducerTopic</code>.</p>
+<code>ErrMissingStreamName</code>, or <code>ErrMissingProducerTopic</code>; TLS settings without
+<code>TLSEnable</code> return <code>ErrTLSNotEnabled</code>.</p>
 <h3 id="producer-usage_1">Producer usage<a class="headerlink" href="#producer-usage_1" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">package</span><span class="w"> </span><span class="nx">main</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
@@ -4103,7 +4223,7 @@ is allowed per consumer — calling <code>Consume</code> twice returns <code>Err
 </span><span id="__span-14-55"><a id="__codelineno-14-55" name="__codelineno-14-55" href="#__codelineno-14-55"></a>
 </span><span id="__span-14-56"><a id="__codelineno-14-56" name="__codelineno-14-56" href="#__codelineno-14-56"></a><span class="w">    </span><span class="c1">// Block on SIGINT/SIGTERM. When a signal arrives cancel() stops the</span>
 </span><span id="__span-14-57"><a id="__codelineno-14-57" name="__codelineno-14-57" href="#__codelineno-14-57"></a><span class="w">    </span><span class="c1">// consume session via the watcher goroutine, and the deferred</span>
-</span><span id="__span-14-58"><a id="__codelineno-14-58" name="__codelineno-14-58" href="#__codelineno-14-58"></a><span class="w">    </span><span class="c1">// Disconnect() drains the connection.</span>
+</span><span id="__span-14-58"><a id="__codelineno-14-58" name="__codelineno-14-58" href="#__codelineno-14-58"></a><span class="w">    </span><span class="c1">// Disconnect() closes the connection.</span>
 </span><span id="__span-14-59"><a id="__codelineno-14-59" name="__codelineno-14-59" href="#__codelineno-14-59"></a><span class="w">    </span><span class="nx">sigCh</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nb">make</span><span class="p">(</span><span class="kt">chan</span><span class="w"> </span><span class="nx">os</span><span class="p">.</span><span class="nx">Signal</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-14-60"><a id="__codelineno-14-60" name="__codelineno-14-60" href="#__codelineno-14-60"></a><span class="w">    </span><span class="nx">signal</span><span class="p">.</span><span class="nx">Notify</span><span class="p">(</span><span class="nx">sigCh</span><span class="p">,</span><span class="w"> </span><span class="nx">syscall</span><span class="p">.</span><span class="nx">SIGINT</span><span class="p">,</span><span class="w"> </span><span class="nx">syscall</span><span class="p">.</span><span class="nx">SIGTERM</span><span class="p">)</span>
 </span><span id="__span-14-61"><a id="__codelineno-14-61" name="__codelineno-14-61" href="#__codelineno-14-61"></a><span class="w">    </span><span class="o">&lt;-</span><span class="nx">sigCh</span>
@@ -4199,7 +4319,7 @@ example <code>Placement</code>, <code>Sources</code>, <code>SubjectTransform</co
 <tbody>
 <tr>
 <td><code>ErrMissingJSURL</code></td>
-<td><code>JSConnectionConfig.URL</code> was empty</td>
+<td><code>JSConnectionConfig.URL</code> was empty or held no non-empty entry</td>
 </tr>
 <tr>
 <td><code>ErrMissingStreamName</code></td>
@@ -4231,7 +4351,7 @@ example <code>Placement</code>, <code>Sources</code>, <code>SubjectTransform</co
 </tr>
 </tbody>
 </table>
-<p>The existing core-NATS sentinels (<code>ErrMissingProducerTopic</code>, <code>ErrInvalidAuthType</code>,
+<p>The core-NATS sentinels (<code>ErrMissingProducerTopic</code>, <code>ErrInvalidAuthType</code>, <code>ErrTLSNotEnabled</code>,
 <code>ErrNilConfig</code>, <code>ErrConsumerClosed</code>, <code>ErrProducerClosed</code>) are also returned by
 the JetStream paths where appropriate.</p>
 
@@ -4256,7 +4376,7 @@ the JetStream paths where appropriate.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="April 11, 2026 14:52:35 UTC">April 11, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 8, 2026 11:36:06 UTC">October 8, 2026</span>
   </span>
 
     
