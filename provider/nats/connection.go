@@ -93,6 +93,9 @@ func connect(p connectParams) (*nats.Conn, error) {
 		return nil, terr
 	} else if tls != nil {
 		opts.TLSConfig = tls
+		// without Secure, nats.go uses TLS only when the server's INFO demands it, and a
+		// server (or an attacker) that does not would receive credentials in plaintext
+		opts.Secure = true
 	}
 
 	if p.PingInterval > 0 {
