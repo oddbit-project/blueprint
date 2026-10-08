@@ -16,14 +16,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Breaking changes
 
-- With `tlsEnable` set, two kinds of deployment that connected in plaintext before now fail
-  to connect (#104):
+- With `tlsEnable` set, three kinds of deployment that connected in plaintext before now
+  fail to connect (#104, #110):
   - Against a server that does not offer TLS, the error is `nats: secure connection not
     available`. Enable TLS on the server, or unset `tlsEnable`.
   - Against a server that offers TLS without requiring it, the client now uses TLS, so a
     certificate the client cannot verify (private CA without `tlsCa`, connecting by IP to a
     certificate with only DNS names) fails with an `x509` error. Set `tlsCa` or connect by
     the certificate's name.
+  - Against a server that requests a client certificate during the TLS handshake, a
+    client without one fails with `tls: certificate required`. Set `tlsCert` and
+    `tlsKey` (#110).
+- TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password)
+  without `tlsEnable` now fail `Validate()` with the new `ErrTLSNotEnabled`, for the
+  producer, consumer and JetStream configs. They used to be ignored silently, leaving the
+  connection, and its credentials, in plaintext. Set `tlsEnable`, or remove the settings
+  (#110).
 
 ### Added
 

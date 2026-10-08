@@ -20,7 +20,7 @@ The NATS client provides a simple interface for connecting to NATS servers, publ
 ### Producer Configuration
 
 The effective shape below is flattened for readability. In the actual Go
-type, `Password`/`Token` come from the embedded
+type, `Password` (also the token for `AuthType` "token") comes from the embedded
 `secure.DefaultCredentialConfig`, the TLS fields come from the embedded
 `tls.ClientConfig`, and the connection-tuning fields come from the embedded
 `ProducerOptions` struct.
@@ -46,6 +46,9 @@ type ProducerConfig struct {
 	TLSCert               string // Client certificate file path
 	TLSKey                string // Client key file path
 	TLSCA                 string // CA certificate file path
+	// for an encrypted client key, one of ClientConfig.TlsKeyCredential.Password,
+	// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,
+	// tlsKeyPasswordFile); cfg.Password is the auth password, not this one
 }
 ```
 
@@ -64,14 +67,14 @@ JetStream configurations alike.
   the whole pool), so a `nats://` server without TLS then fails to connect.
 - Credentials can be given per entry (`nats://user:pass@n1:4222`). A comma inside
   credentials embedded in `URL` must be percent-encoded as `%2C`, or the entry is split at
-  it. The `Username`, `Password` and `Token` fields are not split and need no encoding.
+  it. The `Username` and `Password` fields are not split and need no encoding.
 - A `URL` with no non-empty entry (such as `" , "`) fails `Validate()` with the config's
   missing-URL error.
 
 ### Consumer Configuration
 
 As with `ProducerConfig`, the shape below is flattened for readability. In
-the actual Go type, `Password`/`Token` come from the embedded
+the actual Go type, `Password` (also the token for `AuthType` "token") comes from the embedded
 `secure.DefaultCredentialConfig`, the TLS fields come from the embedded
 `tls.ClientConfig`, and `QueueGroup` together with the connection-tuning
 fields come from the embedded `ConsumerOptions` struct. To set a queue group
@@ -100,6 +103,9 @@ type ConsumerConfig struct {
 	TLSCert               string // Client certificate file path
 	TLSKey                string // Client key file path
 	TLSCA                 string // CA certificate file path
+	// for an encrypted client key, one of ClientConfig.TlsKeyCredential.Password,
+	// .PasswordEnvVar or .PasswordFile (json tlsKeyPassword, tlsKeyPasswordEnvVar,
+	// tlsKeyPasswordFile); cfg.Password is the auth password, not this one
 }
 ```
 
@@ -367,7 +373,9 @@ TLS: a `nats://` or `tls://` server that neither requires nor offers TLS is refu
 TLS handshake fails instead). A server that offers TLS without requiring it is connected to
 over TLS, so its certificate must verify against `TLSCA` (or the system roots). This protects
 credentials from an on-path attacker only while certificates are verified;
-`TLSInsecureSkipVerify` gives that protection up.
+`TLSInsecureSkipVerify` gives that protection up. TLS settings
+(`TLSCA`, `TLSCert`, `TLSKey`, `TLSInsecureSkipVerify` or a key password) without
+`TLSEnable` make `Validate()` fail with `ErrTLSNotEnabled`, instead of being ignored.
 
 ## JetStream
 
@@ -713,6 +721,6 @@ JetStream-specific error sentinels (all declared in `provider/nats/js_common.go`
 | `ErrInvalidRetention` | `StreamConfig.Retention` was not `""`, `"limits"`, `"interest"`, or `"workqueue"` |
 | `ErrInvalidStorage` | `StreamConfig.Storage` was not `""`, `"file"`, or `"memory"` |
 
-The existing core-NATS sentinels (`ErrMissingProducerTopic`, `ErrInvalidAuthType`,
+The core-NATS sentinels (`ErrMissingProducerTopic`, `ErrInvalidAuthType`, `ErrTLSNotEnabled`,
 `ErrNilConfig`, `ErrConsumerClosed`, `ErrProducerClosed`) are also returned by
 the JetStream paths where appropriate.

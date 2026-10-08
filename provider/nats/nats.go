@@ -16,6 +16,7 @@ const (
 	ErrProducerClosed       = utils.Error("Producer is already closed")
 
 	ErrInvalidAuthType = utils.Error("Invalid authentication type")
+	ErrTLSNotEnabled   = utils.Error("TLS settings require tlsEnable")
 	ErrNilConfig       = utils.Error("Config is nil")
 
 	DefaultTimeout      = time.Second * 30

@@ -43,6 +43,17 @@ func serverURLs(url string) []string {
 	return result
 }
 
+// validateTLS rejects TLS settings given without tlsEnable: TLSConfig() ignores them, so
+// the connection would silently stay in plaintext
+func validateTLS(c tlsProvider.ClientConfig) error {
+	key := c.TlsKeyCredential
+	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||
+		key.Password != "" || key.PasswordEnvVar != "" || key.PasswordFile != "") {
+		return ErrTLSNotEnabled
+	}
+	return nil
+}
+
 // connect opens a NATS connection using the shared parameters. It transparently
 // handles secure credential loading for AuthTypeBasic/Token and TLS wiring.
 // The caller is responsible for logging; connect only returns errors.
