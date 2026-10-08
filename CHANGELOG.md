@@ -38,6 +38,12 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 - `config/provider`: a variable for a slice of anything but strings (for example the NATS `Native.BackOff`) is
   now ignored instead of panicking, and a variable named after a nested section itself (`APP_DATABASE=x`) no
   longer stops the section's fields (`APP_DATABASE_HOST`) from being read (#107).
+- `config/provider`: `EnvProvider` and `JsonProvider` `Get`/`GetKey` no longer crash the process
+  (`fatal error: stack overflow`) on a self-referential config type (`Next *Node` inside `Node`, or
+  `A → *B → *A`), or on a cycle of pointers built into the destination. A nil section whose type already
+  encloses it stays nil instead of being allocated without end: with `JsonProvider` always, with
+  `EnvProvider` unless a variable under its key writes a value (`APP_NEXT_NAME`). A cycle is walked once.
+  Configs without a recursive type are unaffected (#120).
 
 ## [v0.14.0] - 2026-10-08
 

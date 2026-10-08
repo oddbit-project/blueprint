@@ -105,14 +105,16 @@ func applyDefaults(dest interface{}) error {
 	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
-	return applyStructDefaults(v)
+	return applyStructDefaults(v, newStructPath())
 }
 
-// applyStructDefaults applies defaults to the exported fields of v, nested structs included
-func applyStructDefaults(v reflect.Value) error {
+// applyStructDefaults applies defaults to the exported fields of v, nested structs included;
+// path holds the structs above v
+func applyStructDefaults(v reflect.Value, path *structPath) error {
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
+	defer path.push(v, "")()
 
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
@@ -133,20 +135,29 @@ func applyStructDefaults(v reflect.Value) error {
 
 		// Recursively apply defaults to nested structs
 		if fieldValue.Kind() == reflect.Struct {
-			if err := applyStructDefaults(fieldValue); err != nil {
+			if err := applyStructDefaults(fieldValue, path); err != nil {
 				return err
 			}
 		} else if fieldValue.Kind() == reflect.Pointer && fieldValue.Type().Elem().Kind() == reflect.Struct {
 			if !fieldValue.IsNil() {
-				if err := applyStructDefaults(fieldValue.Elem()); err != nil {
+				// a cycle the caller built is walked once
+				if path.hasPointer(fieldValue) {
+					continue
+				}
+				if err := applyStructDefaults(fieldValue.Elem(), path); err != nil {
 					return err
 				}
+				continue
+			}
+			// a section of a type already on the path would need an unbounded chain of
+			// sections for its defaults, so it stays nil
+			if path.hasType(fieldValue.Type().Elem()) {
 				continue
 			}
 			// an absent section stays nil, so callers can tell it apart, unless a
 			// default inside it sets a non-zero value
 			section := reflect.New(fieldValue.Type().Elem())
-			if err := applyStructDefaults(section.Elem()); err != nil {
+			if err := applyStructDefaults(section.Elem(), path); err != nil {
 				return err
 			}
 			if !section.Elem().IsZero() {
