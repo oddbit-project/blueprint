@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+
 ### Security
 
 - With TLS enabled (`tlsEnable`), the connection now requires TLS. Before, a `nats://` URL used

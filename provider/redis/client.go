@@ -61,7 +61,7 @@ func (c *Config) Validate() error {
 	if len(c.Address) == 0 {
 		return ErrMissingAddress
 	}
-	return nil
+	return c.ValidateEnabled()
 }
 
 func NewClient(config *Config) (*Client, error) {

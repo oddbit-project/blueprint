@@ -145,7 +145,11 @@ func (c *Config) Validate() error {
 		return errors.New("SSL cannot be disabled for AWS endpoints")
 	}
 
-	return nil
+	// the TLS settings are only applied over SSL
+	if c.TLSEnable && !c.UseSSL {
+		return ErrTLSRequiresSSL
+	}
+	return c.ValidateEnabled()
 }
 
 // IsCustomEndpoint returns true if a custom endpoint is configured

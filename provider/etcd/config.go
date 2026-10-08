@@ -113,7 +113,7 @@ func (c *Config) Validate() error {
 	if len(c.Endpoints) == 0 {
 		return errors.New("no etcd endpoints provided")
 	}
-	return nil
+	return c.ValidateEnabled()
 }
 
 // NewClient creates and returns a new etcd client using this configuration.

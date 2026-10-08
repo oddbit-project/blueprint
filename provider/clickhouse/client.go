@@ -124,7 +124,7 @@ func (c ClientConfig) Validate() error {
 		return ErrInvalidConnStrategy
 	}
 
-	return nil
+	return c.ValidateEnabled()
 }
 
 func NewClient(config *ClientConfig) (*Client, error) {
