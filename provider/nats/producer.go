@@ -8,6 +8,7 @@ import (
 	"github.com/oddbit-project/blueprint/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
 	"slices"
+	"sync"
 	"time"
 )
 
@@ -16,7 +17,7 @@ type ProducerOptions struct {
 	PingInterval uint `json:"pingInterval"` // PingInterval value in seconds, defaults to 2 minutes
 	MaxPingsOut  uint `json:"maxPingsOut"`  // MaxPingsOut value, defaults to 2
 	Timeout      uint `json:"timeout"`      // Connection timeout in milliseconds, defaults to 2000
-	DrainTimeout uint `json:"drainTimeout"` // Drain timeout in milliseconds, defaults to 30000
+	DrainTimeout uint `json:"drainTimeout"` // Drain timeout in milliseconds, defaults to 30000; bounds Disconnect
 }
 
 type ProducerConfig struct {
@@ -35,6 +36,10 @@ type Producer struct {
 	Subject string
 	Conn    *nats.Conn
 	Logger  *log.Logger
+
+	mu      sync.Mutex
+	closing bool          // Disconnect has started; guarded by mu
+	stopped chan struct{} // closed when the first Disconnect returns; guarded by mu
 }
 
 // ApplyOptions sets additional connection parameters
@@ -47,6 +52,9 @@ func (p ProducerOptions) ApplyOptions(opts *nats.Options) {
 	}
 	if p.Timeout > 0 {
 		opts.Timeout = time.Duration(p.Timeout) * time.Millisecond
+	}
+	if p.DrainTimeout > 0 {
+		opts.DrainTimeout = time.Duration(p.DrainTimeout) * time.Millisecond
 	}
 }
 
@@ -95,6 +103,7 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 		PingInterval: cfg.PingInterval,
 		MaxPingsOut:  cfg.MaxPingsOut,
 		Timeout:      cfg.Timeout,
+		DrainTimeout: cfg.DrainTimeout,
 	})
 	if err != nil {
 		logger.Error(err, "Failed to connect to NATS", log.KV{
@@ -112,17 +121,30 @@ func NewProducer(cfg *ProducerConfig, logger *log.Logger) (*Producer, error) {
 	}, nil
 }
 
-// Disconnect closes the connection to NATS
+// Disconnect drains the connection to NATS and closes it; it can block up to
+// drainTimeout plus 5 seconds
 func (p *Producer) Disconnect() {
-	// Check if producer is nil or already disconnected
-	if p == nil || p.Conn == nil {
+	if p == nil {
 		return
 	}
 
-	// Check if already draining
-	if p.Conn.IsDraining() {
+	p.mu.Lock()
+	conn := p.Conn
+	if conn == nil {
+		p.mu.Unlock()
 		return
 	}
+	if p.closing {
+		// another Disconnect is flushing; return when it has finished
+		stopped := p.stopped
+		p.mu.Unlock()
+		<-stopped
+		return
+	}
+	p.closing = true
+	p.stopped = make(chan struct{})
+	defer close(p.stopped)
+	p.mu.Unlock()
 
 	// Log disconnect if logger is available
 	if p.Logger != nil {
@@ -131,14 +153,15 @@ func (p *Producer) Disconnect() {
 		})
 	}
 
-	// Use Drain for graceful shutdown
-	if err := p.Conn.Drain(); err != nil && p.Logger != nil {
+	// Use Drain for graceful shutdown: it flushes pending publishes before closing
+	if err := conn.Drain(); err != nil && p.Logger != nil {
 		p.Logger.Error(err, "Error during NATS connection drain", nil)
 	}
+	waitClosed(conn, conn.Opts.DrainTimeout+drainFlushTimeout)
 
-	// Close and clean up
-	p.Conn.Close()
+	p.mu.Lock()
 	p.Conn = nil
+	p.mu.Unlock()
 }
 
 // IsConnected returns true if the NATS connection is connected

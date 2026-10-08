@@ -158,14 +158,16 @@ func runConsumer(ctx context.Context, url, subject, queue string) {
 		return nil
 	}
 
-	// Subscribe to subject
-	err = consumer.Subscribe(ctx, handler)
+	// Subscribe to subject. The handlers get their own context: ctx is cancelled on
+	// shutdown, and a cancelled handler would drop the messages the deferred Disconnect
+	// is meant to let it finish
+	err = consumer.Subscribe(context.Background(), handler)
 	if err != nil {
 		logger.Error(err, "Failed to subscribe", nil)
 		return
 	}
 
-	// Wait for context cancellation
+	// Wait for context cancellation; the deferred Disconnect then drains
 	<-ctx.Done()
 	logger.Info("Consumer shutting down", nil)
 }

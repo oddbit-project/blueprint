@@ -38,6 +38,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A comma in `url` now always separates servers. A URL whose credentials contain a comma
   (`nats://user:p,ss@host`) connected before and now fails; percent-encode the comma as
   `%2C` (#99).
+- `Consumer.Disconnect` now shuts down gracefully: it drains the `Subscribe`
+  subscriptions, lets the handlers finish the messages already delivered to them while
+  the connection is still open, then drains and closes the connection. Previously it
+  unsubscribed and closed at once, so buffered messages were handled on a closed
+  connection and their reply acknowledgements failed. Unread `SubscribeSync` messages are
+  dropped. `Producer.Disconnect` now waits for its drain to finish. Both can block for up
+  to `drainTimeout` plus 5 seconds; lower `drainTimeout` if your shutdown has a tighter
+  deadline. To get the graceful drain, keep the `Subscribe` context live until
+  `Disconnect` returns (a handler still stops, dropping its buffer, once that context is
+  cancelled), and do not call `Disconnect` from inside a handler (#105).
+- Once `Consumer.Disconnect` has started, `Subscribe` and `SubscribeSync` return
+  `ErrConsumerClosed`; a second `Disconnect` on a consumer or producer waits for the first
+  to finish (#105).
+- The JetStream types' `Disconnect` closes the connection directly instead of starting a
+  drain it then cut short (pending writes are still flushed) (#105).
+- Connections now start from nats.go's default options, which also turns on reconnect
+  jitter (100ms, 1s with TLS) and a 1-minute write timeout (#105).
+
+### Fixed
+
+- `pingInterval` now defaults to 2 minutes as documented, for producers, consumers and
+  JetStream connections. Client pings were off when it was unset, so a stale connection
+  was only noticed by TCP (#105).
+- A configured `drainTimeout` is now applied to the connection (default 30000ms); it was
+  ignored (#105).
 
 ## [v0.9.0] - 2026-09-27
 

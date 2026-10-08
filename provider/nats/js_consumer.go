@@ -394,9 +394,8 @@ func (c *JSConsumer) Disconnect() {
 			"stream": c.StreamName,
 		})
 	}
-	if err := conn.Drain(); err != nil && c.Logger != nil {
-		c.Logger.Error(err, "Error during NATS connection drain", nil)
-	}
+	// Close flushes pending writes; a Drain followed at once by Close would only
+	// leave nats.go's drain goroutine polling until its timeout
 	conn.Close()
 	// Intentionally do not set c.Conn = nil: nats.Conn methods are safe to call
 	// after Close, IsConnected() returns false, and leaving the field set
