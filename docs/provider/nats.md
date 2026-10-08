@@ -32,7 +32,7 @@ type ProducerConfig struct {
 	AuthType string // Authentication type: "none", "basic", "token"
 	Username string // Username for basic auth
 	Password string // Password for basic auth (embedded secure.DefaultCredentialConfig)
-	Token    string // Auth token (embedded secure.DefaultCredentialConfig)
+	// for AuthType "token", the token is the Password above
 
 	// Connection settings (embedded ProducerOptions)
 	PingInterval uint // PingInterval in seconds, defaults to 2 minutes
@@ -41,11 +41,11 @@ type ProducerConfig struct {
 	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
 
 	// TLS Configuration (embedded tls.ClientConfig)
-	TLSEnabled            bool   // Enable TLS
+	TLSEnable             bool   // Enable TLS; the server must then offer TLS
 	TLSInsecureSkipVerify bool   // Skip certificate verification
-	TLSCertFile           string // Client certificate file path
-	TLSKeyFile            string // Client key file path
-	TLSCaFile             string // CA certificate file path
+	TLSCert               string // Client certificate file path
+	TLSKey                string // Client key file path
+	TLSCA                 string // CA certificate file path
 }
 ```
 
@@ -85,7 +85,7 @@ type ConsumerConfig struct {
 	AuthType   string // Authentication type: "none", "basic", "token"
 	Username   string // Username for basic auth
 	Password   string // Password for basic auth (embedded secure.DefaultCredentialConfig)
-	Token      string // Auth token (embedded secure.DefaultCredentialConfig)
+	// for AuthType "token", the token is the Password above
 	QueueGroup string // Queue group (embedded ConsumerOptions.QueueGroup)
 
 	// Connection settings (embedded ConsumerOptions)
@@ -95,11 +95,11 @@ type ConsumerConfig struct {
 	DrainTimeout uint // Drain timeout in milliseconds, defaults to 30000
 
 	// TLS Configuration (embedded tls.ClientConfig)
-	TLSEnabled            bool   // Enable TLS
+	TLSEnable             bool   // Enable TLS; the server must then offer TLS
 	TLSInsecureSkipVerify bool   // Skip certificate verification
-	TLSCertFile           string // Client certificate file path
-	TLSKeyFile            string // Client key file path
-	TLSCaFile             string // CA certificate file path
+	TLSCert               string // Client certificate file path
+	TLSKey                string // Client key file path
+	TLSCA                 string // CA certificate file path
 }
 ```
 
@@ -286,7 +286,8 @@ config := &nats.ProducerConfig{
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeBasic,
 	Username: "user",
-	Password: "password",
+	// the password is read from the embedded secure.DefaultCredentialConfig
+	DefaultCredentialConfig: nats.StringPasswordConfig("password"),
 }
 ```
 
@@ -297,7 +298,8 @@ config := &nats.ProducerConfig{
 	URL:      "nats://localhost:4222",
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeToken,
-	Token:    "my-auth-token",
+	// the token is read from the embedded secure.DefaultCredentialConfig
+	DefaultCredentialConfig: nats.StringPasswordConfig("my-auth-token"),
 }
 ```
 
@@ -305,17 +307,27 @@ config := &nats.ProducerConfig{
 
 ```go
 config := &nats.ProducerConfig{
-	URL:      "nats://localhost:4222",
+	URL:      "tls://localhost:4222",
 	Subject:  "my.subject",
 	AuthType: nats.AuthTypeNone,
-	// TLS Configuration
-	TLSEnabled:            true,
-	TLSInsecureSkipVerify: false,
-	TLSCertFile:           "/path/to/client.crt",
-	TLSKeyFile:            "/path/to/client.key",
-	TLSCaFile:             "/path/to/ca.crt",
+	// TLS Configuration (embedded tls.ClientConfig)
+	ClientConfig: tls.ClientConfig{
+		TLSEnable:             true,
+		TLSInsecureSkipVerify: false,
+		TLSCert:               "/path/to/client.crt",
+		TLSKey:                "/path/to/client.key",
+		TLSCA:                 "/path/to/ca.crt",
+	},
 }
 ```
+
+`tls` here is Blueprint's `provider/tls` package. With `TLSEnable` set the connection requires
+TLS: a `nats://` or `tls://` server that neither requires nor offers TLS is refused with
+`nats: secure connection not available`, and no credentials are sent to it (for `ws://` the
+TLS handshake fails instead). A server that offers TLS without requiring it is connected to
+over TLS, so its certificate must verify against `TLSCA` (or the system roots). This protects
+credentials from an on-path attacker only while certificates are verified;
+`TLSInsecureSkipVerify` gives that protection up.
 
 ## JetStream
 
@@ -338,9 +350,9 @@ type JSConnectionConfig struct {
     URL          string // NATS server URL or comma-separated list
     AuthType     string // "none" | "basic" | "token"
     Username     string // for basic auth
-    // embedded secure.DefaultCredentialConfig: Password / Token
+    // embedded secure.DefaultCredentialConfig: Password (the token for AuthType "token")
     ClientName   string // defaults to "natsJSProducer" / "natsJSConsumer"
-    // embedded tls.ClientConfig: TLSEnabled, TLSCertFile, etc.
+    // embedded tls.ClientConfig: TLSEnable, TLSCert, TLSKey, TLSCA, etc.
     PingInterval uint   // seconds
     MaxPingsOut  uint
     Timeout      uint   // milliseconds

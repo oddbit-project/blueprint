@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- With TLS enabled (`tlsEnable`), the connection now requires TLS. Before, a `nats://` URL used
+  TLS only when the server's INFO demanded it, so a server without TLS, or an attacker on the
+  network path, received CONNECT, username and password or token included, in plaintext, on
+  the first connect and on every reconnect. With `tlsInsecureSkipVerify` an on-path attacker
+  can still present any certificate (#104).
+
+### Breaking changes
+
+- With `tlsEnable` set, two kinds of deployment that connected in plaintext before now fail
+  to connect (#104):
+  - Against a server that does not offer TLS, the error is `nats: secure connection not
+    available`. Enable TLS on the server, or unset `tlsEnable`.
+  - Against a server that offers TLS without requiring it, the client now uses TLS, so a
+    certificate the client cannot verify (private CA without `tlsCa`, connecting by IP to a
+    certificate with only DNS names) fails with an `x509` error. Set `tlsCa` or connect by
+    the certificate's name.
+
 ### Added
 
 - `url` accepts a comma-separated server list (e.g. a cluster seed list), split as
