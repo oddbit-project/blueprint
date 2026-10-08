@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// fakeServerINFO is the INFO line the fake servers send: no TLS, no auth
+const fakeServerINFO = `INFO {"server_id":"x","version":"2.10.0","proto":1,"max_payload":1048576}` + "\r\n"
+
 // handshakeServer accepts connections and answers every PING, enough for a client
 // to connect; the effective options are then read from the client's Conn
 func handshakeServer(t *testing.T) string {
@@ -26,7 +29,7 @@ func handshakeServer(t *testing.T) string {
 			}
 			go func(c net.Conn) {
 				defer func() { _ = c.Close() }()
-				_, _ = c.Write([]byte(`INFO {"server_id":"x","version":"2.10.0","proto":1,"max_payload":1048576}` + "\r\n"))
+				_, _ = c.Write([]byte(fakeServerINFO))
 				r := bufio.NewReader(c)
 				for {
 					line, err := r.ReadString('\n')
@@ -56,6 +59,7 @@ func TestIssue105_DefaultPingAndFlusher(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Conn.Close()
 	assert.Equal(t, nats.DefaultPingInterval, c.Conn.Opts.PingInterval, "consumer ping interval")
+	assert.Equal(t, nats.DefaultFlusherTimeout, c.Conn.Opts.FlusherTimeout, "consumer flusher timeout")
 }
 
 func TestIssue105_ConfiguredPingInterval(t *testing.T) {
@@ -69,25 +73,47 @@ func TestIssue105_ConfiguredPingInterval(t *testing.T) {
 
 func TestIssue105_DrainTimeout(t *testing.T) {
 	url := handshakeServer(t)
+	cases := []struct {
+		name    string
+		connect func(drainMs uint) (*nats.Conn, error)
+		drainMs uint
+		want    time.Duration
+	}{
+		{"configured producer", producerConn(url), 5000, 5 * time.Second},
+		{"configured consumer", consumerConn(url), 4000, 4 * time.Second},
+		{"default producer", producerConn(url), 0, nats.DefaultDrainTimeout},
+		{"default consumer", consumerConn(url), 0, nats.DefaultDrainTimeout},
+	}
+	for _, tc := range cases {
+		conn, err := tc.connect(tc.drainMs)
+		require.NoError(t, err, tc.name)
+		assert.Equal(t, tc.want, conn.Opts.DrainTimeout, tc.name)
+		conn.Close()
+	}
+}
 
-	cfg := &ProducerConfig{URL: url, Subject: "x", AuthType: AuthTypeNone}
-	cfg.DrainTimeout = 5000
-	p, err := NewProducer(cfg, nil)
-	require.NoError(t, err)
-	defer p.Conn.Close()
-	assert.Equal(t, 5*time.Second, p.Conn.Opts.DrainTimeout, "configured producer drain timeout")
+func producerConn(url string) func(uint) (*nats.Conn, error) {
+	return func(drainMs uint) (*nats.Conn, error) {
+		cfg := &ProducerConfig{URL: url, Subject: "x", AuthType: AuthTypeNone}
+		cfg.DrainTimeout = drainMs
+		p, err := NewProducer(cfg, nil)
+		if err != nil {
+			return nil, err
+		}
+		return p.Conn, nil
+	}
+}
 
-	ccfg := &ConsumerConfig{URL: url, Subject: "x", AuthType: AuthTypeNone}
-	ccfg.DrainTimeout = 4000
-	c, err := NewConsumer(ccfg, nil)
-	require.NoError(t, err)
-	defer c.Conn.Close()
-	assert.Equal(t, 4*time.Second, c.Conn.Opts.DrainTimeout, "configured consumer drain timeout")
-
-	d, err := NewProducer(&ProducerConfig{URL: url, Subject: "x", AuthType: AuthTypeNone}, nil)
-	require.NoError(t, err)
-	defer d.Conn.Close()
-	assert.Equal(t, nats.DefaultDrainTimeout, d.Conn.Opts.DrainTimeout, "default drain timeout")
+func consumerConn(url string) func(uint) (*nats.Conn, error) {
+	return func(drainMs uint) (*nats.Conn, error) {
+		cfg := &ConsumerConfig{URL: url, Subject: "x", AuthType: AuthTypeNone}
+		cfg.DrainTimeout = drainMs
+		c, err := NewConsumer(cfg, nil)
+		if err != nil {
+			return nil, err
+		}
+		return c.Conn, nil
+	}
 }
 
 func TestIssue105_JetStreamDefaultPing(t *testing.T) {
@@ -95,4 +121,12 @@ func TestIssue105_JetStreamDefaultPing(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 	assert.Equal(t, nats.DefaultPingInterval, conn.Opts.PingInterval)
+}
+
+func TestIssue105_ApplyOptionsDrainTimeout(t *testing.T) {
+	var popts, copts nats.Options
+	ProducerOptions{DrainTimeout: 5000}.ApplyOptions(&popts)
+	ConsumerOptions{DrainTimeout: 4000}.ApplyOptions(&copts)
+	assert.Equal(t, 5*time.Second, popts.DrainTimeout, "ProducerOptions")
+	assert.Equal(t, 4*time.Second, copts.DrainTimeout, "ConsumerOptions")
 }

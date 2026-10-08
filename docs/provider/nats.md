@@ -250,9 +250,10 @@ func main() {
    publishes still go out.
 5. The connection is drained, which flushes pending publishes, and closed.
 
-Steps 3 and 4 share one deadline of `drainTimeout`; closing the connection can
-take up to 5 seconds more, so `Disconnect` blocks for at most `drainTimeout`
-plus 5 seconds. If the deadline passes first, the connection is closed anyway:
+Steps 3 and 4 share one deadline of `drainTimeout`; closing the connection
+normally takes up to 5 seconds more, so `Disconnect` normally blocks for at most
+`drainTimeout` plus 5 seconds (a socket write to a server that stopped reading can
+add up to the 1-minute write timeout). If the deadline passes first, the connection is closed anyway:
 handlers keep receiving the messages left in their buffer after `Disconnect`
 returns, and their replies and publishes fail.
 
@@ -265,7 +266,12 @@ every handler to finish, including the one calling it, so it sits out the whole
 `drainTimeout`, and that handler's later replies run on a closed connection.
 
 `Producer.Disconnect` drains the connection, flushing pending publishes, and
-waits up to `drainTimeout` plus 5 seconds for it to close.
+waits up to `drainTimeout` plus 5 seconds for it to close; a second call waits for
+the first to finish.
+
+This applies to `Consumer` and `Producer`. The JetStream types' `Disconnect`
+closes the connection at once (pending writes are flushed); a JetStream consumer's
+unacknowledged messages are redelivered by the server.
 
 ### Synchronous Message Consumption
 
@@ -592,7 +598,7 @@ func main() {
 
     // Block on SIGINT/SIGTERM. When a signal arrives cancel() stops the
     // consume session via the watcher goroutine, and the deferred
-    // Disconnect() drains the connection.
+    // Disconnect() closes the connection.
     sigCh := make(chan os.Signal, 1)
     signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
     <-sigCh

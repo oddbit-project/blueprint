@@ -155,9 +155,8 @@ func (p *JSProducer) Disconnect() {
 			"subject": p.Subject,
 		})
 	}
-	if err := conn.Drain(); err != nil && p.Logger != nil {
-		p.Logger.Error(err, "Error during NATS connection drain", nil)
-	}
+	// Close flushes pending writes; a Drain followed at once by Close would only
+	// leave nats.go's drain goroutine polling until its timeout
 	conn.Close()
 	// Intentionally do not set p.Conn = nil; see note in JSConsumer.Disconnect.
 }

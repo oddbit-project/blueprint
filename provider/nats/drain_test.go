@@ -27,7 +27,7 @@ func drainServer(t *testing.T) (url string, subscribed <-chan struct{}, release 
 			return
 		}
 		defer func() { _ = c.Close() }()
-		_, _ = c.Write([]byte(`INFO {"server_id":"x","version":"2.10.0","proto":1,"max_payload":1048576}` + "\r\n"))
+		_, _ = c.Write([]byte(fakeServerINFO))
 		r := bufio.NewReader(c)
 		var sid, subject string
 		unsubscribed := false
@@ -59,7 +59,8 @@ func drainServer(t *testing.T) (url string, subscribed <-chan struct{}, release 
 func TestIssue105_CancelDuringDrainDoesNotPanic(t *testing.T) {
 	url, subscribed, release := drainServer(t)
 	cfg := &ConsumerConfig{URL: url, Subject: "issue105", AuthType: AuthTypeNone}
-	cfg.DrainTimeout = 3000
+	const drain = 500 * time.Millisecond
+	cfg.DrainTimeout = uint(drain / time.Millisecond)
 	c, err := NewConsumer(cfg, nil)
 	require.NoError(t, err)
 	conn := c.Conn
@@ -78,7 +79,9 @@ func TestIssue105_CancelDuringDrainDoesNotPanic(t *testing.T) {
 		c.Disconnect()
 		close(done)
 	}()
-	require.Eventually(t, conn.IsDraining, 5*time.Second, 5*time.Millisecond)
+	// the server holds the subscription drain's PONG, so the connection drain starts
+	// once drainTimeout has passed
+	require.Eventually(t, conn.IsDraining, drain+2*time.Second, 5*time.Millisecond)
 
 	// the handler stops while the connection drains, then an in-flight message arrives;
 	// a closed handler channel here panics inside nats.go's read loop

@@ -18,7 +18,7 @@ type ConsumerOptions struct {
 	PingInterval uint   `json:"pingInterval"` // PingInterval value in seconds, defaults to 2 minutes
 	MaxPingsOut  uint   `json:"maxPingsOut"`  // MaxPingsOut value, defaults to 2
 	Timeout      uint   `json:"timeout"`      // Connection timeout in milliseconds, defaults to 2000
-	DrainTimeout uint   `json:"drainTimeout"` // Drain timeout in milliseconds, defaults to 30000
+	DrainTimeout uint   `json:"drainTimeout"` // Drain timeout in milliseconds, defaults to 30000; bounds Disconnect
 }
 
 type ConsumerConfig struct {
@@ -81,6 +81,9 @@ func (c ConsumerOptions) ApplyOptions(opts *nats.Options) {
 	}
 	if c.Timeout > 0 {
 		opts.Timeout = time.Duration(c.Timeout) * time.Millisecond
+	}
+	if c.DrainTimeout > 0 {
+		opts.DrainTimeout = time.Duration(c.DrainTimeout) * time.Millisecond
 	}
 }
 
@@ -163,9 +166,14 @@ func (c *Consumer) IsConnected() bool {
 
 // Disconnect stops the subscriptions, lets the Subscribe handlers finish the messages
 // already delivered while the connection is still open, then drains and closes the
-// connection. Handlers get up to drainTimeout; closing the connection can take up to
-// 5 seconds more. Once Disconnect has started, Subscribe and SubscribeSync return
-// ErrConsumerClosed
+// connection. Handlers get up to drainTimeout; closing the connection normally takes
+// up to 5 seconds more. Once Disconnect has started, Subscribe and SubscribeSync return
+// ErrConsumerClosed, and a second Disconnect waits for this one to finish.
+//
+// Keep the context passed to Subscribe live until Disconnect returns: a handler stops
+// when it is cancelled and its buffered messages are dropped. Do not call Disconnect
+// from inside a handler: it waits for every handler, including the caller, so it sits
+// out the whole drainTimeout.
 func (c *Consumer) Disconnect() {
 	if c == nil {
 		return
@@ -274,7 +282,9 @@ func convertMessage(msg *nats.Msg) Message {
 	}
 }
 
-// Subscribe subscribes to the subject and processes messages with the handler function
+// Subscribe subscribes to the subject and processes messages with the handler function.
+// The handler stops when ctx is cancelled; for a graceful Disconnect keep ctx live until
+// Disconnect returns, and do not call Disconnect from inside the handler
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 	c.subsLock.Lock()
 	defer c.subsLock.Unlock()
@@ -329,8 +339,11 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 			if !sub.IsValid() {
 				h.closeChan()
 			} else if err := sub.Unsubscribe(); err != nil {
-				// ErrConnectionDraining is expected while Disconnect drains
-				if !errors.Is(err, nats.ErrConnectionDraining) {
+				// expected while Disconnect drains, or once it has removed the
+				// subscription or closed the connection
+				if !errors.Is(err, nats.ErrConnectionDraining) &&
+					!errors.Is(err, nats.ErrBadSubscription) &&
+					!errors.Is(err, nats.ErrConnectionClosed) {
 					c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
 						"subject": c.Subject,
 					})
