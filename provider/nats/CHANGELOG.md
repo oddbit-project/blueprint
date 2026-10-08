@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `Producer.IsConnected`, `Publish`, `PublishMsg`, `PublishRequest` and `Request`, and
+  `Consumer.IsConnected`, `NextMsg`, `Unsubscribe` and `Request`, no longer race with
+  `Disconnect` on the `Conn` field when called from another goroutine while it runs, for
+  example a worker still publishing during shutdown. Under `-race` such a call was
+  reported as a data race. In builds that read the field twice, such as race-enabled or
+  unoptimised (`-gcflags='-N -l'`, as debuggers use) builds, `IsConnected` could also
+  dereference a nil connection if `Disconnect` cleared the field between its check and its
+  call. Code that reads the exported `Conn` field itself while `Disconnect` runs still
+  races; use the methods instead (#113).
+
 ## [v0.10.0] - 2026-10-08
 
 Requires Blueprint core v0.14.0.
