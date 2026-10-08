@@ -235,7 +235,14 @@ type AppConfig struct {
 }
 ```
 
-If `APP_DATABASE_*` or `APP_SERVER_*` variables are present, Blueprint allocates the nested structs and fills them recursively. Any missing nested fields continue to use their `default:` tags.
+If `APP_DATABASE_*` or `APP_SERVER_*` variables set values, Blueprint allocates the nested structs and fills them recursively. Any missing nested fields continue to use their `default:` tags.
+A nil pointer section that no variable writes to stays nil, as with the JSON provider, unless one of its `default:`
+tags sets a non-zero value; it is then allocated with those defaults. A variable that writes nothing (a field kind
+the provider does not parse, such as a slice of anything but strings, an invalid value, or the key of a section
+itself) does not allocate it, and a section's own key does not stop its fields from being read. Unexported
+fields, and embedded pointers to unexported types, are not read from the environment and get no defaults; the
+exported fields of an embedded struct value are read under the embedded type's name as prefix, like any
+nested struct. `json:"-"` does not exclude a field from the environment.
 
 ### CamelCase Conversion
 

@@ -23,7 +23,9 @@ type EnvProvider struct {
 
 var DefaultSeparator = CommaSeparator
 
-func setFieldValueFromString(fieldValue reflect.Value, val string, strict bool) error {
+// setFieldValueFromString sets fieldValue from val and reports whether it wrote a value; an
+// unsupported kind, or an invalid value when not strict, is left alone
+func setFieldValueFromString(fieldValue reflect.Value, val string, strict bool) (bool, error) {
 	switch fieldValue.Kind() {
 	case reflect.String:
 		fieldValue.SetString(val)
@@ -31,37 +33,42 @@ func setFieldValueFromString(fieldValue reflect.Value, val string, strict bool) 
 		intVal, err := strconv.Atoi(val)
 		if err != nil {
 			if strict {
-				return fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
+				return false, fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
 			}
-			return nil
+			return false, nil
 		}
 		fieldValue.SetInt(int64(intVal))
 	case reflect.Bool:
 		boolVal, err := strconv.ParseBool(val)
 		if err != nil {
 			if strict {
-				return fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
+				return false, fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
 			}
-			return nil
+			return false, nil
 		}
 		fieldValue.SetBool(boolVal)
 	case reflect.Float64:
 		floatVal, err := strconv.ParseFloat(val, 64)
 		if err != nil {
 			if strict {
-				return fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
+				return false, fmt.Errorf("%w: %q", config.ErrInvalidDefault, val)
 			}
-			return nil
+			return false, nil
 		}
 		fieldValue.SetFloat(floatVal)
 	case reflect.Slice:
+		if fieldValue.Type().Elem().Kind() != reflect.String {
+			return false, nil
+		}
 		sliceVal := reflect.MakeSlice(fieldValue.Type(), 0, 0)
 		for _, s := range strings.Split(val, DefaultSeparator) {
 			sliceVal = reflect.Append(sliceVal, reflect.ValueOf(strings.TrimSpace(s)))
 		}
 		fieldValue.Set(sliceVal)
+	default:
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 // NewEnvProvider builds a new config.ConfigProvider object from system Environment variables.
@@ -149,13 +156,27 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 	if v.Kind() != reflect.Struct {
 		return config.ErrInvalidType
 	}
+	_, err := e.readPrefixedValue(prefix, v)
+	return err
+}
+
+// readPrefixedValue fills the struct v from the variables under prefix, and reports whether a
+// variable was present or a default set a non-zero value
+func (e *EnvProvider) readPrefixedValue(prefix string, v reflect.Value) (bool, error) {
 	// Convert prefix if needed
 	if prefix != "" {
 		prefix = strings.ToUpper(e.convertKey(prefix))
 	}
 
+	set := false
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
+		// unexported fields are not configuration; an embedded struct value of an unexported
+		// type is kept, since its exported fields are settable (an embedded pointer to one is
+		// skipped, as in the JSON provider)
+		if !field.IsExported() && (!field.Anonymous || field.Type.Kind() != reflect.Struct) {
+			continue
+		}
 		fieldName := field.Tag.Get("env")
 		fieldValue := v.Field(i)
 		if fieldName == "" {
@@ -180,29 +201,46 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 			}
 		}
 
+		written := false
 		if ok {
-			if err := setFieldValueFromString(fieldValue, val, isDefault); err != nil {
-				return err
+			var err error
+			written, err = setFieldValueFromString(fieldValue, val, isDefault)
+			if err != nil {
+				return false, err
 			}
-		} else {
+			if written && (!isDefault || !fieldValue.IsZero()) {
+				set = true
+			}
+		}
+		// a value that wrote nothing (such as the key of a section itself) does not hide the
+		// section's own fields
+		if !written {
 			// if its struct, recurse
 			if fieldValue.Kind() == reflect.Struct {
-				if fieldValue.CanAddr() {
-					if err := e.readPrefixedStruct(envKey, fieldValue.Addr().Interface()); err != nil {
-						return err
-					}
+				fieldSet, err := e.readPrefixedValue(envKey, fieldValue)
+				if err != nil {
+					return false, err
 				}
+				set = set || fieldSet
 			} else if fieldValue.Kind() == reflect.Pointer && fieldValue.Type().Elem().Kind() == reflect.Struct {
+				target := fieldValue
 				if fieldValue.IsNil() {
-					fieldValue.Set(reflect.New(fieldValue.Type().Elem()))
+					// an absent section stays nil, so callers can tell it apart, unless a
+					// variable or a non-zero default inside it sets something
+					target = reflect.New(fieldValue.Type().Elem())
 				}
-				if err := e.readPrefixedStruct(envKey, fieldValue.Interface()); err != nil {
-					return err
+				fieldSet, err := e.readPrefixedValue(envKey, target.Elem())
+				if err != nil {
+					return false, err
 				}
+				if fieldSet && fieldValue.IsNil() {
+					fieldValue.Set(target)
+				}
+				set = set || fieldSet
 			}
 		}
 	}
-	return nil
+	return set, nil
 }
 
 // readKeyInterface reads a configuration value for the specified key
