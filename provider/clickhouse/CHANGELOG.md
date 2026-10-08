@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-Requires the Blueprint core release after v0.13.0 (`tls.ClientConfig.ValidateEnabled`, #116).
+## [v0.11.0] - 2026-10-08
+
+Requires Blueprint core v0.14.0.
 
 ### Added
 

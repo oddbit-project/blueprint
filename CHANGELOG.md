@@ -17,6 +17,25 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.14.0] - 2026-10-08
+
+### Module versions
+
+Released together with core v0.14.0; each requires core v0.14.0:
+
+- `provider/clickhouse` v0.11.0: cluster mode creates a replicated, shared migration log and rejects
+  an existing node-local one (#98); TLS settings without `tlsEnable` are rejected (#116).
+- `provider/nats` v0.10.0: `url` accepts a server list (#99); `tlsEnable` now requires TLS (#104);
+  documented ping/drain defaults are applied and `Disconnect` drains gracefully (#105); TLS
+  settings without `tlsEnable` are rejected (#110, #116).
+- `provider/etcd` v0.11.0, `provider/franz` v0.10.0, `provider/kafka` v0.10.0, `provider/mqtt`
+  v0.10.0, `provider/redis` v0.10.0, `provider/s3` v0.11.0: TLS settings without `tlsEnable` are
+  rejected; s3 also rejects `tlsEnable` without `useSSL` (#116).
+- `provider/smtp` v0.10.1: uses the shared core check; no behaviour change (#116).
+
+All but smtp include breaking changes; see each provider's changelog. The other providers are unchanged and
+work with core v0.14.0 at their current versions.
+
 ### Breaking changes
 
 - `config/provider`: `JsonProvider.Get` and `GetKey` no longer allocate a nested pointer section
