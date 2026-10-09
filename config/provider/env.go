@@ -156,19 +156,31 @@ func (e *EnvProvider) readPrefixedStruct(prefix string, dest interface{}) error 
 	if v.Kind() != reflect.Struct {
 		return config.ErrInvalidType
 	}
-	_, err := e.readPrefixedValue(prefix, v)
+	_, _, err := e.readPrefixedValue(prefix, v, newStructPath())
 	return err
 }
 
+// hasKeyUnder reports whether a variable lies under the section read under prefix
+func (e *EnvProvider) hasKeyUnder(prefix string) bool {
+	prefix += "_"
+	for key := range e.configData {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // readPrefixedValue fills the struct v from the variables under prefix, and reports whether a
-// variable was present or a default set a non-zero value
-func (e *EnvProvider) readPrefixedValue(prefix string, v reflect.Value) (bool, error) {
+// variable was present or a default set a non-zero value, and whether a variable wrote a
+// value; path holds the structs above v
+func (e *EnvProvider) readPrefixedValue(prefix string, v reflect.Value, path *structPath) (set bool, fromVar bool, err error) {
 	// Convert prefix if needed
 	if prefix != "" {
 		prefix = strings.ToUpper(e.convertKey(prefix))
 	}
+	defer path.push(v, prefix)()
 
-	set := false
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
 		// unexported fields are not configuration; an embedded struct value of an unexported
@@ -206,10 +218,13 @@ func (e *EnvProvider) readPrefixedValue(prefix string, v reflect.Value) (bool, e
 			var err error
 			written, err = setFieldValueFromString(fieldValue, val, isDefault)
 			if err != nil {
-				return false, err
+				return false, false, err
 			}
 			if written && (!isDefault || !fieldValue.IsZero()) {
 				set = true
+			}
+			if written && !isDefault {
+				fromVar = true
 			}
 		}
 		// a value that wrote nothing (such as the key of a section itself) does not hide the
@@ -217,30 +232,52 @@ func (e *EnvProvider) readPrefixedValue(prefix string, v reflect.Value) (bool, e
 		if !written {
 			// if its struct, recurse
 			if fieldValue.Kind() == reflect.Struct {
-				fieldSet, err := e.readPrefixedValue(envKey, fieldValue)
+				fieldSet, fieldFromVar, err := e.readPrefixedValue(envKey, fieldValue, path)
 				if err != nil {
-					return false, err
+					return false, false, err
 				}
 				set = set || fieldSet
+				fromVar = fromVar || fieldFromVar
 			} else if fieldValue.Kind() == reflect.Pointer && fieldValue.Type().Elem().Kind() == reflect.Struct {
 				target := fieldValue
+				recursive := false
+				if fieldValue.IsNil() {
+					sectionType := fieldValue.Type().Elem()
+					// a section of a type already on the path would allocate itself without
+					// end through its defaults, so it is entered only while a variable lies
+					// under its key, and never twice under one key (a key can convert back
+					// to a shorter one)
+					if path.hasType(sectionType) {
+						sectionPrefix := strings.ToUpper(e.convertKey(envKey))
+						if path.hasSection(sectionType, sectionPrefix) || !e.hasKeyUnder(sectionPrefix) {
+							continue
+						}
+						recursive = true
+					}
+					target = reflect.New(sectionType)
+				} else if path.hasPointer(fieldValue) {
+					// a cycle the caller built is walked once
+					continue
+				}
+				fieldSet, fieldFromVar, err := e.readPrefixedValue(envKey, target.Elem(), path)
+				if err != nil {
+					return false, false, err
+				}
 				if fieldValue.IsNil() {
 					// an absent section stays nil, so callers can tell it apart, unless a
-					// variable or a non-zero default inside it sets something
-					target = reflect.New(fieldValue.Type().Elem())
-				}
-				fieldSet, err := e.readPrefixedValue(envKey, target.Elem())
-				if err != nil {
-					return false, err
-				}
-				if fieldSet && fieldValue.IsNil() {
+					// variable or a non-zero default inside it sets something; a recursive
+					// one needs a variable
+					if !fieldSet || (recursive && !fieldFromVar) {
+						continue
+					}
 					fieldValue.Set(target)
 				}
 				set = set || fieldSet
+				fromVar = fromVar || fieldFromVar
 			}
 		}
 	}
-	return set, nil
+	return set, fromVar, nil
 }
 
 // readKeyInterface reads a configuration value for the specified key

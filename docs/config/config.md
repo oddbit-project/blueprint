@@ -99,7 +99,10 @@ Defaults apply to exported fields, nested structs included. Unexported fields an
 left alone, except that the exported fields of an embedded struct value (not an embedded pointer) are covered. A nil
 pointer to a nested struct (a section absent from the JSON) stays nil unless one of its `default:` tags
 sets a non-zero value; it is then allocated with those defaults. A section whose defaults are all zero values
-(`default:"0"`, `default:"false"`, `default:""`) stays nil.
+(`default:"0"`, `default:"false"`, `default:""`) stays nil. In a recursive config type (`Next *Node` inside
+`Node`, or `A → *B → *A`), a nil section whose type is already among the structs enclosing it stays nil, so
+defaults fill one level and not an endless chain; a non-nil chain the caller built is walked to its end, and a
+cycle in it is walked once.
 
 ### Multiple Data Sources
 
@@ -242,7 +245,10 @@ the provider does not parse, such as a slice of anything but strings, an invalid
 itself) does not allocate it, and a section's own key does not stop its fields from being read. Unexported
 fields, and embedded pointers to unexported types, are not read from the environment and get no defaults; the
 exported fields of an embedded struct value are read under the embedded type's name as prefix, like any
-nested struct. `json:"-"` does not exclude a field from the environment.
+nested struct. `json:"-"` does not exclude a field from the environment. In a recursive config type, a nil
+section whose type is already among the structs enclosing it is allocated only when a variable under its key
+writes a value (`APP_NEXT_NAME` fills `Next`, `APP_NEXT_NEXT_NAME` fills `Next.Next`); its defaults alone, or
+a variable that writes nothing, do not allocate it. A cycle of pointers the caller built is walked once.
 
 ### CamelCase Conversion
 
@@ -380,7 +386,9 @@ type Config struct {
 // All fields will use their default values
 ```
 
-Defaults are applied recursively to nested value structs and nested `*struct` fields. If a default cannot be parsed into the target field type, the provider returns `config.ErrInvalidDefault`.
+Defaults are applied recursively to nested value structs and nested `*struct` fields, except that a nil
+`*struct` section whose type already encloses it (a recursive config type) is not allocated for its defaults alone: with JSON it stays
+nil, and from the environment it is allocated only when a variable writes a value into it. If a default cannot be parsed into the target field type, the provider returns `config.ErrInvalidDefault`.
 
 ### Removed and Renamed Keys
 
