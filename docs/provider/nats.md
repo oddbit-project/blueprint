@@ -279,6 +279,15 @@ This applies to `Consumer` and `Producer`. The JetStream types' `Disconnect`
 closes the connection at once (pending writes are flushed); a JetStream consumer's
 unacknowledged messages are redelivered by the server.
 
+The `Producer` and `Consumer` methods can be called from other goroutines while
+`Disconnect` runs, for example by a worker still publishing during shutdown. While the
+connection drains, `IsConnected` still reports true and calls can fail with nats.go
+errors such as `nats.ErrConnectionDraining`; once the connection is closed,
+`IsConnected` reports false and the others return `ErrProducerClosed` or
+`ErrConsumerClosed`.
+`Disconnect` sets the exported `Conn` field to nil, so code that reads `Conn` directly
+must not run while `Disconnect` may.
+
 ### Synchronous Message Consumption
 
 `NextMsg` returns the upstream `nats.ErrTimeout` sentinel when the timeout
