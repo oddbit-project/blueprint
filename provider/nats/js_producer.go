@@ -20,6 +20,7 @@ type JSProducerConfig struct {
 	Subject          string       `json:"subject"`
 	Stream           StreamConfig `json:"stream"`
 	AutoCreateStream bool         `json:"autoCreateStream"`
+	DrainTimeout     uint         `json:"drainTimeout"` // milliseconds, defaults to 30000; bounds Disconnect's wait for PublishAsync acks
 }
 
 // Validate verifies the producer configuration including the embedded
@@ -67,7 +68,7 @@ func NewJSProducer(cfg *JSProducerConfig, logger *log.Logger) (*JSProducer, erro
 		return nil, err
 	}
 
-	conn, err := cfg.dial("natsJSProducer")
+	conn, err := cfg.dial("natsJSProducer", cfg.DrainTimeout)
 	if err != nil {
 		return nil, err
 	}
