@@ -3682,7 +3682,10 @@
 left alone, except that the exported fields of an embedded struct value (not an embedded pointer) are covered. A nil
 pointer to a nested struct (a section absent from the JSON) stays nil unless one of its <code>default:</code> tags
 sets a non-zero value; it is then allocated with those defaults. A section whose defaults are all zero values
-(<code>default:"0"</code>, <code>default:"false"</code>, <code>default:""</code>) stays nil.</p>
+(<code>default:"0"</code>, <code>default:"false"</code>, <code>default:""</code>) stays nil. In a recursive config type (<code>Next *Node</code> inside
+<code>Node</code>, or <code>A → *B → *A</code>), a nil section whose type is already among the structs enclosing it stays nil, so
+defaults fill one level and not an endless chain; a non-nil chain the caller built is walked to its end, and a
+cycle in it is walked once.</p>
 <h3 id="multiple-data-sources">Multiple Data Sources<a class="headerlink" href="#multiple-data-sources" title="Permanent link">&para;</a></h3>
 <div class="language-golang highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// From file</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nx">cfg</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">provider</span><span class="p">.</span><span class="nx">NewJsonProvider</span><span class="p">(</span><span class="s">"config.json"</span><span class="p">)</span>
@@ -3799,7 +3802,17 @@ sets a non-zero value; it is then allocated with those defaults. A section whose
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nx">Server</span><span class="w">   </span><span class="o">*</span><span class="nx">ServerConfig</span><span class="w">   </span><span class="s">`env:"SERVER"`</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>If <code>APP_DATABASE_*</code> or <code>APP_SERVER_*</code> variables are present, Blueprint allocates the nested structs and fills them recursively. Any missing nested fields continue to use their <code>default:</code> tags.</p>
+<p>If <code>APP_DATABASE_*</code> or <code>APP_SERVER_*</code> variables set values, Blueprint allocates the nested structs and fills them recursively. Any missing nested fields continue to use their <code>default:</code> tags.
+A nil pointer section that no variable writes to stays nil, as with the JSON provider, unless one of its <code>default:</code>
+tags sets a non-zero value; it is then allocated with those defaults. A variable that writes nothing (a field kind
+the provider does not parse, such as a slice of anything but strings, an invalid value, or the key of a section
+itself) does not allocate it, and a section's own key does not stop its fields from being read. Unexported
+fields, and embedded pointers to unexported types, are not read from the environment and get no defaults; the
+exported fields of an embedded struct value are read under the embedded type's name as prefix, like any
+nested struct. <code>json:"-"</code> does not exclude a field from the environment. In a recursive config type, a nil
+section whose type is already among the structs enclosing it is allocated only when a variable under its key
+writes a value (<code>APP_NEXT_NAME</code> fills <code>Next</code>, <code>APP_NEXT_NEXT_NAME</code> fills <code>Next.Next</code>); its defaults alone, or
+a variable that writes nothing, do not allocate it. A cycle of pointers the caller built is walked once.</p>
 <h3 id="camelcase-conversion">CamelCase Conversion<a class="headerlink" href="#camelcase-conversion" title="Permanent link">&para;</a></h3>
 <div class="language-golang highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">Config</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nx">DatabaseURL</span><span class="w">      </span><span class="kt">string</span><span class="w"> </span><span class="s">`env:"DATABASE_URL"`</span>
@@ -3913,7 +3926,9 @@ sets a non-zero value; it is then allocated with those defaults. A section whose
 </span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1">// Or missing environment variables</span>
 </span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="c1">// All fields will use their default values</span>
 </span></code></pre></div>
-<p>Defaults are applied recursively to nested value structs and nested <code>*struct</code> fields. If a default cannot be parsed into the target field type, the provider returns <code>config.ErrInvalidDefault</code>.</p>
+<p>Defaults are applied recursively to nested value structs and nested <code>*struct</code> fields, except that a nil
+<code>*struct</code> section whose type already encloses it (a recursive config type) is not allocated for its defaults alone: with JSON it stays
+nil, and from the environment it is allocated only when a variable writes a value into it. If a default cannot be parsed into the target field type, the provider returns <code>config.ErrInvalidDefault</code>.</p>
 <h3 id="removed-and-renamed-keys">Removed and Renamed Keys<a class="headerlink" href="#removed-and-renamed-keys" title="Permanent link">&para;</a></h3>
 <p>The JSON provider silently ignores keys the destination struct does not declare, so a stale config
 that still carries a removed or renamed key boots on the default value with no error. Use
@@ -4048,7 +4063,7 @@ will just return the argument string:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 7, 2026 15:43:46 UTC">October 7, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 8, 2026 22:19:42 UTC">October 8, 2026</span>
   </span>
 
     

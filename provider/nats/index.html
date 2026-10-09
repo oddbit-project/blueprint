@@ -3928,8 +3928,26 @@ every handler to finish, including the one calling it, so it sits out the whole
 waits up to <code>drainTimeout</code> plus 5 seconds for it to close; a second call waits for
 the first to finish.</p>
 <p>This applies to <code>Consumer</code> and <code>Producer</code>. The JetStream types' <code>Disconnect</code>
-closes the connection at once (pending writes are flushed); a JetStream consumer's
-unacknowledged messages are redelivered by the server.</p>
+closes the connection without draining it (pending writes are flushed); with an <code>explicit</code>
+or <code>all</code> ack policy, a JetStream consumer's unacknowledged messages are redelivered by the
+server (with <code>none</code> they are not). <code>JSProducer.Disconnect</code>
+first waits for the acks of pending <code>PublishAsync</code> calls, up to the connection's drain
+timeout (nats.go's default of 30 seconds; the JetStream configs have no <code>drainTimeout</code>
+setting, see #127). It stops waiting as soon as none is pending or the connection closes, and does
+not wait on a connection that is already closed. A future still pending then fails with
+<code>jetstream.ErrJetStreamPublisherClosed</code>; its message may still have been stored. As in
+nats.go, futures pending when the connection starts reconnecting fail with
+<code>nats.ErrDisconnected</code>, which also ends the wait. A second <code>Disconnect</code> call returns
+once the first has closed the connection. While a <code>Drain</code> you started on <code>producer.Conn</code> is in progress,
+<code>Disconnect</code> returns at once and does not fail pending futures.</p>
+<p>The <code>Producer</code> and <code>Consumer</code> methods can be called from other goroutines while
+<code>Disconnect</code> runs, for example by a worker still publishing during shutdown. While the
+connection drains, <code>IsConnected</code> still reports true and calls can fail with nats.go
+errors such as <code>nats.ErrConnectionDraining</code>; once the connection is closed,
+<code>IsConnected</code> reports false and the others return <code>ErrProducerClosed</code> or
+<code>ErrConsumerClosed</code>.
+<code>Disconnect</code> sets the exported <code>Conn</code> field to nil, so code that reads <code>Conn</code> directly
+must not run while <code>Disconnect</code> may.</p>
 <h3 id="synchronous-message-consumption">Synchronous Message Consumption<a class="headerlink" href="#synchronous-message-consumption" title="Permanent link">&para;</a></h3>
 <p><code>NextMsg</code> returns the upstream <code>nats.ErrTimeout</code> sentinel when the timeout
 expires without a message arriving. Because the Blueprint provider package
@@ -4010,7 +4028,10 @@ over TLS, so its certificate must verify against <code>TLSCA</code> (or the syst
 credentials from an on-path attacker only while certificates are verified;
 <code>TLSInsecureSkipVerify</code> gives that protection up. TLS settings
 (<code>TLSCA</code>, <code>TLSCert</code>, <code>TLSKey</code>, <code>TLSInsecureSkipVerify</code> or a key password) without
-<code>TLSEnable</code> make <code>Validate()</code> fail with <code>ErrTLSNotEnabled</code>, instead of being ignored.</p>
+<code>TLSEnable</code> make <code>Validate()</code> fail with <code>ErrTLSNotEnabled</code>, instead of being ignored.
+With <code>TLSEnable</code>, <code>TLSCert</code> and <code>TLSKey</code> must be set together, and a key password requires both:
+otherwise <code>Validate()</code> fails with <code>tls.ErrTLSIncompleteKeyPair</code>, instead of connecting without the
+client certificate (#115).</p>
 <h2 id="jetstream">JetStream<a class="headerlink" href="#jetstream" title="Permanent link">&para;</a></h2>
 <p>JetStream is NATS' built-in persistent streaming layer. The Blueprint NATS
 provider exposes JetStream through two dedicated types that are independent
@@ -4089,7 +4110,8 @@ by the constructors before any network round-trips. Invalid policy strings
 return <code>ErrInvalidAckPolicy</code> / <code>ErrInvalidDeliverPolicy</code> / <code>ErrInvalidRetention</code>
 / <code>ErrInvalidStorage</code>; missing required fields return <code>ErrMissingJSURL</code>,
 <code>ErrMissingStreamName</code>, or <code>ErrMissingProducerTopic</code>; TLS settings without
-<code>TLSEnable</code> return <code>ErrTLSNotEnabled</code>.</p>
+<code>TLSEnable</code> return <code>ErrTLSNotEnabled</code>, and an incomplete client certificate/key
+pair with it returns <code>tls.ErrTLSIncompleteKeyPair</code>.</p>
 <h3 id="producer-usage_1">Producer usage<a class="headerlink" href="#producer-usage_1" title="Permanent link">&para;</a></h3>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">package</span><span class="w"> </span><span class="nx">main</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
@@ -4147,18 +4169,19 @@ return <code>ErrInvalidAckPolicy</code> / <code>ErrInvalidDeliverPolicy</code> /
 </span><span id="__span-13-54"><a id="__codelineno-13-54" name="__codelineno-13-54" href="#__codelineno-13-54"></a><span class="w">    </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">producer</span><span class="p">.</span><span class="nx">PublishMsg</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">"orders.updated"</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">(</span><span class="s">`{"id":"o-1"}`</span><span class="p">))</span>
 </span><span id="__span-13-55"><a id="__codelineno-13-55" name="__codelineno-13-55" href="#__codelineno-13-55"></a>
 </span><span id="__span-13-56"><a id="__codelineno-13-56" name="__codelineno-13-56" href="#__codelineno-13-56"></a><span class="w">    </span><span class="c1">// Async publish: returns a future whose Ok()/Err() channels signal the</span>
-</span><span id="__span-13-57"><a id="__codelineno-13-57" name="__codelineno-13-57" href="#__codelineno-13-57"></a><span class="w">    </span><span class="c1">// eventual ack without blocking the caller.</span>
-</span><span id="__span-13-58"><a id="__codelineno-13-58" name="__codelineno-13-58" href="#__codelineno-13-58"></a><span class="w">    </span><span class="nx">fut</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">producer</span><span class="p">.</span><span class="nx">PublishAsync</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">"orders.created"</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">(</span><span class="s">`{"id":"o-3"}`</span><span class="p">))</span>
-</span><span id="__span-13-59"><a id="__codelineno-13-59" name="__codelineno-13-59" href="#__codelineno-13-59"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-60"><a id="__codelineno-13-60" name="__codelineno-13-60" href="#__codelineno-13-60"></a><span class="w">        </span><span class="k">select</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-13-61"><a id="__codelineno-13-61" name="__codelineno-13-61" href="#__codelineno-13-61"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="o">&lt;-</span><span class="nx">fut</span><span class="p">.</span><span class="nx">Ok</span><span class="p">():</span>
-</span><span id="__span-13-62"><a id="__codelineno-13-62" name="__codelineno-13-62" href="#__codelineno-13-62"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&lt;-</span><span class="nx">fut</span><span class="p">.</span><span class="nx">Err</span><span class="p">():</span>
-</span><span id="__span-13-63"><a id="__codelineno-13-63" name="__codelineno-13-63" href="#__codelineno-13-63"></a><span class="w">            </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"Async publish failed"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
-</span><span id="__span-13-64"><a id="__codelineno-13-64" name="__codelineno-13-64" href="#__codelineno-13-64"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="o">&lt;-</span><span class="nx">time</span><span class="p">.</span><span class="nx">After</span><span class="p">(</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">):</span>
-</span><span id="__span-13-65"><a id="__codelineno-13-65" name="__codelineno-13-65" href="#__codelineno-13-65"></a><span class="w">            </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="kc">nil</span><span class="p">,</span><span class="w"> </span><span class="s">"Async publish timed out"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
-</span><span id="__span-13-66"><a id="__codelineno-13-66" name="__codelineno-13-66" href="#__codelineno-13-66"></a><span class="w">        </span><span class="p">}</span>
-</span><span id="__span-13-67"><a id="__codelineno-13-67" name="__codelineno-13-67" href="#__codelineno-13-67"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-13-68"><a id="__codelineno-13-68" name="__codelineno-13-68" href="#__codelineno-13-68"></a><span class="p">}</span>
+</span><span id="__span-13-57"><a id="__codelineno-13-57" name="__codelineno-13-57" href="#__codelineno-13-57"></a><span class="w">    </span><span class="c1">// eventual ack without blocking the caller. Disconnect waits for pending</span>
+</span><span id="__span-13-58"><a id="__codelineno-13-58" name="__codelineno-13-58" href="#__codelineno-13-58"></a><span class="w">    </span><span class="c1">// acks, up to the drain timeout, then fails the futures still pending.</span>
+</span><span id="__span-13-59"><a id="__codelineno-13-59" name="__codelineno-13-59" href="#__codelineno-13-59"></a><span class="w">    </span><span class="nx">fut</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">producer</span><span class="p">.</span><span class="nx">PublishAsync</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">"orders.created"</span><span class="p">,</span><span class="w"> </span><span class="p">[]</span><span class="kt">byte</span><span class="p">(</span><span class="s">`{"id":"o-3"}`</span><span class="p">))</span>
+</span><span id="__span-13-60"><a id="__codelineno-13-60" name="__codelineno-13-60" href="#__codelineno-13-60"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-13-61"><a id="__codelineno-13-61" name="__codelineno-13-61" href="#__codelineno-13-61"></a><span class="w">        </span><span class="k">select</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-13-62"><a id="__codelineno-13-62" name="__codelineno-13-62" href="#__codelineno-13-62"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="o">&lt;-</span><span class="nx">fut</span><span class="p">.</span><span class="nx">Ok</span><span class="p">():</span>
+</span><span id="__span-13-63"><a id="__codelineno-13-63" name="__codelineno-13-63" href="#__codelineno-13-63"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&lt;-</span><span class="nx">fut</span><span class="p">.</span><span class="nx">Err</span><span class="p">():</span>
+</span><span id="__span-13-64"><a id="__codelineno-13-64" name="__codelineno-13-64" href="#__codelineno-13-64"></a><span class="w">            </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"Async publish failed"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
+</span><span id="__span-13-65"><a id="__codelineno-13-65" name="__codelineno-13-65" href="#__codelineno-13-65"></a><span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="o">&lt;-</span><span class="nx">time</span><span class="p">.</span><span class="nx">After</span><span class="p">(</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">):</span>
+</span><span id="__span-13-66"><a id="__codelineno-13-66" name="__codelineno-13-66" href="#__codelineno-13-66"></a><span class="w">            </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="kc">nil</span><span class="p">,</span><span class="w"> </span><span class="s">"Async publish timed out"</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span>
+</span><span id="__span-13-67"><a id="__codelineno-13-67" name="__codelineno-13-67" href="#__codelineno-13-67"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-13-68"><a id="__codelineno-13-68" name="__codelineno-13-68" href="#__codelineno-13-68"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-13-69"><a id="__codelineno-13-69" name="__codelineno-13-69" href="#__codelineno-13-69"></a><span class="p">}</span>
 </span></code></pre></div>
 <h3 id="consumer-usage_1">Consumer usage<a class="headerlink" href="#consumer-usage_1" title="Permanent link">&para;</a></h3>
 <p><code>JSConsumer.Consume</code> starts continuous delivery; the handler is invoked once
@@ -4376,7 +4399,7 @@ the JetStream paths where appropriate.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 8, 2026 11:36:06 UTC">October 8, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 9, 2026 09:09:43 UTC">October 9, 2026</span>
   </span>
 
     
