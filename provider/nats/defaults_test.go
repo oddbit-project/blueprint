@@ -117,7 +117,7 @@ func consumerConn(url string) func(uint) (*nats.Conn, error) {
 }
 
 func TestIssue105_JetStreamDefaultPing(t *testing.T) {
-	conn, err := (&JSConnectionConfig{URL: handshakeServer(t), AuthType: AuthTypeNone}).dial("x")
+	conn, err := (&JSConnectionConfig{URL: handshakeServer(t), AuthType: AuthTypeNone}).dial("x", 0)
 	require.NoError(t, err)
 	defer conn.Close()
 	assert.Equal(t, nats.DefaultPingInterval, conn.Opts.PingInterval)

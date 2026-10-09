@@ -59,8 +59,9 @@ func (c JSConnectionConfig) Validate() error {
 }
 
 // dial opens a NATS connection using the shared connect() helper. It validates
-// the config and resolves a default client name when one is not provided.
-func (cfg *JSConnectionConfig) dial(defaultName string) (*nats.Conn, error) {
+// the config and resolves a default client name when one is not provided; a zero
+// drainTimeout (milliseconds) keeps nats.go's default.
+func (cfg *JSConnectionConfig) dial(defaultName string, drainTimeout uint) (*nats.Conn, error) {
 	if cfg == nil {
 		return nil, ErrNilConfig
 	}
@@ -81,6 +82,7 @@ func (cfg *JSConnectionConfig) dial(defaultName string) (*nats.Conn, error) {
 		PingInterval: cfg.PingInterval,
 		MaxPingsOut:  cfg.MaxPingsOut,
 		Timeout:      cfg.Timeout,
+		DrainTimeout: drainTimeout,
 	})
 }
 
