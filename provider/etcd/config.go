@@ -75,6 +75,8 @@ func (c *Config) WithAuth(username, password string) *Config {
 
 // WithTLS configures TLS settings for secure connections and returns the config for chaining.
 // Set allowInsecure to true to skip certificate verification (not recommended for production).
+// certFile and keyFile must both be set or both be empty: a half pair fails Validate() and
+// NewClient with tls.ErrTLSIncompleteKeyPair.
 func (c *Config) WithTLS(certFile, keyFile, caFile string, allowInsecure bool) *Config {
 	c.TLSEnable = true
 	c.TLSCert = certFile

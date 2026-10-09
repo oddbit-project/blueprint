@@ -111,6 +111,9 @@ func main() {
 TLS settings (`TLSCA`, `TLSCert`, `TLSKey`, `TLSInsecureSkipVerify` or a key password) require
 `TLSEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`, instead of connecting
 without them in plaintext (#116).
+With `TLSEnable`, `TLSCert` and `TLSKey` must be set together, and a key password requires both:
+otherwise `Validate()` fails with `tls.ErrTLSIncompleteKeyPair`, instead of connecting without the
+client certificate (#115).
 
 ## Using the Kafka Consumer
 

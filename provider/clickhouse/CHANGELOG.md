@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- With `tlsEnable`, a `tlsCert` without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password
+  without both now fails `Validate()` with `tls.ErrTLSIncompleteKeyPair`, when built with a core
+  release that carries the check (after v0.14.0), whether this provider or the application requires
+  it. They used to be ignored silently: the client connected without a client certificate, so a
+  server requiring one rejected the handshake and a server only requesting one could accept it
+  without the intended identity. Set both `tlsCert` and `tlsKey`, or remove the client certificate
+  settings (#115).
+
 ## [v0.11.0] - 2026-10-08
 
 Requires Blueprint core v0.14.0.

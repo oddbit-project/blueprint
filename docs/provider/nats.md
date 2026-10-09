@@ -276,8 +276,27 @@ waits up to `drainTimeout` plus 5 seconds for it to close; a second call waits f
 the first to finish.
 
 This applies to `Consumer` and `Producer`. The JetStream types' `Disconnect`
-closes the connection at once (pending writes are flushed); a JetStream consumer's
-unacknowledged messages are redelivered by the server.
+closes the connection without draining it (pending writes are flushed); with an `explicit`
+or `all` ack policy, a JetStream consumer's unacknowledged messages are redelivered by the
+server (with `none` they are not). `JSProducer.Disconnect`
+first waits for the acks of pending `PublishAsync` calls, up to the connection's drain
+timeout (nats.go's default of 30 seconds; the JetStream configs have no `drainTimeout`
+setting, see #127). It stops waiting as soon as none is pending or the connection closes, and does
+not wait on a connection that is already closed. A future still pending then fails with
+`jetstream.ErrJetStreamPublisherClosed`; its message may still have been stored. As in
+nats.go, futures pending when the connection starts reconnecting fail with
+`nats.ErrDisconnected`, which also ends the wait. A second `Disconnect` call returns
+once the first has closed the connection. While a `Drain` you started on `producer.Conn` is in progress,
+`Disconnect` returns at once and does not fail pending futures.
+
+The `Producer` and `Consumer` methods can be called from other goroutines while
+`Disconnect` runs, for example by a worker still publishing during shutdown. While the
+connection drains, `IsConnected` still reports true and calls can fail with nats.go
+errors such as `nats.ErrConnectionDraining`; once the connection is closed,
+`IsConnected` reports false and the others return `ErrProducerClosed` or
+`ErrConsumerClosed`.
+`Disconnect` sets the exported `Conn` field to nil, so code that reads `Conn` directly
+must not run while `Disconnect` may.
 
 ### Synchronous Message Consumption
 
@@ -376,6 +395,9 @@ credentials from an on-path attacker only while certificates are verified;
 `TLSInsecureSkipVerify` gives that protection up. TLS settings
 (`TLSCA`, `TLSCert`, `TLSKey`, `TLSInsecureSkipVerify` or a key password) without
 `TLSEnable` make `Validate()` fail with `ErrTLSNotEnabled`, instead of being ignored.
+With `TLSEnable`, `TLSCert` and `TLSKey` must be set together, and a key password requires both:
+otherwise `Validate()` fails with `tls.ErrTLSIncompleteKeyPair`, instead of connecting without the
+client certificate (#115).
 
 ## JetStream
 
@@ -469,7 +491,8 @@ by the constructors before any network round-trips. Invalid policy strings
 return `ErrInvalidAckPolicy` / `ErrInvalidDeliverPolicy` / `ErrInvalidRetention`
 / `ErrInvalidStorage`; missing required fields return `ErrMissingJSURL`,
 `ErrMissingStreamName`, or `ErrMissingProducerTopic`; TLS settings without
-`TLSEnable` return `ErrTLSNotEnabled`.
+`TLSEnable` return `ErrTLSNotEnabled`, and an incomplete client certificate/key
+pair with it returns `tls.ErrTLSIncompleteKeyPair`.
 
 ### Producer usage
 
@@ -530,7 +553,8 @@ func main() {
     _, _ = producer.PublishMsg(ctx, "orders.updated", []byte(`{"id":"o-1"}`))
 
     // Async publish: returns a future whose Ok()/Err() channels signal the
-    // eventual ack without blocking the caller.
+    // eventual ack without blocking the caller. Disconnect waits for pending
+    // acks, up to the drain timeout, then fails the futures still pending.
     fut, err := producer.PublishAsync(ctx, "orders.created", []byte(`{"id":"o-3"}`))
     if err == nil {
         select {

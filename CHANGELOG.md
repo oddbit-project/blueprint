@@ -17,6 +17,47 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `config/provider`: `EnvProvider.Get` and `GetKey` no longer allocate a nested pointer section that no
+  variable writes to, unless a `default:` tag inside it sets a non-zero value, as `JsonProvider` does for
+  absent JSON sections since v0.14.0. A variable that writes nothing (a field kind the provider does not
+  parse, an invalid value, or the key of a section itself) does not count. Code that reads such a section
+  without a nil check (it used to be allocated with zero values) must check for nil, or give the section a
+  default (#107).
+- `provider/tls`: with `tlsEnable`, `ClientConfig.ValidateEnabled()` now rejects a `tlsCert` without
+  `tlsKey`, a `tlsKey` without `tlsCert`, and a key password (`tlsKeyPassword`,
+  `tlsKeyPasswordEnvVar` or `tlsKeyPasswordFile`) without both, with the new
+  `ErrTLSIncompleteKeyPair`. `TLSConfig()` ignores them, so the connection went without a client
+  certificate. The clickhouse, etcd, franz, kafka, mqtt, nats, redis, s3 and smtp providers call
+  `ValidateEnabled()` from their config validation, so they reject such a config when built with
+  this core release, whether the provider or the application requires it: set both `tlsCert` and
+  `tlsKey`, or remove the client certificate settings (#115).
+
+### Added
+
+- `provider/tls`: `ErrTLSIncompleteKeyPair`, returned by `ClientConfig.ValidateEnabled()` for an
+  incomplete client certificate/key pair (#115).
+
+### Fixed
+
+- `config/provider`: `EnvProvider.Get` and `GetKey` no longer panic on a config struct with an unexported field
+  (struct, pointer, or scalar with a `default:` tag or a matching variable) or an embedded field of an
+  unexported type, and no longer panic on the NATS `JSConsumerConfig` and `StreamConfig`. Unexported fields are
+  left alone, and so is an embedded pointer to an unexported type; the exported fields of an embedded struct
+  value of an unexported type are now read, under the type name as prefix like any
+  embedded struct. Unlike `JsonProvider`, fields tagged `json:"-"` (such as the NATS `Native` sections) are
+  still read from the environment (#107).
+- `config/provider`: a variable for a slice of anything but strings (for example the NATS `Native.BackOff`) is
+  now ignored instead of panicking, and a variable named after a nested section itself (`APP_DATABASE=x`) no
+  longer stops the section's fields (`APP_DATABASE_HOST`) from being read (#107).
+- `config/provider`: `EnvProvider` and `JsonProvider` `Get`/`GetKey` no longer crash the process
+  (`fatal error: stack overflow`) on a self-referential config type (`Next *Node` inside `Node`, or
+  `A → *B → *A`), or on a cycle of pointers built into the destination. A nil section whose type already
+  encloses it stays nil instead of being allocated without end: with `JsonProvider` always, with
+  `EnvProvider` unless a variable under its key writes a value (`APP_NEXT_NAME`). A cycle is walked once.
+  Configs without a recursive type are unaffected (#120).
+
 ## [v0.14.0] - 2026-10-08
 
 ### Module versions

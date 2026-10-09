@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -51,8 +52,9 @@ type JSProducer struct {
 	Stream  jetstream.Stream
 	Logger  *log.Logger
 
-	mu     sync.Mutex
-	closed bool
+	mu      sync.Mutex
+	closed  bool
+	stopped chan struct{} // closed once the first Disconnect has closed Conn
 }
 
 // NewJSProducer creates a JetStream producer.
@@ -131,8 +133,12 @@ func (p *JSProducer) IsConnected() bool {
 	return p.Conn.IsConnected()
 }
 
-// Disconnect drains and closes the underlying connection. Safe to call
-// multiple times.
+// Disconnect waits for pending PublishAsync acks, up to the connection's
+// DrainTimeout or until the connection closes, then closes the underlying
+// connection; futures still pending then fail with
+// jetstream.ErrJetStreamPublisherClosed. It does neither while a Drain started
+// on Conn is in progress. Safe to call multiple times; a second call returns
+// once the first has closed the connection.
 func (p *JSProducer) Disconnect() {
 	if p == nil {
 		return
@@ -140,14 +146,20 @@ func (p *JSProducer) Disconnect() {
 
 	p.mu.Lock()
 	if p.closed {
+		// another Disconnect may be waiting for acks; return once it has closed Conn
+		stopped := p.stopped
 		p.mu.Unlock()
+		<-stopped
 		return
 	}
 	p.closed = true
+	stopped := make(chan struct{})
+	p.stopped = stopped
 	conn := p.Conn
 	p.mu.Unlock()
 
 	if conn == nil || conn.IsDraining() {
+		close(stopped)
 		return
 	}
 	if p.Logger != nil {
@@ -155,9 +167,31 @@ func (p *JSProducer) Disconnect() {
 			"subject": p.Subject,
 		})
 	}
+	if p.JS != nil {
+		// nats.go leaves acks pending when the connection closes, so a close ends the
+		// wait; the listener is registered before the check so no close is missed
+		closed := conn.StatusChanged(nats.CLOSED)
+		if !conn.IsClosed() {
+			timer := time.NewTimer(conn.Opts.DrainTimeout)
+			select {
+			case <-p.JS.PublishAsyncComplete():
+			case <-closed:
+			case <-timer.C:
+			}
+			timer.Stop()
+		}
+	}
 	// Close flushes pending writes; a Drain followed at once by Close would only
 	// leave nats.go's drain goroutine polling until its timeout
 	conn.Close()
+	// released before the cleanup, which runs a PublishAsyncErrHandler on this
+	// goroutine; a Disconnect made from that handler would otherwise never return
+	close(stopped)
+	// nats.go leaves futures pending on close; cleaning up after Close also fails
+	// one registered by a PublishAsync racing this call
+	if p.JS != nil {
+		p.JS.CleanupPublisher()
+	}
 	// Intentionally do not set p.Conn = nil; see note in JSConsumer.Disconnect.
 }
 
@@ -204,7 +238,8 @@ func (p *JSProducer) PublishJSON(ctx context.Context, data interface{}) (*jetstr
 // PubAckFuture exposes a channel for the ack. The caller-supplied context is
 // checked up front (the underlying jetstream async publish has no ctx
 // parameter), so callers should also select on the future's channel for
-// cancellation after dispatch.
+// cancellation after dispatch. Disconnect waits for pending acks and fails
+// the futures still pending when it closes the connection.
 func (p *JSProducer) PublishAsync(ctx context.Context, subject string, data []byte) (jetstream.PubAckFuture, error) {
 	if p == nil {
 		return nil, errors.New("publisher is nil")

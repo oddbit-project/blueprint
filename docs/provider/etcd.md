@@ -99,6 +99,9 @@ WithTLS(
 key password) require `tlsEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`,
 instead of connecting without them, which with bare `host:port` endpoints means plaintext. This
 applies to `Config.NewClient` and to the package-level `NewClient` (#116).
+With `tlsEnable` (and so with `WithTLS`), `tlsCert` and `tlsKey` must be set together, and a key
+password requires both: otherwise both `NewClient` functions and `Validate()` fail with
+`tls.ErrTLSIncompleteKeyPair`, instead of connecting without the client certificate (#115).
 
 ### Client-Side Encryption
 

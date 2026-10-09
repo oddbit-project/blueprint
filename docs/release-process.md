@@ -155,10 +155,10 @@ code imports from core, tag in this order instead of a single `tag-version` call
    version.
 2. **Tag core only**: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 3. **Bump the core requirement** in the affected providers' `go.mod` — currently
-   `provider/clickhouse`, `provider/pgsql` and `provider/sqlite`, and, for the release that adds
-   `tls.ClientConfig.ValidateEnabled` (#116), also `provider/etcd`, `provider/franz`,
-   `provider/kafka`, `provider/mqtt`, `provider/nats`, `provider/redis`, `provider/s3` and
-   `provider/smtp` — to `vX.Y.Z`:
+   `provider/clickhouse`, `provider/pgsql` and `provider/sqlite` (`dbx`/`gohan`), and
+   `provider/etcd`, `provider/franz`, `provider/kafka`, `provider/mqtt`, `provider/nats`,
+   `provider/redis`, `provider/s3` and `provider/smtp` (`tls.ClientConfig.ValidateEnabled`, whose
+   rules a core release can change, as #115 did) — to `vX.Y.Z`:
    `make update-deps VERSION=vX.Y.Z`, or `cd provider/<name> && go get
    github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy` per module. Commit the `go.mod`/
    `go.sum` changes.

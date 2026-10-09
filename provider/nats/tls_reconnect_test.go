@@ -7,19 +7,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // plaintextEvent is what the plaintext recorder saw on one connection: either a CONNECT
-// line or the client closing the connection without sending one
+// line or the connection ending (the client closing it, or the read deadline) without one
 type plaintextEvent struct {
 	acceptedAt time.Time
 	connect    bool
 }
 
 // plaintextRecorder is a server without TLS that accepts any number of connections and
-// reports, per connection, whether the client sent CONNECT in plaintext or hung up
+// reports, per connection, whether the client sent CONNECT in plaintext before the
+// connection ended
 func plaintextRecorder(t *testing.T) (string, <-chan plaintextEvent) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -90,5 +92,35 @@ func TestIssue110_ReconnectRefusesPlaintextServer(t *testing.T) {
 		case <-timeout:
 			t.Fatal("the client never reconnected to the plaintext server")
 		}
+	}
+}
+
+func TestIssue117_DiscoveredPlaintextServerRefused(t *testing.T) {
+	plainURL, events := plaintextRecorder(t)
+	// only the TLS server is configured; the plaintext one is learned from its INFO
+	tlsURL, caFile, tlsDone := fakeServer(t, fakeTLSRequired, strings.TrimPrefix(plainURL, "nats://"))
+
+	p, err := NewProducer(tlsProducerConfig(tlsURL, caFile, true), nil)
+	require.NoError(t, err)
+	defer p.Conn.Close()
+	select {
+	case res := <-tlsDone:
+		require.True(t, res.tlsConnect, "the first connection was not over TLS")
+	case <-time.After(10 * time.Second):
+		t.Fatal("the TLS server never completed a handshake")
+	}
+
+	// the client knows the plaintext server only from INFO, so it can reach it only by
+	// reconnecting after the TLS server closed. nats.go leaves a refused connection open,
+	// so without a CONNECT the event comes from the recorder's read deadline; the client's
+	// last error shows the refusal, not a stall, is why no CONNECT arrived. It is still
+	// the refusal's because the next attempt first waits ReconnectWait (DefaultTimeout,
+	// longer than the deadline)
+	select {
+	case ev := <-events:
+		assert.False(t, ev.connect, "credentials were sent in plaintext to a discovered server")
+		assert.ErrorIs(t, p.Conn.LastError(), nats.ErrSecureConnWanted, "the discovered server was not refused")
+	case <-time.After(10 * time.Second):
+		t.Fatal("the client never reconnected to the discovered server")
 	}
 }

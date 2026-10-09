@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- With `tlsEnable`, a `tlsCert` without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password
+  without both now fails the producer, consumer and JetStream `Validate()` with
+  `tls.ErrTLSIncompleteKeyPair`, when built with a core release that carries the check (after
+  v0.14.0), whether this provider or the application requires it. They used to be ignored silently:
+  the client connected without a client certificate, so a server requiring one rejected the
+  handshake and a server only requesting one could accept it without the intended identity. Set both
+  `tlsCert` and `tlsKey`, or remove the client certificate settings (#115).
+
+### Fixed
+
+- `Producer.IsConnected`, `Publish`, `PublishMsg`, `PublishRequest` and `Request`, and
+  `Consumer.IsConnected`, `NextMsg`, `Unsubscribe` and `Request`, no longer race with
+  `Disconnect` on the `Conn` field when called from another goroutine while it runs, for
+  example a worker still publishing during shutdown. Under `-race` such a call was
+  reported as a data race. In builds that read the field twice, such as race-enabled or
+  unoptimised (`-gcflags='-N -l'`, as debuggers use) builds, `IsConnected` could also
+  dereference a nil connection if `Disconnect` cleared the field between its check and its
+  call. Code that reads the exported `Conn` field itself while `Disconnect` runs still
+  races; use the methods instead (#113).
+- `JSProducer.Disconnect` now waits for the acks of pending `PublishAsync` calls, up to the
+  connection's drain timeout (nats.go's default, 30 seconds), before closing, and fails the
+  futures still pending with `jetstream.ErrJetStreamPublisherClosed`. Before, it closed at
+  once and those futures never resolved, so a caller waiting on `Ok()` or `Err()` without
+  its own deadline blocked forever. A second `Disconnect` call now returns only once the
+  first has closed the connection. Shutdown can now take up to 30 seconds longer while
+  acks are outstanding, and the JetStream configs have no setting to shorten it: allow for
+  it in the process's shutdown deadline. A failed future's message may still have been
+  stored (#114).
+
 ## [v0.10.0] - 2026-10-08
 
 Requires Blueprint core v0.14.0.

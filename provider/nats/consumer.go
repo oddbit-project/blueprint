@@ -48,7 +48,7 @@ type Consumer struct {
 	URL       string
 	Subject   string
 	Queue     string
-	Conn      *nats.Conn
+	Conn      *nats.Conn // set to nil by Disconnect; do not read it while Disconnect may run, use the methods
 	Logger    *log.Logger
 	subs      []*nats.Subscription // SubscribeSync subscriptions
 	handlers  map[*nats.Subscription]*handlerSub
@@ -158,13 +158,20 @@ func NewConsumer(cfg *ConsumerConfig, logger *log.Logger) (*Consumer, error) {
 	}, nil
 }
 
+// conn returns the connection, read under subsLock because Disconnect clears it
+func (c *Consumer) conn() *nats.Conn {
+	if c == nil {
+		return nil
+	}
+	c.subsLock.Lock()
+	defer c.subsLock.Unlock()
+	return c.Conn
+}
+
 // IsConnected returns true if the consumer is connected
 func (c *Consumer) IsConnected() bool {
-	// Check if consumer or connection is nil
-	if c == nil || c.Conn == nil {
-		return false
-	}
-	return c.Conn.IsConnected()
+	conn := c.conn()
+	return conn != nil && conn.IsConnected()
 }
 
 // Disconnect stops the subscriptions, lets the Subscribe handlers finish the messages
@@ -291,7 +298,8 @@ func convertMessage(msg *nats.Msg) Message {
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 	c.subsLock.Lock()
 	defer c.subsLock.Unlock()
-	if c.closing || !c.IsConnected() {
+	// subsLock is held, so check c.Conn directly; IsConnected would deadlock
+	if c.closing || c.Conn == nil || !c.Conn.IsConnected() {
 		return ErrConsumerClosed
 	}
 	conn := c.Conn
@@ -403,7 +411,8 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 func (c *Consumer) SubscribeSync() (*nats.Subscription, error) {
 	c.subsLock.Lock()
 	defer c.subsLock.Unlock()
-	if c.closing || !c.IsConnected() {
+	// subsLock is held, so check c.Conn directly; IsConnected would deadlock
+	if c.closing || c.Conn == nil || !c.Conn.IsConnected() {
 		return nil, ErrConsumerClosed
 	}
 
@@ -486,12 +495,13 @@ func (c *Consumer) Unsubscribe(sub *nats.Subscription) error {
 // Request sends a request and waits for a response
 func (c *Consumer) Request(subject string, data []byte, timeout time.Duration) (*Message, error) {
 	// Check if consumer is connected
-	if !c.IsConnected() {
+	conn := c.conn()
+	if conn == nil || !conn.IsConnected() {
 		return nil, ErrConsumerClosed
 	}
 
 	// Make the request
-	msg, err := c.Conn.Request(subject, data, timeout)
+	msg, err := conn.Request(subject, data, timeout)
 	if err != nil {
 		// Only log the error if we have a logger
 		if c.Logger != nil {

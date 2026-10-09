@@ -27,9 +27,10 @@ clientConfig.TlsKeyCredential.PasswordEnvVar = "KEY_PASSWORD"
 // Or use a file
 clientConfig.TlsKeyCredential.PasswordFile = "/path/to/keypassword.txt"
 
-// Reject TLS settings given without TLSEnable (call it from your config's Validate)
+// Reject TLS settings given without TLSEnable, and an incomplete certificate/key pair
+// (call it from your config's Validate)
 if err := clientConfig.ValidateEnabled(); err != nil {
-    // err is tls.ErrTLSNotEnabled
+    // err is tls.ErrTLSNotEnabled or tls.ErrTLSIncompleteKeyPair
 }
 
 // Generate the TLS configuration
@@ -47,6 +48,10 @@ if err != nil {
 `TLSInsecureSkipVerify` or a key password is set without `TLSEnable`, so a misconfiguration fails
 instead of silently connecting without them (usually in plaintext); the providers that embed
 `ClientConfig` call it from the `Validate()` of their configs (#116).
+With `TLSEnable`, `TLSConfig()` loads a client certificate only when both `TLSCert` and `TLSKey`
+are set, so `ValidateEnabled()` also returns `ErrTLSIncompleteKeyPair` for a `TLSCert` without
+`TLSKey`, a `TLSKey` without `TLSCert`, or a key password without both, instead of connecting
+without the client certificate (#115).
 
 ## Server Configuration
 

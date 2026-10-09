@@ -106,6 +106,9 @@ func main() {
 TLS settings (`tlsCa`, `tlsCert`, `tlsKey`, `tlsInsecureSkipVerify` or a key password) require
 `tlsEnable`: without it, `Validate()` fails with `tls.ErrTLSNotEnabled`, instead of connecting
 without them in plaintext (#116).
+With `tlsEnable`, `tlsCert` and `tlsKey` must be set together, and a key password requires both:
+otherwise `Validate()` fails with `tls.ErrTLSIncompleteKeyPair`, instead of connecting without the
+client certificate (#115).
 
 ### Synchronous Production
 
