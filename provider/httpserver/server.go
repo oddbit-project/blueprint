@@ -13,7 +13,12 @@ import (
 	"github.com/oddbit-project/blueprint/provider/httpserver/auth"
 	httplog "github.com/oddbit-project/blueprint/provider/httpserver/log"
 	tlsProvider "github.com/oddbit-project/blueprint/provider/tls"
+	"github.com/oddbit-project/blueprint/utils"
 )
+
+// ErrTLSNoCertificate is returned by Start when TLS is enabled but there is no server
+// certificate: no complete tlsCert/tlsKey pair, and none set on Server.TLSConfig after NewServer
+const ErrTLSNoCertificate = utils.Error("tlsEnable requires tlsCert and tlsKey, or a certificate set on Server.TLSConfig")
 
 type ServerConfig struct {
 	Host           string   `json:"host"`
@@ -256,7 +261,8 @@ func (s *Server) Route() *gin.Engine {
 
 // Start starts the HTTP server of the Server instance.
 // If the Server's TLSConfig is nil, it starts the server using ListenAndServe method of httpserver.Server.
-// Otherwise, it starts the server using ListenAndServeTLS method of httpserver.Server.
+// Otherwise, it starts the server using ListenAndServeTLS method of httpserver.Server, or
+// returns ErrTLSNoCertificate at once when the TLSConfig has no certificate.
 // If the returned error from the server is not http.ErrServerClosed, it is returned.
 // Otherwise, nil is returned.
 //
@@ -282,6 +288,12 @@ func (s *Server) Start() error {
 	if s.Server.TLSConfig == nil {
 		err = s.Server.ListenAndServe()
 	} else {
+		// with no certificate, net/http would load one from the empty file names and fail
+		// with an error that names no setting
+		tc := s.Server.TLSConfig
+		if len(tc.Certificates) == 0 && tc.GetCertificate == nil && tc.GetConfigForClient == nil {
+			return ErrTLSNoCertificate
+		}
 		err = s.Server.ListenAndServeTLS("", "")
 	}
 	// when Shutdown() is called, the return error is http.ErrServerClosed

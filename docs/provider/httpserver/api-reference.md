@@ -122,7 +122,7 @@ if err != nil {
 ```go
 func (s *Server) Start() error
 ```
-Starts the HTTP server (blocking call).
+Starts the HTTP server (blocking call). With TLS enabled, it returns `ErrTLSNoCertificate` at once when there is no server certificate: no complete `tlsCert`/`tlsKey` pair, and no certificate set on `Server.TLSConfig` (`Certificates`, `GetCertificate` or `GetConfigForClient`) after `NewServer`.
 
 - Uses TLS if `TLSConfig` is configured
 - Returns `nil` when gracefully shut down
