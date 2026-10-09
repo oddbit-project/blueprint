@@ -158,7 +158,8 @@ code imports from core, tag in this order instead of a single `tag-version` call
    `provider/clickhouse`, `provider/pgsql` and `provider/sqlite` (`dbx`/`gohan`), and
    `provider/etcd`, `provider/franz`, `provider/kafka`, `provider/mqtt`, `provider/nats`,
    `provider/redis`, `provider/s3` and `provider/smtp` (`tls.ClientConfig.ValidateEnabled`, whose
-   rules a core release can change, as #115 did) — to `vX.Y.Z`:
+   rules a core release can change, as #115 did), and `provider/httpserver` and
+   `provider/metrics` (`tls.ServerConfig`, for the same reason) — to `vX.Y.Z`:
    `make update-deps VERSION=vX.Y.Z`, or `cd provider/<name> && go get
    github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy` per module. Commit the `go.mod`/
    `go.sum` changes.
