@@ -273,6 +273,9 @@ func (p *Producer) PublishRequest(subject string, reply string, data []byte) err
 
 // Request publishes a request message and waits for a response with a timeout
 func (p *Producer) Request(subject string, data []byte, timeout time.Duration) (*nats.Msg, error) {
+	if p == nil {
+		return nil, errors.New("publisher is nil")
+	}
 	// Check if producer is connected
 	conn := p.conn()
 	if conn == nil || !conn.IsConnected() {
@@ -308,7 +311,9 @@ func (p *Producer) Request(subject string, data []byte, timeout time.Duration) (
 func (p *Producer) PublishJSON(data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		p.Logger.Error(err, "Failed to marshal JSON for NATS publication", nil)
+		if p != nil && p.Logger != nil {
+			p.Logger.Error(err, "Failed to marshal JSON for NATS publication", nil)
+		}
 		return err
 	}
 
@@ -319,7 +324,9 @@ func (p *Producer) PublishJSON(data interface{}) error {
 func (p *Producer) PublishJSONMsg(subject string, data interface{}) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		p.Logger.Error(err, "Failed to marshal JSON for NATS publication", nil)
+		if p != nil && p.Logger != nil {
+			p.Logger.Error(err, "Failed to marshal JSON for NATS publication", nil)
+		}
 		return err
 	}
 
@@ -330,7 +337,9 @@ func (p *Producer) PublishJSONMsg(subject string, data interface{}) error {
 func (p *Producer) RequestJSON(subject string, data interface{}, timeout time.Duration) (*nats.Msg, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		p.Logger.Error(err, "Failed to marshal JSON for NATS request", nil)
+		if p != nil && p.Logger != nil {
+			p.Logger.Error(err, "Failed to marshal JSON for NATS request", nil)
+		}
 		return nil, err
 	}
 

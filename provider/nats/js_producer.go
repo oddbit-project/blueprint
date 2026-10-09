@@ -198,6 +198,9 @@ func (p *JSProducer) Disconnect() {
 // Publish publishes data to the configured subject and waits for the server
 // ack.
 func (p *JSProducer) Publish(ctx context.Context, data []byte) (*jetstream.PubAck, error) {
+	if p == nil {
+		return nil, errors.New("publisher is nil")
+	}
 	return p.PublishMsg(ctx, p.Subject, data)
 }
 
@@ -226,7 +229,7 @@ func (p *JSProducer) PublishMsg(ctx context.Context, subject string, data []byte
 func (p *JSProducer) PublishJSON(ctx context.Context, data interface{}) (*jetstream.PubAck, error) {
 	payload, err := json.Marshal(data)
 	if err != nil {
-		if p.Logger != nil {
+		if p != nil && p.Logger != nil {
 			p.Logger.Error(err, "Failed to marshal JSON for JetStream publish", nil)
 		}
 		return nil, err

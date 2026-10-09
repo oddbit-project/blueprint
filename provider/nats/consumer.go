@@ -296,6 +296,9 @@ func convertMessage(msg *nats.Msg) Message {
 // The handler stops when ctx is cancelled; for a graceful Disconnect keep ctx live until
 // Disconnect returns, and do not call Disconnect from inside the handler
 func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
+	if c == nil {
+		return ErrConsumerClosed
+	}
 	c.subsLock.Lock()
 	defer c.subsLock.Unlock()
 	// subsLock is held, so check c.Conn directly; IsConnected would deadlock
@@ -409,6 +412,9 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 // SubscribeSync subscribes synchronously and returns a subscription that can be used to fetch messages
 func (c *Consumer) SubscribeSync() (*nats.Subscription, error) {
+	if c == nil {
+		return nil, ErrConsumerClosed
+	}
 	c.subsLock.Lock()
 	defer c.subsLock.Unlock()
 	// subsLock is held, so check c.Conn directly; IsConnected would deadlock
