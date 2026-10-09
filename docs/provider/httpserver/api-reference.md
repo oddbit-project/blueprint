@@ -31,7 +31,7 @@ Creates a new server configuration with default values.
 ```go
 func (c *ServerConfig) Validate() error
 ```
-Validates the server configuration. Checks port range (1-65535), sets default timeouts if zero, and sets default server name if empty.
+Validates the server configuration. Checks port range (1-65535), sets default timeouts if zero, and sets default server name if empty. With `TLSEnable`, it returns `tls.ErrTLSIncompleteKeyPair` for a `TLSCert` without `TLSKey`, a `TLSKey` without `TLSCert`, or a key password without both (`tls.ServerConfig.ValidateKeyPair`).
 
 ```go
 func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error)

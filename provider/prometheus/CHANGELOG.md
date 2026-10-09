@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- With `tlsEnable`, a `tlsCert` without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password
+  without both now fails `Config.Validate()`, and so `NewServer`, with `tls.ErrTLSIncompleteKeyPair`,
+  through the httpserver provider's `ServerConfig.Validate()`, when built with an httpserver release
+  that carries the check. Set both `tlsCert` and `tlsKey`, or remove the certificate settings (#128).
+
 ## [v0.10.0] - 2026-09-28
 
 Requires Blueprint core v0.11.0 and `provider/httpserver` v0.9.4.
