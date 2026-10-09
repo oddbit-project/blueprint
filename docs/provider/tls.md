@@ -81,6 +81,10 @@ serverConfig.TlsKeyCredential.PasswordEnvVar = "KEY_PASSWORD"
 // Or use a file
 serverConfig.TlsKeyCredential.PasswordFile = "/path/to/keypassword.txt"
 
+if err := serverConfig.ValidateKeyPair(); err != nil {
+    // err is tls.ErrTLSIncompleteKeyPair
+}
+
 // Generate the TLS configuration
 tlsConfig, err := serverConfig.TLSConfig()
 if err != nil {
@@ -96,6 +100,14 @@ makes `TLSConfig()` return `ErrInvalidTlsVersion`. `TLSCipherSuites` accepts the
 (for example `"TLS_AES_128_GCM_SHA256"` or `"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"`); an unknown name returns
 `ErrInvalidCipher`. Versions and cipher suites are validated and applied even when `TLSEnable` is set without any
 certificate, key or CA files.
+
+With `TLSEnable`, `TLSConfig()` loads the server certificate only when both `TLSCert` and `TLSKey` are set, so
+`ValidateKeyPair()` returns `ErrTLSIncompleteKeyPair` for a `TLSCert` without `TLSKey`, a `TLSKey` without `TLSCert`,
+or a key password without both; without it, such a server failed only when it started, with an error naming no setting.
+`TLSEnable` with no certificate settings at all is still accepted, and `ValidateKeyPair()` checks nothing without
+`TLSEnable`. `httpserver.ServerConfig.Validate()` calls it, and so `httpserver.NewServer` and the prometheus provider
+reject such a config; the metrics provider keeps its own stricter check, `ErrMissingTLSCert`, which also rejects
+`TLSEnable` without a pair (#128).
 
 The key password is read from the first non-empty source: `Password`, then `PasswordEnvVar`, then `PasswordFile`.
 An environment variable is read from the process environment and is not cleared after reading, so the password can be

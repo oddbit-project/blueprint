@@ -58,6 +58,21 @@ type ServerConfig struct {
 	TLSEnable          bool     `json:"tlsEnable"`
 }
 
+// ValidateKeyPair rejects, with TLSEnable, a TLSCert without TLSKey, a TLSKey without
+// TLSCert, or a key password without both, returning ErrTLSIncompleteKeyPair; TLSConfig()
+// would silently load no server certificate for them
+func (c *ServerConfig) ValidateKeyPair() error {
+	if !c.TLSEnable {
+		return nil
+	}
+	key := c.TlsKeyCredential
+	keyPassword := key.Password != "" || key.PasswordEnvVar != "" || key.PasswordFile != ""
+	if (c.TLSCert == "") != (c.TLSKey == "") || (keyPassword && c.TLSCert == "") {
+		return ErrTLSIncompleteKeyPair
+	}
+	return nil
+}
+
 // TLSConfig returns a tls.Config, may be nil without error if TLS is not configured.
 func (c *ServerConfig) TLSConfig() (*tls.Config, error) {
 	if !c.TLSEnable {

@@ -39,9 +39,10 @@ import (
 // without TLSEnable
 const ErrTLSNotEnabled = utils.Error("TLS settings require tlsEnable")
 
-// ErrTLSIncompleteKeyPair is returned by ClientConfig.ValidateEnabled for a client certificate
-// without its key, a key without its certificate, or a key password without both
-const ErrTLSIncompleteKeyPair = utils.Error("TLS client certificate requires both tlsCert and tlsKey")
+// ErrTLSIncompleteKeyPair is returned by ClientConfig.ValidateEnabled and
+// ServerConfig.ValidateKeyPair for a certificate without its key, a key without its
+// certificate, or a key password without both
+const ErrTLSIncompleteKeyPair = utils.Error("TLS certificate requires both tlsCert and tlsKey")
 
 // ClientConfig represents the configuration for a tls client configuration
 type ClientConfig struct {
