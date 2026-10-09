@@ -58,6 +58,12 @@ config.Host = "" // empty string also binds to all interfaces
 
 **Problem:** Invalid or missing TLS certificates.
 
+With `tlsEnable` and no complete `tlsCert`/`tlsKey` pair, `Start()` returns `httpserver.ErrTLSNoCertificate` ("tlsEnable
+requires tlsCert and tlsKey, or a certificate set on Server.TLSConfig"), unless a certificate was set on
+`Server.TLSConfig` after `NewServer`. Misspelled setting names (`tls_cert`, `tlsCertFile`) are dropped by the JSON
+loader and end up here (from the release that adds `ValidateKeyPair`, #128, a half pair is rejected
+earlier, by `Validate()`, with `tls.ErrTLSIncompleteKeyPair`).
+
 **Debugging:**
 ```go
 func validateTLSConfig(config *httpserver.ServerConfig) error {
