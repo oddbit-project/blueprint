@@ -276,11 +276,12 @@ waits up to `drainTimeout` plus 5 seconds for it to close; a second call waits f
 the first to finish.
 
 This applies to `Consumer` and `Producer`. The JetStream types' `Disconnect`
-closes the connection without draining it (pending writes are flushed); a JetStream
-consumer's unacknowledged messages are redelivered by the server. `JSProducer.Disconnect`
+closes the connection without draining it (pending writes are flushed); with an `explicit`
+or `all` ack policy, a JetStream consumer's unacknowledged messages are redelivered by the
+server (with `none` they are not). `JSProducer.Disconnect`
 first waits for the acks of pending `PublishAsync` calls, up to the connection's drain
 timeout (nats.go's default of 30 seconds; the JetStream configs have no `drainTimeout`
-setting). It stops waiting as soon as none is pending or the connection closes, and does
+setting, see #127). It stops waiting as soon as none is pending or the connection closes, and does
 not wait on a connection that is already closed. A future still pending then fails with
 `jetstream.ErrJetStreamPublisherClosed`; its message may still have been stored. As in
 nats.go, futures pending when the connection starts reconnecting fail with
