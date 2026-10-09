@@ -38,6 +38,11 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 - `provider/tls`: `ErrTLSIncompleteKeyPair`, returned by `ClientConfig.ValidateEnabled()` for an
   incomplete client certificate/key pair (#115).
+- `provider/tls`: `ServerConfig.ValidateKeyPair()`, which returns `ErrTLSIncompleteKeyPair` for a
+  `tlsCert` without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password without both, with
+  `tlsEnable`. `TLSConfig()` still ignores them; nothing in core calls the method, so core alone
+  changes no behaviour. The httpserver provider calls it from `ServerConfig.Validate()` (see its
+  CHANGELOG) (#128).
 
 ### Fixed
 
