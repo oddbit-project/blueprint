@@ -124,6 +124,26 @@ func TestInvalidConfigTLSNotEnabled(t *testing.T) {
 	}
 }
 
+// Test validation: an incomplete client certificate/key pair with TLSEnable should return an error
+func TestIssue115_InvalidConfigTLSIncompleteKeyPair(t *testing.T) {
+	cases := map[string]func(cfg *smtp.Config){
+		"certWithoutKey":         func(cfg *smtp.Config) { cfg.TLSCert = "/path/to/cert.pem" },
+		"keyWithoutCert":         func(cfg *smtp.Config) { cfg.TLSKey = "/path/to/key.pem" },
+		"keyPasswordWithoutPair": func(cfg *smtp.Config) { cfg.TlsKeyCredential.Password = "secret" },
+	}
+
+	for name, apply := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := testConfig("noauth")
+			cfg.TLSEnable = true
+			apply(cfg)
+
+			_, err := smtp.NewMailer(cfg)
+			require.ErrorIs(t, err, tls.ErrTLSIncompleteKeyPair)
+		})
+	}
+}
+
 // Test validation: credentials without an auth type should return an error, as
 // go-mail would never send them
 func TestInvalidConfigCredentialsWithoutAuth(t *testing.T) {

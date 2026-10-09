@@ -39,6 +39,10 @@ import (
 // without TLSEnable
 const ErrTLSNotEnabled = utils.Error("TLS settings require tlsEnable")
 
+// ErrTLSIncompleteKeyPair is returned by ClientConfig.ValidateEnabled for a client certificate
+// without its key, a key without its certificate, or a key password without both
+const ErrTLSIncompleteKeyPair = utils.Error("TLS client certificate requires both tlsCert and tlsKey")
+
 // ClientConfig represents the configuration for a tls client configuration
 type ClientConfig struct {
 	TLSCA                 string `json:"tlsCa"`
@@ -49,14 +53,22 @@ type ClientConfig struct {
 	TLSInsecureSkipVerify bool   `json:"tlsInsecureSkipVerify"`
 }
 
-// ValidateEnabled rejects TLS settings given without TLSEnable: TLSConfig() ignores
-// them, so the connection would silently go without the configured CA, client
-// certificate or verification setting, usually in plaintext
+// ValidateEnabled rejects TLS settings that TLSConfig() would silently ignore:
+//   - any TLS setting given without TLSEnable returns ErrTLSNotEnabled, as the connection
+//     would go without the configured CA, client certificate or verification setting,
+//     usually in plaintext;
+//   - with TLSEnable, a TLSCert without TLSKey, a TLSKey without TLSCert, or a key password
+//     without both returns ErrTLSIncompleteKeyPair, as the connection would go without the
+//     client certificate
 func (c *ClientConfig) ValidateEnabled() error {
 	key := c.TlsKeyCredential
-	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify ||
-		key.Password != "" || key.PasswordEnvVar != "" || key.PasswordFile != "") {
+	keyPassword := key.Password != "" || key.PasswordEnvVar != "" || key.PasswordFile != ""
+	if !c.TLSEnable && (c.TLSCA != "" || c.TLSCert != "" || c.TLSKey != "" || c.TLSInsecureSkipVerify || keyPassword) {
 		return ErrTLSNotEnabled
+	}
+	// past the check above, any certificate, key or key password is set with TLSEnable
+	if (c.TLSCert == "") != (c.TLSKey == "") || (keyPassword && c.TLSCert == "") {
+		return ErrTLSIncompleteKeyPair
 	}
 	return nil
 }

@@ -105,7 +105,8 @@ config.SSLOnConnect = true // implicit TLS on port 465
 `TLSEnable` controls whether the certificate settings above are used; when it is `false`, go-mail's own defaults apply
 (server name taken from the host, TLS 1.2 minimum, system trust store), and configuring any of `TLSCA`, `TLSCert`,
 `TLSKey`, `TLSInsecureSkipVerify` or a key password without it is rejected with `ErrTLSNotEnabled` rather than
-silently ignored.
+silently ignored. With `TLSEnable`, `TLSCert` and `TLSKey` must be set together, and a key password requires both:
+otherwise `NewMailer` fails with `tls.ErrTLSIncompleteKeyPair`, instead of connecting without the client certificate.
 
 Note that `TLSEnable` does not, on its own, decide whether the connection is encrypted — that is the STARTTLS policy
 below, which requires TLS by default. The two are configured separately:
@@ -628,6 +629,7 @@ if err := mailer.Send(msg); err != nil {
 | `ErrInvalidTLSPolicy` | `TLSPolicy` is not mandatory, opportunistic or none                          |
 | `ErrInvalidTimeout`   | Negative `Timeout`                                                           |
 | `ErrTLSNotEnabled`    | Certificate settings configured while `TLSEnable` is false                   |
+| `tls.ErrTLSIncompleteKeyPair` | With `TLSEnable`, `TLSCert` without `TLSKey` (or the reverse), or a key password without both |
 | `ErrInvalidFrom`      | `From` is not a valid address                                                |
 | `ErrInvalidBcc`       | `Bcc` contains an invalid address                                            |
 | `ErrInvalidAuthType`  | `AuthType` is not recognised, or `custom` without a custom auth option        |
