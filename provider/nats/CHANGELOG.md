@@ -17,6 +17,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   dereference a nil connection if `Disconnect` cleared the field between its check and its
   call. Code that reads the exported `Conn` field itself while `Disconnect` runs still
   races; use the methods instead (#113).
+- `JSProducer.Disconnect` now waits for the acks of pending `PublishAsync` calls, up to the
+  connection's drain timeout (nats.go's default, 30 seconds), before closing, and fails the
+  futures still pending with `jetstream.ErrJetStreamPublisherClosed`. Before, it closed at
+  once and those futures never resolved, so a caller waiting on `Ok()` or `Err()` without
+  its own deadline blocked forever. A second `Disconnect` call now returns only once the
+  first has closed the connection. Shutdown can now take up to 30 seconds longer while
+  acks are outstanding, and the JetStream configs have no setting to shorten it: allow for
+  it in the process's shutdown deadline. A failed future's message may still have been
+  stored (#114).
 
 ## [v0.10.0] - 2026-10-08
 
