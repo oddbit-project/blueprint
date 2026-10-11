@@ -280,8 +280,9 @@ closes the connection without draining it (pending writes are flushed); with an 
 or `all` ack policy, a JetStream consumer's unacknowledged messages are redelivered by the
 server (with `none` they are not). `JSProducer.Disconnect`
 first waits for the acks of pending `PublishAsync` calls, up to the connection's drain
-timeout (nats.go's default of 30 seconds; the JetStream configs have no `drainTimeout`
-setting, see #127). It stops waiting as soon as none is pending or the connection closes, and does
+timeout (`JSProducerConfig.DrainTimeout`, json `drainTimeout`, in milliseconds; nats.go's
+default of 30 seconds when unset); closing the connection afterwards flushes pending writes,
+which a server that stopped reading can stretch to the 1-minute write timeout. It stops waiting as soon as none is pending or the connection closes, and does
 not wait on a connection that is already closed. A future still pending then fails with
 `jetstream.ErrJetStreamPublisherClosed`; its message may still have been stored. As in
 nats.go, futures pending when the connection starts reconnecting fail with
@@ -440,6 +441,7 @@ type JSProducerConfig struct {
     Subject          string       // default publish subject
     Stream           StreamConfig // stream to target
     AutoCreateStream bool         // create-or-update stream on startup
+    DrainTimeout     uint         // milliseconds, defaults to 30000; bounds Disconnect's wait for PublishAsync acks
 }
 
 type StreamConfig struct {
