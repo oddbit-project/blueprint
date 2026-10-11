@@ -397,7 +397,7 @@ Returns the server's registry, for registering additional collectors.
 func (s *Server) Start() error
 ```
 
-Starts the underlying HTTP server and blocks. Returns `nil` after `Shutdown()`, `httpserver.ErrTLSNoCertificate` at once when `tlsEnable` is set without a complete `tlsCert`/`tlsKey` pair, or the listener error otherwise.
+Starts the underlying HTTP server and blocks. Returns `nil` after `Shutdown()`, `httpserver.ErrTLSNoCertificate` at once when `tlsEnable` is set without a complete `tlsCert`/`tlsKey` pair (unless a certificate was set on `Server.Server.TLSConfig` after `NewServer`; needs an httpserver release that has the error), or the listener error otherwise.
 
 ```go
 func (s *Server) Shutdown(ctx context.Context) error

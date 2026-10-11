@@ -21,7 +21,7 @@ blueprint/
 │   ├── redis/go.mod         # github.com/oddbit-project/blueprint/provider/redis
 │   ├── s3/go.mod            # github.com/oddbit-project/blueprint/provider/s3
 │   ├── httpserver/go.mod    # github.com/oddbit-project/blueprint/provider/httpserver
-│   └── ...                  # 13 total provider modules
+│   └── ...                  # 17 provider modules
 └── go.work                  # Workspace for development
 ```
 
@@ -68,6 +68,8 @@ When updating core library without provider changes:
    ```bash
    make test-all
    ```
+   `test-all` does not test `prometheus` or `jwtprovider`; test them by hand (see
+   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 3. **Tag core only**:
    ```bash
    git tag v0.8.1
@@ -87,13 +89,19 @@ When updating both core and providers (major releases):
    make test-all
    make build-all
    ```
+   Neither covers `prometheus` or `jwtprovider`; test and build them by hand (see
+   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 3. **Update dependencies** if needed:
    ```bash
    make update-deps VERSION=v0.9.0
    ```
    This bumps only the core requirement, and skips `prometheus` and `jwtprovider` (see
    [Modules outside `PROVIDERS`](#modules-outside-providers)); for provider-to-provider requirements
-   see [Providers that require other providers](#providers-that-require-other-providers).
+   see [Providers that require other providers](#providers-that-require-other-providers). The
+   bumped requirement names a core tag that step 4 has not created yet (the local `replace` hides
+   that); when provider code needs the new core, use the order in
+   [gohan/dbx release order](#gohandbx-release-order) instead: tag and push core, then bump, then
+   tag the providers.
 4. **Tag all modules**:
    ```bash
    make tag-version VERSION=v0.9.0
@@ -186,12 +194,18 @@ which steps 3 and 5 skip.
 
 ## Modules outside `PROVIDERS`
 
-`prometheus` and `jwtprovider` are **not** in the Makefile's `PROVIDERS` list, so `make update-deps`
-and `make tag-version` skip them in every release type. When either is part of a release, bump and tag
-it by hand: `cd provider/<name> && go get github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy`
-for the core requirement, [Providers that require other providers](#providers-that-require-other-providers)
-for its provider requirements, and `git tag provider/<name>/vA.B.C && git push origin
-provider/<name>/vA.B.C` for the tag.
+`prometheus` and `jwtprovider` are **not** in the Makefile's `PROVIDERS` list, so every target that
+loops over it skips them, in every release type: `make test-all` and `test-providers` (and so CI,
+which runs `make test`), `build-providers` (`build-all`), `tidy-providers` (`tidy-all`), a local
+`make sbom`, `update-deps` and `tag-version`. When either is part of a release, or core changes
+something it uses, do each step by hand in `provider/<name>`:
+
+- test and build: `go test -race ./... && go build ./...`;
+- tidy: `go mod tidy`;
+- core requirement: `go get github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy`;
+- provider requirements: see
+  [Providers that require other providers](#providers-that-require-other-providers);
+- tag: `git tag provider/<name>/vA.B.C && git push origin provider/<name>/vA.B.C`.
 
 ## Providers that require other providers
 
@@ -201,7 +215,8 @@ module's local `replace`) hides a stale requirement from the tests. This applies
 type, including a provider-only release.
 
 Whenever a provider's `[Unreleased]` entries rely on a change in another provider (for example a
-prometheus entry that relies on a new httpserver check), check that the provider's `go.mod` requires
+prometheus entry that relies on a new httpserver check), or its code, tests included, uses a symbol
+added to another provider since the version its `go.mod` requires, check that the provider's `go.mod` requires
 a version of the dependency that has the change. This holds whether the dependency's change is still
 unreleased or was released earlier: a provider can lag a dependency that is already tagged. If it
 does not:
@@ -276,8 +291,8 @@ go get github.com/oddbit-project/blueprint/provider/s3@v0.8.0       # Stable S3
 
 ### Pre-Release
 
-- [ ] All tests passing (`make test-all`)
-- [ ] All modules build (`make build-all`)
+- [ ] All tests passing (`make test-all`, plus `prometheus` and `jwtprovider` by hand)
+- [ ] All modules build (`make build-all`, plus `prometheus` and `jwtprovider` by hand)
 - [ ] Dependencies tidied (`make tidy-all`)
 - [ ] Documentation updated
 - [ ] CHANGELOG.md updated
