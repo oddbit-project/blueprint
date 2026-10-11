@@ -1,15 +1,16 @@
 SBOM_FILE=sbom.json
 CYCLONEDX_GOMOD_VERSION ?= v1.12.0
 
-# Provider modules list
-PROVIDERS := franz kafka nats mqtt redis s3 etcd pgsql sqlite clickhouse httpserver metrics smtp htpasswd hmacprovider
+# Provider modules: every directory under provider/ with its own go.mod. Derived, so that a
+# new provider module is covered by every target below without having to be added here.
+PROVIDERS := $(patsubst provider/%/go.mod,%,$(wildcard provider/*/go.mod))
 
 # Build tags enabling integration tests gated behind //go:build integration (db, etcd).
 # Most integration suites instead gate on testing.Short() and run without any tag.
 INTEGRATION_TAGS ?= integration
 
 .PHONY: help sbom sbom-clean install-sbom-tool test test-unit test-integration test-all test-providers test-pgsql test-clickhouse test-kafka test-franz test-nats test-mqtt test-s3 test-db test-etcd test-coverage test-coverage-unit clean-test benchmark-s3
-.PHONY: build build-all build-providers tidy tidy-all tidy-providers update-deps tag-version
+.PHONY: build build-all build-providers tidy tidy-all tidy-providers update-deps tag-version require-providers
 
 # Default target
 help:
@@ -54,8 +55,15 @@ test-integration:
 	@echo "Running all integration tests with testcontainers and race detector..."
 	@go test -v -race -tags=$(INTEGRATION_TAGS) ./...
 
+# Fails when PROVIDERS is empty, so that a target that loops over it never succeeds by doing
+# nothing: make run from another directory, a tree without the provider modules, or PROVIDERS=
+require-providers:
+ifeq ($(strip $(PROVIDERS)),)
+	$(error no provider modules found: PROVIDERS is empty. Run make from the root of a repository checkout, and do not pass an empty PROVIDERS)
+endif
+
 # Run all tests (unit + integration) with race detector
-test-all:
+test-all: require-providers
 	@echo "Running all tests (unit + integration) with race detector..."
 	@go test -v -race -tags=$(INTEGRATION_TAGS) ./...
 	@for provider in $(PROVIDERS); do \
@@ -64,7 +72,7 @@ test-all:
 	done
 
 # Test only provider modules
-test-providers:
+test-providers: require-providers
 	@echo "Running tests for all provider modules..."
 	@for provider in $(PROVIDERS); do \
 		echo "Testing provider/$$provider..."; \
@@ -144,7 +152,7 @@ benchmark-s3:
 install-sbom-tool:
 	go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CYCLONEDX_GOMOD_VERSION)
 
-sbom: install-sbom-tool
+sbom: require-providers install-sbom-tool
 	@echo "Generating SBOM for core module..."
 	@cyclonedx-gomod mod -licenses -json -output sbom-core.json
 	@mkdir -p sbom-providers
@@ -165,10 +173,10 @@ build:
 	@echo "Building core Blueprint library..."
 	@go build ./...
 
-build-all: build build-providers
+build-all: require-providers build build-providers
 	@echo "All modules built successfully"
 
-build-providers:
+build-providers: require-providers
 	@echo "Building provider modules..."
 	@for provider in $(PROVIDERS); do \
 		echo "Building provider/$$provider..."; \
@@ -180,10 +188,10 @@ tidy:
 	@echo "Tidying core module dependencies..."
 	@go mod tidy
 
-tidy-all: tidy tidy-providers
+tidy-all: require-providers tidy tidy-providers
 	@echo "All module dependencies tidied"
 
-tidy-providers:
+tidy-providers: require-providers
 	@echo "Tidying provider module dependencies..."
 	@for provider in $(PROVIDERS); do \
 		echo "Tidying provider/$$provider..."; \
@@ -191,7 +199,7 @@ tidy-providers:
 	done
 
 # Update all provider dependencies to latest Blueprint version
-update-deps:
+update-deps: require-providers
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make update-deps VERSION=v0.8.0"; \
 		exit 1; \
@@ -203,7 +211,7 @@ update-deps:
 	done
 
 # Tag all modules with a version
-tag-version:
+tag-version: require-providers
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make tag-version VERSION=v0.8.0"; \
 		exit 1; \

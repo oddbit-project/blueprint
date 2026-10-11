@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.11.0
-	github.com/oddbit-project/blueprint v0.11.0
+	github.com/oddbit-project/blueprint v0.12.0
 	github.com/oddbit-project/blueprint/provider/httpserver v0.9.4
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
@@ -45,7 +45,7 @@ require (
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.9.0 // indirect
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.9.0 // indirect
 	github.com/oddbit-project/blueprint/provider/jwtprovider v0.9.0 // indirect
-	github.com/oddbit-project/blueprint/provider/redis v0.8.2 // indirect
+	github.com/oddbit-project/blueprint/provider/redis v0.9.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -62,7 +62,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/arch v0.21.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
