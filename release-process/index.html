@@ -3119,6 +3119,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#modules-outside-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modules outside PROVIDERS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providers-that-require-other-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providers that require other providers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#version-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3531,6 +3553,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#modules-outside-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modules outside PROVIDERS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#providers-that-require-other-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Providers that require other providers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#version-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3751,7 +3795,7 @@ independent provider versioning.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── redis/go.mod         # github.com/oddbit-project/blueprint/provider/redis
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── s3/go.mod            # github.com/oddbit-project/blueprint/provider/s3
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   ├── httpserver/go.mod    # github.com/oddbit-project/blueprint/provider/httpserver
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   └── ...                  # 13 total provider modules
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   └── ...                  # 17 provider modules
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└── go.work                  # Workspace for development
 </span></code></pre></div>
 <h2 id="release-types">Release Types<a class="headerlink" href="#release-types" title="Permanent link">&para;</a></h2>
@@ -3764,6 +3808,10 @@ independent provider versioning.</p>
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>provider/redis
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>go<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-v<span class="w"> </span>./...
 </span></code></pre></div></li>
+<li><strong>Check provider requirements</strong>: if this provider's <code>[Unreleased]</code> entries rely on another
+   provider's change, or another provider's entries rely on this one, follow
+   <a href="#providers-that-require-other-providers">Providers that require other providers</a> (the dependency
+   is tagged first; the dependant's <code>go.mod</code> is bumped before it is tagged).</li>
 <li><strong>Tag only that provider</strong>:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>tag<span class="w"> </span>provider/redis/v0.8.1
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>provider/redis/v0.8.1
@@ -3784,7 +3832,9 @@ independent provider versioning.</p>
 <li><strong>Make changes</strong> to core modules (<code>/db</code>, <code>/config</code>, <code>/crypt</code>, etc.)</li>
 <li><strong>Test core and all providers</strong>:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>test-all
-</span></code></pre></div></li>
+</span></code></pre></div>
+   <code>test-all</code> does not test <code>prometheus</code> or <code>jwtprovider</code>; test them by hand (see
+   <a href="#modules-outside-providers">Modules outside <code>PROVIDERS</code></a>).</li>
 <li><strong>Tag core only</strong>:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>tag<span class="w"> </span>v0.8.1
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.8.1
@@ -3799,13 +3849,24 @@ independent provider versioning.</p>
 <li><strong>Run comprehensive tests</strong>:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>test-all
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>build-all
-</span></code></pre></div></li>
+</span></code></pre></div>
+   Neither covers <code>prometheus</code> or <code>jwtprovider</code>; test and build them by hand (see
+   <a href="#modules-outside-providers">Modules outside <code>PROVIDERS</code></a>).</li>
 <li><strong>Update dependencies</strong> if needed:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make<span class="w"> </span>update-deps<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>v0.9.0
-</span></code></pre></div></li>
+</span></code></pre></div>
+   This bumps only the core requirement, and skips <code>prometheus</code> and <code>jwtprovider</code> (see
+   <a href="#modules-outside-providers">Modules outside <code>PROVIDERS</code></a>); for provider-to-provider requirements
+   see <a href="#providers-that-require-other-providers">Providers that require other providers</a>. The
+   bumped requirement names a core tag that step 4 has not created yet (the local <code>replace</code> hides
+   that); when provider code needs the new core, use the order in
+   <a href="#gohandbx-release-order">gohan/dbx release order</a> instead: tag and push core, then bump, then
+   tag the providers.</li>
 <li><strong>Tag all modules</strong>:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>make<span class="w"> </span>tag-version<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>v0.9.0
-</span></code></pre></div></li>
+</span></code></pre></div>
+   <code>prometheus</code> and <code>jwtprovider</code> are not tagged by this; tag them by hand (see
+   <a href="#modules-outside-providers">Modules outside <code>PROVIDERS</code></a>).</li>
 <li><strong>Push all tags</strong>:
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.9.0
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>--tags
@@ -3868,12 +3929,77 @@ code imports from core, tag in this order instead of a single <code>tag-version<
    <code>make update-deps VERSION=vX.Y.Z</code>, or <code>cd provider/&lt;name&gt; &amp;&amp; go get
    github.com/oddbit-project/blueprint@vX.Y.Z &amp;&amp; go mod tidy</code> per module. Commit the <code>go.mod</code>/
    <code>go.sum</code> changes.</li>
-<li><strong>Tag the providers</strong> (<code>make tag-version VERSION=vX.Y.Z</code> is safe now that step 3 has landed,
-   or tag them individually).</li>
+<li><strong>Bump provider-to-provider requirements</strong> where a provider's release depends on another
+   provider's change; see <a href="#providers-that-require-other-providers">Providers that require other providers</a>.</li>
+<li><strong>Tag the providers</strong> (<code>make tag-version VERSION=vX.Y.Z</code> is safe now that steps 3 and 4 have
+   landed, or tag them individually).</li>
 </ol>
 <p><code>sqlite</code> is included in the Makefile's <code>PROVIDERS</code> list, so <code>tag-version</code>, <code>sbom</code>,
 <code>update-deps</code>, <code>build-providers</code> and <code>tidy-providers</code> already act on it along with the other
 provider modules — no separate step is needed for <code>sqlite</code> itself.</p>
+<p>See <a href="#modules-outside-providers">Modules outside <code>PROVIDERS</code></a> for <code>prometheus</code> and <code>jwtprovider</code>,
+which steps 3 and 5 skip.</p>
+<h2 id="modules-outside-providers">Modules outside <code>PROVIDERS</code><a class="headerlink" href="#modules-outside-providers" title="Permanent link">&para;</a></h2>
+<p><code>prometheus</code> and <code>jwtprovider</code> are <strong>not</strong> in the Makefile's <code>PROVIDERS</code> list, so every target that
+loops over it skips them, in every release type: <code>make test-all</code> and <code>test-providers</code> (and so CI,
+which runs <code>make test</code>), <code>build-providers</code> (<code>build-all</code>), <code>tidy-providers</code> (<code>tidy-all</code>), a local
+<code>make sbom</code>, <code>update-deps</code> and <code>tag-version</code>. When either is part of a release, or core changes
+something it uses, do each step by hand in <code>provider/&lt;name&gt;</code>:</p>
+<ul>
+<li>test and build: <code>go test -race ./... &amp;&amp; go build ./...</code>;</li>
+<li>tidy: <code>go mod tidy</code>;</li>
+<li>core requirement: <code>go get github.com/oddbit-project/blueprint@vX.Y.Z &amp;&amp; go mod tidy</code>;</li>
+<li>provider requirements: see
+  <a href="#providers-that-require-other-providers">Providers that require other providers</a>;</li>
+<li>tag: <code>git tag provider/&lt;name&gt;/vA.B.C &amp;&amp; git push origin provider/&lt;name&gt;/vA.B.C</code>.</li>
+</ul>
+<h2 id="providers-that-require-other-providers">Providers that require other providers<a class="headerlink" href="#providers-that-require-other-providers" title="Permanent link">&para;</a></h2>
+<p>Some providers require other providers. Neither <code>make update-deps</code> nor the core steps above bump
+those requirements, so each keeps the version it last pinned, and the workspace (<code>go.work</code> and each
+module's local <code>replace</code>) hides a stale requirement from the tests. This applies to <strong>every</strong> release
+type, including a provider-only release.</p>
+<p>Whenever a provider's <code>[Unreleased]</code> entries rely on a change in another provider (for example a
+prometheus entry that relies on a new httpserver check), or its code, tests included, uses a symbol
+added to another provider since the version its <code>go.mod</code> requires, check that the provider's <code>go.mod</code> requires
+a version of the dependency that has the change. This holds whether the dependency's change is still
+unreleased or was released earlier: a provider can lag a dependency that is already tagged. If it
+does not:</p>
+<ol>
+<li>If the change is unreleased, release the dependency first, and <strong>push</strong> its tag:
+   <code>git tag provider/&lt;dep&gt;/vA.B.C &amp;&amp; git push origin provider/&lt;dep&gt;/vA.B.C</code>.</li>
+<li>Bump the dependant's requirement on it and commit:
+   <code>cd provider/&lt;name&gt; &amp;&amp; go get github.com/oddbit-project/blueprint/provider/&lt;dep&gt;@vA.B.C &amp;&amp; go mod tidy</code>.
+   The local <code>replace</code> means <code>go get</code> can succeed even when the tag is not on the remote, so check
+   step 1's push first.</li>
+<li>Update the dependant's CHANGELOG line that states the requirement ("Requires … <code>provider/&lt;dep&gt;</code>
+   vA.B.C").</li>
+<li>Then release the dependant.</li>
+</ol>
+<p>The direct requirements today, and the release order they imply:</p>
+<table>
+<thead>
+<tr>
+<th>provider</th>
+<th>requires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>provider/hmacprovider</code></td>
+<td><code>provider/redis</code></td>
+</tr>
+<tr>
+<td><code>provider/httpserver</code></td>
+<td><code>provider/hmacprovider</code>, <code>provider/htpasswd</code>, <code>provider/jwtprovider</code></td>
+</tr>
+<tr>
+<td><code>provider/prometheus</code></td>
+<td><code>provider/httpserver</code></td>
+</tr>
+</tbody>
+</table>
+<p>Order: <code>redis</code>; then <code>hmacprovider</code>, <code>htpasswd</code> and <code>jwtprovider</code>; then <code>httpserver</code>; then
+<code>prometheus</code>. Check a provider's <code>go.mod</code> for others before relying on this list.</p>
 <h2 id="version-strategy">Version Strategy<a class="headerlink" href="#version-strategy" title="Permanent link">&para;</a></h2>
 <h3 id="semantic-versioning">Semantic Versioning<a class="headerlink" href="#semantic-versioning" title="Permanent link">&para;</a></h3>
 <p>All modules follow <a href="https://semver.org/">Semantic Versioning</a>:</p>
@@ -3951,8 +4077,8 @@ provider modules — no separate step is needed for <code>sqlite</code> itself.<
 <h2 id="release-checklist">Release Checklist<a class="headerlink" href="#release-checklist" title="Permanent link">&para;</a></h2>
 <h3 id="pre-release">Pre-Release<a class="headerlink" href="#pre-release" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] All tests passing (<code>make test-all</code>)</li>
-<li>[ ] All modules build (<code>make build-all</code>)</li>
+<li>[ ] All tests passing (<code>make test-all</code>, plus <code>prometheus</code> and <code>jwtprovider</code> by hand)</li>
+<li>[ ] All modules build (<code>make build-all</code>, plus <code>prometheus</code> and <code>jwtprovider</code> by hand)</li>
 <li>[ ] Dependencies tidied (<code>make tidy-all</code>)</li>
 <li>[ ] Documentation updated</li>
 <li>[ ] CHANGELOG.md updated</li>
@@ -4084,7 +4210,7 @@ provider modules — no separate step is needed for <code>sqlite</code> itself.<
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 9, 2026 11:07:27 UTC">October 9, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 11, 2026 05:28:49 UTC">October 11, 2026</span>
   </span>
 
     

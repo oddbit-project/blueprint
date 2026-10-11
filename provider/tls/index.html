@@ -3245,20 +3245,31 @@ without the client certificate (#115).</p>
 </span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="c1">// Or use a file</span>
 </span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="nx">serverConfig</span><span class="p">.</span><span class="nx">TlsKeyCredential</span><span class="p">.</span><span class="nx">PasswordFile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"/path/to/keypassword.txt"</span>
 </span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="c1">// Generate the TLS configuration</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="nx">tlsConfig</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">serverConfig</span><span class="p">.</span><span class="nx">TLSConfig</span><span class="p">()</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="c1">// handle error</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="p">}</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="c1">// Use tlsConfig with your server implementation</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="c1">// ...</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">serverConfig</span><span class="p">.</span><span class="nx">ValidateKeyPair</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="c1">// err is tls.ErrTLSIncompleteKeyPair</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="p">}</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="c1">// Generate the TLS configuration</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="nx">tlsConfig</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">serverConfig</span><span class="p">.</span><span class="nx">TLSConfig</span><span class="p">()</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">    </span><span class="c1">// handle error</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="p">}</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="c1">// Use tlsConfig with your server implementation</span>
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="c1">// ...</span>
 </span></code></pre></div>
 <p><code>TLSMinVersion</code> and <code>TLSMaxVersion</code> accept <code>"TLS12"</code> or <code>"TLS13"</code>; any other value (including <code>"1.2"</code> or <code>"1.3"</code>)
 makes <code>TLSConfig()</code> return <code>ErrInvalidTlsVersion</code>. <code>TLSCipherSuites</code> accepts the names of the supported AEAD suites
 (for example <code>"TLS_AES_128_GCM_SHA256"</code> or <code>"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"</code>); an unknown name returns
 <code>ErrInvalidCipher</code>. Versions and cipher suites are validated and applied even when <code>TLSEnable</code> is set without any
 certificate, key or CA files.</p>
+<p>With <code>TLSEnable</code>, <code>TLSConfig()</code> loads the server certificate only when both <code>TLSCert</code> and <code>TLSKey</code> are set, so
+<code>ValidateKeyPair()</code> returns <code>ErrTLSIncompleteKeyPair</code> for a <code>TLSCert</code> without <code>TLSKey</code>, a <code>TLSKey</code> without <code>TLSCert</code>,
+or a key password without both; without it, such a server failed only when it started, with an error naming no setting.
+<code>TLSEnable</code> with no certificate settings at all is still accepted, and <code>ValidateKeyPair()</code> checks nothing without
+<code>TLSEnable</code>. <code>httpserver.ServerConfig.Validate()</code> calls it, and so <code>httpserver.NewServer</code>, and the prometheus provider once
+it requires that httpserver release, reject such a config; the metrics provider keeps its own stricter check, <code>ErrMissingTLSCert</code>, which also rejects
+<code>TLSEnable</code> without a pair (#128).</p>
 <p>The key password is read from the first non-empty source: <code>Password</code>, then <code>PasswordEnvVar</code>, then <code>PasswordFile</code>.
 An environment variable is read from the process environment and is not cleared after reading, so the password can be
 fetched again (for example when the configuration is rebuilt).</p>
@@ -3317,7 +3328,7 @@ certificates are rejected with <code>ErrExpiredCert</code>.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 8, 2026 22:13:44 UTC">October 8, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 11, 2026 05:28:46 UTC">October 11, 2026</span>
   </span>
 
     

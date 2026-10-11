@@ -3932,8 +3932,9 @@ closes the connection without draining it (pending writes are flushed); with an 
 or <code>all</code> ack policy, a JetStream consumer's unacknowledged messages are redelivered by the
 server (with <code>none</code> they are not). <code>JSProducer.Disconnect</code>
 first waits for the acks of pending <code>PublishAsync</code> calls, up to the connection's drain
-timeout (nats.go's default of 30 seconds; the JetStream configs have no <code>drainTimeout</code>
-setting, see #127). It stops waiting as soon as none is pending or the connection closes, and does
+timeout (<code>JSProducerConfig.DrainTimeout</code>, json <code>drainTimeout</code>, in milliseconds; nats.go's
+default of 30 seconds when unset); closing the connection afterwards flushes pending writes,
+which a server that stopped reading can stretch to the 1-minute write timeout. It stops waiting as soon as none is pending or the connection closes, and does
 not wait on a connection that is already closed. A future still pending then fails with
 <code>jetstream.ErrJetStreamPublisherClosed</code>; its message may still have been stored. As in
 nats.go, futures pending when the connection starts reconnecting fail with
@@ -4064,24 +4065,25 @@ with the same URL/auth/TLS fields used by the core types.</p>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nx">Subject</span><span class="w">          </span><span class="kt">string</span><span class="w">       </span><span class="c1">// default publish subject</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="nx">Stream</span><span class="w">           </span><span class="nx">StreamConfig</span><span class="w"> </span><span class="c1">// stream to target</span>
 </span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="nx">AutoCreateStream</span><span class="w"> </span><span class="kt">bool</span><span class="w">         </span><span class="c1">// create-or-update stream on startup</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="p">}</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="kd">type</span><span class="w"> </span><span class="nx">StreamConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">    </span><span class="nx">Name</span><span class="w">        </span><span class="kt">string</span>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">    </span><span class="nx">Description</span><span class="w"> </span><span class="kt">string</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="nx">Subjects</span><span class="w">    </span><span class="p">[]</span><span class="kt">string</span><span class="w">       </span><span class="c1">// e.g. ["orders.&gt;"]</span>
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="nx">Retention</span><span class="w">   </span><span class="kt">string</span><span class="w">         </span><span class="c1">// "limits" | "interest" | "workqueue"</span>
-</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="nx">Storage</span><span class="w">     </span><span class="kt">string</span><span class="w">         </span><span class="c1">// "file" | "memory"</span>
-</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nx">MaxAge</span><span class="w">      </span><span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span>
-</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nx">MaxMsgs</span><span class="w">     </span><span class="kt">int64</span>
-</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="nx">MaxBytes</span><span class="w">    </span><span class="kt">int64</span>
-</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="nx">Replicas</span><span class="w">    </span><span class="kt">int</span>
-</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span><span class="nx">Duplicates</span><span class="w">  </span><span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span>
-</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>
-</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="c1">// Native escape hatch: when set, all other StreamConfig fields are</span>
-</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="c1">// ignored and the supplied jetstream.StreamConfig is used verbatim.</span>
-</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span><span class="nx">Native</span><span class="w"> </span><span class="o">*</span><span class="nx">jetstream</span><span class="p">.</span><span class="nx">StreamConfig</span>
-</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="p">}</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="nx">DrainTimeout</span><span class="w">     </span><span class="kt">uint</span><span class="w">         </span><span class="c1">// milliseconds, defaults to 30000; bounds Disconnect's wait for PublishAsync acks</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="p">}</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="kd">type</span><span class="w"> </span><span class="nx">StreamConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">    </span><span class="nx">Name</span><span class="w">        </span><span class="kt">string</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="nx">Description</span><span class="w"> </span><span class="kt">string</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="nx">Subjects</span><span class="w">    </span><span class="p">[]</span><span class="kt">string</span><span class="w">       </span><span class="c1">// e.g. ["orders.&gt;"]</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="nx">Retention</span><span class="w">   </span><span class="kt">string</span><span class="w">         </span><span class="c1">// "limits" | "interest" | "workqueue"</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nx">Storage</span><span class="w">     </span><span class="kt">string</span><span class="w">         </span><span class="c1">// "file" | "memory"</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span><span class="nx">MaxAge</span><span class="w">      </span><span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="nx">MaxMsgs</span><span class="w">     </span><span class="kt">int64</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="nx">MaxBytes</span><span class="w">    </span><span class="kt">int64</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">    </span><span class="nx">Replicas</span><span class="w">    </span><span class="kt">int</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span><span class="nx">Duplicates</span><span class="w">  </span><span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span>
+</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>
+</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="c1">// Native escape hatch: when set, all other StreamConfig fields are</span>
+</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span><span class="c1">// ignored and the supplied jetstream.StreamConfig is used verbatim.</span>
+</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">    </span><span class="nx">Native</span><span class="w"> </span><span class="o">*</span><span class="nx">jetstream</span><span class="p">.</span><span class="nx">StreamConfig</span>
+</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="p">}</span>
 </span></code></pre></div>
 <p><code>AutoCreateStream</code> defaults to <code>false</code> for production safety — in that mode
 the producer looks the stream up at startup and fails if it does not exist.
@@ -4375,7 +4377,7 @@ example <code>Placement</code>, <code>Sources</code>, <code>SubjectTransform</co
 </tbody>
 </table>
 <p>The core-NATS sentinels (<code>ErrMissingProducerTopic</code>, <code>ErrInvalidAuthType</code>, <code>ErrTLSNotEnabled</code>,
-<code>ErrNilConfig</code>, <code>ErrConsumerClosed</code>, <code>ErrProducerClosed</code>) are also returned by
+<code>ErrNilConfig</code>, <code>ErrConsumerClosed</code>, <code>ErrProducerClosed</code>, <code>ErrNilProducer</code>) are also returned by
 the JetStream paths where appropriate.</p>
 
 
@@ -4399,7 +4401,7 @@ the JetStream paths where appropriate.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 9, 2026 09:09:43 UTC">October 9, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 9, 2026 11:47:47 UTC">October 9, 2026</span>
   </span>
 
     
