@@ -187,7 +187,7 @@ func (p *Producer) IsConnected() bool {
 func (p *Producer) Publish(data []byte) error {
 	// Check for nil producer or disconnected state
 	if p == nil {
-		return errors.New("publisher is nil")
+		return ErrNilProducer
 	}
 
 	conn := p.conn()
@@ -216,7 +216,7 @@ func (p *Producer) Publish(data []byte) error {
 func (p *Producer) PublishMsg(subject string, data []byte) error {
 	// Check for nil producer
 	if p == nil {
-		return errors.New("publisher is nil")
+		return ErrNilProducer
 	}
 
 	conn := p.conn()
@@ -245,7 +245,7 @@ func (p *Producer) PublishMsg(subject string, data []byte) error {
 func (p *Producer) PublishRequest(subject string, reply string, data []byte) error {
 	// Check for nil producer
 	if p == nil {
-		return errors.New("publisher is nil")
+		return ErrNilProducer
 	}
 
 	conn := p.conn()
@@ -274,7 +274,7 @@ func (p *Producer) PublishRequest(subject string, reply string, data []byte) err
 // Request publishes a request message and waits for a response with a timeout
 func (p *Producer) Request(subject string, data []byte, timeout time.Duration) (*nats.Msg, error) {
 	if p == nil {
-		return nil, errors.New("publisher is nil")
+		return nil, ErrNilProducer
 	}
 	// Check if producer is connected
 	conn := p.conn()

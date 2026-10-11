@@ -750,5 +750,5 @@ JetStream-specific error sentinels (all declared in `provider/nats/js_common.go`
 | `ErrInvalidStorage` | `StreamConfig.Storage` was not `""`, `"file"`, or `"memory"` |
 
 The core-NATS sentinels (`ErrMissingProducerTopic`, `ErrInvalidAuthType`, `ErrTLSNotEnabled`,
-`ErrNilConfig`, `ErrConsumerClosed`, `ErrProducerClosed`) are also returned by
+`ErrNilConfig`, `ErrConsumerClosed`, `ErrProducerClosed`, `ErrNilProducer`) are also returned by
 the JetStream paths where appropriate.

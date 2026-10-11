@@ -38,9 +38,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   stored (#114).
 - `Producer.Request` and `RequestJSON`, `JSProducer.Publish` and `PublishJSON`, and
   `Consumer.Subscribe` and `SubscribeSync` called on a nil receiver now return an error
-  ("publisher is nil" for the producers, `ErrConsumerClosed` for the consumer) instead of
-  panicking, as `Publish`, `PublishMsg`, `PublishRequest`, `NextMsg` and `Unsubscribe`
-  already did. The `Producer` JSON helpers and `JSProducer.PublishJSON` no longer panic
+  (the new `ErrNilProducer`, "publisher is nil", for the producers; `ErrConsumerClosed` for the
+  consumer) instead of panicking, as `Publish`, `PublishMsg`, `PublishRequest`, `NextMsg` and `Unsubscribe`
+  already did; those now return `ErrNilProducer` too, with the same text. The `Producer` JSON helpers and `JSProducer.PublishJSON` no longer panic
   when `json.Marshal` fails on a nil receiver or a `Producer` built without a `Logger`;
   they return the marshal error. Values from the constructors are unaffected, apart from a
   nil producer or consumer kept after an ignored constructor error (#126).

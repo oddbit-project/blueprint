@@ -3,7 +3,6 @@ package nats
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"sync"
 	"time"
 
@@ -199,7 +198,7 @@ func (p *JSProducer) Disconnect() {
 // ack.
 func (p *JSProducer) Publish(ctx context.Context, data []byte) (*jetstream.PubAck, error) {
 	if p == nil {
-		return nil, errors.New("publisher is nil")
+		return nil, ErrNilProducer
 	}
 	return p.PublishMsg(ctx, p.Subject, data)
 }
@@ -207,7 +206,7 @@ func (p *JSProducer) Publish(ctx context.Context, data []byte) (*jetstream.PubAc
 // PublishMsg publishes data to an explicit subject.
 func (p *JSProducer) PublishMsg(ctx context.Context, subject string, data []byte) (*jetstream.PubAck, error) {
 	if p == nil {
-		return nil, errors.New("publisher is nil")
+		return nil, ErrNilProducer
 	}
 	if !p.IsConnected() {
 		return nil, ErrProducerClosed
@@ -245,7 +244,7 @@ func (p *JSProducer) PublishJSON(ctx context.Context, data interface{}) (*jetstr
 // the futures still pending when it closes the connection.
 func (p *JSProducer) PublishAsync(ctx context.Context, subject string, data []byte) (jetstream.PubAckFuture, error) {
 	if p == nil {
-		return nil, errors.New("publisher is nil")
+		return nil, ErrNilProducer
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err

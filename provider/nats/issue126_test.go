@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// call126 runs fn and fails the test, instead of the test binary, if it panics
+// call126 runs fn and fails the test, instead of the test binary, if it panics; it
+// asserts, so the calls after a panicking one in the same test still run
 func call126(t *testing.T, fn func() error) error {
 	t.Helper()
 	var err error
-	require.NotPanics(t, func() { err = fn() })
+	assert.NotPanics(t, func() { err = fn() })
 	return err
 }
 
@@ -25,13 +25,13 @@ func TestIssue126_NilProducerRequest(t *testing.T) {
 		_, err := p.Request("subj", []byte("x"), time.Millisecond)
 		return err
 	})
-	assert.EqualError(t, err, "publisher is nil")
+	assert.ErrorIs(t, err, ErrNilProducer)
 
 	err = call126(t, func() error {
 		_, err := p.RequestJSON("subj", map[string]string{"a": "b"}, time.Millisecond)
 		return err
 	})
-	assert.EqualError(t, err, "publisher is nil")
+	assert.ErrorIs(t, err, ErrNilProducer)
 }
 
 func TestIssue126_NilProducerJSONMarshalError(t *testing.T) {
@@ -74,12 +74,12 @@ func TestIssue126_NilJSProducerPublish(t *testing.T) {
 		_, err := p.Publish(ctx, []byte("x"))
 		return err
 	})
-	assert.EqualError(t, err, "publisher is nil")
+	assert.ErrorIs(t, err, ErrNilProducer)
 	err = call126(t, func() error {
 		_, err := p.PublishJSON(ctx, map[string]string{"a": "b"})
 		return err
 	})
-	assert.EqualError(t, err, "publisher is nil")
+	assert.ErrorIs(t, err, ErrNilProducer)
 	err = call126(t, func() error {
 		_, err := p.PublishJSON(ctx, make(chan int))
 		return err
@@ -151,4 +151,37 @@ func TestIssue126_GuardLoggerMarshalError(t *testing.T) {
 	_, err = jp.PublishJSON(context.Background(), bad)
 	assert.ErrorAs(t, err, &ute)
 	logged(t, buf, "Failed to marshal JSON for JetStream publish")
+}
+
+// Every nil-producer return is the ErrNilProducer sentinel, with the text the older
+// guards already returned
+func TestIssue126_NilProducerSentinel(t *testing.T) {
+	var p *Producer
+	var jp *JSProducer
+	ctx := context.Background()
+	calls := map[string]func() error{
+		"Producer.Publish":        func() error { return p.Publish([]byte("x")) },
+		"Producer.PublishMsg":     func() error { return p.PublishMsg("subj", []byte("x")) },
+		"Producer.PublishRequest": func() error { return p.PublishRequest("subj", "reply", []byte("x")) },
+		"Producer.Request": func() error {
+			_, err := p.Request("subj", []byte("x"), time.Millisecond)
+			return err
+		},
+		"JSProducer.Publish": func() error { _, err := jp.Publish(ctx, []byte("x")); return err },
+		"JSProducer.PublishMsg": func() error {
+			_, err := jp.PublishMsg(ctx, "subj", []byte("x"))
+			return err
+		},
+		"JSProducer.PublishAsync": func() error {
+			_, err := jp.PublishAsync(ctx, "subj", []byte("x"))
+			return err
+		},
+	}
+	for name, fn := range calls {
+		t.Run(name, func(t *testing.T) {
+			err := call126(t, fn)
+			assert.ErrorIs(t, err, ErrNilProducer)
+			assert.EqualError(t, err, "publisher is nil")
+		})
+	}
 }
