@@ -299,6 +299,10 @@ errors such as `nats.ErrConnectionDraining`; once the connection is closed,
 `Disconnect` sets the exported `Conn` field to nil, so code that reads `Conn` directly
 must not run while `Disconnect` may.
 
+The `Logger` is optional. The constructors create one when given nil, and a `Producer`,
+`Consumer`, `JSProducer` or `JSConsumer` built as a struct literal with no `Logger` works
+without logging: each log call is skipped.
+
 ### Synchronous Message Consumption
 
 `NextMsg` returns the upstream `nats.ErrTimeout` sentinel when the timeout

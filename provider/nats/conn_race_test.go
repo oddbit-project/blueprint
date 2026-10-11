@@ -28,15 +28,6 @@ func callPastClose(conn *nats.Conn, call func()) <-chan struct{} {
 	return done
 }
 
-func waitDone(t *testing.T, done <-chan struct{}) {
-	t.Helper()
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("caller did not finish")
-	}
-}
-
 // Issue #113 claim 1: Producer methods called concurrently with Disconnect do not race
 // on the Conn field
 func TestIssue113_ProducerMethodsDoNotRaceDisconnect(t *testing.T) {
@@ -56,7 +47,7 @@ func TestIssue113_ProducerMethodsDoNotRaceDisconnect(t *testing.T) {
 
 			done := callPastClose(p.Conn, func() { call(p) })
 			p.Disconnect()
-			waitDone(t, done)
+			waitDone(t, done, "caller did not finish")
 		})
 	}
 }
@@ -83,7 +74,7 @@ func TestIssue113_ConsumerMethodsDoNotRaceDisconnect(t *testing.T) {
 
 			done := callPastClose(c.Conn, func() { call(c, sub) })
 			c.Disconnect()
-			waitDone(t, done)
+			waitDone(t, done, "caller did not finish")
 		})
 	}
 }

@@ -77,7 +77,7 @@ When updating core library without provider changes:
 
 ### 3. Coordinated Release
 
-When updating both core and providers (major releases):
+When updating both core and providers:
 
 #### Steps:
 
@@ -87,25 +87,35 @@ When updating both core and providers (major releases):
    make test-all
    make build-all
    ```
-3. **Update dependencies** if needed:
+3. **Tag and push core** first, so that the version the providers are about to require exists:
    ```bash
-   make update-deps VERSION=v0.9.0
+   git tag v0.15.0
+   git push origin v0.15.0
    ```
-   This bumps only the core requirement; for provider-to-provider requirements see
-   [Providers that require other providers](#providers-that-require-other-providers). The
-   bumped requirement names a core tag that step 4 has not created yet (the local `replace` hides
-   that); when provider code needs the new core, use the order in
-   [gohan/dbx release order](#gohandbx-release-order) instead: tag and push core, then bump, then
-   tag the providers.
-4. **Tag all modules**:
+4. **Bump the providers' core requirement** to that version and commit the `go.mod`/`go.sum`
+   changes:
    ```bash
-   make tag-version VERSION=v0.9.0
+   make update-deps VERSION=v0.15.0
    ```
-5. **Push all tags**:
+   This bumps only the core requirement.
+5. **Tag the providers being released, each with its own next version**, and push each tag. A
+   provider is released when it has changes of its own, or when its bumped requirement has to
+   ship; the others need no tag. Providers are versioned independently of core (at core `v0.14.0`,
+   nats was at `v0.10.0` and clickhouse at `v0.11.0`), so the tag is not core's version; pick it
+   from the provider's own `[Unreleased]` entries, as in [Version Strategy](#version-strategy):
    ```bash
-   git push origin v0.9.0
-   git push origin --tags
+   git tag provider/<name>/vA.B.C
+   git push origin provider/<name>/vA.B.C
    ```
+   Tag providers that others require first. Where a provider's release depends on another
+   provider's change, bump its requirement once that tag is pushed, and before tagging it; see
+   [Providers that require other providers](#providers-that-require-other-providers) for the
+   order.
+
+   `make tag-version VERSION=vX.Y.Z` tags core **and every provider** with that one version. It
+   fits only a release in which every module takes the same version: run it after the step 4
+   commit, in place of steps 3 and 5's tags, and push core's tag and each provider tag. In any
+   other release it would tag the providers with core's version.
 6. **Create GitHub release** with comprehensive release notes
 
 ## Release Commands Reference
@@ -117,7 +127,7 @@ When updating both core and providers (major releases):
 make build-all
 make test-all
 
-# Tag all modules with same version (coordinated release)
+# Tag core and every provider with one version (only when all modules take the same version)
 make tag-version VERSION=v0.9.0
 
 # Update all provider dependencies to specific core version
@@ -139,7 +149,7 @@ git tag provider/redis/v0.8.1
 # Push specific tag
 git push origin provider/redis/v0.8.1
 
-# Push all tags
+# Push every local tag at once (it publishes all of them: check `git tag -l` first)
 git push origin --tags
 
 # List existing tags
@@ -159,7 +169,8 @@ dependency does not contain the current `dbx`/`gohan` code — a broken release 
 who resolves the provider's `go.mod` normally (i.e. without the workspace's `replace`).
 
 For a release that bumps `gohan`, adds to or changes `dbx`, or anything a provider's non-test
-code imports from core, tag in this order instead of a single `tag-version` call:
+code imports from core, tag in this order (the [Coordinated Release](#3-coordinated-release) order,
+with `gohan` first):
 
 1. **Tag `gohan` first**, in its own repository, if this release depends on a new `gohan`
    version.
@@ -175,8 +186,9 @@ code imports from core, tag in this order instead of a single `tag-version` call
    `go.sum` changes.
 4. **Bump provider-to-provider requirements** where a provider's release depends on another
    provider's change; see [Providers that require other providers](#providers-that-require-other-providers).
-5. **Tag the providers** (`make tag-version VERSION=vX.Y.Z` is safe now that steps 3 and 4 have
-   landed, or tag them individually).
+5. **Tag the providers**, each with its own next version (`git tag provider/<name>/vA.B.C`), now
+   that steps 3 and 4 have landed. `make tag-version VERSION=vX.Y.Z` tags every provider with
+   core's version, so use it only when every module takes that same version.
 
 The Makefile's `PROVIDERS` list is derived from `provider/*/go.mod` in the working tree (it uses GNU
 make functions), so
@@ -340,8 +352,8 @@ go get github.com/oddbit-project/blueprint/provider/redis@v0.8.1
 # Full framework
 go get github.com/oddbit-project/blueprint@v0.9.0
 
-# Or individual providers
-go get github.com/oddbit-project/blueprint/provider/redis@v0.9.0
+# Or individual providers, each at its own version (not core's)
+go get github.com/oddbit-project/blueprint/provider/redis@v0.10.0
 ```
 
 ```
@@ -355,7 +367,8 @@ go get github.com/oddbit-project/blueprint/provider/redis@v0.9.0
    - Check replace directives in go.mod files
 
 2. **Tags not recognized**
-   - Ensure tags are pushed to remote: `git push origin --tags`
+   - Ensure tags are pushed to remote: `git push origin <tag>` for each one (`git push origin
+     --tags` pushes every local tag, including any made by mistake)
    - Wait for Go proxy cache refresh (up to 10 minutes)
 
 3. **Version conflicts**

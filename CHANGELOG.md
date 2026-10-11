@@ -17,6 +17,30 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.15.0] - 2026-10-11
+
+### Module versions
+
+Released together with core v0.15.0; each requires core v0.15.0:
+
+- `provider/nats` v0.11.0: an incomplete client certificate/key pair is rejected (#115); the new
+  `JSProducerConfig.DrainTimeout` bounds the ack wait in `JSProducer.Disconnect` (#114, #127);
+  methods no longer race `Disconnect` on `Conn` (#113); a nil receiver returns an error, with the
+  new `ErrNilProducer`, and a missing `Logger` is tolerated, where both used to panic (#126, #134).
+- `provider/httpserver` v0.11.0: an incomplete server certificate/key pair now fails `Validate()`
+  (#128); `Start()` returns the new `ErrTLSNoCertificate` when TLS is enabled without a certificate
+  (#135); an out-of-range port is reported with the new `ErrInvalidPort` (#141).
+- `provider/prometheus` v0.11.0: the same three changes, through httpserver; it now requires
+  `provider/httpserver` v0.11.0 (#128, #135, #141).
+- `provider/clickhouse` v0.12.0, `provider/etcd` v0.12.0, `provider/franz` v0.11.0, `provider/kafka`
+  v0.11.0, `provider/mqtt` v0.11.0, `provider/redis` v0.11.0, `provider/s3` v0.12.0 and
+  `provider/smtp` v0.11.0: an incomplete client certificate/key pair is rejected (#115).
+
+All of them include breaking changes; see each provider's changelog. etcd, httpserver, mqtt,
+prometheus and s3 also carry the `golang.org/x/net` fix below. The other providers (hmacprovider,
+htpasswd, jwtprovider, metrics, pgsql and sqlite) are unchanged and work with core v0.15.0 at their
+current versions.
+
 ### Security
 
 - **golang.org/x/net**: upgraded from v0.58.0 to v0.60.0, fixing CVE-2026-78669 (HTTP/2; rated HIGH), in the

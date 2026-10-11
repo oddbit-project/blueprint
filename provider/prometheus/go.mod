@@ -4,8 +4,8 @@ go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.11.0
-	github.com/oddbit-project/blueprint v0.12.0
-	github.com/oddbit-project/blueprint/provider/httpserver v0.9.4
+	github.com/oddbit-project/blueprint v0.15.0
+	github.com/oddbit-project/blueprint/provider/httpserver v0.11.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 )

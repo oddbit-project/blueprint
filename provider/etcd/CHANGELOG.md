@@ -6,12 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [v0.12.0] - 2026-10-11
+
+Requires Blueprint core v0.15.0.
+
+### Security
+
+- **golang.org/x/net**: upgraded from v0.58.0 to v0.60.0, fixing CVE-2026-78669 (HTTP/2; rated HIGH).
+  It is an indirect dependency.
+
 ### Breaking changes
 
 - With `tlsEnable`, a `tlsCert` without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password
   without both now fails `Validate()` and both `NewClient` functions (including a config built with
   `WithTLS`) with `tls.ErrTLSIncompleteKeyPair`, when built with a core release that carries the
-  check (after v0.14.0), whether this provider or the application requires it. They used to be
+  check (v0.15.0 or later), whether this provider or the application requires it. They used to be
   ignored silently: the client connected without a client certificate, so a server requiring one
   rejected the handshake and a server only requesting one could accept it without the intended
   identity. Set both `tlsCert` and `tlsKey`, or remove the client certificate settings (#115).
