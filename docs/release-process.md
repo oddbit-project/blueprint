@@ -68,8 +68,6 @@ When updating core library without provider changes:
    ```bash
    make test-all
    ```
-   `test-all` does not test `prometheus` or `jwtprovider`; test them by hand (see
-   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 3. **Tag core only**:
    ```bash
    git tag v0.8.1
@@ -89,15 +87,12 @@ When updating both core and providers (major releases):
    make test-all
    make build-all
    ```
-   Neither covers `prometheus` or `jwtprovider`; test and build them by hand (see
-   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 3. **Update dependencies** if needed:
    ```bash
    make update-deps VERSION=v0.9.0
    ```
-   This bumps only the core requirement, and skips `prometheus` and `jwtprovider` (see
-   [Modules outside `PROVIDERS`](#modules-outside-providers)); for provider-to-provider requirements
-   see [Providers that require other providers](#providers-that-require-other-providers). The
+   This bumps only the core requirement; for provider-to-provider requirements see
+   [Providers that require other providers](#providers-that-require-other-providers). The
    bumped requirement names a core tag that step 4 has not created yet (the local `replace` hides
    that); when provider code needs the new core, use the order in
    [gohan/dbx release order](#gohandbx-release-order) instead: tag and push core, then bump, then
@@ -106,8 +101,6 @@ When updating both core and providers (major releases):
    ```bash
    make tag-version VERSION=v0.9.0
    ```
-   `prometheus` and `jwtprovider` are not tagged by this; tag them by hand (see
-   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 5. **Push all tags**:
    ```bash
    git push origin v0.9.0
@@ -185,27 +178,13 @@ code imports from core, tag in this order instead of a single `tag-version` call
 5. **Tag the providers** (`make tag-version VERSION=vX.Y.Z` is safe now that steps 3 and 4 have
    landed, or tag them individually).
 
-`sqlite` is included in the Makefile's `PROVIDERS` list, so `tag-version`, `sbom`,
-`update-deps`, `build-providers` and `tidy-providers` already act on it along with the other
-provider modules — no separate step is needed for `sqlite` itself.
-
-See [Modules outside `PROVIDERS`](#modules-outside-providers) for `prometheus` and `jwtprovider`,
-which steps 3 and 5 skip.
-
-## Modules outside `PROVIDERS`
-
-`prometheus` and `jwtprovider` are **not** in the Makefile's `PROVIDERS` list, so every target that
-loops over it skips them, in every release type: `make test-all` and `test-providers` (and so CI,
-which runs `make test`), `build-providers` (`build-all`), `tidy-providers` (`tidy-all`), a local
-`make sbom`, `update-deps` and `tag-version`. When either is part of a release, or core changes
-something it uses, do each step by hand in `provider/<name>`:
-
-- test and build: `go test -race ./... && go build ./...`;
-- tidy: `go mod tidy`;
-- core requirement: `go get github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy`;
-- provider requirements: see
-  [Providers that require other providers](#providers-that-require-other-providers);
-- tag: `git tag provider/<name>/vA.B.C && git push origin provider/<name>/vA.B.C`.
+The Makefile's `PROVIDERS` list is derived from `provider/*/go.mod` in the working tree (it uses GNU
+make functions), so
+`test-all`, `test-providers`, `build-providers`, `tidy-providers`, `sbom`, `update-deps` and
+`tag-version` act on every provider module, including one added later. A new module still needs
+its `use` line in `go.work` and its entry in the lint matrix (`.github/workflows/lint.yml`), which
+are written by hand. Because the list comes from the working tree, run the release targets from a
+clean checkout: an uncommitted `provider/<name>/go.mod` would be bumped and tagged too.
 
 ## Providers that require other providers
 
@@ -291,8 +270,8 @@ go get github.com/oddbit-project/blueprint/provider/s3@v0.8.0       # Stable S3
 
 ### Pre-Release
 
-- [ ] All tests passing (`make test-all`, plus `prometheus` and `jwtprovider` by hand)
-- [ ] All modules build (`make build-all`, plus `prometheus` and `jwtprovider` by hand)
+- [ ] All tests passing (`make test-all`)
+- [ ] All modules build (`make build-all`)
 - [ ] Dependencies tidied (`make tidy-all`)
 - [ ] Documentation updated
 - [ ] CHANGELOG.md updated

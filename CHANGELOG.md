@@ -50,6 +50,18 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
   changes no behaviour. The httpserver provider calls it from `ServerConfig.Validate()` (see its
   CHANGELOG) (#128).
 
+### Build
+
+- The Makefile's `PROVIDERS` list is now derived from `provider/*/go.mod` instead of being written
+  by hand. `make test` (and so CI) now also runs the `provider/prometheus` and
+  `provider/jwtprovider` tests, which no automated run executed before, and `build-all`,
+  `tidy-all`, `sbom`, `update-deps` and `tag-version` now act on those two modules as well.
+  Maintainers: `make tag-version VERSION=…` now also tags `provider/prometheus` and
+  `provider/jwtprovider`; a new provider module is covered without editing the Makefile; the targets
+  that loop over the providers now fail with "no provider modules found" when the list is empty
+  (make run from outside the repository root, or `PROVIDERS=` given), where `make test PROVIDERS=`
+  used to run the core tests and no provider; and the Makefile now needs GNU make (#138).
+
 ### Fixed
 
 - `config/provider`: `EnvProvider.Get` and `GetKey` no longer panic on a config struct with an unexported field
