@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- With `tlsEnable`, a `tlsCert` without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password
+  without both now fails `ServerConfig.Validate()`, and so `NewServer`, with
+  `tls.ErrTLSIncompleteKeyPair`. The server used to be built without a certificate and failed only
+  at `Start()`, with `open : no such file or directory`. Set both `tlsCert` and `tlsKey`, or remove
+  the certificate settings. Requires a core release with `tls.ServerConfig.ValidateKeyPair` (after
+  v0.14.0) (#128).
+
 ## [v0.10.1] - 2026-09-28
 
 Requires Blueprint core v0.11.0. Requires `provider/jwtprovider` v0.9.0, `provider/hmacprovider` v0.9.0 and `provider/htpasswd` v0.9.0.

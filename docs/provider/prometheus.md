@@ -148,7 +148,8 @@ func main() {
 
 `Validate()` replaces a zero `Port` with `DefaultPort` (`2220`) and then delegates to
 `httpserver.ServerConfig.Validate()`, which replaces an empty `ServerName` with `"http"` and non-positive timeouts with
-`30`/`60`, and rejects ports outside `0`–`65535`. `Host` is not defaulted by `Validate()`: an empty `Host` listens on
+`30`/`60`, rejects ports outside `0`–`65535`, and, with `tlsEnable`, returns `tls.ErrTLSIncompleteKeyPair` for a `tlsCert`
+without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password without both. `Host` is not defaulted by `Validate()`: an empty `Host` listens on
 all interfaces, so start from `NewConfig()` to get the `localhost` binding.
 
 ## Usage Examples
