@@ -162,6 +162,7 @@ github.com/oddbit-project/blueprint/provider/jwtprovider v0.9.0 h1:jChEfUcgGVBnL
 github.com/oddbit-project/blueprint/provider/jwtprovider v0.9.0/go.mod h1:0MupqyMa3Me3hjfBnH8FX1gE6kzk4ndaa2ZhnyEZyGU=
 github.com/oddbit-project/blueprint/provider/redis v0.8.2 h1:1LcfQnhI6XH5r90Ma1ps463+o8Rqjhx3CFvdD3Xi7Wk=
 github.com/oddbit-project/blueprint/provider/redis v0.8.2/go.mod h1:JL/igtWof1nuroM6G107j6rspcCTVZNFDMzKgHIitA4=
+github.com/oddbit-project/blueprint/provider/redis v0.9.0/go.mod h1:Rx5n980gb9rETd2tDIpaxgUinyXUD0Qb1Nr6l7PN72Q=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
@@ -251,6 +252,8 @@ golang.org/x/crypto v0.57.0/go.mod h1:Fdz0i5U6CoizGwLda9DttjSk6qlZo25zYNtR+ycvuZ
 golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
 golang.org/x/net v0.58.0 h1:ynWG7rqYi4ccpTEuPZ2QGWHktVEM9DMCj9yzDE0Q7To=
 golang.org/x/net v0.58.0/go.mod h1:YwCddHnFlT7eLQqVprV19OnhLGtc5xOKgE0RyqgfWAU=
+golang.org/x/net v0.60.0 h1:79p50tfZlm0J9YfoDsSi639qSXNGVwEzOPLCxM2FsYU=
+golang.org/x/net v0.60.0/go.mod h1:2DA/G1UfVbCpQPeWTmMPGY7Cs2PkBkwu743bVX5PIVg=
 golang.org/x/sync v0.23.0 h1:KameEIfc1IkluZyXWLn39Wd4tURc6GbCiISGiZm2bQk=
 golang.org/x/sync v0.23.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
