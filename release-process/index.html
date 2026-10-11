@@ -3818,7 +3818,7 @@ independent provider versioning.</p>
 <li><strong>Create GitHub release</strong> for the core tag</li>
 </ol>
 <h3 id="3-coordinated-release">3. Coordinated Release<a class="headerlink" href="#3-coordinated-release" title="Permanent link">&para;</a></h3>
-<p>When updating both core and providers (major releases):</p>
+<p>When updating both core and providers:</p>
 <h4 id="steps_2">Steps:<a class="headerlink" href="#steps_2" title="Permanent link">&para;</a></h4>
 <ol>
 <li><strong>Make changes</strong> across core and providers</li>
@@ -3826,31 +3826,40 @@ independent provider versioning.</p>
    <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>make<span class="w"> </span>test-all
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>make<span class="w"> </span>build-all
 </span></code></pre></div></li>
-<li><strong>Update dependencies</strong> if needed:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>make<span class="w"> </span>update-deps<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>v0.9.0
+<li><strong>Tag and push core</strong> first, so that the version the providers are about to require exists:
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>tag<span class="w"> </span>v0.15.0
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.15.0
+</span></code></pre></div></li>
+<li><strong>Bump the providers' core requirement</strong> to that version and commit the <code>go.mod</code>/<code>go.sum</code>
+   changes:
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>make<span class="w"> </span>update-deps<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>v0.15.0
 </span></code></pre></div>
-   This bumps only the core requirement; for provider-to-provider requirements see
-   <a href="#providers-that-require-other-providers">Providers that require other providers</a>. The
-   bumped requirement names a core tag that step 4 has not created yet (the local <code>replace</code> hides
-   that); when provider code needs the new core, use the order in
-   <a href="#gohandbx-release-order">gohan/dbx release order</a> instead: tag and push core, then bump, then
-   tag the providers.</li>
-<li><strong>Tag all modules</strong>:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>make<span class="w"> </span>tag-version<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>v0.9.0
-</span></code></pre></div></li>
-<li><strong>Push all tags</strong>:
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.9.0
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>--tags
-</span></code></pre></div></li>
-<li><strong>Create GitHub release</strong> with comprehensive release notes</li>
+   This bumps only the core requirement.</li>
+<li><strong>Tag the providers being released, each with its own next version</strong>, and push each tag. A
+   provider is released when it has changes of its own, or when its bumped requirement has to
+   ship; the others need no tag. Providers are versioned independently of core (at core <code>v0.14.0</code>,
+   nats was at <code>v0.10.0</code> and clickhouse at <code>v0.11.0</code>), so the tag is not core's version; pick it
+   from the provider's own <code>[Unreleased]</code> entries, as in <a href="#version-strategy">Version Strategy</a>:
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>tag<span class="w"> </span>provider/&lt;name&gt;/vA.B.C
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>provider/&lt;name&gt;/vA.B.C
+</span></code></pre></div>
+   Tag providers that others require first. Where a provider's release depends on another
+   provider's change, bump its requirement once that tag is pushed, and before tagging it; see
+   <a href="#providers-that-require-other-providers">Providers that require other providers</a> for the
+   order.</li>
 </ol>
+<p><code>make tag-version VERSION=vX.Y.Z</code> tags core <strong>and every provider</strong> with that one version. It
+   fits only a release in which every module takes the same version: run it after the step 4
+   commit, in place of steps 3 and 5's tags, and push core's tag and each provider tag. In any
+   other release it would tag the providers with core's version.
+6. <strong>Create GitHub release</strong> with comprehensive release notes</p>
 <h2 id="release-commands-reference">Release Commands Reference<a class="headerlink" href="#release-commands-reference" title="Permanent link">&para;</a></h2>
 <h3 id="using-makefile">Using Makefile<a class="headerlink" href="#using-makefile" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Build and test everything</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>make<span class="w"> </span>build-all
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>make<span class="w"> </span>test-all
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># Tag all modules with same version (coordinated release)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># Tag core and every provider with one version (only when all modules take the same version)</span>
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>make<span class="w"> </span>tag-version<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span>v0.9.0
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># Update all provider dependencies to specific core version</span>
@@ -3869,7 +3878,7 @@ independent provider versioning.</p>
 </span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Push specific tag</span>
 </span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>provider/redis/v0.8.1
 </span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># Push all tags</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="c1"># Push every local tag at once (it publishes all of them: check `git tag -l` first)</span>
 </span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>--tags
 </span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
 </span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># List existing tags</span>
@@ -3886,7 +3895,8 @@ step, <code>tag-version</code> therefore publishes <code>provider/clickhouse</co
 dependency does not contain the current <code>dbx</code>/<code>gohan</code> code — a broken release for any consumer
 who resolves the provider's <code>go.mod</code> normally (i.e. without the workspace's <code>replace</code>).</p>
 <p>For a release that bumps <code>gohan</code>, adds to or changes <code>dbx</code>, or anything a provider's non-test
-code imports from core, tag in this order instead of a single <code>tag-version</code> call:</p>
+code imports from core, tag in this order (the <a href="#3-coordinated-release">Coordinated Release</a> order,
+with <code>gohan</code> first):</p>
 <ol>
 <li><strong>Tag <code>gohan</code> first</strong>, in its own repository, if this release depends on a new <code>gohan</code>
    version.</li>
@@ -3902,8 +3912,9 @@ code imports from core, tag in this order instead of a single <code>tag-version<
    <code>go.sum</code> changes.</li>
 <li><strong>Bump provider-to-provider requirements</strong> where a provider's release depends on another
    provider's change; see <a href="#providers-that-require-other-providers">Providers that require other providers</a>.</li>
-<li><strong>Tag the providers</strong> (<code>make tag-version VERSION=vX.Y.Z</code> is safe now that steps 3 and 4 have
-   landed, or tag them individually).</li>
+<li><strong>Tag the providers</strong>, each with its own next version (<code>git tag provider/&lt;name&gt;/vA.B.C</code>), now
+   that steps 3 and 4 have landed. <code>make tag-version VERSION=vX.Y.Z</code> tags every provider with
+   core's version, so use it only when every module takes that same version.</li>
 </ol>
 <p>The Makefile's <code>PROVIDERS</code> list is derived from <code>provider/*/go.mod</code> in the working tree (it uses GNU
 make functions), so
@@ -4099,8 +4110,8 @@ does not:</p>
 </span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a># Full framework
 </span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a>go get github.com/oddbit-project/blueprint@v0.9.0
 </span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a>
-</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a># Or individual providers
-</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a>go get github.com/oddbit-project/blueprint/provider/redis@v0.9.0
+</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a># Or individual providers, each at its own version (not core's)
+</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a>go get github.com/oddbit-project/blueprint/provider/redis@v0.10.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>## Troubleshooting
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
@@ -4111,18 +4122,19 @@ does not:</p>
 </span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>   - Check replace directives in go.mod files
 </span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
 </span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>2. **Tags not recognized**
-</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>   - Ensure tags are pushed to remote: `git push origin --tags`
-</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>   - Wait for Go proxy cache refresh (up to 10 minutes)
-</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>
-</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>3. **Version conflicts**
-</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>   - Check all go.mod files for consistent versions
-</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>   - Use `make update-deps` to synchronize versions
-</span><span id="__span-15-16"><a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a>
-</span><span id="__span-15-17"><a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>### Development vs Production
-</span><span id="__span-15-18"><a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>
-</span><span id="__span-15-19"><a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>**Development** (using workspace):
-</span><span id="__span-15-20"><a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a>```bash
-</span><span id="__span-15-21"><a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a>GOWORK=/path/to/blueprint/go.work go build
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>   - Ensure tags are pushed to remote: `git push origin &lt;tag&gt;` for each one (`git push origin
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>     --tags` pushes every local tag, including any made by mistake)
+</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>   - Wait for Go proxy cache refresh (up to 10 minutes)
+</span><span id="__span-15-13"><a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>
+</span><span id="__span-15-14"><a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>3. **Version conflicts**
+</span><span id="__span-15-15"><a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>   - Check all go.mod files for consistent versions
+</span><span id="__span-15-16"><a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a>   - Use `make update-deps` to synchronize versions
+</span><span id="__span-15-17"><a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>
+</span><span id="__span-15-18"><a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>### Development vs Production
+</span><span id="__span-15-19"><a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>
+</span><span id="__span-15-20"><a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a>**Development** (using workspace):
+</span><span id="__span-15-21"><a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a>```bash
+</span><span id="__span-15-22"><a id="__codelineno-15-22" name="__codelineno-15-22" href="#__codelineno-15-22"></a>GOWORK=/path/to/blueprint/go.work go build
 </span></code></pre></div>
 <p><strong>Production</strong> (using published modules):</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>go<span class="w"> </span>get<span class="w"> </span>github.com/oddbit-project/blueprint/provider/redis@v0.8.1
@@ -4169,7 +4181,7 @@ does not:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 11, 2026 06:52:03 UTC">October 11, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 11, 2026 07:16:44 UTC">October 11, 2026</span>
   </span>
 
     
