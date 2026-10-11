@@ -31,7 +31,7 @@ Creates a new server configuration with default values.
 ```go
 func (c *ServerConfig) Validate() error
 ```
-Validates the server configuration. Replaces a zero port with the default and rejects ports outside 0-65535, sets default timeouts if not positive, and sets default server name if empty. With `TLSEnable`, it returns `tls.ErrTLSIncompleteKeyPair` for a `TLSCert` without `TLSKey`, a `TLSKey` without `TLSCert`, or a key password without both (`tls.ServerConfig.ValidateKeyPair`).
+Validates the server configuration. Replaces a zero port with the default and rejects ports outside 0-65535 with `ErrInvalidPort`, sets default timeouts if not positive, and sets default server name if empty. With `TLSEnable`, it returns `tls.ErrTLSIncompleteKeyPair` for a `TLSCert` without `TLSKey`, a `TLSKey` without `TLSCert`, or a key password without both (`tls.ServerConfig.ValidateKeyPair`).
 
 ```go
 func (c *ServerConfig) NewServer(logger *log.Logger) (*Server, error)

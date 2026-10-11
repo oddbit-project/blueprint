@@ -20,6 +20,9 @@ import (
 // certificate: no complete tlsCert/tlsKey pair, and none set on Server.TLSConfig after NewServer
 const ErrTLSNoCertificate = utils.Error("tlsEnable requires tlsCert and tlsKey, or a certificate set on Server.TLSConfig")
 
+// ErrInvalidPort is returned by ServerConfig.Validate for a port outside 0-65535
+const ErrInvalidPort = utils.Error("port must be between 0 and 65535")
+
 type ServerConfig struct {
 	Host           string   `json:"host"`
 	Port           int      `json:"port"`
@@ -83,7 +86,7 @@ func (c *ServerConfig) Validate() error {
 		c.Port = ServerDefaultPort
 	}
 	if c.Port < 0 || c.Port > 65535 {
-		return errors.New("port must be between 0 and 65535")
+		return ErrInvalidPort
 	}
 	if err := c.ValidateKeyPair(); err != nil {
 		return err
