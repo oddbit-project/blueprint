@@ -13,6 +13,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   through the httpserver provider's `ServerConfig.Validate()`, when built with an httpserver release
   that carries the check. Set both `tlsCert` and `tlsKey`, or remove the certificate settings (#128).
 
+### Added
+
+- `Config.Validate()` reports a port outside 0-65535 with `httpserver.ErrInvalidPort`, matchable
+  with `errors.Is`, when built with an httpserver release that has it. The text is unchanged (#141).
+
 ### Changed
 
 - With `tlsEnable` and no complete `tlsCert`/`tlsKey` pair, `Start()` returns `httpserver.ErrTLSNoCertificate`

@@ -62,16 +62,6 @@ func literal134(t *testing.T, url, subject string, logger *log.Logger) *Consumer
 	return &Consumer{Conn: nc, Subject: subject, Logger: logger}
 }
 
-// await134 waits for ch to be closed, failing the test after 5s
-func await134(t *testing.T, ch <-chan struct{}, what string) {
-	t.Helper()
-	select {
-	case <-ch:
-	case <-time.After(5 * time.Second):
-		t.Fatal(what)
-	}
-}
-
 // waitHandlers waits for the Subscribe handler goroutines to return
 func waitHandlers(t *testing.T, c *Consumer) {
 	t.Helper()
@@ -80,11 +70,7 @@ func waitHandlers(t *testing.T, c *Consumer) {
 		c.handlerWg.Wait()
 		close(done)
 	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("handler goroutine did not return")
-	}
+	waitDone(t, done, "handler goroutine did not return")
 }
 
 func TestIssue134_SubscribeNilLoggerReceivesMessages(t *testing.T) {
@@ -158,7 +144,7 @@ func TestIssue134_HandlerGoroutineNilLogger(t *testing.T) {
 				return errors.New("handler failed")
 			})
 		})
-		await134(t, handled, "handler never ran")
+		waitDone(t, handled, "handler never ran")
 		c.Disconnect()
 		waitHandlers(t, c)
 	})
@@ -175,7 +161,7 @@ func TestIssue134_HandlerGoroutineNilLogger(t *testing.T) {
 				return nil
 			})
 		})
-		await134(t, handled, "handler never ran")
+		waitDone(t, handled, "handler never ran")
 		cancel()
 		waitHandlers(t, c)
 	})
@@ -200,7 +186,7 @@ func TestIssue134_GuardLoggerStillLogs(t *testing.T) {
 			close(handled)
 			return errors.New("handler failed")
 		}))
-		await134(t, handled, "handler never ran")
+		waitDone(t, handled, "handler never ran")
 		cancel()
 		waitHandlers(t, c)
 		logged(t, buf, "Subscribed to NATS subject")

@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the certificate settings. Requires a core release with `tls.ServerConfig.ValidateKeyPair` (after
   v0.14.0) (#128).
 
+### Added
+
+- `ErrInvalidPort`, returned by `ServerConfig.Validate()` (and so `NewServer`) for a port outside
+  0-65535. The text is unchanged ("port must be between 0 and 65535"); it used to be an ad-hoc
+  error that could only be matched by its text, and can now be matched with `errors.Is` (#141).
+
 ### Changed
 
 - With `tlsEnable` and no server certificate (no complete `tlsCert`/`tlsKey` pair, and none set on
