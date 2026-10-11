@@ -324,10 +324,12 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 	if err != nil {
 		close(msgChan)
-		c.Logger.Error(err, "Failed to subscribe to NATS subject", log.KV{
-			"subject": c.Subject,
-			"queue":   c.Queue,
-		})
+		if c.Logger != nil {
+			c.Logger.Error(err, "Failed to subscribe to NATS subject", log.KV{
+				"subject": c.Subject,
+				"queue":   c.Queue,
+			})
+		}
 		return err
 	}
 
@@ -339,10 +341,12 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 	c.handlerWg.Add(1)
 
 	// Log subscription
-	c.Logger.Info("Subscribed to NATS subject", log.KV{
-		"subject": c.Subject,
-		"queue":   c.Queue,
-	})
+	if c.Logger != nil {
+		c.Logger.Info("Subscribed to NATS subject", log.KV{
+			"subject": c.Subject,
+			"queue":   c.Queue,
+		})
+	}
 
 	// Process messages in a goroutine
 	go func() {
@@ -358,9 +362,11 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 				if !errors.Is(err, nats.ErrConnectionDraining) &&
 					!errors.Is(err, nats.ErrBadSubscription) &&
 					!errors.Is(err, nats.ErrConnectionClosed) {
-					c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
-						"subject": c.Subject,
-					})
+					if c.Logger != nil {
+						c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
+							"subject": c.Subject,
+						})
+					}
 				}
 			} else {
 				h.closeChan()
@@ -384,24 +390,30 @@ func (c *Consumer) Subscribe(ctx context.Context, handler ConsumerFunc) error {
 
 				// Process message with handler
 				if err := handler(ctx, message); err != nil {
-					c.Logger.Error(err, "Error processing NATS message", log.KV{
-						"subject": msg.Subject,
-					})
+					if c.Logger != nil {
+						c.Logger.Error(err, "Error processing NATS message", log.KV{
+							"subject": msg.Subject,
+						})
+					}
 				}
 
 				// If there's a reply subject, send an empty acknowledgment (optional)
 				if msg.Reply != "" {
 					if err := conn.Publish(msg.Reply, nil); err != nil {
-						c.Logger.Error(err, "Failed to acknowledge message", log.KV{
-							"reply": msg.Reply,
-						})
+						if c.Logger != nil {
+							c.Logger.Error(err, "Failed to acknowledge message", log.KV{
+								"reply": msg.Reply,
+							})
+						}
 					}
 				}
 
 			case <-ctx.Done():
-				c.Logger.Info("Context canceled, stopping NATS subscription", log.KV{
-					"subject": c.Subject,
-				})
+				if c.Logger != nil {
+					c.Logger.Info("Context canceled, stopping NATS subscription", log.KV{
+						"subject": c.Subject,
+					})
+				}
 				return
 			}
 		}
@@ -434,10 +446,12 @@ func (c *Consumer) SubscribeSync() (*nats.Subscription, error) {
 	}
 
 	if err != nil {
-		c.Logger.Error(err, "Failed to subscribe synchronously to NATS subject", log.KV{
-			"subject": c.Subject,
-			"queue":   c.Queue,
-		})
+		if c.Logger != nil {
+			c.Logger.Error(err, "Failed to subscribe synchronously to NATS subject", log.KV{
+				"subject": c.Subject,
+				"queue":   c.Queue,
+			})
+		}
 		return nil, err
 	}
 
@@ -460,9 +474,11 @@ func (c *Consumer) NextMsg(sub *nats.Subscription, timeout time.Duration) (*Mess
 			return nil, err
 		}
 
-		c.Logger.Error(err, "Error getting next NATS message", log.KV{
-			"subject": sub.Subject,
-		})
+		if c.Logger != nil {
+			c.Logger.Error(err, "Error getting next NATS message", log.KV{
+				"subject": sub.Subject,
+			})
+		}
 		return nil, err
 	}
 
@@ -479,9 +495,11 @@ func (c *Consumer) Unsubscribe(sub *nats.Subscription) error {
 
 	err := sub.Unsubscribe()
 	if err != nil {
-		c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
-			"subject": sub.Subject,
-		})
+		if c.Logger != nil {
+			c.Logger.Error(err, "Failed to unsubscribe from NATS subject", log.KV{
+				"subject": sub.Subject,
+			})
+		}
 		return err
 	}
 

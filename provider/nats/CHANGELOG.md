@@ -53,6 +53,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   when `json.Marshal` fails on a nil receiver or a `Producer` built without a `Logger`;
   they return the marshal error. Values from the constructors are unaffected, apart from a
   nil producer or consumer kept after an ignored constructor error (#126).
+- A `Consumer` built as a struct literal without a `Logger` no longer panics. `Subscribe`
+  panicked when its subscribe failed, and on success after registering the handler, so a caller that recovered was left with a
+  half-registered subscription that made `Disconnect` wait out the full drain timeout.
+  `SubscribeSync`, `NextMsg` and `Unsubscribe` panicked on their error paths, and the handler
+  goroutine's logging (handler error, failed ack, context cancelled) would have panicked once
+  `Subscribe` got past its own. Each `Logger` call is now skipped when `Logger` is nil, as `Disconnect` and
+  `Request` already did. Consumers from `NewConsumer` are unaffected (#134).
 
 ## [v0.10.0] - 2026-10-08
 
