@@ -15,6 +15,9 @@ const (
 	ErrMissingProducerURL   = utils.Error("Missing Producer URL")
 	ErrMissingProducerTopic = utils.Error("Missing Producer Subject")
 	ErrProducerClosed       = utils.Error("Producer is already closed")
+	// ErrNilProducer is returned by the Producer and JSProducer publish and request
+	// methods called on a nil receiver
+	ErrNilProducer = utils.Error("publisher is nil")
 
 	ErrInvalidAuthType = utils.Error("Invalid authentication type")
 	ErrTLSNotEnabled   = tlsProvider.ErrTLSNotEnabled

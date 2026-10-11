@@ -16,6 +16,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   handshake and a server only requesting one could accept it without the intended identity. Set both
   `tlsCert` and `tlsKey`, or remove the client certificate settings (#115).
 
+### Added
+
+- `JSProducerConfig.DrainTimeout` (json `drainTimeout`, milliseconds) bounds how long
+  `JSProducer.Disconnect` waits for the acks of pending `PublishAsync` calls. It defaults to
+  nats.go's 30 seconds. Set it below the process's shutdown deadline, leaving room
+  for closing the connection afterwards: a socket write to a server that stopped reading can
+  add up to the 1-minute write timeout. `JSConsumerConfig` has
+  no such setting, since `JSConsumer.Disconnect` does not drain (#127).
+
 ### Fixed
 
 - `Producer.IsConnected`, `Publish`, `PublishMsg`, `PublishRequest` and `Request`, and
@@ -32,10 +41,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   futures still pending with `jetstream.ErrJetStreamPublisherClosed`. Before, it closed at
   once and those futures never resolved, so a caller waiting on `Ok()` or `Err()` without
   its own deadline blocked forever. A second `Disconnect` call now returns only once the
-  first has closed the connection. Shutdown can now take up to 30 seconds longer while
-  acks are outstanding, and the JetStream configs have no setting to shorten it: allow for
-  it in the process's shutdown deadline. A failed future's message may still have been
-  stored (#114).
+  first has closed the connection. Shutdown can now take up to the drain timeout longer
+  while acks are outstanding: allow for it in the process's shutdown deadline, or lower
+  `drainTimeout` in the `JSProducerConfig` (#127). A failed future's message may still have
+  been stored (#114).
+- `Producer.Request` and `RequestJSON`, `JSProducer.Publish` and `PublishJSON`, and
+  `Consumer.Subscribe` and `SubscribeSync` called on a nil receiver now return an error
+  (the new `ErrNilProducer`, "publisher is nil", for the producers; `ErrConsumerClosed` for the
+  consumer) instead of panicking, as `Publish`, `PublishMsg`, `PublishRequest`, `NextMsg` and `Unsubscribe`
+  already did; those now return `ErrNilProducer` too, with the same text. The `Producer` JSON helpers and `JSProducer.PublishJSON` no longer panic
+  when `json.Marshal` fails on a nil receiver or a `Producer` built without a `Logger`;
+  they return the marshal error. Values from the constructors are unaffected, apart from a
+  nil producer or consumer kept after an ignored constructor error (#126).
+- A `Consumer` built as a struct literal without a `Logger` no longer panics. `Subscribe`
+  panicked when its subscribe failed, and on success after registering the handler, so a caller that recovered was left with a
+  half-registered subscription that made `Disconnect` wait out the full drain timeout.
+  `SubscribeSync`, `NextMsg` and `Unsubscribe` panicked on their error paths, and the handler
+  goroutine's logging (handler error, failed ack, context cancelled) would have panicked once
+  `Subscribe` got past its own. Each `Logger` call is now skipped when `Logger` is nil, as `Disconnect` and
+  `Request` already did. Consumers from `NewConsumer` are unaffected (#134).
 
 ## [v0.10.0] - 2026-10-08
 

@@ -119,7 +119,7 @@ func NewJSConsumer(cfg *JSConsumerConfig, logger *log.Logger) (*JSConsumer, erro
 		return nil, err
 	}
 
-	conn, err := cfg.dial("natsJSConsumer")
+	conn, err := cfg.dial("natsJSConsumer", 0)
 	if err != nil {
 		return nil, err
 	}

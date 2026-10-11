@@ -148,7 +148,8 @@ func main() {
 
 `Validate()` replaces a zero `Port` with `DefaultPort` (`2220`) and then delegates to
 `httpserver.ServerConfig.Validate()`, which replaces an empty `ServerName` with `"http"` and non-positive timeouts with
-`30`/`60`, and rejects ports outside `0`–`65535`. `Host` is not defaulted by `Validate()`: an empty `Host` listens on
+`30`/`60`, rejects ports outside `0`–`65535`, and, with `tlsEnable`, returns `tls.ErrTLSIncompleteKeyPair` for a `tlsCert`
+without `tlsKey`, a `tlsKey` without `tlsCert`, or a key password without both. `Host` is not defaulted by `Validate()`: an empty `Host` listens on
 all interfaces, so start from `NewConfig()` to get the `localhost` binding.
 
 ## Usage Examples
@@ -396,7 +397,7 @@ Returns the server's registry, for registering additional collectors.
 func (s *Server) Start() error
 ```
 
-Starts the underlying HTTP server and blocks. Returns `nil` after `Shutdown()`, or the listener error otherwise.
+Starts the underlying HTTP server and blocks. Returns `nil` after `Shutdown()`, `httpserver.ErrTLSNoCertificate` at once when `tlsEnable` is set without a complete `tlsCert`/`tlsKey` pair (unless a certificate was set on `Server.Server.TLSConfig` after `NewServer`; needs an httpserver release that has the error), or the listener error otherwise.
 
 ```go
 func (s *Server) Shutdown(ctx context.Context) error

@@ -21,7 +21,7 @@ blueprint/
 │   ├── redis/go.mod         # github.com/oddbit-project/blueprint/provider/redis
 │   ├── s3/go.mod            # github.com/oddbit-project/blueprint/provider/s3
 │   ├── httpserver/go.mod    # github.com/oddbit-project/blueprint/provider/httpserver
-│   └── ...                  # 13 total provider modules
+│   └── ...                  # 17 provider modules
 └── go.work                  # Workspace for development
 ```
 
@@ -39,13 +39,17 @@ When updating a single provider without core changes:
    cd provider/redis
    go test -v ./...
    ```
-3. **Tag only that provider**:
+3. **Check provider requirements**: if this provider's `[Unreleased]` entries rely on another
+   provider's change, or another provider's entries rely on this one, follow
+   [Providers that require other providers](#providers-that-require-other-providers) (the dependency
+   is tagged first; the dependant's `go.mod` is bumped before it is tagged).
+4. **Tag only that provider**:
    ```bash
    git tag provider/redis/v0.8.1
    git push origin provider/redis/v0.8.1
    ```
-4. **Create GitHub release** for the provider tag
-5. **Update documentation** if needed
+5. **Create GitHub release** for the provider tag
+6. **Update documentation** if needed
 
 #### Example Scenarios:
 
@@ -64,6 +68,8 @@ When updating core library without provider changes:
    ```bash
    make test-all
    ```
+   `test-all` does not test `prometheus` or `jwtprovider`; test them by hand (see
+   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 3. **Tag core only**:
    ```bash
    git tag v0.8.1
@@ -83,14 +89,25 @@ When updating both core and providers (major releases):
    make test-all
    make build-all
    ```
+   Neither covers `prometheus` or `jwtprovider`; test and build them by hand (see
+   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 3. **Update dependencies** if needed:
    ```bash
    make update-deps VERSION=v0.9.0
    ```
+   This bumps only the core requirement, and skips `prometheus` and `jwtprovider` (see
+   [Modules outside `PROVIDERS`](#modules-outside-providers)); for provider-to-provider requirements
+   see [Providers that require other providers](#providers-that-require-other-providers). The
+   bumped requirement names a core tag that step 4 has not created yet (the local `replace` hides
+   that); when provider code needs the new core, use the order in
+   [gohan/dbx release order](#gohandbx-release-order) instead: tag and push core, then bump, then
+   tag the providers.
 4. **Tag all modules**:
    ```bash
    make tag-version VERSION=v0.9.0
    ```
+   `prometheus` and `jwtprovider` are not tagged by this; tag them by hand (see
+   [Modules outside `PROVIDERS`](#modules-outside-providers)).
 5. **Push all tags**:
    ```bash
    git push origin v0.9.0
@@ -163,12 +180,67 @@ code imports from core, tag in this order instead of a single `tag-version` call
    `make update-deps VERSION=vX.Y.Z`, or `cd provider/<name> && go get
    github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy` per module. Commit the `go.mod`/
    `go.sum` changes.
-4. **Tag the providers** (`make tag-version VERSION=vX.Y.Z` is safe now that step 3 has landed,
-   or tag them individually).
+4. **Bump provider-to-provider requirements** where a provider's release depends on another
+   provider's change; see [Providers that require other providers](#providers-that-require-other-providers).
+5. **Tag the providers** (`make tag-version VERSION=vX.Y.Z` is safe now that steps 3 and 4 have
+   landed, or tag them individually).
 
 `sqlite` is included in the Makefile's `PROVIDERS` list, so `tag-version`, `sbom`,
 `update-deps`, `build-providers` and `tidy-providers` already act on it along with the other
 provider modules — no separate step is needed for `sqlite` itself.
+
+See [Modules outside `PROVIDERS`](#modules-outside-providers) for `prometheus` and `jwtprovider`,
+which steps 3 and 5 skip.
+
+## Modules outside `PROVIDERS`
+
+`prometheus` and `jwtprovider` are **not** in the Makefile's `PROVIDERS` list, so every target that
+loops over it skips them, in every release type: `make test-all` and `test-providers` (and so CI,
+which runs `make test`), `build-providers` (`build-all`), `tidy-providers` (`tidy-all`), a local
+`make sbom`, `update-deps` and `tag-version`. When either is part of a release, or core changes
+something it uses, do each step by hand in `provider/<name>`:
+
+- test and build: `go test -race ./... && go build ./...`;
+- tidy: `go mod tidy`;
+- core requirement: `go get github.com/oddbit-project/blueprint@vX.Y.Z && go mod tidy`;
+- provider requirements: see
+  [Providers that require other providers](#providers-that-require-other-providers);
+- tag: `git tag provider/<name>/vA.B.C && git push origin provider/<name>/vA.B.C`.
+
+## Providers that require other providers
+
+Some providers require other providers. Neither `make update-deps` nor the core steps above bump
+those requirements, so each keeps the version it last pinned, and the workspace (`go.work` and each
+module's local `replace`) hides a stale requirement from the tests. This applies to **every** release
+type, including a provider-only release.
+
+Whenever a provider's `[Unreleased]` entries rely on a change in another provider (for example a
+prometheus entry that relies on a new httpserver check), or its code, tests included, uses a symbol
+added to another provider since the version its `go.mod` requires, check that the provider's `go.mod` requires
+a version of the dependency that has the change. This holds whether the dependency's change is still
+unreleased or was released earlier: a provider can lag a dependency that is already tagged. If it
+does not:
+
+1. If the change is unreleased, release the dependency first, and **push** its tag:
+   `git tag provider/<dep>/vA.B.C && git push origin provider/<dep>/vA.B.C`.
+2. Bump the dependant's requirement on it and commit:
+   `cd provider/<name> && go get github.com/oddbit-project/blueprint/provider/<dep>@vA.B.C && go mod tidy`.
+   The local `replace` means `go get` can succeed even when the tag is not on the remote, so check
+   step 1's push first.
+3. Update the dependant's CHANGELOG line that states the requirement ("Requires … `provider/<dep>`
+   vA.B.C").
+4. Then release the dependant.
+
+The direct requirements today, and the release order they imply:
+
+| provider | requires |
+|---|---|
+| `provider/hmacprovider` | `provider/redis` |
+| `provider/httpserver` | `provider/hmacprovider`, `provider/htpasswd`, `provider/jwtprovider` |
+| `provider/prometheus` | `provider/httpserver` |
+
+Order: `redis`; then `hmacprovider`, `htpasswd` and `jwtprovider`; then `httpserver`; then
+`prometheus`. Check a provider's `go.mod` for others before relying on this list.
 
 ## Version Strategy
 
@@ -219,8 +291,8 @@ go get github.com/oddbit-project/blueprint/provider/s3@v0.8.0       # Stable S3
 
 ### Pre-Release
 
-- [ ] All tests passing (`make test-all`)
-- [ ] All modules build (`make build-all`)
+- [ ] All tests passing (`make test-all`, plus `prometheus` and `jwtprovider` by hand)
+- [ ] All modules build (`make build-all`, plus `prometheus` and `jwtprovider` by hand)
 - [ ] Dependencies tidied (`make tidy-all`)
 - [ ] Documentation updated
 - [ ] CHANGELOG.md updated
