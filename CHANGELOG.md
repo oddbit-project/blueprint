@@ -17,6 +17,12 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Security
+
+- **golang.org/x/net**: upgraded from v0.58.0 to v0.60.0, fixing CVE-2026-78669 (HTTP/2; rated HIGH), in the
+  core module and in the etcd, httpserver, mqtt, prometheus and s3 providers, which list it. It is an indirect
+  dependency. The other providers pick the fixed version up through core once they require this core release.
+
 ### Breaking changes
 
 - `config/provider`: `EnvProvider.Get` and `GetKey` no longer allocate a nested pointer section that no
