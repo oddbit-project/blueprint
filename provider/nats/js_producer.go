@@ -3,7 +3,6 @@ package nats
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"sync"
 	"time"
 
@@ -198,13 +197,16 @@ func (p *JSProducer) Disconnect() {
 // Publish publishes data to the configured subject and waits for the server
 // ack.
 func (p *JSProducer) Publish(ctx context.Context, data []byte) (*jetstream.PubAck, error) {
+	if p == nil {
+		return nil, ErrNilProducer
+	}
 	return p.PublishMsg(ctx, p.Subject, data)
 }
 
 // PublishMsg publishes data to an explicit subject.
 func (p *JSProducer) PublishMsg(ctx context.Context, subject string, data []byte) (*jetstream.PubAck, error) {
 	if p == nil {
-		return nil, errors.New("publisher is nil")
+		return nil, ErrNilProducer
 	}
 	if !p.IsConnected() {
 		return nil, ErrProducerClosed
@@ -226,7 +228,7 @@ func (p *JSProducer) PublishMsg(ctx context.Context, subject string, data []byte
 func (p *JSProducer) PublishJSON(ctx context.Context, data interface{}) (*jetstream.PubAck, error) {
 	payload, err := json.Marshal(data)
 	if err != nil {
-		if p.Logger != nil {
+		if p != nil && p.Logger != nil {
 			p.Logger.Error(err, "Failed to marshal JSON for JetStream publish", nil)
 		}
 		return nil, err
@@ -242,7 +244,7 @@ func (p *JSProducer) PublishJSON(ctx context.Context, data interface{}) (*jetstr
 // the futures still pending when it closes the connection.
 func (p *JSProducer) PublishAsync(ctx context.Context, subject string, data []byte) (jetstream.PubAckFuture, error) {
 	if p == nil {
-		return nil, errors.New("publisher is nil")
+		return nil, ErrNilProducer
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
