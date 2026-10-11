@@ -65,9 +65,7 @@ func (c *ServerConfig) ValidateKeyPair() error {
 	if !c.TLSEnable {
 		return nil
 	}
-	key := c.TlsKeyCredential
-	keyPassword := key.Password != "" || key.PasswordEnvVar != "" || key.PasswordFile != ""
-	if (c.TLSCert == "") != (c.TLSKey == "") || (keyPassword && c.TLSCert == "") {
+	if incompleteKeyPair(c.TLSCert, c.TLSKey, c.TlsKeyCredential) {
 		return ErrTLSIncompleteKeyPair
 	}
 	return nil

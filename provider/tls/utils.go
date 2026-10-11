@@ -114,6 +114,14 @@ func ParseTLSVersion(version string) (uint16, error) {
 	return 0, ErrInvalidTlsVersion
 }
 
+// incompleteKeyPair reports a certificate without its key, a key without its certificate, or
+// a key password without both: the rule ClientConfig.ValidateEnabled and
+// ServerConfig.ValidateKeyPair share
+func incompleteKeyPair(cert, key string, cred TlsKeyCredential) bool {
+	keyPassword := cred.Password != "" || cred.PasswordEnvVar != "" || cred.PasswordFile != ""
+	return (cert == "") != (key == "") || (keyPassword && cert == "")
+}
+
 // IsEmpty returns true if credential source is empty
 func (c TlsKeyCredential) IsEmpty() bool {
 	return strings.TrimSpace(c.Password) == "" &&

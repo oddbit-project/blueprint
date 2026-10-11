@@ -68,7 +68,7 @@ func (c *ClientConfig) ValidateEnabled() error {
 		return ErrTLSNotEnabled
 	}
 	// past the check above, any certificate, key or key password is set with TLSEnable
-	if (c.TLSCert == "") != (c.TLSKey == "") || (keyPassword && c.TLSCert == "") {
+	if incompleteKeyPair(c.TLSCert, c.TLSKey, c.TlsKeyCredential) {
 		return ErrTLSIncompleteKeyPair
 	}
 	return nil

@@ -105,8 +105,8 @@ With `TLSEnable`, `TLSConfig()` loads the server certificate only when both `TLS
 `ValidateKeyPair()` returns `ErrTLSIncompleteKeyPair` for a `TLSCert` without `TLSKey`, a `TLSKey` without `TLSCert`,
 or a key password without both; without it, such a server failed only when it started, with an error naming no setting.
 `TLSEnable` with no certificate settings at all is still accepted, and `ValidateKeyPair()` checks nothing without
-`TLSEnable`. `httpserver.ServerConfig.Validate()` calls it, and so `httpserver.NewServer` and the prometheus provider
-reject such a config; the metrics provider keeps its own stricter check, `ErrMissingTLSCert`, which also rejects
+`TLSEnable`. `httpserver.ServerConfig.Validate()` calls it, and so `httpserver.NewServer`, and the prometheus provider once
+it requires that httpserver release, reject such a config; the metrics provider keeps its own stricter check, `ErrMissingTLSCert`, which also rejects
 `TLSEnable` without a pair (#128).
 
 The key password is read from the first non-empty source: `Password`, then `PasswordEnvVar`, then `PasswordFile`.

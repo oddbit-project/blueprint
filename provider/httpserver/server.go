@@ -80,7 +80,7 @@ func (c *ServerConfig) Validate() error {
 	if c.Port < 0 || c.Port > 65535 {
 		return errors.New("port must be between 0 and 65535")
 	}
-	if err := c.ServerConfig.ValidateKeyPair(); err != nil {
+	if err := c.ValidateKeyPair(); err != nil {
 		return err
 	}
 	if c.ReadTimeout <= 0 {
