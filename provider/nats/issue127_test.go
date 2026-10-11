@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +26,19 @@ func TestIssue127_JSONDrainTimeoutSetsConnOption(t *testing.T) {
 	assert.Equal(t, 1500*time.Millisecond, p.Conn.Opts.DrainTimeout)
 }
 
+func TestIssue127_GoDrainTimeoutSetsConnOption(t *testing.T) {
+	url, _ := ackServer(t, nil)
+	cfg := &JSProducerConfig{
+		JSConnectionConfig: JSConnectionConfig{URL: url, AuthType: AuthTypeNone},
+		Subject:            "issue114",
+		DrainTimeout:       2500,
+	}
+	p, err := NewJSProducer(cfg, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { p.Conn.Close() })
+	assert.Equal(t, 2500*time.Millisecond, p.Conn.Opts.DrainTimeout)
+}
+
 func TestIssue127_DisconnectBoundedByConfiguredDrainTimeout(t *testing.T) {
 	url, published := ackServer(t, nil)
 	p := jsProducer127(t, url, `,"drainTimeout":300`)
@@ -36,7 +50,9 @@ func TestIssue127_DisconnectBoundedByConfiguredDrainTimeout(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Disconnect did not return within 5s with drainTimeout 300ms")
 	}
-	assert.GreaterOrEqual(t, time.Since(start), 300*time.Millisecond, "Disconnect returned before the drain timeout")
+	elapsed := time.Since(start)
+	assert.GreaterOrEqual(t, elapsed, 300*time.Millisecond, "Disconnect returned before the drain timeout")
+	assert.Less(t, elapsed, 300*time.Millisecond+time.Second, "Disconnect outlasted the drain timeout")
 	select {
 	case <-paf.Err():
 	case <-time.After(time.Second):
@@ -48,5 +64,5 @@ func TestIssue127_DisconnectBoundedByConfiguredDrainTimeout(t *testing.T) {
 func TestIssue127_NoDrainTimeoutKeepsDefault(t *testing.T) {
 	url, _ := ackServer(t, nil)
 	p := jsProducer127(t, url, ``)
-	assert.Equal(t, 30*time.Second, p.Conn.Opts.DrainTimeout)
+	assert.Equal(t, nats.DefaultDrainTimeout, p.Conn.Opts.DrainTimeout)
 }

@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - `JSProducerConfig.DrainTimeout` (json `drainTimeout`, milliseconds) bounds how long
   `JSProducer.Disconnect` waits for the acks of pending `PublishAsync` calls. It defaults to
-  nats.go's 30 seconds, as before. Set it below the process's shutdown deadline, leaving room
+  nats.go's 30 seconds. Set it below the process's shutdown deadline, leaving room
   for closing the connection afterwards: a socket write to a server that stopped reading can
   add up to the 1-minute write timeout. `JSConsumerConfig` has
   no such setting, since `JSConsumer.Disconnect` does not drain (#127).
