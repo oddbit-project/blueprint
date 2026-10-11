@@ -46,6 +46,16 @@ func handshakeServer(t *testing.T) string {
 	return "nats://" + ln.Addr().String()
 }
 
+// waitDone waits for done to be closed, failing the test with what after 10 seconds
+func waitDone(t *testing.T, done <-chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal(what)
+	}
+}
+
 func TestIssue105_DefaultPingAndFlusher(t *testing.T) {
 	url := handshakeServer(t)
 
