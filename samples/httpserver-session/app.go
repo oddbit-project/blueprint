@@ -59,8 +59,7 @@ func (a *Application) Build() {
 
 	// register api server shutdown
 	blueprint.RegisterDestructor(func() error {
-		_ = server.Stop(a.Context)
-		return nil
+		return server.Stop(blueprint.ShutdownContext())
 	})
 
 	// Start http server
