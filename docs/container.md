@@ -30,10 +30,8 @@ function to close log files opened by file logging.
 package main
 
 import (
-	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/oddbit-project/blueprint"
 	"github.com/oddbit-project/blueprint/config/provider"
@@ -57,9 +55,7 @@ func main() {
 
 	// executed by Shutdown(), in reverse registration order
 	blueprint.RegisterDestructor(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		return srv.Shutdown(ctx)
+		return srv.Shutdown(blueprint.ShutdownContext())
 	})
 
 	// Run() never returns; the process exits when a signal is received
@@ -205,6 +201,26 @@ and logged once with the message `"Error while shutting down"`.
 When using `Container.Run`, `Shutdown` is invoked automatically on `SIGINT`, `SIGTERM` and `SIGHUP`,
 when the application context is cancelled, and by `AbortFatal`.
 
+A destructor that stops something with a deadline (`http.Server.Shutdown`, `PeriodicRunner.Stop`)
+passes it `ShutdownContext()`. That context is not cancelled when the destructors start, and its
+deadline is the shutdown timeout (`DefaultShutdownTimeout`, 5s; change it with `SetShutdownTimeout`)
+counted from the start of `Shutdown`, shared by all destructors. `Shutdown` does not enforce the
+timeout: a destructor that does not use `ShutdownContext` runs as long as it takes. Keep the timeout
+below the grace period of whatever stops the process (`docker stop`: 10s, Kubernetes: 30s), or the
+destructors after a slow one are killed before they run.
+
+```go
+blueprint.SetShutdownTimeout(10 * time.Second)
+blueprint.RegisterDestructor(func() error {
+	return server.Shutdown(blueprint.ShutdownContext())
+})
+```
+
+Do not pass `GetContext()` instead. On a signal or a cancelled application context, it is already
+cancelled when the destructors run, so `server.Shutdown` returns `context.Canceled` at once and requests
+in flight are dropped. On `AbortFatal`, or a direct `Shutdown` call, it is still live and has no deadline,
+so `server.Shutdown` waits as long as the slowest request.
+
 ### Aborting on Fatal Errors
 
 `AbortFatal` is designed for inline error checks during application setup. It does nothing when the
@@ -315,6 +331,28 @@ with `errors.Join` and logged at error level. If `arg` is not nil, it is then lo
 zerolog logger at fatal level, which exits the process with code 1; this happens on every call with a
 non-nil `arg`, including when the destructors have already run.
 
+#### ShutdownContext
+
+```go
+func ShutdownContext() context.Context
+```
+
+Returns the context destructors pass to `Shutdown`/`Stop` calls; call it from a destructor, since
+elsewhere it may run before `Shutdown` has started. While `Shutdown` runs the destructors,
+it has one deadline, the shutdown timeout counted from the start of `Shutdown`, shared by all
+destructors. Before the first `Shutdown` it returns `context.Background()`; once `Shutdown` has run the
+destructors, it returns a cancelled context.
+
+#### SetShutdownTimeout
+
+```go
+func SetShutdownTimeout(d time.Duration)
+```
+
+Sets the deadline of `ShutdownContext` for the next `Shutdown`, counted from its start. The default is
+`DefaultShutdownTimeout` (5s). A `d` of zero or less gives destructors an already expired context. Keep
+it below the grace period of whatever stops the process.
+
 ### Methods
 
 #### Register
@@ -347,7 +385,8 @@ Reports whether a service is registered under `name`. Thread-safe.
 func (c *Container) GetContext() context.Context
 ```
 
-Returns the application context (`c.Context`).
+Returns the application context (`c.Context`). On a signal it is already cancelled when the destructors
+run, and on `AbortFatal` it has no deadline, so destructors use `ShutdownContext` for shutdown deadlines.
 
 #### Run
 
@@ -383,6 +422,9 @@ immediately. `Terminate` does **not** run destructors - call `Shutdown` first if
 - **Graceful shutdown from application code.** Calling `CancelCtx()` while `Run` is active runs the
   destructors and exits with code `0`. On a signal, the context is cancelled before the destructors run,
   so goroutines watching `Context` can start winding down while resources are being released.
+- **`GetContext()` is not a shutdown deadline.** On a signal it is cancelled before the destructors run,
+  so `server.Shutdown(app.GetContext())` returns `context.Canceled` at once and drops requests in flight;
+  on `AbortFatal` it has no deadline. Pass `ShutdownContext()` instead.
 - **`os.Exit` semantics apply.** `Terminate` and the fatal log in `Shutdown` call `os.Exit`: deferred
   functions do not run, and goroutines watching the application context are not waited for.
 - **`RegisterDestructor` during or after `Shutdown` is a no-op**, and `GetDestructorManager` returns `nil`

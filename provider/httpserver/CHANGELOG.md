@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The `Server.Start` doc comment's example passed the application context to `Shutdown` in a destructor.
+  That context is already cancelled when the destructors run on a signal, so the server dropped requests
+  in flight. The example now uses `context.WithTimeout(context.Background(), …)`; with core that has
+  `blueprint.ShutdownContext()`, use that instead (#145).
+
 ## [v0.11.0] - 2026-10-11
 
 Requires Blueprint core v0.15.0. Requires `provider/jwtprovider` v0.9.0, `provider/hmacprovider` v0.9.0 and `provider/htpasswd` v0.9.0.

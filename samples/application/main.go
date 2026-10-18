@@ -84,7 +84,7 @@ func (a *Application) Build() {
 func (a *Application) Run() {
 	// register http destructor callback
 	blueprint.RegisterDestructor(func() error {
-		return a.httpServer.Shutdown(a.container.GetContext())
+		return a.httpServer.Shutdown(blueprint.ShutdownContext())
 	})
 
 	// Start  application - http server
