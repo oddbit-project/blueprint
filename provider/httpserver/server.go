@@ -276,8 +276,11 @@ func (s *Server) Route() *gin.Engine {
 //
 //	func (a *SampleApplication) Run() {
 //	    // register http destructor callback
+//	    // the application context is already cancelled when destructors run
 //	    blueprint.RegisterDestructor(func() error {
-//	        return a.httpServer.Shutdown(a.container.GetContext())
+//	        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	        defer cancel()
+//	        return a.httpServer.Shutdown(ctx)
 //	    })
 //
 //	    // Start  application - http server

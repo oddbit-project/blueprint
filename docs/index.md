@@ -61,9 +61,10 @@ func main() {
         c.JSON(200, gin.H{"message": "hello"})
     })
 
-    // runs on shutdown, after the application context is cancelled
+    // runs on shutdown, after the application context is cancelled; ShutdownContext
+    // gives the server time to finish requests in flight
     blueprint.RegisterDestructor(func() error {
-        return server.Shutdown(app.GetContext())
+        return server.Shutdown(blueprint.ShutdownContext())
     })
 
     app.Run(func(any) error {

@@ -17,6 +17,24 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+### Added
+
+- `ShutdownContext()`, the context for destructors to pass to `Shutdown`/`Stop` calls: it is not
+  cancelled when the destructors start, and its deadline is the shutdown timeout counted from the start of
+  `Shutdown`, shared by all destructors. The timeout defaults to `DefaultShutdownTimeout` (5s); change it
+  with `SetShutdownTimeout`, keeping it below the grace period of whatever stops the process
+  (`docker stop`: 10s) (#145).
+
+### Fixed
+
+- The README, `docs/index.md`, the `provider/httpserver` `Start` example and the `application` and
+  `httpserver-session` samples passed the application context to `Shutdown`/`Stop` in a destructor. That
+  context is already cancelled when the destructors run, so the server gave up at once and dropped
+  requests in flight on every graceful stop. They now pass `ShutdownContext()` (the provider example, whose
+  module does not require this core yet, a `context.WithTimeout`). If your code has
+  `server.Shutdown(app.GetContext())` (or `Stop`) in a destructor, replace the context with
+  `blueprint.ShutdownContext()` (#145).
+
 ## [v0.15.0] - 2026-10-11
 
 ### Module versions
