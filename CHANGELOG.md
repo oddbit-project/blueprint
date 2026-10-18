@@ -17,6 +17,14 @@ For detailed changes in specific providers, see the individual CHANGELOG.md file
 
 ## [Unreleased]
 
+## [v0.16.0] - 2026-10-18
+
+### Module versions
+
+Core only: no provider is released. The providers are unchanged and work with core v0.16.0 at their
+current versions. `provider/httpserver`'s `[Unreleased]` section carries a doc-comment fix only (#145),
+which ships with its next release.
+
 ### Added
 
 - `ShutdownContext()`, the context for destructors to pass to `Shutdown`/`Stop` calls: it is not
