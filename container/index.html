@@ -773,6 +773,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#shutdowncontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ShutdownContext
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setshutdowntimeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SetShutdownTimeout
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3498,6 +3520,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#shutdowncontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ShutdownContext
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setshutdowntimeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SetShutdownTimeout
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3662,50 +3706,46 @@ function to close log files opened by file logging.</p>
 <div class="language-go highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">package</span><span class="w"> </span><span class="nx">main</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">import</span><span class="w"> </span><span class="p">(</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="s">"context"</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="s">"errors"</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="s">"net/http"</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="s">"time"</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint"</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint/config/provider"</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint/log"</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint/utils"</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">)</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="nx">utils</span><span class="p">.</span><span class="nx">PanicOnError</span><span class="p">(</span><span class="nx">log</span><span class="p">.</span><span class="nx">Configure</span><span class="p">(</span><span class="nx">log</span><span class="p">.</span><span class="nx">NewDefaultConfig</span><span class="p">()))</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">"my-app"</span><span class="p">)</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nx">cfg</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">provider</span><span class="p">.</span><span class="nx">NewJsonProvider</span><span class="p">(</span><span class="s">"config.json"</span><span class="p">)</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"failed to load configuration"</span><span class="p">)</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">        </span><span class="k">return</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="s">"errors"</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="s">"net/http"</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint"</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint/config/provider"</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint/log"</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="s">"github.com/oddbit-project/blueprint/utils"</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">)</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="kd">func</span><span class="w"> </span><span class="nx">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nx">utils</span><span class="p">.</span><span class="nx">PanicOnError</span><span class="p">(</span><span class="nx">log</span><span class="p">.</span><span class="nx">Configure</span><span class="p">(</span><span class="nx">log</span><span class="p">.</span><span class="nx">NewDefaultConfig</span><span class="p">()))</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="s">"my-app"</span><span class="p">)</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nx">cfg</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">provider</span><span class="p">.</span><span class="nx">NewJsonProvider</span><span class="p">(</span><span class="s">"config.json"</span><span class="p">)</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">        </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Error</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="s">"failed to load configuration"</span><span class="p">)</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">        </span><span class="k">return</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="nx">app</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">NewContainer</span><span class="p">(</span><span class="nx">cfg</span><span class="p">)</span>
 </span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="nx">app</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">NewContainer</span><span class="p">(</span><span class="nx">cfg</span><span class="p">)</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="nx">srv</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">http</span><span class="p">.</span><span class="nx">Server</span><span class="p">{</span><span class="nx">Addr</span><span class="p">:</span><span class="w"> </span><span class="s">":8080"</span><span class="p">}</span>
 </span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="nx">srv</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">http</span><span class="p">.</span><span class="nx">Server</span><span class="p">{</span><span class="nx">Addr</span><span class="p">:</span><span class="w"> </span><span class="s">":8080"</span><span class="p">}</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">    </span><span class="c1">// executed by Shutdown(), in reverse registration order</span>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">    </span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">RegisterDestructor</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">        </span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">cancel</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">WithTimeout</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span><span class="w"> </span><span class="mi">5</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">        </span><span class="k">defer</span><span class="w"> </span><span class="nx">cancel</span><span class="p">()</span>
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">srv</span><span class="p">.</span><span class="nx">Shutdown</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
-</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">    </span><span class="p">})</span>
-</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>
-</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">    </span><span class="c1">// Run() never returns; the process exits when a signal is received</span>
-</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="w">    </span><span class="c1">// or when the application context is cancelled</span>
-</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="w">    </span><span class="nx">app</span><span class="p">.</span><span class="nx">Run</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">a</span><span class="w"> </span><span class="kd">interface</span><span class="p">{})</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">        </span><span class="nx">c</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">a</span><span class="p">.(</span><span class="o">*</span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">Container</span><span class="p">)</span>
-</span><span id="__span-1-40"><a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">        </span><span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-41"><a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">srv</span><span class="p">.</span><span class="nx">ListenAndServe</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="nx">errors</span><span class="p">.</span><span class="nx">Is</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="nx">http</span><span class="p">.</span><span class="nx">ErrServerClosed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-1-42"><a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">                </span><span class="nx">c</span><span class="p">.</span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
-</span><span id="__span-1-43"><a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="w">            </span><span class="p">}</span>
-</span><span id="__span-1-44"><a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a><span class="w">        </span><span class="p">}()</span>
-</span><span id="__span-1-45"><a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span>
-</span><span id="__span-1-46"><a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="w">    </span><span class="p">})</span>
-</span><span id="__span-1-47"><a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a><span class="p">}</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">    </span><span class="c1">// executed by Shutdown(), in reverse registration order</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">    </span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">RegisterDestructor</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">srv</span><span class="p">.</span><span class="nx">Shutdown</span><span class="p">(</span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">ShutdownContext</span><span class="p">())</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">    </span><span class="p">})</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">    </span><span class="c1">// Run() never returns; the process exits when a signal is received</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">    </span><span class="c1">// or when the application context is cancelled</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">    </span><span class="nx">app</span><span class="p">.</span><span class="nx">Run</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">a</span><span class="w"> </span><span class="kd">interface</span><span class="p">{})</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">        </span><span class="nx">c</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">a</span><span class="p">.(</span><span class="o">*</span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">Container</span><span class="p">)</span>
+</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">        </span><span class="k">go</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">srv</span><span class="p">.</span><span class="nx">ListenAndServe</span><span class="p">();</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="nx">errors</span><span class="p">.</span><span class="nx">Is</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span><span class="w"> </span><span class="nx">http</span><span class="p">.</span><span class="nx">ErrServerClosed</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="w">                </span><span class="nx">c</span><span class="p">.</span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">            </span><span class="p">}</span>
+</span><span id="__span-1-40"><a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">        </span><span class="p">}()</span>
+</span><span id="__span-1-41"><a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="kc">nil</span>
+</span><span id="__span-1-42"><a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">    </span><span class="p">})</span>
+</span><span id="__span-1-43"><a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>The functions passed to <code>Run</code> are expected to be non-blocking: they are executed sequentially on the
 calling goroutine, and the signal loop only starts after all of them return. Long-running work
@@ -3820,11 +3860,27 @@ is discarded before the destructors run, so subsequent <code>Shutdown</code> cal
 and logged once with the message <code>"Error while shutting down"</code>.</p>
 <p>When using <code>Container.Run</code>, <code>Shutdown</code> is invoked automatically on <code>SIGINT</code>, <code>SIGTERM</code> and <code>SIGHUP</code>,
 when the application context is cancelled, and by <code>AbortFatal</code>.</p>
+<p>A destructor that stops something with a deadline (<code>http.Server.Shutdown</code>, <code>PeriodicRunner.Stop</code>)
+passes it <code>ShutdownContext()</code>. That context is not cancelled when the destructors start, and its
+deadline is the shutdown timeout (<code>DefaultShutdownTimeout</code>, 5s; change it with <code>SetShutdownTimeout</code>)
+counted from the start of <code>Shutdown</code>, shared by all destructors. <code>Shutdown</code> does not enforce the
+timeout: a destructor that does not use <code>ShutdownContext</code> runs as long as it takes. Keep the timeout
+below the grace period of whatever stops the process (<code>docker stop</code>: 10s, Kubernetes: 30s), or the
+destructors after a slow one are killed before they run.</p>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nx">blueprint</span><span class="p">.</span><span class="nx">SetShutdownTimeout</span><span class="p">(</span><span class="mi">10</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nx">blueprint</span><span class="p">.</span><span class="nx">RegisterDestructor</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">server</span><span class="p">.</span><span class="nx">Shutdown</span><span class="p">(</span><span class="nx">blueprint</span><span class="p">.</span><span class="nx">ShutdownContext</span><span class="p">())</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="p">})</span>
+</span></code></pre></div>
+<p>Do not pass <code>GetContext()</code> instead. On a signal or a cancelled application context, it is already
+cancelled when the destructors run, so <code>server.Shutdown</code> returns <code>context.Canceled</code> at once and requests
+in flight are dropped. On <code>AbortFatal</code>, or a direct <code>Shutdown</code> call, it is still live and has no deadline,
+so <code>server.Shutdown</code> waits as long as the slowest request.</p>
 <h3 id="aborting-on-fatal-errors">Aborting on Fatal Errors<a class="headerlink" href="#aborting-on-fatal-errors" title="Permanent link">&para;</a></h3>
 <p><code>AbortFatal</code> is designed for inline error checks during application setup. It does nothing when the
 error is <code>nil</code>; otherwise it runs the destructors, logs the error at fatal level and exits:</p>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nx">a</span><span class="p">.</span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">a</span><span class="p">.</span><span class="nx">Config</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">cfg</span><span class="p">))</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nx">a</span><span class="p">.</span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">cfg</span><span class="p">.</span><span class="nx">Validate</span><span class="p">())</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nx">a</span><span class="p">.</span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">a</span><span class="p">.</span><span class="nx">Config</span><span class="p">.</span><span class="nx">Get</span><span class="p">(</span><span class="nx">cfg</span><span class="p">))</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nx">a</span><span class="p">.</span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">cfg</span><span class="p">.</span><span class="nx">Validate</span><span class="p">())</span>
 </span></code></pre></div>
 <p>If a function passed to <code>Run</code> returns an error, <code>Run</code> calls <code>AbortFatal</code> with it.</p>
 <h2 id="lifecycle">Lifecycle<a class="headerlink" href="#lifecycle" title="Permanent link">&para;</a></h2>
@@ -3886,17 +3942,17 @@ error is <code>nil</code>; otherwise it runs the destructors, logs the error at 
 <h2 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h2>
 <h3 id="types">Types<a class="headerlink" href="#types" title="Permanent link">&para;</a></h3>
 <h4 id="runtimefn">RuntimeFn<a class="headerlink" href="#runtimefn" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">RuntimeFn</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">app</span><span class="w"> </span><span class="kd">interface</span><span class="p">{})</span><span class="w"> </span><span class="kt">error</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">RuntimeFn</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">app</span><span class="w"> </span><span class="kd">interface</span><span class="p">{})</span><span class="w"> </span><span class="kt">error</span>
 </span></code></pre></div>
 <p>Startup function executed by <code>Container.Run</code>. The <code>app</code> argument is the <code>*Container</code> on which <code>Run</code>
 was called.</p>
 <h4 id="container">Container<a class="headerlink" href="#container" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">Container</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="nx">Config</span><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">ConfigProvider</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nx">Context</span><span class="w">   </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nx">CancelCtx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">CancelFunc</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="c1">// contains unexported fields</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">}</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">Container</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span><span class="nx">Config</span><span class="w">    </span><span class="nx">config</span><span class="p">.</span><span class="nx">ConfigProvider</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nx">Context</span><span class="w">   </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nx">CancelCtx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">CancelFunc</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="c1">// contains unexported fields</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">}</span>
 </span></code></pre></div>
 <ul>
 <li><code>Config</code> - configuration provider passed to <code>NewContainer</code></li>
@@ -3905,23 +3961,23 @@ was called.</p>
 </ul>
 <h3 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h3>
 <h4 id="newcontainer">NewContainer<a class="headerlink" href="#newcontainer" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">NewContainer</span><span class="p">(</span><span class="nx">config</span><span class="w"> </span><span class="nx">config</span><span class="p">.</span><span class="nx">ConfigProvider</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">NewContainer</span><span class="p">(</span><span class="nx">config</span><span class="w"> </span><span class="nx">config</span><span class="p">.</span><span class="nx">ConfigProvider</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span>
 </span></code></pre></div>
 <p>Creates a container with the given configuration provider, a new cancellable application context
 and an empty service registry. The provider is not validated and may be <code>nil</code>.</p>
 <h4 id="registerdestructor">RegisterDestructor<a class="headerlink" href="#registerdestructor" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">RegisterDestructor</span><span class="p">(</span><span class="nx">fn</span><span class="w"> </span><span class="nx">callstack</span><span class="p">.</span><span class="nx">CallableFn</span><span class="p">)</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">RegisterDestructor</span><span class="p">(</span><span class="nx">fn</span><span class="w"> </span><span class="nx">callstack</span><span class="p">.</span><span class="nx">CallableFn</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Adds <code>fn</code> (<code>func() error</code>) to the global destructor list. Destructors are executed by <code>Shutdown</code> in
 reverse registration order. Calling <code>RegisterDestructor</code> while <code>Shutdown</code> is running, or after it has
 run, is a no-op: <code>fn</code> is silently discarded.</p>
 <h4 id="getdestructormanager">GetDestructorManager<a class="headerlink" href="#getdestructormanager" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">GetDestructorManager</span><span class="p">()</span><span class="w"> </span><span class="o">*</span><span class="nx">callstack</span><span class="p">.</span><span class="nx">CallStack</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">GetDestructorManager</span><span class="p">()</span><span class="w"> </span><span class="o">*</span><span class="nx">callstack</span><span class="p">.</span><span class="nx">CallStack</span>
 </span></code></pre></div>
 <p>Returns the global destructor <code>*callstack.CallStack</code> (package <code>github.com/oddbit-project/blueprint/types/callstack</code>).
 Returns <code>nil</code> after <code>Shutdown</code> has run.</p>
 <h4 id="shutdown">Shutdown<a class="headerlink" href="#shutdown" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">Shutdown</span><span class="p">(</span><span class="nx">arg</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">Shutdown</span><span class="p">(</span><span class="nx">arg</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Clears the destructor list and runs the destructors it held (in reverse order), so the destructors are
 executed only once. A call made while the destructors are running (from a destructor, or from another
@@ -3931,34 +3987,49 @@ to run. Destructor errors are combined
 with <code>errors.Join</code> and logged at error level. If <code>arg</code> is not nil, it is then logged with the global
 zerolog logger at fatal level, which exits the process with code 1; this happens on every call with a
 non-nil <code>arg</code>, including when the destructors have already run.</p>
+<h4 id="shutdowncontext">ShutdownContext<a class="headerlink" href="#shutdowncontext" title="Permanent link">&para;</a></h4>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">ShutdownContext</span><span class="p">()</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+</span></code></pre></div>
+<p>Returns the context destructors pass to <code>Shutdown</code>/<code>Stop</code> calls; call it from a destructor, since
+elsewhere it may run before <code>Shutdown</code> has started. While <code>Shutdown</code> runs the destructors,
+it has one deadline, the shutdown timeout counted from the start of <code>Shutdown</code>, shared by all
+destructors. Before the first <code>Shutdown</code> it returns <code>context.Background()</code>; once <code>Shutdown</code> has run the
+destructors, it returns a cancelled context.</p>
+<h4 id="setshutdowntimeout">SetShutdownTimeout<a class="headerlink" href="#setshutdowntimeout" title="Permanent link">&para;</a></h4>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">SetShutdownTimeout</span><span class="p">(</span><span class="nx">d</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Duration</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Sets the deadline of <code>ShutdownContext</code> for the next <code>Shutdown</code>, counted from its start. The default is
+<code>DefaultShutdownTimeout</code> (5s). A <code>d</code> of zero or less gives destructors an already expired context. Keep
+it below the grace period of whatever stops the process.</p>
 <h3 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h3>
 <h4 id="register">Register<a class="headerlink" href="#register" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Register</span><span class="p">(</span><span class="nx">name</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">service</span><span class="w"> </span><span class="kd">interface</span><span class="p">{})</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Register</span><span class="p">(</span><span class="nx">name</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">service</span><span class="w"> </span><span class="kd">interface</span><span class="p">{})</span>
 </span></code></pre></div>
 <p>Stores <code>service</code> under <code>name</code>, replacing any existing entry. Thread-safe.</p>
 <h4 id="get">Get<a class="headerlink" href="#get" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Get</span><span class="p">(</span><span class="nx">name</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="kd">interface</span><span class="p">{},</span><span class="w"> </span><span class="kt">bool</span><span class="p">)</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Get</span><span class="p">(</span><span class="nx">name</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="kd">interface</span><span class="p">{},</span><span class="w"> </span><span class="kt">bool</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Returns the service registered under <code>name</code> and whether it exists. Thread-safe.</p>
 <h4 id="exists">Exists<a class="headerlink" href="#exists" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Exists</span><span class="p">(</span><span class="nx">name</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="kt">bool</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Exists</span><span class="p">(</span><span class="nx">name</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="kt">bool</span>
 </span></code></pre></div>
 <p>Reports whether a service is registered under <code>name</code>. Thread-safe.</p>
 <h4 id="getcontext">GetContext<a class="headerlink" href="#getcontext" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">GetContext</span><span class="p">()</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">GetContext</span><span class="p">()</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
 </span></code></pre></div>
-<p>Returns the application context (<code>c.Context</code>).</p>
+<p>Returns the application context (<code>c.Context</code>). On a signal it is already cancelled when the destructors
+run, and on <code>AbortFatal</code> it has no deadline, so destructors use <code>ShutdownContext</code> for shutdown deadlines.</p>
 <h4 id="run">Run<a class="headerlink" href="#run" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Run</span><span class="p">(</span><span class="nx">mainFn</span><span class="w"> </span><span class="p">...</span><span class="nx">RuntimeFn</span><span class="p">)</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Run</span><span class="p">(</span><span class="nx">mainFn</span><span class="w"> </span><span class="p">...</span><span class="nx">RuntimeFn</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Executes the startup functions and blocks, handling OS signals and context cancellation as described
 in <a href="#lifecycle">Lifecycle</a>. Never returns.</p>
 <h4 id="abortfatal">AbortFatal<a class="headerlink" href="#abortfatal" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">err</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">AbortFatal</span><span class="p">(</span><span class="nx">err</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
 </span></code></pre></div>
 <p>No-op if <code>err</code> is nil. Otherwise calls <code>Shutdown(err)</code> followed by <code>Terminate(err)</code>.</p>
 <h4 id="terminate">Terminate<a class="headerlink" href="#terminate" title="Permanent link">&para;</a></h4>
-<div class="language-go highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Terminate</span><span class="p">(</span><span class="nx">err</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
+<div class="language-go highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kd">func</span><span class="w"> </span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">Container</span><span class="p">)</span><span class="w"> </span><span class="nx">Terminate</span><span class="p">(</span><span class="nx">err</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Cancels the application context (if not already cancelled) and exits the process with <code>os.Exit</code>: code
 <code>0</code> if <code>err</code> is nil, <code>-1</code> otherwise. Only the first call proceeds; concurrent or later calls return
@@ -3970,6 +4041,9 @@ immediately. <code>Terminate</code> does <strong>not</strong> run destructors - 
 <li><strong>Graceful shutdown from application code.</strong> Calling <code>CancelCtx()</code> while <code>Run</code> is active runs the
   destructors and exits with code <code>0</code>. On a signal, the context is cancelled before the destructors run,
   so goroutines watching <code>Context</code> can start winding down while resources are being released.</li>
+<li><strong><code>GetContext()</code> is not a shutdown deadline.</strong> On a signal it is cancelled before the destructors run,
+  so <code>server.Shutdown(app.GetContext())</code> returns <code>context.Canceled</code> at once and drops requests in flight;
+  on <code>AbortFatal</code> it has no deadline. Pass <code>ShutdownContext()</code> instead.</li>
 <li><strong><code>os.Exit</code> semantics apply.</strong> <code>Terminate</code> and the fatal log in <code>Shutdown</code> call <code>os.Exit</code>: deferred
   functions do not run, and goroutines watching the application context are not waited for.</li>
 <li><strong><code>RegisterDestructor</code> during or after <code>Shutdown</code> is a no-op</strong>, and <code>GetDestructorManager</code> returns <code>nil</code>
@@ -4011,7 +4085,7 @@ immediately. <code>Terminate</code> does <strong>not</strong> run destructors - 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="September 28, 2026 05:22:15 UTC">September 28, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 18, 2026 16:01:26 UTC">October 18, 2026</span>
   </span>
 
     
