@@ -17,7 +17,7 @@ require (
 	github.com/oddbit-project/blueprint/provider/franz v0.8.5
 	github.com/oddbit-project/blueprint/provider/hmacprovider v0.9.0
 	github.com/oddbit-project/blueprint/provider/htpasswd v0.9.0
-	github.com/oddbit-project/blueprint/provider/httpserver v0.9.4
+	github.com/oddbit-project/blueprint/provider/httpserver v0.11.0
 	github.com/oddbit-project/blueprint/provider/jwtprovider v0.9.0
 	github.com/oddbit-project/blueprint/provider/kafka v0.8.4
 	github.com/oddbit-project/blueprint/provider/metrics v0.8.2
